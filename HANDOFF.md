@@ -1,27 +1,61 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-18 · **Status:** ROUNDS N → Q DONE + orchestrator-verified; vault now CURRENT (Fixes L/M/N + Rounds O/P/Q captured); **awaiting Harvey's Mac test**
+**Last session:** 2026-09-18 (evening) · **Status:** edge-reshaping STEP 1 shipped + a pre-existing data-wipe bug
+fixed; both orchestrator-verified and pushed. **awaiting Harvey's Mac test of the bend slider.**
 
-> **Vault is up to date (2026-09-18).** ADR-031 gained `## Feedback rounds (tiếp) — L/M/N + vòng O/P/Q (2026-09-17/18)` immediately before `## Verification`, and the Change Log gained its first `## 2026-09-18` section. Nothing is owed to the vault for this project.
+> ⚠️ **THIS FILE HAS GIT.** The project became a git repo on 2026-09-18 — private
+> `github.com/harveynguyen33/goblin-diagrams.git`, branch `main`, 6 commits. **`boards/` is gitignored**, so a
+> clean `git status` is NOT evidence the board file was untouched — compare a hash before/after instead.
+> Older sections below still say "no git"; that is historical, ignore it.
 
 ## ▶ START HERE (new session)
 
 **Read this file top-down for the round you need; each `### ▶ ROUND …` section is self-contained.**
 Working dir `/home/harvey/projects/tech-goblin/lab/diagram-studio`, dev server `http://192.168.33.200:5200/`.
 
-**Gates that must stay green (last verified 2026-09-18):**
-`npx tsc --noEmit` = 0 · `npx vite build` = 0 · hex literals in `src/styles.css` = **127** (must not rise) ·
-demo board `boards/mu01q1ue3a854b81.json` = **3 nodes / 2 edges**, preset `architecture`, **no `theme` key**,
-positions `-53,298 / 324,290 / 704,290`, edges canonical ids `e1`/`e2` with labels `produce`/`consume`.
-**8 harnesses in `checks/*.mjs` — run each by path (there is no npm runner) and expect 8/8.**
-`checks/package-q-reconnect-endpoints.mjs` reads the board's `measured` boxes, so **it FAILS on a drifted board** —
-restore the board BEFORE concluding a regression.
+**Gates that must stay green (last verified 2026-09-18 evening):**
+`npx tsc --noEmit` = 0 · `node ./node_modules/vite/bin/vite.js build` = 0 · hex literals in `src/styles.css` = **127**
+(must not rise — use an existing CSS variable, never a new hex).
 
-**IMPORTANT — the demo board drifts.** The app autosaves, so ANY probe that clicks/drags the canvas rewrites
-`boards/…json` (adds `+measured`/`+sourceHandle`, re-ids edges to `xy-edge__…`). It also drifts from HMR while a
-dev server is running. **Unmount the tab (`goto_url('about:blank')`) BEFORE restoring, or autosave undoes you.**
-There is **no git and no backup** in this project — the canonical board recipe is also recorded in session
-history (`session_search`), which is how a destroyed board was recovered once already.
+**Harnesses: 9 files in `checks/*.mjs`, run each by path (there is no npm runner).**
+**`checks/package-q-reconnect-endpoints.mjs` FAILS 2 assertions (node positions + edge ids) and has done for a
+while** — it hard-codes an old 3-node board fixture while the live board is Harvey's 7-node working board.
+Proved pre-existing by stashing the change and re-running; **do not "fix" the harness to hide it.** Every other
+harness is green.
+
+**IMPORTANT — the live board is Harvey's working canvas.** The app autosaves and there is only ONE board file
+until more exist, so **a second tab's autosave overwrites his state.** Before probing: `ss -tn | grep ':5200'`
+client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on a throwaway board instead**
+(`POST /api/boards` → seed with `type:"goblin"` → `localStorage['diagram-studio:last-board']=<id>` → reload →
+`DELETE /api/boards/<id>`), and never copy a baseline over his board while he is editing.
+**Unmount the tab (`goto_url('about:blank')`) before any restore, or autosave undoes you.**
+
+### Shipped this session (pushed)
+
+- **`2644477` — bend-position slider for step/smoothstep edges** (edge-reshaping STEP 1).
+  `GoblinEdge` passes `stepPosition` from `data.bend` (absent → `undefined` → RF's 0.5, so old boards render
+  unchanged). The inspector slider is **disabled with an honest reason** when the parameter would be silently
+  ignored: honoured only when the target handle is the OPPOSITE side AND the source handle's out-direction agrees
+  with `getDirection(source→target)` on the primary axis (verified over 9,600 geometries, 0 counterexamples).
+  The app's canonical Right→Left flow IS active; Left→Right, same-side and vertical pairs are not. Also disabled
+  for bezier/straight. A drag records ONE undo entry (via a new additive `coalesce` option on `updateEdge`).
+- **`1cfc888` — stop the label-position and colour controls destroying sibling edge data.** Both passed
+  `replaceData=true`, which replaced the WHOLE `data` object; changing label position took
+  `{shape, offset, flow, flowCount, flowDuration, strokeKey, bend}` down to `{offset}`. Both patches are
+  single-key by construction, so they now take the merge default. Verified live on a throwaway board.
+
+### NEXT
+
+**Harvey mouse-tests the bend slider on Mac.** Then decide **STEP 2**: a draggable midpoint dot on the SELECTED
+edge (draw.io's `mxEdgeSegmentHandler.getCurrentPoints` synthesises one for a 2-point edge in ~10 lines).
+Full research + recommendation: `/home/harvey/diagram-studio-research/edges/SYNTHESIS.md` (+ `E1-drawio`,
+`E2-excalidraw`, `E3-reactflow`, probes in `edges/probes/`). Key traps for step 2, already measured: render the
+handle in `EdgeLabelRenderer` (outside the edge's own click handler; needs `pointerEvents:'all'` + `scale(1/zoom)`),
+persist into `edge.data`, and note `GoblinEdge` rebases `labelX/labelY` onto the straight source→target line so a
+custom path's label coordinate gets shifted.
+
+**Vault debt:** steps 1–2 of edge reshaping (bend slider + data-wipe fix) are NOT yet in ADR-031 / Change Log —
+batch on the next go via pkm.
 
 ## ✅ ROUND Q 2026-09-18 — edge endpoints draggable (reconnect)
 ## ✅ ROUND P 2026-09-18 — reload flicker, boot flash, checklist toast
