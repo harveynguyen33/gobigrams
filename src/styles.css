@@ -1383,7 +1383,61 @@ kbd {
    The shape's own 1.5px border is NOT part of the selection signal and keeps its
    normal weight in BOTH states — there is deliberately no `.selected` override
    on `.shape-frame` or on the `ShapeFrame` stroke. */
-.resize-line { border-width: 0 !important; }
+/* ITEM 1 (2026-09-18, approved mockup "A — wide edge band") — the mid-edge
+   controls get a real hit target. The corner grips were already reachable; the
+   four LINE controls were a 1px strip with NO hit area at all, and they were
+   ALSO buried: `elementFromPoint()` at an edge midpoint returned `.node-body`,
+   because `.node-body` is `position: relative` with no z-index and comes AFTER
+   the resize controls in the DOM, so it won the z-index:auto group on tree
+   order — the same class of bug FIX 3b fixed for the grips. Widening a control
+   that is still under the body would have changed nothing.
+   Z-INDEX 1, AND WHY IT IS THE ONLY VALUE. The control must clear the body but
+   stay under the two things it must never steal, so the band's z-index is
+   bounded on BOTH sides: `.node-body` paints in the positioned z-index:auto
+   group (0, and it wins ties on tree order because it comes later), the corner
+   grip is `z-index: 2` and the connect dot is `z-index: 5`. There is exactly
+   one integer strictly between those, so the ordering is:
+     connect dot (5)  >  corner grip (2)  >  line band (1)  >  node body (auto)
+   `position: absolute` is not restated here: RF's own `.react-flow__resize-control
+   { position: absolute }` (installed style.css:528) already supplies it, which
+   is what makes a z-index take effect at all. */
+.resize-line {
+  border-width: 0 !important;
+  z-index: 1;
+}
+/* The INVISIBLE hit band. `::after` is a pseudo-element, so it takes part in
+   HIT TESTING — the same device the corner grip below (inset: -6px) and the
+   coarse-pointer handle ring at EOF (inset: -5px) already use. `outline` and
+   `box-shadow` are paint-only and would NOT have worked here. The band paints
+   NOTHING at all — no background, no border, no box-shadow, no outline — so
+   the "exactly ONE selection-coloured painted line" invariant this file guards
+   is untouched: it adds a hit box, not a painted box.
+   PERPENDICULAR, AND CENTRED ON THE NODE'S EDGE. RF sizes these controls as a
+   cross: `.line.left/.right { width: 1px; height: 100% }` and
+   `.line.top/.bottom { height: 1px; width: 100% }` (installed style.css:590-617),
+   so the band must grow along the axis the control is thin in — horizontally
+   for the left/right pair, vertically for the top/bottom pair — and must grow
+   NOTHING along the other axis, where the parent already spans the full edge.
+   The parent box is already centred on the node's edge by RF's own transform
+   (`translate(-50%, 0)` on left/right, `translate(0, -50%)` on top/bottom), so
+   a 50% offset pulled back by half the band's own size centres the band on
+   that same edge line.
+   10px TOTAL, matching the corner grip's painted 10px above so the two
+   affordances feel the same size. NOTE the unit difference: RF keeps the
+   HANDLE variant screen-constant by writing `scale: max(1/zoom, 1)` inline
+   (`scaleSelector`, @xyflow/react/dist/esm/index.js:4851) but writes nothing
+   for the LINE variant, so the band is in node-local px and shrinks on screen
+   with the node at zoom < 1 while the grip does not. Kept node-local on
+   purpose: the band must track the node whose edge it grabs, exactly like the
+   node's own border, not the viewport. */
+.resize-line.left::after, .resize-line.right::after {
+  content: ''; position: absolute;
+  top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 10px;
+}
+.resize-line.top::after, .resize-line.bottom::after {
+  content: ''; position: absolute;
+  left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 10px;
+}
 /* C — FIX 3, "khó kéo thấy". The visible grip goes 8px → 10px, and it carries
    a bigger INVISIBLE hit area: `::after` is a pseudo-element, so it takes part
    in hit testing and its 6px negative insets grow the box to 22x22 — the
