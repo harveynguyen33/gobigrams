@@ -1,15 +1,24 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-18 (night) · **Status:** edge-reshaping **STEP 2 shipped** — a draw.io-style
-draggable midpoint on the selected edge. Orchestrator-verified live and pushed (**`6bb65c2`** on top of the
-coder's **`e1397c0`**). **awaiting Harvey's Mac test of the drag.**
+**Last session:** 2026-09-18 (late night) · **Status:** edge-reshaping **ROUND T** shipped — the midpoint drag
+now works on BOTH axes, the bend slider is gone, and the big endpoint circle no longer paints. Pushed as
+**`65d1927`**. **awaiting Harvey's re-test.**
 
-> **The bend SLIDER was geometrically INERT on his own board — his complaint was correct, and measured.**
-> `getSmoothStepPath`'s `stepPosition` slides the cross-bar along the split axis; between two nodes *level*
-> on the perpendicular axis that bar has zero length, so the parameter is discarded. Measured by
-> flattening both paths and comparing geometry: **`e1` (level right→left) = 0.000px across the whole
-> 0→1 sweep**, `e2` (0.5px stagger) = 0.50px, while a diagonal control moved 176px. The slider KEEPS its
-> UI and behaviour (it is real for diagonal edges) — only the drag supersedes it.
+> **ROUND S's drag only moved LEFT/RIGHT. Root cause, measured:** `bendAxis` derived the dragged coordinate
+> from the SPLIT the generator happens to use — and that flips at **0.001px** of stagger, so on any
+> non-pixel-level edge only one axis was reachable. A 600-geometry sweep then proved the generator READS
+> exactly one of `centerX`/`centerY` and **never both (0/600)**, so "store both and let the generator draw
+> it" could not work.
+>
+> **The rule that ships: no stored point → the generator (unchanged, parity 480/480). Stored point →
+> `freePath`, our own orthogonal staircase through BOTH coordinates.** The drag's axis comes from the
+> **pointer delta** (draw.io's real rule), locked once per gesture, with a `col-resize`/`row-resize` cursor.
+>
+> **ROUND T also:** the bend-position slider is DELETED (with `coalesce` / `bendDragging` / `.range-row`);
+> `.react-flow__edgeupdater` (the 38px "hình tròn to", r=14, ROUND Q) **paints nothing** — `fill/stroke: none`,
+> `opacity: 0`, reveal rules deleted — while `edgesReconnectable` + `RECONNECT_RADIUS` keep the silent hit
+> area, so reconnect still works. Auto-remove: releasing on the generator's own point drops the waypoint.
+> **`data.bend` (the old fraction) is still READ** so an old board renders unchanged.
 
 > ⚠️ **THIS FILE HAS GIT.** The project became a git repo on 2026-09-18 — private
 > `github.com/harveynguyen33/goblin-diagrams.git`, branch `main`. **`boards/` is gitignored**, so a
@@ -70,18 +79,28 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**Harvey mouse-tests the midpoint drag on Mac.** Click a step/smoothstep line → an orange dot appears at the
-middle of it → drag it (one axis) and the line follows. Undo restores it in ONE step.
-Known behaviours to expect, all measured: the handle is **off-axis to the line and vertical** on his level
-`e1` (the horizontal bar is collapsed there, so vertical is the only direction that can bend it); the
-**label moves with the drag** — unavoidable, because the handle is painted at the generator's own path
-midpoint, which IS the label's anchor; the handle shows **only on the selected edge**, and the click that
-selects is the click that reveals it.
+**Harvey re-tests the midpoint drag on Mac.** Click a step/smoothstep line → an orange dot appears → drag it
+**in any direction**: it now moves up/down AND left/right. Behaviour to expect:
+- The axis is chosen from the direction you pull first and **locks for that drag**, so the line stays square.
+  Pull it roughly sideways → it moves sideways; pull it roughly up/down → it moves up/down. The **cursor tells
+  you which** (`col-resize` / `row-resize`).
+- **Release it on the line's original path and the bend is dropped** (auto-remove, 10px) — the edge returns to
+  the clean routed look.
+- The handle shows **only on the selected edge**, and a click on empty canvas or Escape dismisses it.
+- The **label travels with the bend** (the handle is painted at the path's midpoint, which is what the label
+  anchors to).
+- On a `smoothstep` edge the label can sit up to ~12px off the line — that is the ROUNDED CORNER's arc centre,
+  exactly where the generator puts its own label. On `step` edges (the app's `consume` line) it is exact.
+- **The reconnect endpoint disc is gone deliberately** (~the big circle). Reconnecting still works — aim at the
+  endpoint itself; the hit area is still there, just unpainted.
 
-**Vault debt:** edge reshaping — the bend slider (STEP 1 + the data-wipe fix) AND the drag (STEP 2) are NOT
-yet in ADR-031 / Change Log. Batch on the next go via pkm. `checks/round-s-edge-bend.mjs` is the new harness
-(9 files in `checks/` now).
+**Vault debt:** edge reshaping — STEP 1/2 (ROUND S) AND ROUND T are NOT yet in ADR-031 / Change Log. Batch on
+the next go via pkm. `checks/round-s-edge-bend.mjs` covers a–j.
+**Stale harness:** `checks/package-q-reconnect-endpoints.mjs` now FAILS 13 (was 2): 11 of its assertions
+require the endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. It is left untouched as
+the record; do not "fix" it to hide the change — retire or rewrite it if reconnect paint ever returns.
 
+## ✅ ROUND T 2026-09-18 — 2-D midpoint drag, slider removed, endpoint circle unpainted
 ## ✅ ROUND S 2026-09-18 — draw.io-style draggable midpoint on the selected edge
 ## ✅ ROUND Q 2026-09-18 — edge endpoints draggable (reconnect)
 ## ✅ ROUND P 2026-09-18 — reload flicker, boot flash, checklist toast
