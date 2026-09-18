@@ -1,62 +1,63 @@
 /**
- * ROUND S — the maths of a draw.io-style midpoint drag.
+ * ROUND T — the maths of a FREE 2-D midpoint waypoint, draw.io's model.
  *
- * WHY THIS FILE EXISTS, and why it is pure (no React, no DOM):
- *
- * The bend SLIDER shipped in 2644477 is geometrically INERT on a level pair of
- * nodes. `getSmoothStepPath`'s `stepPosition` slides the step's cross-bar along
- * the split axis, and between two nodes level on the perpendicular axis that bar
- * has zero length — so the parameter is discarded and the drawn line is
- * identical at 0, 0.5 and 1. Harvey's board is exactly that (`e1`: a level
- * right→left pair, 212px apart, 0.000px across the whole sweep), which is why
- * the control reads as a lie. The slider keeps its UI and its behaviour — that is
- * what it is for.
- *
- * draw.io does something better: ONE draggable midpoint on the selected edge.
- * Its reference (`mxEdgeSegmentHandler.getCurrentPoints`) synthesises a point for
- * a 2-point edge, so ANY line is immediately draggable, and THE DRAG MOVES ALONG
- * ONE AXIS ONLY — the other coordinate is inherited. That single-axis rule is
- * the whole reason draw.io's control feels square.
+ * WHY THIS FILE EXISTS, and why it is pure (no React, no DOM): the rules below
+ * are the whole of the drag's geometry, so `checks/round-s-edge-bend.mjs` can run
+ * them in plain Node against the INSTALLED generator and nothing here can be
+ * wrong in a way the app hides.
  *
  * ---------------------------------------------------------------------------
- * THE FOUR GENERATOR FACTS THIS FILE IS BUILT ON, all read out of the installed
- * `@xyflow/system` and re-checked by `checks/round-s-edge-bend.mjs`:
+ * THE MEASURED ROOT CAUSE OF THE OLD ONE-AXIS MODEL (ROUND S, deleted here).
  *
- * 1. THE CENTRE IS READ ONLY IN THE OPPOSITE-HANDLE BRANCH (:1263). The other
- *    branch recomputes it outright (:1341), so a stored point there is a place
- *    the line never goes — hence `bendActive4`/`bendDraggable4` and
- *    `effectiveMid`.
- * 2. WHICH COORDINATE IS READ DEPENDS ON THE HANDLE AXIS. The bar is the
- *    VERTICAL split (reads `centerX`) when `sourceDir[dirAccessor] === currDir`
- *    (:1292), else the HORIZONTAL one (reads `centerY`, :1288-1291) — and
- *    `dirAccessor` comes from the SOURCE handle (:1250). So the same "do the
- *    handles point the same way" answer means opposite coordinates for a
- *    top/bottom pair and a left/right pair. Reading it off `agree` alone (the
- *    first attempt at this file) makes the drag write a coordinate the generator
- *    reads for something else, and the line just sits there. `bendAxis` derives
- *    it from the split actually used, and the harness is the proof.
- * 3. A COLLAPSED BAR CANNOT BE BENT BY THE GENERATOR AT ALL. When the bar's two
- *    ends coincide, any centre slides a zero-length segment: `getSmoothStepPath`
- *    is structurally unable to draw the detour. `customStepPath` draws it by
- *    hand from the same gapped points, with `getBend` replicated verbatim
- *    (:1363-1379) so the corners round the same way as every other edge.
- * 4. THE PATH'S LABEL IS THE PASSED CENTRE. `getPoints` returns `centerX`/
- *    `centerY` (:1361) and `centeredPath` passes both coordinates, so the label —
- *    and therefore the handle, which sits on it — is exactly the point handed
- *    over. That is what makes the handle stay on the line AND on the label: one
- *    point, computed once. `applyDrag` clears the coordinate the drag does NOT
- *    own, so that point is always on the bar and never drifts off the line when
- *    a node moves and the split choice changes under a stored value.
+ * ROUND S decided the drag's axis from the split `getSmoothStepPath` happens to
+ * use. Measured on the installed generator (`@xyflow/system`), dragging 90px:
+ *
+ *   e1  level right→left, 212px      barLen 0    axis 'v'  up/down 90.0px, left/right 0.0px
+ *   e2  right→left, 0.5px stagger    barLen >0   axis 'h'  up/down  0.0px, left/right 0.5px
+ *   any stagger ≥ 0.001px            barLen >0   axis 'h'  up/down  0.0px, left/right works
+ *
+ * The axis FLIPS at 0.001px of stagger: on every edge that is not pixel-level
+ * the dot could only move left/right — exactly the user's complaint, on a board
+ * whose live edge (`e1`) has 188px of vertical stagger.
+ *
+ * AND THE GENERATOR CANNOT BE MADE TO GIVE BOTH DIRECTIONS. A 600-geometry
+ * sweep that flipped `centerX` by 60 and then `centerY` by 60, watching which
+ * move changes the drawn path:
+ *
+ *   both coordinates move the line :   0  (0.0%)
+ *   only centerX moves it          : 290
+ *   only centerY moves it          : 309
+ *   neither (collapsed bar)        :   1
+ *
+ * `getSmoothStepPath` reads exactly ONE of the two coordinates, never both. So
+ * "store both coordinates and let the generator draw it" cannot work on ANY
+ * geometry, and the one-axis rule was a consequence of the generator's shape
+ * rather than of what the user wants.
+ *
+ * ---------------------------------------------------------------------------
+ * THE MODEL THAT REPLACES IT, and it is simpler:
+ *
+ *   NO stored bend point → the GENERATOR (unchanged, byte-identical).
+ *   A stored bend point  → `freePath`, OUR OWN orthogonal staircase, which
+ *                          reads BOTH coordinates.
+ *
+ * Parity is guaranteed by construction — an untouched board never leaves the
+ * generator — and it is the only way both directions can work.
+ *
+ * `getBend` below is replicated VERBATIM from the installed generator
+ * (index.mjs:1363-1379) so a hand-routed line rounds its corners exactly like
+ * every other edge on the board. The only `edgeBend` rules that survived ROUND S
+ * are the ones with a LIVE reader: `drawnMid` (the drag's base point),
+ * `plainMidpoint` (the generator's own default), `bendGate` (where a handle is
+ * offered at all) and `applyDrag` (the writer).
  * ---------------------------------------------------------------------------
  */
-import {getSmoothStepPath, Position} from '@xyflow/system';
-
 export type Pt = {x: number; y: number};
 export type Side4 = 'left' | 'right' | 'top' | 'bottom';
-/** The coordinate the drag owns. `'h'` = it writes `centerX`, `'v'` = `centerY`
- *  (see `bendAxis`, which derives this from the split the generator uses). */
+/** The coordinate a single drag owns. `'h'` = it writes `bendX`, `'v'` = `bendY`
+ *  — decided from the POINTER delta (`dragAxis`), never from the routing. */
 export type BendAxis = 'h' | 'v';
-export type BendPhase = 'start' | 'move';
+export type BendPhase = 'start' | 'move' | 'end';
 export type BendGeo = {s: Pt; t: Pt; sp: Side4; tp: Side4};
 
 /** The generator's own `handleDirections` table (index.mjs:1223). */
@@ -86,96 +87,54 @@ const gapped = (geo: BendGeo, gap = STEP_GAP_PX) => {
 /** The generator's `distance` helper (index.mjs:1235). */
 const distance = (a: Pt, b: Pt) => Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
-/** The generator's own routing decision (index.mjs:1245-1251, :1263, :1292-1297).
- *
- *  `usedVertical` is the split the path is actually built from — `agree` XOR
- *  `dirAccessor === 'x'`, per facts 2 above. `bar` is that split's two ends: the
- *  segment the centre slides. `barLen === 0` means the bar is a point and the
- *  centre cannot move the line (fact 3). */
+/** The generator's own routing facts, kept ONLY for `drawnMid`'s "what the
+ *  generator would have drawn" default. `dirAccessor` is the axis the SOURCE
+ *  handle points along (index.mjs:1250), which is what the generator's
+ *  `stepPosition` fraction slides along; `sg`/`tg` are the gapped endpoints. */
 function splitInfo(geo: BendGeo) {
   const {sg, tg} = gapped(geo);
   const dirAccessor: 'x' | 'y' = geo.sp === 'left' || geo.sp === 'right' ? 'x' : 'y';
-  const currDir = dirAccessor === 'x'
-    ? (sg.x < tg.x ? 1 : -1)
-    : (sg.y < tg.y ? 1 : -1);
-  const agree = SIDE_OUT[geo.sp][dirAccessor] === currDir;
-  const usedVertical = agree === (dirAccessor === 'x');
-  const bar: [Pt, Pt] = usedVertical
-    ? [{x: 0, y: sg.y}, {x: 0, y: tg.y}]
-    : [{x: sg.x, y: 0}, {x: tg.x, y: 0}];
-  return {sg, tg, dirAccessor, currDir, agree, usedVertical, bar, barLen: distance(bar[0], bar[1])};
-}
-
-/** Does a bend position reach the path at all? The existing `bendActive`
- *  predicate, generalised onto the geometry: the opposite-handle case only
- *  (fact 1), and the source handle must point along the run on BOTH readings —
- *  `getDirection`'s overall direction (`:1229`) and the split selector
- *  (`:1292`) — or the generator discards the fraction. This is the SLIDER's
- *  gate: a fraction only ever writes the PRIMARY coordinate, which is narrower
- *  than "a drag can move it" (see `bendDraggable4`). */
-export function bendActive4(geo: BendGeo): boolean {
-  if (OPPOSITE_SIDE[geo.sp] !== geo.tp) return false;
-  const {sg, tg, dirAccessor, currDir} = splitInfo(geo);
-  const od = SIDE_OUT[geo.sp];
-  const overall = dirAccessor === 'x'
-    ? (sg.x < tg.x ? {x: 1, y: 0} : {x: -1, y: 0})
-    : (sg.y < tg.y ? {x: 0, y: 1} : {x: 0, y: -1});
-  const axis = overall.x !== 0 ? 'x' : 'y';
-  return od[axis] === overall[axis] && od[dirAccessor] === currDir;
-}
-
-/** Can the midpoint drag move this line at all? Every OPPOSITE-side geometry —
- *  the whole set of shapes where the generator consults a centre at all
- *  (fact 1). Within it, either the bar is a real segment and the generator's own
- *  centre moves the line, or the bar has collapsed and `customStepPath` draws the
- *  detour. This is the HANDLE's gate, and `bendAxis` names the coordinate. */
-export function bendDraggable4(geo: BendGeo): boolean {
-  return OPPOSITE_SIDE[geo.sp] === geo.tp;
-}
-
-/** The shape `getSmoothStepPath` cannot bend: the bar it uses has both ends in
- *  the same place, so the centre slides a zero-length segment (fact 3). */
-export function collapsed4(geo: BendGeo): boolean {
-  return splitInfo(geo).barLen === 0;
-}
-
-/** Can the generator DRAW the point the drag writes — i.e. is the bar a real
- *  segment? False only on a collapsed bar, which takes the hand-built route. */
-export function axisLive(geo: BendGeo): boolean {
-  return splitInfo(geo).barLen > 0;
-}
-
-/** The coordinate the drag owns: the one the used split reads (`:1279-1291`),
- *  or — on a collapsed bar — the PERPENDICULAR one, the only coordinate left
- *  that can bend the line. `'h'` = writes `centerX`, `'v'` = writes `centerY`. */
-export function bendAxis(geo: BendGeo): BendAxis {
-  const {usedVertical, barLen, dirAccessor} = splitInfo(geo);
-  if (barLen > 0) return usedVertical ? 'h' : 'v';
-  return dirAccessor === 'x' ? 'v' : 'h';
-}
-
-/** THE GATE, for a caller that already holds the geometry — the edge renderer,
- *  which is handed both anchors and both handle sides as props. `App.bendSupport`
- *  is the same rule expressed for an `Edge` plus the board's nodes, so the drag
- *  handle and the inspector's slider are enabled together. */
-export function bendGate(geo: BendGeo): {active: boolean; axis: BendAxis | null} {
-  return bendDraggable4(geo) ? {active: true, axis: bendAxis(geo)} : {active: false, axis: null};
+  return {sg, tg, dirAccessor};
 }
 
 /** The plain coordinate midpoint of the gapped endpoints — EXACTLY what the
  *  generator computes for `stepPosition: 0.5` (:1266 / :1272). This is the point
- *  a board with no stored bend must hand over, so that adding this feature
- *  changes no existing path by a fraction of a pixel. */
+ *  an edge with nothing stored is drawn through, so it is also the coordinate
+ *  `freePath` invents for an axis the user has not dragged yet — a drag on one
+ *  axis must not move the other. */
 export function plainMidpoint(geo: BendGeo): Pt {
   const {sg, tg} = gapped(geo);
   return {x: (sg.x + tg.x) / 2, y: (sg.y + tg.y) / 2};
 }
 
-/** The drawn W for an edge: the stored coordinate for the axis the drag owns,
- *  the fraction `stepPosition` would have produced for the axis it does NOT, and
- *  the generator's own midpoint otherwise. Keeping the fraction here is what
- *  makes the step-position slider keep working through this renderer (harness
- *  (a2)) and what keeps an untouched board byte-identical. */
+/** Is a midpoint handle offered on this geometry at all? Every OPPOSITE-side
+ *  pair — the set of shapes where a waypoint reads as a bend of the line rather
+ *  than as a second elbow on the same side. The drag itself is 2-D everywhere,
+ *  so this is the ONLY condition left; the old axis model's collapsed-bar
+ *  special-casing is gone with the axis model that needed it.
+ *
+ *  NOTE this is the HANDLE's gate, not the renderer's: the renderer routes
+ *  through `freePath` whenever a bend key is STORED (`needsCustom`), including a
+ *  key an older board stored on a geometry that would not offer a handle today. */
+export function bendDraggable4(geo: BendGeo): boolean {
+  return OPPOSITE_SIDE[geo.sp] === geo.tp;
+}
+
+/** `bendDraggable4` as the renderer/reporting shape (a caller that wants the
+ *  boolean directly uses `bendDraggable4`). */
+export function bendGate(geo: BendGeo): {active: boolean} {
+  return {active: bendDraggable4(geo)};
+}
+
+/** The drawn W for an edge: the stored coordinate per axis, the fraction
+ *  `stepPosition` would have produced for an axis with nothing stored, and the
+ *  generator's own midpoint otherwise.
+ *
+ *  TWO live readers, and they are the two that must agree:
+ *   * the DRAG's base point — where the handle sits when the gesture starts;
+ *   * an edge an older board stored a `bend` FRACTION on but never a point: that
+ *     fraction still renders through the generator (`stepPosition`), so the drag
+ *     must start from where the line is, not from the plain midpoint. */
 export function drawnMid(geo: BendGeo, bendX?: number, bendY?: number, bend?: number): Pt {
   const {sg, tg, dirAccessor} = splitInfo(geo);
   const f = bend ?? 0.5;
@@ -185,59 +144,59 @@ export function drawnMid(geo: BendGeo, bendX?: number, bendY?: number, bend?: nu
   };
 }
 
-/** The W the path actually draws through: the free point where a centre is
- *  consulted, the generator's own midpoint where it is not (fact 1 — a stored
- *  point there would be a place the line never goes). */
-export function effectiveMid(geo: BendGeo, W: Pt): Pt {
-  return bendDraggable4(geo) ? W : plainMidpoint(geo);
-}
+/** The bend keys an edge's data may carry. `bend` is READ-ONLY legacy: nothing
+ *  writes it any more (the slider that owned it is gone), but an old board's
+ *  fraction must keep rendering exactly as it did. */
+export type BendData = {bend?: number; bendX?: number; bendY?: number};
 
-/** The centre of the bar for a given W — which is also the point the generator
- *  reports as the label when the bar is the coordinate it reads. On an untouched
- *  edge this IS the plain midpoint: the synthesised handle draw.io starts the
- *  user from, in the middle of the line, with nothing stored. */
-export function stepMidpoint(geo: BendGeo, W: Pt): Pt {
-  const {sg, tg} = gapped(geo);
-  return bendAxis(geo) === 'h'
-    ? {x: W.x, y: (sg.y + tg.y) / 2}
-    : {x: (sg.x + tg.x) / 2, y: W.y};
-}
-
-/** The exact object a drag writes: the owned key ONLY. Modelled here rather than
- *  inline in `onBend` so the harness exercises the real writer — a patch that
- *  carried the other coordinate too would let a drag leak into a coordinate the
- *  generator reads for its own purposes. */
+/** The exact object a drag writes: the owned key ONLY. Modelled here rather
+ *  than inline in `onBend` so the harness exercises the real writer — a patch
+ *  that carried the other coordinate would let a drag leak into the axis the
+ *  pointer never moved along. */
 export function dragPatch(axis: BendAxis, W: Pt): {bendX?: number; bendY?: number} {
   return axis === 'h' ? {bendX: W.x} : {bendY: W.y};
 }
 
-/** The bend keys an edge's data may carry. */
-export type BendData = {bend?: number; bendX?: number; bendY?: number};
-
-/** An edge's data after a drag: the owned key written, and BOTH stale keys
- *  dropped — the `stepPosition` fraction, and the coordinate for the axis this
- *  drag does not own.
+/** An edge's data after a drag: the owned key written, the OTHER axis's key
+ *  PRESERVED, and the legacy fraction dropped.
  *
- *  The fraction goes because once an absolute point is stored the generator
- *  stops reading it (`:1266` / `:1272` short-circuit on the passed centre), and a
- *  value nothing reads is the dead control this round exists to remove. The
- *  OTHER axis's key goes because a drag writes one coordinate and the other is
- *  inherited: leaving a stale per-axis coordinate behind would let a node move
- *  change which split the generator uses, promote that stale value into the one
- *  it reads, and throw the label off the bar and the handle off the line.
+ *  Both coordinates are meaningful now — `freePath` reads `W.x` AND `W.y` — so
+ *  a drag must not clear the key it does not own: clearing it would snap the
+ *  other axis back to the generator's default mid-drag. (ROUND S deleted it, and
+ *  ROUND S was wrong to: the generator read one coordinate, `freePath` reads
+ *  two.)
  *
- *  (The step-position SLIDER is untouched: it still writes `bend`, and `drawnMid`
- *  still honours it — only a DRAG supersedes it.) */
+ *  `bend` goes because the slider that wrote it is gone and an absolute point
+ *  supersedes it; `drawnMid` still honours a stored fraction for an old board,
+ *  so this is the only place the key is ever removed besides a reconnect. */
 export function applyDrag<T extends BendData>(data: T, axis: BendAxis, W: Pt): T {
   const out = {...data, ...dragPatch(axis, W)} as T;
   delete out.bend;
-  if (axis === 'h') delete out.bendY; else delete out.bendX;
   return out;
 }
 
+/** draw.io's axis rule: the axis the POINTER is moving along wins, decided from
+ *  the delta alone. `Math.abs(dx) >= Math.abs(dy)` makes a 45° drag horizontal
+ *  and a mostly-vertical one vertical, which is what a user means by "I pulled
+ *  it up".
+ *
+ *  The geometry is deliberately NOT consulted — that was the ROUND S bug. The
+ *  parameter stays in the signature so every call site reads the same shape
+ *  (geometry, delta) and a future rule can use it without a call-site churn. */
+export function dragAxis(_geo: BendGeo, dx: number, dy: number): BendAxis {
+  return Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+}
+
+/** ROUND T — the auto-remove threshold (px, FLOW units). `App.onBend('end')`
+ *  deletes BOTH stored keys when the released waypoint is within this distance
+ *  of `plainMidpoint` — the generator's own default point — so a user can put an
+ *  edge back to a clean routed look instead of leaving a point that bends
+ *  nothing. 10px is far below any deliberate bend and above pointer noise. */
+export const BEND_SNAP_PX = 10;
+
 /** `getBend` replicated from the installed generator (index.mjs:1363-1379)
- *  VERBATIM, so the hand-built path below rounds its corners exactly like every
- *  other edge on the board — including the collinear early return. */
+ *  VERBATIM, so `freePath` rounds its corners exactly like every other edge on
+ *  the board — including the collinear early return. */
 function getBend(a: Pt, b: Pt, c: Pt, size: number): string {
   const bendSize = Math.min(distance(a, b) / 2, distance(b, c) / 2, size);
   const {x, y} = b;
@@ -252,67 +211,52 @@ function getBend(a: Pt, b: Pt, c: Pt, size: number): string {
   return `L ${x},${y + bendSize * yDir}Q ${x},${y} ${x + bendSize * xDir},${y}`;
 }
 
-/** The step path for the geometry the generator cannot express (fact 3): the
- *  detour is placed at the free coordinate, between the same gapped points and
- *  with the same corner treatment, so the line looks like the generator drew it.
- *  Its label is the bar's centre, which is on that detour by construction. With
- *  W at the midpoint every point is collinear, `getBend` returns the straight
- *  `L`, and the result traces the same line the generator draws (harness (a)). */
-export function customStepPath(geo: BendGeo, W: Pt, borderRadius: number): [string, number, number] {
-  const {sg, tg, usedVertical} = splitInfo(geo);
-  const free = usedVertical ? W.y : W.x;
-  const a = usedVertical ? {x: sg.x, y: free} : {x: free, y: sg.y};
-  const b = usedVertical ? {x: tg.x, y: free} : {x: free, y: tg.y};
+/** THE FREE ROUTE — an orthogonal staircase through the waypoint, using BOTH of
+ *  `W.x` and `W.y`. This is what makes up/down AND left/right reachable on the
+ *  same edge, which `getSmoothStepPath` can never do (one coordinate only, see
+ *  the sweep at the top of this file).
+ *
+ *  Routed by the SOURCE handle's own axis, so the line leaves the handle in the
+ *  direction the handle points:
+ *    left / right (horizontal): s → sg → (W.x, sg.y) → (W.x, W.y) → (tg.x, W.y) → tg → t
+ *    top / bottom (vertical)  : s → sg → (sg.x, W.y) → (W.x, W.y) → (W.x, tg.y) → tg → t
+ *
+ *  Consecutive duplicate points are dropped (so a waypoint that lands on an
+ *  existing vertex, or on the gapped endpoint's own line, collapses cleanly),
+ *  which is also what keeps the degenerate cases a VALID path rather than a
+ *  `NaN`: every emitted point comes from `geo` or from a finite `W`. A
+ *  non-finite `W` is replaced by the generator's own midpoint rather than
+ *  written into an `M`/`L` command.
+ *
+ *  The label is `W` itself: `W` is a vertex of the staircase by construction
+ *  (the only point that can drop out is one that coincides with a neighbour, and
+ *  then it lies on the segment that replaced it), so the handle painted on the
+ *  label stays on the line. With `borderRadius: 0` — what the app draws for a
+ *  `step` edge — the corner is exact to the last bit. */
+export function freePath(geo: BendGeo, W: Pt, borderRadius: number): [string, number, number] {
+  const {sg, tg} = gapped(geo);
+  const w = Number.isFinite(W.x) && Number.isFinite(W.y) ? W : plainMidpoint(geo);
+  const horizontal = geo.sp === 'left' || geo.sp === 'right';
+  const raw: Pt[] = horizontal
+    ? [geo.s, sg, {x: w.x, y: sg.y}, {x: w.x, y: w.y}, {x: tg.x, y: w.y}, tg, geo.t]
+    : [geo.s, sg, {x: sg.x, y: w.y}, {x: w.x, y: w.y}, {x: w.x, y: tg.y}, tg, geo.t];
   const pts: Pt[] = [];
-  for (const p of [geo.s, sg, a, b, tg, geo.t]) {
+  for (const p of raw) {
     const last = pts[pts.length - 1];
     if (!last || last.x !== p.x || last.y !== p.y) pts.push(p);
   }
   let path = `M${pts[0].x} ${pts[0].y}`;
   for (let i = 1; i < pts.length - 1; i++) path += getBend(pts[i - 1], pts[i], pts[i + 1], borderRadius);
   path += `L${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
-  const anchor = stepMidpoint(geo, W);
-  return [path, anchor.x, anchor.y];
+  return [path, w.x, w.y];
 }
 
-/** True when a stored point exists on the axis the generator cannot draw, so the
- *  hand-built route is required. Everything else — including a stored point the
- *  generator's used split reads — stays on the generator. */
-export function needsCustom(geo: BendGeo, bendX?: number, bendY?: number): boolean {
-  if (axisLive(geo)) return false;
-  return bendAxis(geo) === 'h' ? bendX !== undefined : bendY !== undefined;
-}
-
-/** `getSmoothStepPath` with an explicit centre and NO fraction. Both coordinates
- *  are handed over, so the generator's own label (`:1361`) is exactly this point
- *  — which is why the handle, drawn at the label, is always on the line. */
-export function centeredPath(geo: BendGeo, W: Pt, borderRadius: number): [string, number, number] {
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX: geo.s.x, sourceY: geo.s.y, sourcePosition: geo.sp as Position,
-    targetX: geo.t.x, targetY: geo.t.y, targetPosition: geo.tp as Position,
-    borderRadius,
-    centerX: W.x, centerY: W.y,
-  });
-  return [path, labelX, labelY];
-}
-
-/** The path through the INSTALLED generator with an explicit centre, so a bent
- *  line and an unbent one come out of exactly the same code. */
-export function stepPath(geo: BendGeo, W: Pt, borderRadius: number): [string, number, number] {
-  return centeredPath(geo, effectiveMid(geo, W), borderRadius);
-}
-
-/** Everything a renderer needs for one bend-capable edge, from ONE call, so the
- *  path, the label and the handle cannot be derived from different points:
- *  `labelX`/`labelY` ARE the synthesised midpoint (draw.io's handle in the middle
- *  of the line) and the handle is drawn there — the spec's `mx`/`my`. `custom`
- *  selects the hand-built route (`needsCustom` decides). */
-export function bendRender(
-  geo: BendGeo, W: Pt, borderRadius: number, custom = false,
-): {path: string; labelX: number; labelY: number} {
-  const E = effectiveMid(geo, W);
-  const [path, labelX, labelY] = custom
-    ? customStepPath(geo, E, borderRadius)
-    : centeredPath(geo, E, borderRadius);
-  return {path, labelX, labelY};
+/** Does this edge need OUR route rather than the generator's? A stored bend key
+ *  and nothing else — an untouched board (and an old board that only carries the
+ *  legacy `bend` fraction) stays on the generator, so nothing already on a
+ *  canvas moves by a pixel. The geometry is not consulted: a stored waypoint is
+ *  drawn by `freePath` on ANY geometry, which is the only rule that keeps the
+ *  path and the handle on the same point. */
+export function needsCustom(_geo: BendGeo, bendX?: number, bendY?: number): boolean {
+  return bendX !== undefined || bendY !== undefined;
 }

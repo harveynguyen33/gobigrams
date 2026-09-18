@@ -1150,64 +1150,31 @@ body {
 }
 .react-flow__edge.selected .react-flow__edge-text { fill: var(--sel); }
 
-/* ---------- Q: the edge ENDPOINT grab affordance ----------
-   WHAT WAS WRONG: reconnect was fully wired (`onReconnect` + `edgesReconnectable`
-   in App.tsx) and had no face. React Flow renders one `react-flow__edgeupdater`
-   circle per endpoint and paints it `stroke="transparent" fill="transparent"`
-   (@xyflow/react/dist/esm/index.js, EdgeAnchor), so the only way to find the
-   gesture was to hit an invisible disc of `reconnectRadius` (10px by RF's own
-   default — raised to 14 by `RECONNECT_RADIUS` in App.tsx).
+/* ---------- Q/T: the edge ENDPOINT grab affordance — PAINT REMOVED ----------
+   ROUND Q painted React Flow's `react-flow__edgeupdater` circle (r=14 →
+   38px, `fill: var(--elevated)`, `stroke: var(--sel) 2`, revealed on edge hover).
+   That is the "hình tròn to" the user asked to be deleted: in the `paper` theme
+   — a cream ground with a deep-blue selection colour and a burnt-orange accent —
+   it renders as a 38px blue-ringed cream disc hanging off every endpoint of a
+   hovered edge.
 
-   THIS IS THE GRABBER ITSELF, NOT A LOOK-ALIKE. RF styles the circle as
-   `cursor: move; pointer-events: all` (node_modules/@xyflow/react/dist/style.css),
-   and this block only supplies the paint. So the dot the user aims at and the dot
-   that receives the pointerdown are the SAME element at the SAME centre — the
-   "two overlapping discs" defect fix F had to delete (see the handle rules above)
-   cannot arise, because there is no second element and no offset to get wrong.
-   That is also why nothing here translates: a decorative dot shifted onto the
-   endpoint would leave the real hit area `radius` away from it, i.e. it would paint
-   a lie. RF places the disc with `cx = shiftX(endpointX, radius, side)` /
-   `cy = shiftY(...)`, which pushes it `radius` OUTWARD along its own side (Right is
-   `x + radius`), so the disc is TANGENT to the endpoint and hangs in the gap clear
-   of the node. Taking the wire attachment point J (the outer edge of the connect dot RF
-   centres on the node border), the dot occupies one side of J and the disc the other:
-   dot [J-12, J], disc [J, J+28] at radius 14 — adjacent, never overlapping, so the visible
-   grabber cannot cover the connect handle it belongs to. The disc's own width IS its hit
-   width (it is the same element), so the paint is deliberately a little larger than the
-   12px handle: a target that can be FOUND. Note the disc hangs OUTWARD, so where a node
-   sits very close the node's own body (a higher layer, opaque, above the edge renderer)
-   clips it; at normal spacing the disc sits in open canvas.
+   ROUND T REMOVES THE FACE, NOT THE FEATURE. Nothing here paints the circle any
+   more: `fill`/`stroke` are `none` and it is invisible unconditionally, so no
+   rule in this sheet can reveal it again. The CAPABILITY is untouched —
+   `edgesReconnectable={!readOnly}` and `RECONNECT_RADIUS` in App.tsx still put
+   the same element at the same centre with the same silent hit area (RF's own
+   `cursor: move; pointer-events: all`, which this sheet does not override), so
+   reconnect still works exactly as it did; the user simply aims at the endpoint
+   rather than at a disc.
 
-   REVEAL — hover, and only hover. `.updating` is React Flow's own state, stamped on
-   the edge GROUP by EdgeWrapper (`updating: updateHover`), and `updateHover` is set
-   by the anchor's `onMouseEnter`/`onMouseOut` — so it is already live exactly while
-   the pointer is on the wire or on a grabber, with no JS of ours in the path. The
-   trailing `:hover` arms cover the moment before any pointer has entered a grabber
-   (RF's handler runs on the circle, `:hover` on the group is true for the whole
-   wire). At rest nothing paints, so the canvas stays clean. `opacity .15s` matches
-   the handle transitions above and is silenced by the reduced-motion block at EOF. */
-.react-flow__edgeupdater {
-  fill: var(--elevated);
-  stroke: var(--sel);
-  stroke-width: 2;
+   NOTHING IN THIS APP MAY PAINT THAT CIRCLE AGAIN WITHOUT ASKING. The reveal,
+   read-only and hover media blocks were deleted with the paint, because none of
+   them carries meaning once nothing is drawn. */
+.ds-flow-wrap .react-flow__edgeupdater,
+.ds-flow-wrap.ds-read-only .react-flow__edgeupdater {
+  fill: none;
+  stroke: none;
   opacity: 0;
-  transition: opacity .15s;
-}
-@media (hover: hover) {
-  .ds-flow-wrap .react-flow__edge:hover .react-flow__edgeupdater,
-  .ds-flow-wrap .react-flow__edge.updating .react-flow__edgeupdater,
-  .ds-flow-wrap .react-flow__edgeupdater:hover { opacity: 1; }
-}
-/* K/Q — REVIEW MODE. `edgesReconnectable={!readOnly}` means RF renders no anchors
-   at all while the mode is on, so there is nothing to reveal; this block is the
-   same belt-and-braces the handle rules above carry, so the affordance stays dark
-   even if a future change re-enables the prop. `opacity: 0` is paint-only — the
-   circle's `pointer-events: all` is untouched by it, which is harmless here because
-   the element does not exist under the gate. */
-@media (hover: hover) {
-  .ds-flow-wrap.ds-read-only .react-flow__edge:hover .react-flow__edgeupdater,
-  .ds-flow-wrap.ds-read-only .react-flow__edge.updating .react-flow__edgeupdater,
-  .ds-flow-wrap.ds-read-only .react-flow__edgeupdater:hover { opacity: 0; }
 }
 
 /* ---------- group boundary node ---------- */
@@ -1802,10 +1769,6 @@ kbd {
 /* respect reduced-motion: freeze all edge flow */
 @media (prefers-reduced-motion: reduce) {
   .edge-flow-dash, .edge-flow-pulse { animation: none; }
-  /* Q — the endpoint grab affordance's opacity fade. Same treatment as the
-     handle transitions (opacity only, no movement), silenced under the same
-     query so a reduced-motion user gets the dot instantly or not at all. */
-  .react-flow__edgeupdater { transition: none; }
 }
 
 /* ---------- snap-to-grid affordance ---------- */
@@ -2987,112 +2950,22 @@ kbd {
 
 /* ---- 6. SWATCHES — .swatches / .swatch already carry their rules. ----- */
 
-/* ---- 7. RANGE — STEP 1 (2026-09-18) bend position. ---------------------
-   The app's first range input. Tokens only — no new colour literal (the
-   sheet's hex count is a gate and must stay 127).
-
-   `appearance: none` + an explicit track and thumb, because a native range
-   cannot follow the five themes on any engine; the same reasoning as the
-   select kit above. The track is a 4px pill painted from `--border` /
-   `--dim2` so it reads at rest; the thumb is a 15px `--elevated` disc with a
-   `--acc` ring — the focus/hover colour the rest of the kit uses. Height is
-   fixed at 15px so the row height does not depend on the engine's default. */
-.range-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.range-row input[type="range"] {
-  flex: 1;
-  min-width: 0;
-  height: 15px;
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-  outline: none;
-}
-.range-row input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-}
-.range-row input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-}
-.range-row input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 15px;
-  height: 15px;
-  margin-top: -5.5px;             /* centre the 15px thumb on the 4px track */
-  border-radius: 50%;
-  background: var(--elevated);
-  border: 2px solid var(--acc);
-  transition: border-color .15s, box-shadow .15s;
-}
-.range-row input[type="range"]::-moz-range-thumb {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--elevated);
-  border: 2px solid var(--acc);
-  transition: border-color .15s, box-shadow .15s;
-}
-.range-row input[type="range"]:hover::-webkit-slider-thumb { border-color: var(--sel); }
-.range-row input[type="range"]:hover::-moz-range-thumb { border-color: var(--sel); }
-.range-row input[type="range"]:focus-visible::-webkit-slider-thumb {
-  border-color: var(--sel);
-  box-shadow: 0 0 0 3px var(--acc-soft);
-}
-.range-row input[type="range"]:focus-visible::-moz-range-thumb {
-  border-color: var(--sel);
-  box-shadow: 0 0 0 3px var(--acc-soft);
-}
-/* DISABLED = "this edge's routing ignores a bend position". Dimmed so it
-   cannot be mistaken for a live control, and its reason is the `.field-note`
-   line rendered beneath it. */
-.range-row input[type="range"]:disabled { cursor: not-allowed; }
-.range-row input[type="range"]:disabled::-webkit-slider-thumb {
-  border-color: var(--dim2);
-  background: var(--surface);
-}
-.range-row input[type="range"]:disabled::-moz-range-thumb {
-  border-color: var(--dim2);
-  background: var(--surface);
-}
-
-/* the numeric read-out — mono + tabular so the digits do not jitter as the
-   value changes under a drag. */
-.range-val {
-  flex: none;
-  min-width: 34px;
-  text-align: right;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dim);
-}
-.range-row:has(input[type="range"]:disabled) .range-val { color: var(--dim2); }
-
-/* the one-line honest reason a control is off. Not `.hint` (that is a padded
-   block used for multi-line inspector notes) — this hugs its field. */
-.field-note {
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--dim2);
-}
+/* ---- 7. RANGE — REMOVED (ROUND T, 2026-09-18). ------------------------
+   STEP 1's slider for the step's cross-bar was the app's only range input; it is
+   gone at the user's request (the control could not move the line on the
+   geometry it was offered on, so it read as a lie). Its whole kit — the row, the
+   explicit track and thumb, the numeric read-out and the one-line reason note —
+   was deleted with it, and nothing else in this sheet referenced any of them.
+   `grep -rn` for those class names under `src/` returns 0. -------- */
 
 /* ---------------------------------------------------------------------------
-   ROUND S — the draggable midpoint of a selected step / smoothstep edge.
+   ROUND S/T — the draggable midpoint of a selected step / smoothstep edge.
 
    draw.io's mechanic: click the line, one handle appears at the middle of the
-   line, drag it and the line follows — along ONE axis, so it stays square.
+   line, drag it and the line follows. ROUND T: FREE IN 2-D — the axis is locked
+   per gesture from the pointer (col-resize / row-resize, set inline by
+   `GoblinEdge`) and the stored waypoint routes the edge through `freePath`,
+   which reads both coordinates.
 
    Tokens only, no literal colours, so the handle recolours with the theme like
    every other canvas control. The stacking level is 6 because the node's own

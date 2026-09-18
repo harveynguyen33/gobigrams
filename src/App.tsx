@@ -15,10 +15,12 @@ import {
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import {
-  // ROUND S — the bend predicate itself (`SIDE_OUT`, `OPPOSITE_SIDE`,
-  // `STEP_GAP_PX`, `isSide4`, `bendActive4`) lives in `edgeBend.ts` now, so the
-  // inspector's slider gate and the drag handle's gate are the SAME rule.
-  bendActive4, bendAxis, applyDrag, drawnMid, isSide4,
+  // ROUND T — the bend rules (`SIDE_OUT`, `OPPOSITE_SIDE`, `STEP_GAP_PX`,
+  // `isSide4`) and the drag's own maths live in `edgeBend.ts`: the geometry a
+  // handler needs, the axis rule the POINTER decides (`dragAxis`), the writer
+  // (`applyDrag`) and the base point (`drawnMid`). The renderer's route is
+  // `freePath` on a stored waypoint and the generator otherwise (`needsCustom`).
+  dragAxis, applyDrag, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
 
@@ -189,15 +191,17 @@ type Snap = {nodes: Node[]; edges: Edge[]};
 type EdgeData = {
   shape?: string;
   offset?: 'center' | 'start' | 'end';
-  /** STEP 1 (2026-09-18): the stored bend position for a step / smoothstep
-   *  route — the fraction `getSmoothStepPath` calls `stepPosition` (0..1).
-   *  Absent means "never set", which the generator resolves to its own 0.5.
-   *  WRITTEN BY THE SLIDER ONLY — a drag supersedes it and deletes it. */
+  /** STEP 1 (2026-09-18): the fraction `getSmoothStepPath` calls `stepPosition`
+   *  (0..1), which slides the step's cross-bar along the split axis. READ-ONLY
+   *  LEGACY as of ROUND T — the slider that wrote it is gone, so nothing here
+   *  writes the key any more; it is read only so a board saved while the slider
+   *  existed still renders exactly as it did. */
   bend?: number;
-  /** ROUND S (2026-09-18): the ABSOLUTE point the selected edge's midpoint was
-   *  dragged to, one key per axis and only ever the axis the drag owns (see
-   *  `edgeBend.dragPatch`). Absent means "never dragged", and the drawn W then
-   *  falls back to the fraction above. */
+  /** ROUND S/T (2026-09-18): the ABSOLUTE 2-D waypoint the edge's midpoint was
+   *  dragged to — `bendX` from a horizontal gesture, `bendY` from a vertical one
+   *  (see `edgeBend.dragAxis`). BOTH are read: a stored key routes the edge
+   *  through `freePath`, which is the only route that can use both coordinates.
+   *  Absent means "never dragged", and the edge stays on the generator. */
   bendX?: number;
   bendY?: number;
 };
@@ -350,32 +354,24 @@ const nodeW = (n: Node) => (n.measured?.width ?? n.width ?? 190) as number;
 const nodeH = (n: Node) => (n.measured?.height ?? n.height ?? 60) as number;
 
 /* ---------------------------------------------------------------------------
-   STEP 1 (2026-09-18) — BEND POSITION for step / smoothstep edges.
+   STEP 1 (2026-09-18) / ROUND T — BEND POSITION for step / smoothstep edges.
 
    `getSmoothStepPath` takes a `stepPosition` fraction (0 = at the source end,
    1 = at the target end, 0.5 = React Flow's default) that slides the step's
-   cross-bar along the split axis. It is NOT a general knob, and the control
-   must be off wherever it is inert — a slider that moves without moving the
-   line is a lie:
+   cross-bar along the split axis. ROUND T REMOVED THE SLIDER that used to expose
+   it — the control is gone from the inspector — and the fraction is now
+   read-only legacy: an old board's stored `bend` still renders through the
+   generator exactly as it did, and nothing writes the key any more. What bends
+   an edge now is the midpoint HANDLE, which stores an absolute 2-D waypoint.
 
-   - `getBezierPath` / `getStraightPath` have no such parameter AT ALL.
-   - Even for step / smoothstep, the generator reads the value only inside its
-     opposite-handle branch (@xyflow/system `index.js:1263`) and, within that
-     branch, only when the split runs along the source handle's own axis
-     (`:1292`) — because the other arm routes through the OTHER accessor
-     (`:1296`), whose centre is the plain `(a + b) / 2` of `:1267` / `:1271`.
-     `bendActive` below is exactly that condition.
-
-   Derived from the generator's source, then re-checked against the real
-   function: a 9,600-geometry sweep over every handle pair compares
-   `getSmoothStepPath({stepPosition: 0.1})` with `0.9` and asserts the path
-   differs precisely when this predicate says it will — 0 counterexamples.
+   The old slider's gate (a per-geometry axis derived from the generator's own
+   split), the collapsed-bar special cases and the `App`-shaped wrapper that
+   presented them to the inspector were all deleted with the control itself.
+   What survives is what has a live reader, in `src/edgeBend.ts`:
+   `dragAxis` (the POINTER's rule — draw.io's), `applyDrag` (the writer),
+   `drawnMid` (the drag's base point), `freePath` (the route that reads both
+   coordinates) and `needsCustom` (stored waypoint → `freePath`).
 --------------------------------------------------------------------------- */
-/* ROUND S — `Side4`, the two side tables, `STEP_GAP_PX`, `isSide4` and the
-   predicate itself now live in `src/edgeBend.ts`. ONE definition of the rule,
-   shared by the slider's gate (`bendSupport` below) and the drag handle's gate
-   in `GoblinEdge`, so the two controls can never disagree about whether a bend
-   position reaches the path. */
 
 /** Midpoint of one named side of a node — the same anchor React Flow hands the
  *  edge component as `sourceX`/`sourceY` (see `GoblinEdge`'s props). */
@@ -409,31 +405,16 @@ const edgeGeo = (e: Edge, nodes: Node[]): BendGeo | null => {
  *  which already holds the two anchors and the two handle sides; the app version
  *  would have to re-derive them and could disagree. */
 
-/** Is a bend position meaningful for this edge, and if not, why not? One honest
- *  line either way, so the inspector never ships a dead control.
- *
- *  ROUND S: this still gates the SLIDER and keeps its contract — it additionally
- *  hands back the geometry and the axis the drag owns, so the handle in
- *  `GoblinEdge` and this gate are one rule. `axis` is non-null exactly when
- *  `active` is. */
-const bendSupport = (
-  e: Edge, nodes: Node[],
-): {active: boolean; why: string; geo: BendGeo | null; axis: BendAxis | null} => {
-  if (e.type !== 'step' && e.type !== 'smoothstep') {
-    return {active: false, why: 'Only step and smoothstep lines have a bend position.', geo: null, axis: null};
-  }
+/** ROUND T — the base point a drag starts from, for the handler that has the
+ *  edge + the board's nodes rather than the renderer's props: exactly
+ *  `GoblinEdge`'s `W` (`drawnMid` over the edge's stored keys, honouring a
+ *  legacy `bend` fraction). */
+const edgeDrawnMid = (e: Edge, nodes: Node[]): Pt | null => {
   const geo = edgeGeo(e, nodes);
-  if (!geo) {
-    return {active: false, why: "This edge's routing ignores a bend position.", geo: null, axis: null};
-  }
-  return bendActive4(geo)
-    ? {active: true, why: '', geo, axis: bendAxis(geo)}
-    : {active: false, why: "This edge's routing ignores a bend position.", geo: null, axis: null};
+  if (!geo) return null;
+  const d = (e.data ?? {}) as EdgeData;
+  return drawnMid(geo, d.bendX, d.bendY, d.bend);
 };
-
-/** The stored bend fraction, or React Flow's own default when never set. */
-const bendOf = (e: Edge | null | undefined): number =>
-  ((e?.data ?? {}) as EdgeData).bend ?? 0.5;
 
 /** Tiny table glyph for the ERD palette row (26×18, same box as ShapePreview). */
 function TableGlyph({color}: {color: string}) {
@@ -1244,10 +1225,6 @@ export default function App() {
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);
   const [, bumpHist] = useState(0);
-  /** STEP 1 — true while a bend-position range drag is in flight, so the
-   *  continuous `onChange` burst collapses into ONE undo entry. Declared with
-   *  the other history refs because `updateEdge` (further down) reads it. */
-  const bendDragging = useRef(false);
 
   const snapshot = useCallback((): Snap => ({
     nodes: nodesRef.current.map(n => ({
@@ -1801,18 +1778,11 @@ export default function App() {
     setNodes(ns => ns.map(n => n.id === sel ? {...n, data: {...n.data, ...patch}} : n));
   };
 
-  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart.
-   *
-   *  `coalesce` (STEP 1) marks a CONTINUOUS gesture — a range drag — as one
-   *  undo step: history is recorded on the first move of the gesture only, so
-   *  a 100-event drag costs ONE entry (holding the pre-drag value) rather than
-   *  flooding the 50-entry stack and destroying the user's older undo steps.
-   *  The gesture ends when the flag is cleared by the control that set it. */
-  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false, coalesce = false) => {
+  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart. */
+  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false) => {
     if (!selEdgeId) return;
     if ('label' in patch) tickTask('label');
-    if (!coalesce || !bendDragging.current) pushHistory();
-    if (coalesce) bendDragging.current = true;
+    pushHistory();
     setEdges(es => es.map(e => {
       if (e.id !== selEdgeId) return e;
       const {style, markerEnd, markerStart, data, ...rest} = patch;
@@ -1845,20 +1815,33 @@ export default function App() {
     setSelEdgeId(id);
   }, [tickTask, pushHistory, setEdges]);
 
-  /** ROUND S — the midpoint drag, draw.io's mechanic.
+  /** ROUND S/T — the midpoint drag, draw.io's mechanic.
    *
    *  `'start'` records ONE history entry and selects the edge, exactly like
    *  `onNodeDragStart` / `onReconnect`: history belongs at the start of a
    *  gesture, never per pointermove, or a 200-event drag would bury the user's
    *  older undo steps.
    *
-   *  `'move'` writes ONLY the coordinate the drag owns (`dragPatch`) and drops
-   *  the stale `stepPosition` fraction — once an absolute point is stored the
-   *  generator stops reading the fraction, and a value nothing reads is a dead
-   *  control in the board file. It deliberately does NOT route through
-   *  `updateEdge`: that is keyed on `selEdgeId`, so on the very first move (the
-   *  one that selects the edge) it would write to the WRONG edge. */
-  const onBend = useCallback((id: string, W: Pt, phase: BendPhase) => {
+   *  `'move'` writes the waypoint the pointer is at, projected onto the ONE axis
+   *  the gesture owns. The axis is draw.io's rule and it comes from the POINTER
+   *  DELTA (`dragAxis`), NOT from the geometry — that was the ROUND S bug: the
+   *  generator's split decided the axis, so on any edge with more than 0.001px
+   *  of stagger the axis was `h` and up/down did nothing at all.
+   *
+   *  THE PROJECTION MATTERS. `freePath` reads BOTH coordinates, so writing the
+   *  raw pointer into both would let a horizontal drag drift vertically. The
+   *  base point is `edgeDrawnMid` (where the edge is drawn right now, so the
+   *  first horizontal move does not also snap the other axis), and the axis the
+   *  gesture does NOT own is taken from it unchanged.
+   *
+   *  `'end'` is the auto-remove: a waypoint released within `BEND_SNAP_PX` of the
+   *  generator's own default point deletes BOTH keys, so the edge goes back to
+   *  the generator's clean route instead of storing a point that bends nothing.
+   *
+   *  It deliberately does NOT route through `updateEdge`: that is keyed on
+   *  `selEdgeId`, so on the very first move (the one that selects the edge) it
+   *  would write to the WRONG edge. */
+  const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
     if (phase === 'start') {
       pushHistory();
       setSelEdgeId(id);
@@ -1868,7 +1851,21 @@ export default function App() {
       if (e.id !== id) return e;
       const geo = edgeGeo(e, nodesRef.current);
       if (!geo) return e;
-      return {...e, data: applyDrag((e.data ?? {}) as EdgeData, bendAxis(geo), W)};
+      const data = (e.data ?? {}) as EdgeData;
+      const base = edgeDrawnMid(e, nodesRef.current);
+      if (!base) return e;
+      const axis = dragAxis(geo, dx, dy);
+      const put: Pt = axis === 'h' ? {x: W.x, y: base.y} : {x: base.x, y: W.y};
+      if (phase === 'end') {
+        const pm = plainMidpoint(geo);
+        if (Math.hypot(put.x - pm.x, put.y - pm.y) <= BEND_SNAP_PX) {
+          const out = {...data};
+          delete out.bendX;
+          delete out.bendY;
+          return {...e, data: out};
+        }
+      }
+      return {...e, data: applyDrag(data, axis, put)};
     }));
   }, [pushHistory, setEdges]);
 
@@ -3007,14 +3004,6 @@ export default function App() {
   const ePathType = (Object.keys(PATH_TYPES) as PathType[]).find(k => PATH_TYPES[k] === selectedEdge?.type && k !== 'custom') ?? 'bezier';
   const eOffset = (((selectedEdge?.data ?? {}) as EdgeData).offset ?? 'center');
 
-  // STEP 1 — bend position. `eBendInfo.active` is the gate: the slider is only
-  // live where `getSmoothStepPath` actually reads `stepPosition`, so it can
-  // never move without moving the line.
-  const eBendInfo = selectedEdge
-    ? bendSupport(selectedEdge, nodes)
-    : {active: false, why: ''};
-  const eBend = bendOf(selectedEdge);
-
   const markerOptions = [
     {v: 'none', label: 'None'},
     {v: MarkerType.ArrowClosed, label: 'Arrow (closed)'},
@@ -4152,37 +4141,6 @@ export default function App() {
                   <option value="start">start</option>
                   <option value="end">end</option>
                 </select>
-              </div>
-              {/* STEP 1 — bend position. Deliberately NOT passed `replaceData`:
-                  updateEdge's SECOND argument REPLACES `data` wholesale,
-                  keeping only the keys the edges memo re-injects (`__type` /
-                  `onCommitLabel` / `readOnly`), so `true` here would silently
-                  drop a stored `bend` on the very control that owns it. The
-                  default merge keeps it. `coalesce` (third arg) makes the whole
-                  drag ONE undo entry. */}
-              <div className="field">
-                <label>bend position</label>
-                <div className="range-row">
-                  <input
-                    type="range"
-                    min="0" max="1" step="0.01"
-                    value={eBend}
-                    disabled={!eBendInfo.active}
-                    aria-label="Bend position"
-                    title={eBendInfo.active
-                      ? 'Where the step crosses the gap — 0 is at the source end, 1 at the target end'
-                      : eBendInfo.why}
-                    onChange={ev => updateEdge({data: {bend: Number(ev.target.value)}}, false, true)}
-                    onPointerUp={() => { bendDragging.current = false; }}
-                    onPointerCancel={() => { bendDragging.current = false; }}
-                    onKeyUp={() => { bendDragging.current = false; }}
-                    onBlur={() => { bendDragging.current = false; }}
-                  />
-                  <span className="range-val">{eBend.toFixed(2)}</span>
-                </div>
-                {!eBendInfo.active && (
-                  <div className="field-note">{eBendInfo.why}</div>
-                )}
               </div>
               <div className="sec-label">Line</div>
               <div className="field">
