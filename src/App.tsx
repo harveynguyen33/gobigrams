@@ -1722,6 +1722,37 @@ export default function App() {
     setSelEdgeId(id);
   }, [tickTask, pushHistory, setEdges]);
 
+  /* ROUND S (2026-09-18) — the Text node's in-place editor commits here.
+
+     A DELIBERATE SIBLING OF `update()` (App.tsx:1682), not a second
+     implementation of it. It keeps BOTH of that function's load-bearing
+     properties, so the field never grows a second source of truth:
+
+       * `pushHistory()` ONCE PER COMMIT. The draft lives in `LabelNode`'s own
+         state, so a keystroke calls nothing; this runs once, on commit — the
+         same discipline as `onCommitLabel` above and the edge editor.
+       * the same `map(n => n.id === id ? {…, data:{…n.data, patch}} : n)` shape,
+         so nothing else on the node's data is clobbered.
+
+     THE ONE DIFFERENCE IS THE KEY, and it is the point: `update()` is keyed on
+     `sel` because the inspector edits whatever is selected, while this is keyed
+     on the `id` the double-clicked node handed back — so the editor writes to
+     the node under the pointer even when the selection says otherwise.
+
+     `setSel(id)` mirrors `onCommitLabel`'s `setSelEdgeId(id)`: the inspector
+     then shows the node that was just edited.
+
+     The no-op guard is `onCommitLabel`'s, for the same reason — a blur that
+     changed nothing must not push a history entry the user never asked for. */
+  const commitLabelText = useCallback((id: string, text: string) => {
+    const cur = nodesRef.current.find(n => n.id === id);
+    if (!cur || (((cur.data as any)?.text ?? '') as string) === text) return;
+    tickTask('node');
+    pushHistory();
+    setNodes(ns => ns.map(n => (n.id === id ? {...n, data: {...n.data, text}} : n)));
+    setSel(id);
+  }, [tickTask, pushHistory, setNodes]);
+
   /** Edges get the label-commit callback + their path kind through data (custom
    *  edges only). L3c: crow's-foot markers are hand-authored SVG, so their
    *  `markerStart`/`markerEnd` become `url(#id)` here — derived from the data,
@@ -1778,6 +1809,23 @@ export default function App() {
          element". Outside review mode `n.className` is passed straight through,
          byte-for-byte as before: there RF sets the token itself. */
       const nodeClassName = readOnly ? [n.className, NO_PAN].filter(Boolean).join(' ') : n.className;
+      /* ROUND S — the `label` kind's in-place editor is rendered by
+         `src/LabelNode.tsx`, and a custom node component receives only its own
+         `data`. So the commit callback and the review-mode flag travel through
+         `data`, per-node — exactly how the edge renderer gets `onCommitLabel`
+         and `readOnly` in `rfEdges` above (fix L). Read off the node's OWN
+         type, so no other kind is touched. */
+      if (n.type === 'label') {
+        return {
+          ...n,
+          className: nodeClassName,
+          data: {
+            ...((n.data ?? {}) as any),
+            onCommitText: commitLabelText,
+            readOnly,
+          },
+        };
+      }
       if (n.type === 'table') {
         return {
           ...n,
@@ -1794,7 +1842,7 @@ export default function App() {
       }
       return {...n, className: nodeClassName};
     }),
-    [nodes, showMode, pushHistory, setNodes, readOnly],
+    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText],
   );
 
   /* ---------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import {memo} from 'react';
+import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
@@ -57,9 +57,16 @@ import {NodeResizer, type NodeProps} from '@xyflow/react';
 /** Free-text annotation node. No handles, no chrome — plain text on the canvas. */
 export type LabelKind = {
   text: string;
+  /** ROUND S — injected per-node by App's `rfNodes` memo, exactly like the
+   *  edge label's `onCommitLabel` in `rfEdges`. Props do NOT reach inside a
+   *  custom node component, so a callback has to travel through `data`. */
+  onCommitText?: (id: string, v: string) => void;
+  /** ROUND S — review mode, threaded through `data` for the same reason (the
+   *  read-only flag had to reach the edge renderer this way too — fix L). */
+  readOnly?: boolean;
 };
 
-const LabelNode = memo(({data, selected}: NodeProps) => {
+const LabelNode = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as LabelKind;
 
   // Same gate as `DiagramNode`: the resizer exists only while selected. In
@@ -75,10 +82,99 @@ const LabelNode = memo(({data, selected}: NodeProps) => {
     />
   ) : null;
 
+  /* ROUND S (2026-09-18) — DOUBLE-CLICK TO TYPE IN PLACE.
+
+     Harvey: "Với Text element, tôi muốn double click and input text inside
+     directly too same as text for line connection." — the edge label's inline
+     editor, on this node kind. Multi-line, so the editor is a <textarea>, not
+     an <input> (the orchestrator's choice): a caption is allowed to contain a
+     line break, and an <input> cannot hold one.
+
+     THE SHAPE IS COPIED FROM `src/GoblinEdge.tsx` ON PURPOSE — local
+     `editing`/`draft` state, a ref, a focus/select effect, `commit()` /
+     `cancel()`, `onBlur` commits, Escape cancels. Two editors that behave
+     differently for the same gesture would be the real defect.
+
+     THE GESTURE IS FREE TO TAKE: App.tsx:3765 early-returns from the canvas
+     insert palette while the target is inside `.react-flow__node`, so a
+     double-click on this node never opened anything before and cannot now.
+
+     ENTER IS NOT HIJACKED — it inserts a newline, because this is a textarea.
+     COMMIT IS ⌘/Ctrl+Enter; Escape cancels; a click away (blur) commits. That
+     is the one deliberate divergence from the edge editor, which is a
+     single-line <input> and can therefore commit on a bare Enter. */
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const area = useRef<HTMLTextAreaElement>(null);
+
+  // One reader for the mode, used by the gesture — same as GoblinEdge's `ro`.
+  const ro = !!d.readOnly;
+
+  useEffect(() => {
+    // The `select()` mirrors GoblinEdge's focus effect. `focus` alone would
+    // leave the caret wherever it landed; selecting the whole caption is what
+    // makes "double-click, type the replacement" work in one stroke.
+    if (editing) window.setTimeout(() => area.current?.select(), 10);
+  }, [editing]);
+
+  const shown = d.text || 'Text';
+
+  /* THE WRITE TARGETS `id`, THE DOUBLE-CLICKED NODE — not whichever node is
+     selected. `id` is React Flow's `NodeProps.id`, i.e. the identity of THIS
+     rendered node, and the whole editor lives inside its `onDoubleClick`, so
+     the two can only ever agree. It would still be wrong to read App's `sel`
+     closure here: React Flow can re-render this node outside a selection
+     change, and the editor would then write to a different node than the one
+     under the pointer. */
+  const commit = () => {
+    setEditing(false);
+    if (draft !== (d.text ?? '')) d.onCommitText?.(id, draft);
+  };
+
+  const cancel = () => {
+    setDraft(d.text ?? '');
+    setEditing(false);
+  };
+
   return (
-    <div className={`label-node${selected ? ' selected' : ''}`}>
+    <div
+      className={`label-node${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
+      onDoubleClick={e => {
+        // The node is draggable; without this the gesture also reaches the
+        // pane / NodeWrapper. Same stop as GoblinEdge's label.
+        e.stopPropagation();
+        // Review mode: the caption stays READABLE, its editor never opens.
+        if (ro) return;
+        setDraft(d.text ?? '');
+        setEditing(true);
+      }}
+      title={editing || ro ? undefined : 'Double-click to edit this text'}
+    >
       {resizer}
-      {d.text || 'Text'}
+      {editing ? (
+        /* `nodrag` — measured in @xyflow/system's useDrag: a pointerdown whose
+           target matches `.nodrag` is dropped by the d3-drag filter, and
+           without that class a text selection inside the textarea would be
+           read as a node DRAG and the text could not be selected at all. The
+           `stopPropagation` above does NOT cover this: React Flow's drag
+           listener is on the wrapper, capturing at the native level. */
+        <textarea
+          ref={area}
+          className="edge-label-input node-label-input nodrag"
+          value={draft}
+          rows={Math.max(1, draft.split('\n').length)}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            // `isEditable` in App.tsx keeps every app shortcut inert while this
+            // is focused, so Escape/⌘Z reach ONLY this handler.
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+          }}
+        />
+      ) : (
+        shown
+      )}
     </div>
   );
 });

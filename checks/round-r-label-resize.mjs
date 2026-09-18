@@ -94,6 +94,33 @@ function jsxHasProp(src, tag, prop) {
   const body = src.slice(at, src.indexOf('>', at));
   return new RegExp(`\\b${prop}\\b`).test(body);
 }
+/** ROUND S — resolve `const NAME = <numeric expression>;` declarations in source
+ *  ORDER, so a floor that is EXPRESSED AS another constant (which is the whole
+ *  point of the new floors) resolves to its number instead of `NaN`.
+ *  Only names and arithmetic are accepted; anything else (a new Set, a JSX
+ *  fragment) is skipped, and a name that is not yet known makes its own
+ *  declaration unresolvable rather than silently evaluating to 0. */
+function numConsts(src) {
+  const out = {};
+  for (const line of src.split('\n')) {
+    const m = /^\s*(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*([^;]+);/.exec(line);
+    if (!m) continue;
+    const expr = m[2].trim();
+    if (!/^[\w\s+*/().-]+$/.test(expr)) continue;
+    let ok = true;
+    const v = expr.replace(/[A-Z][A-Z0-9_]*/g, name => {
+      if (name in out) return `(${out[name]})`;
+      ok = false;
+      return '0';
+    });
+    if (!ok) continue;
+    try {
+      const n = Function(`return (${v})`)();
+      if (Number.isFinite(n)) out[m[1]] = n;
+    } catch { /* not arithmetic — not a floor */ }
+  }
+  return out;
+}
 
 console.log('='.repeat(78));
 console.log('ROUND R — THE `label` (Text) NODE KIND IS RESIZABLE');
@@ -137,18 +164,51 @@ const handleRule = rule(CSS, '.react-flow__resize-control.handle');
 console.log(`  .react-flow__resize-control.handle   [styles.css:${handleRule?.line ?? '-'}] ${JSON.stringify(handleRule?.decls ?? {})}`);
 
 /* ---------- 3. the floors ---------- */
-console.log('\n-- 3. the floors (smaller than a diagram node, by design) --');
+console.log('\n-- 3. the floors ----------');
+/* ROUND S: the TWO floors now have to hold an INVARIANT against each other —
+   the resizer's floor must never be smaller than the CSS content floor — so
+   both are resolved to numbers rather than just printed. The resizer values are
+   EXPRESSIONS in `src/DiagramNode.tsx` (that is the fix: one number is derived
+   from the other), so they are resolved, not assumed to be literals. */
+const DIAG_CONSTS = numConsts(DIAGRAM);
 const minW = +jsxProp(LABEL, 'NodeResizer', 'minWidth');
 const minH = +jsxProp(LABEL, 'NodeResizer', 'minHeight');
-const diagW = +jsxProp(DIAGRAM, 'NodeResizer', 'minWidth');
-const diagH = +jsxProp(DIAGRAM, 'NodeResizer', 'minHeight');
-console.log(`  DiagramNode floors : ${diagW} x ${diagH}`);
-console.log(`  LabelNode   floors : ${minW} x ${minH}`);
+const diagWExpr = jsxProp(DIAGRAM, 'NodeResizer', 'minWidth');
+const diagHExpr = jsxProp(DIAGRAM, 'NodeResizer', 'minHeight');
+const resolve = expr => (expr in DIAG_CONSTS ? DIAG_CONSTS[expr] : Number(expr));
+const diagW = resolve(diagWExpr);
+const diagH = resolve(diagHExpr);
+const cssContentMinW = DIAG_CONSTS.CSS_CONTENT_MIN_W;
+console.log(`  DiagramNode floors : {${diagWExpr}} x {${diagHExpr}}  =  ${diagW} x ${diagH}`);
+console.log(`  DiagramNode constants:`);
+for (const k of ['CSS_CONTENT_MIN_W', 'CONTENT_MIN_H', 'FLOOR_SLACK_PX', 'NODE_MIN_W', 'NODE_MIN_H']) {
+  if (k in DIAG_CONSTS) console.log(`    ${k.padEnd(20)} = ${DIAG_CONSTS[k]}`);
+}
+console.log(`  LabelNode   floors : ${minW} x ${minH}   (its own kind — unchanged by ROUND S)`);
 /* The sheet's own floor for a label that carries no style — must survive, and
    must be strictly below the resizer's, or it would bind instead of the floor. */
 const labelRule = rule(CSS, '.label-node');
+const labelNodeRule = rule(CSS, '.node');
 const cssMinW = labelRule?.decls['min-width'];
+const nodeCssMinW = parseInt(String(labelNodeRule?.decls['min-width'] ?? ''), 10);
 console.log(`  .label-node min-width: ${cssMinW}   [styles.css:${labelRule?.line ?? '-'}]`);
+console.log(`  .node       min-width: ${String(nodeCssMinW)}px   [styles.css:${labelNodeRule?.line ?? '-'}]  (the CSS CONTENT floor)`);
+
+/* ---------- 3b. THE INVARIANT: resizer floor vs the CSS content floor ---------- */
+/* The two measured facts the new floors are justified against — worst-case
+   natural content across the shapes sharing DiagramNode's resizer (`queue`), and
+   the worst-case spill the old 140x80 floor produced. Measured on the running
+   app; the numbers are here, not in the source, because the source cites them
+   and a harness that re-derived them would be a second source of truth. */
+const WORST_CONTENT_W = 199;
+const WORST_CONTENT_H = 131;
+console.log('\n-- 3b. the invariant the two floors now hold ----------');
+console.log(`  resizer minWidth  ${diagW}  >=  .node { min-width }  ${nodeCssMinW}   : ${diagW >= nodeCssMinW}`);
+console.log(`  DiagramNode's CSS_CONTENT_MIN_W (${cssContentMinW}) === the sheet's .node min-width (${nodeCssMinW}) : ${cssContentMinW === nodeCssMinW}`);
+console.log(`  worst-case measured content across the shapes sharing this resizer: ${WORST_CONTENT_W} x ${WORST_CONTENT_H} (queue)`);
+console.log(`  resizer minWidth  ${diagW} >= ${WORST_CONTENT_W} : ${diagW >= WORST_CONTENT_W}      resizer minHeight ${diagH} >= ${WORST_CONTENT_H} : ${diagH >= WORST_CONTENT_H}`);
+/* The OLD floors, asserted absent — a regression to them is the defect itself. */
+console.log(`  the old 140 x 80 floors are gone : ${diagW !== 140 && diagH !== 80}`);
 
 /* ---------- 4. the inner element fills the wrapper on BOTH axes (the I5 fix) -- */
 console.log('\n-- 4. .label-node fills the RF wrapper (the I5 fix, this kind) --');
@@ -184,6 +244,79 @@ const sizeLine = /const size = item\.size \?\?[^\n]*/.exec(APP_SRC)?.[0] ?? '';
 const spread = /\.\.\.\(size \? \{style:\s*\{width: size\.width, height: size\.height\}\} : null\)/.test(APP_SRC);
 console.log(`\n  App.tsx addNodeByLabel: ${sizeLine.trim()}`);
 console.log(`  ...(size ? {style:{width,height}} : null) present: ${spread}`);
+
+/* ---------- 6. ROUND S — the in-place editor on a Text node ---------- */
+console.log('\n-- 6. src/LabelNode.tsx — double-click to type in place (ROUND S) --');
+const APP_SRC_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+const APP = strip(APP_SRC_RAW);
+
+const editorAt = LABEL.indexOf('<textarea');
+const editor = editorAt >= 0;
+const editorClass = jsxProp(LABEL, 'textarea', 'className');
+const gatesOnDbl = jsxHasProp(LABEL, 'div', 'onDoubleClick');
+/* NOT `jsxHasProp` for these: its body ends at the first `>`, and this element
+   contains `onChange={e => …}` — an ARROW, whose `>` truncates the scan before
+   `onBlur` is reached. Measured, not guessed: with the helper, `onBlur` read as
+   absent while the attribute is plainly there. A direct probe over the stripped
+   file is the honest one for a multi-line element with arrows in it. */
+const commitsOnBlur = /onBlur=\{commit\}/.test(LABEL);
+const commitsOnModEnter = /e\.key === 'Enter' && \(e\.metaKey \|\| e\.ctrlKey\)/.test(LABEL);
+const cancels = /e\.key === 'Escape'/.test(LABEL) && /const cancel = \(\) => \{/.test(LABEL);
+const cancelRestores = /setDraft\(d\.text \?\? ''\);\s*setEditing\(false\);/.test(LABEL);
+const roGate = /if \(ro\) return;/.test(LABEL) && /const ro = !!d\.readOnly;/.test(LABEL);
+const writesOwnId = /d\.onCommitText\?\.\(id, draft\)/.test(LABEL)
+  && /const LabelNode = memo\(\(\{id, data, selected\}: NodeProps\)/.test(LABEL);
+const noBareEnterHijack = !/if \(e\.key === 'Enter'\) \{/.test(LABEL);
+const hasNodrag = /nodrag/.test(editorClass ?? '');
+const usesEdgeLook = /edge-label-input/.test(editorClass ?? '');
+const labelInputRule = rule(CSS, '.node-label-input');
+const hasState = /useState/.test(LABEL) && /useRef/.test(LABEL) && /useEffect/.test(LABEL);
+const focusEffect = /setTimeout\(\(\) => area\.current\?\.select\(\), 10\)/.test(LABEL);
+/* SCOPED TO THE EDITOR ELEMENT, not the file: `nodrag` appears elsewhere in this
+   repo (the resize controls carry it), so a whole-file probe would pass even if
+   the textarea lost the class. The element's own slice ends at `/>` — the arrow
+   in `onChange` means a `>`-terminated scan would cut off before `className`
+   on a reordered element. */
+const editorSlice = LABEL.slice(editorAt, LABEL.indexOf('/>', editorAt));
+const hasNodragScoped = /\bnodrag\b/.test(editorSlice);
+
+console.log(`  <textarea> in the component        : ${editor}`);
+console.log(`  className                          : ${editorClass}`);
+console.log(`  label root has onDoubleClick       : ${gatesOnDbl}`);
+console.log(`  onBlur commits                     : ${commitsOnBlur}`);
+console.log(`  Cmd/Ctrl+Enter commits             : ${commitsOnModEnter}`);
+console.log(`  Escape cancels (draft restored)    : ${cancels} / ${cancelRestores}`);
+console.log(`  plain Enter NOT hijacked           : ${noBareEnterHijack}`);
+console.log(`  review-mode gate (ro)              : ${roGate}`);
+console.log(`  writes the node's OWN id           : ${writesOwnId}`);
+console.log(`  local editing/draft state + ref    : ${hasState}`);
+console.log(`  focus/select effect                : ${focusEffect}`);
+console.log(`  nodrag (a selection is not a drag)  : ${hasNodragScoped && hasNodrag}`);
+console.log(`  reuses .edge-label-input           : ${usesEdgeLook}`);
+console.log(`  .node-label-input rule             : ${labelInputRule ? `[styles.css:${labelInputRule.line}] ${JSON.stringify(labelInputRule.decls)}` : '(absent)'}`);
+
+/* The App half: the callback reaches the component, and the commit keeps
+   `update()`'s two load-bearing properties. */
+const appInjects = /onCommitText: commitLabelText/.test(APP) && /readOnly,/.test(APP);
+const appLabelsOnly = /if \(n\.type === 'label'\) \{/.test(APP);
+const commitFn = /const commitLabelText = useCallback\(\(id: string, text: string\) => \{[\s\S]*?\}, \[tickTask, pushHistory, setNodes\]\);/.exec(APP)?.[0] ?? '';
+const commitOnceHistory = (commitFn.match(/pushHistory\(\);/g) ?? []).length === 1;
+const commitKeysOnId = /ns\.map\(n => \(n\.id === id \? \{\.\.\.n, data: \{\.\.\.n\.data, text\}\} : n\)\)/.test(commitFn);
+const commitNoOpGuard = /if \(!cur \|\| \(\(\(cur\.data as any\)\?\.text \?\? ''\) as string\) === text\) return;/.test(commitFn);
+console.log(`\n-- 6b. src/App.tsx — the wiring --`);
+console.log(`  rfNodes injects onCommitText/readOnly, label kind only : ${appInjects && appLabelsOnly}`);
+console.log(`  commitLabelText: pushHistory once per commit           : ${commitOnceHistory}`);
+console.log(`  commitLabelText: writes the passed id                  : ${commitKeysOnId}`);
+console.log(`  commitLabelText: no-op guard                           : ${commitNoOpGuard}`);
+/* The inspector writer must still be there and still be the same semantics. */
+const inspectorTextarea = /selected\.type === 'label' \? \([\s\S]*?<textarea[\s\S]*?onChange=\{e => update\(\{text: e\.target\.value\}/.test(APP);
+const updateFn = /const update = \(patch[\s\S]*?\n  \};/.exec(APP)?.[0] ?? '';
+console.log(`  the inspector textarea still writes via update()        : ${inspectorTextarea}`);
+console.log(`  update() still keyed on its selected id + pushHistory once : ${/if \(!sel\) return;/.test(updateFn) && (updateFn.match(/pushHistory\(\);/g) ?? []).length === 1}`);
+
+/* Tokens only — no literal colour in the two rules ROUND S added. */
+const newRules = `${JSON.stringify(labelInputRule?.decls ?? {})}`;
+console.log(`  no hex literal in .node-label-input                    : ${!/#[0-9a-fA-F]{3,8}\b/.test(newRules)}`);
 
 /* ---------- ASSERTIONS ---------- */
 console.log('\n-- ASSERTIONS --');
@@ -233,6 +366,72 @@ assert('R9 the Text palette item has a default size, above the floor',
 assert('R10 addNodeByLabel honours item.size (no App.tsx change needed)',
   /item\.size \?\?/.test(sizeLine) && spread,
   'item.size is the first branch of the size expression; style is spread onto the node');
+
+/* ---- ROUND S: the floors now hold an invariant against the sheet ---- */
+assert('S1 the resizer floor is NEVER below the CSS content floor (.node min-width)',
+  Number.isFinite(diagW) && Number.isFinite(nodeCssMinW) && diagW >= nodeCssMinW,
+  `resizer ${diagW} >= .node min-width ${nodeCssMinW}`);
+
+assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two)',
+  cssContentMinW === nodeCssMinW && /CSS_CONTENT_MIN_W \+ FLOOR_SLACK_PX/.test(DIAGRAM),
+  `CSS_CONTENT_MIN_W ${cssContentMinW} === .node { min-width: ${nodeCssMinW}px }`);
+
+assert('S3 the floors clear the WORST-CASE measured content (queue 199x131)',
+  diagW >= WORST_CONTENT_W && diagH >= WORST_CONTENT_H,
+  `floor ${diagW}x${diagH} vs content ${WORST_CONTENT_W}x${WORST_CONTENT_H}`);
+
+assert('S4 the old 140x80 floors are GONE (a regression would be the defect)',
+  diagW !== 140 && diagH !== 80,
+  `minWidth=${diagW}, minHeight=${diagH}`);
+
+assert('S5 the sheet keeps min-width: 190px (Harvey\'s option 1.a — not removed)',
+  nodeCssMinW === 190,
+  `.node { min-width: ${nodeCssMinW}px } [styles.css:${labelNodeRule?.line}]`);
+
+assert('S6 the label kind\'s own floors are UNCHANGED, and clear its own content',
+  minW === 80 && minH === 48,
+  `LabelNode still ${minW}x${minH} — one line is 19.5px + 8px padding = 27.5, two = 47`);
+
+/* ---- ROUND S: the in-place editor ---- */
+assert('S7 double-click opens a <textarea> (multi-line: an <input> could not hold the text)',
+  editor && gatesOnDbl && usesEdgeLook,
+  `className "${editorClass}"`);
+
+assert('S8 Escape cancels — the draft is restored before the editor closes',
+  cancels && cancelRestores,
+  'cancel() sets draft back to the stored text, then closes');
+
+assert('S9 blur commits, and Cmd/Ctrl+Enter commits',
+  commitsOnBlur && commitsOnModEnter,
+  'onBlur={commit}; e.key === Enter && (metaKey || ctrlKey) -> commit');
+
+assert('S10 plain Enter is NOT hijacked (it must insert a newline in a textarea)',
+  noBareEnterHijack,
+  'the Enter branch carries a (metaKey || ctrlKey) guard');
+
+assert('S11 the write targets the DOUBLE-CLICKED node\'s id, not the selection',
+  writesOwnId && commitKeysOnId,
+  'LabelNode commits (id, draft) from its own NodeProps; App maps n.id === id');
+
+assert('S12 pushHistory runs ONCE PER COMMIT, never per keystroke',
+  commitOnceHistory && hasState,
+  'the draft lives in local state; exactly one pushHistory() in commitLabelText');
+
+assert('S13 read-only review mode cannot OPEN the editor',
+  roGate && appInjects,
+  'ro = !!d.readOnly, `if (ro) return` before setEditing; readOnly injected per-node in rfNodes');
+
+assert('S14 the editor is a nodrag region (a selection must not start a node drag)',
+  hasNodragScoped && hasNodrag,
+  'the class is on the <textarea> itself; @xyflow/system useDrag drops a pointerdown whose target matches `.nodrag`');
+
+assert('S15 the inspector textarea still writes through update() — two writers, one semantics',
+  inspectorTextarea && /if \(!sel\) return;/.test(updateFn) && (updateFn.match(/pushHistory\(\);/g) ?? []).length === 1,
+  'both writers call pushHistory once per commit and map the same node shape');
+
+assert('S16 the new rule uses tokens only',
+  labelInputRule != null && !/#[0-9a-fA-F]{3,8}\b/.test(newRules),
+  `.node-label-input [styles.css:${labelInputRule?.line}]`);
 
 const failed = assertions.filter(a => !a.pass);
 console.log(`\nHARNESS: ${assertions.length - failed.length}/${assertions.length} passed`);

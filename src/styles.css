@@ -901,6 +901,15 @@ body {
 }
 
 /* ---------- custom node ---------- */
+/* ROUND S (2026-09-18) — `min-width` below is the CSS CONTENT FLOOR, and it is
+   mirrored in `src/DiagramNode.tsx` as `CSS_CONTENT_MIN_W`, which DERIVES that
+   file's `<NodeResizer minWidth>` from it (see the ROUND S header there). The
+   invariant, in one line: the resizer floor must never be smaller than this
+   floor, or a node can be dragged under its own content and the text paints
+   outside the border (`.node` and `.node-body` are both `overflow: visible`).
+   Measured worst-case content across the shapes sharing that resizer: 199x131
+   (`queue`). Change this number and `CSS_CONTENT_MIN_W` must move with it —
+   `checks/round-r-label-resize.mjs` reads BOTH sides and fails if they drift. */
 .node {
   min-width: 190px; position: relative; padding: 0;
   font-size: 13px;
@@ -983,6 +992,26 @@ body {
 .label-node.selected {
   box-shadow: 0 0 0 2px var(--sel);
 }
+/* ROUND S — the in-place editor opened by double-clicking a Text node. The
+   `.edge-label-input` class above supplies the LOOK (mono, elevated surface,
+   `--sel` ring) because the edge label's editor is the reference Harvey asked
+   for; this rule supplies only what is TRUE OF A NODE and false of an edge:
+   the box is a textarea in a flow layout, so it has to fill the label's width
+   and be allowed to grow downward as lines are typed.
+
+   No colour literal appears here — every value is a token, same as the sheet
+   around it. `resize: none` suppresses the browser's own grip: the node's
+   React Flow resizer is the one resize affordance on this element, and a
+   second, differently-behaving grip inside it would be a defect. */
+.label-node.editing { display: block; }
+.node-label-input {
+  display: block; width: 100%; min-width: 0;
+  resize: none; overflow: hidden; white-space: pre-wrap;
+  /* 11px is the edge editor's size; a Text node is 13px, so matching the label
+     it replaces is what keeps the text from jumping as the editor opens. */
+  font-size: 13px; line-height: 1.5;
+}
+.label-node.editing, .label-node.editing .node-label-input { cursor: text; }
 
 /* ---------- custom-shape node (PACKAGE-N §8, imported SVG artwork) ----------
    The user's SVG IS the artwork: no app frame is painted behind it, and the

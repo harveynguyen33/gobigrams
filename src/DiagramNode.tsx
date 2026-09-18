@@ -17,6 +17,81 @@ export const RESIZABLE = new Set<NodeShape>([
  *  database / queue / gateway would fight the architecture-diagram language. */
 const POSTIT = new Set<NodeShape>(['actor', 'note']);
 
+/* ROUND S (2026-09-18) — THE RESIZER FLOORS ARE RAISED TO THE CONTENT FLOOR.
+
+   THE DEFECT: this file's resizer said `minWidth={140} minHeight={80}` while
+   `styles.css` gives `.node` a `min-width: 190px`. The two floors DISAGREED, so
+   a node could be dragged to 140x80 while its own `.node` refused to shrink past
+   190 wide — and `.node` and `.node-body` BOTH carry `overflow: visible`, so the
+   text simply painted OUTSIDE the node's border.
+
+   MEASURED on the running app (local px, zoom-independent — the wrapper size and
+   the min-width floor stripped, layout settled, then read after a frame wait,
+   because a synchronous read of a ResizeObserver-updated box is STALE):
+
+     shape      natural content      spill at a smaller wrapper
+     ---------  ------------------  ------------------------------------------
+     external   168 x 114           wrapper 124 vs inner 139  -> +15px H
+     queue      199 x 131           wrapper 102x96 vs 139x107 -> +37px H, +11px V
+     service    183 x 114           wrapper 139x83 vs 139x83  -> none
+
+   At a narrow width the text DOES wrap (no horizontal spill at 139), so the
+   acute half of the defect is VERTICAL: `queue` needs ~131px and the old floor
+   allowed 80.
+
+   THE FIX (Harvey's option 1.a): raise the floors. `min-width: 190px` STAYS. No
+   ellipsis, no clipping.
+
+   THE INVARIANT THIS FILE NOW HOLDS TO — the resizer floor must NEVER be smaller
+   than the CSS content floor. `NODE_MIN_W` is therefore DERIVED FROM
+   `CSS_CONTENT_MIN_W`, which is the number `.node { min-width }` declares in
+   `src/styles.css`, instead of a third number invented here; the harness reads
+   BOTH sides and fails if they drift apart.
+
+     HORIZONTAL — CSS_CONTENT_MIN_W (190) + the 10px slack below = 200.
+     The slack is not decoration: the tallest natural CONTENT measured across the
+     shapes that share this resizer is `queue` at 199px, i.e. 9px WIDER than the
+     CSS floor, so the CSS floor ALONE would still clip it. 200 is the first value
+     that clears both sources — 10px above the CSS floor, 1px above the worst
+     measured content, and above the other two (168, 183).
+
+     VERTICAL — there is no vertical CSS content floor to derive from (`.node`
+     declares only `min-height: 100%`, a FILL rule, not a content floor), so the
+     floor comes from the worst-case measured CONTENT: `queue` at 131px, which is
+     the `.node.shape-queue .node-body` padding (30px top + 16px bottom) plus its
+     kicker + title + sub. 131 + the same 10px slack = 141. Every other measured
+     shape is shorter and so covered: 114, 114.
+
+   WHY THE SPILL IS NOW UNREACHABLE, IN ONE SENTENCE: React Flow's resizer computes
+   `getSizeClamp(newWidth, minWidth, …) = max(0, minWidth - newWidth, …)` and folds
+   it into the drag delta, so the width it writes back can never be under 200 (and
+   likewise 141 vertically) — at or above every shape's natural content size AND
+   above `.node`'s own 190px CSS floor, which therefore can never bind.
+
+   WHAT THIS FLOOR DOES NOT COVER — `note` and `group`, the other two shapes in
+   RESIZABLE. The measurement above covers `external` / `queue` / `service`; the
+   floor is the worst of those three and is applied to the whole shared resizer.
+   A separate floor for `group` (its `.group-head` banner is 44px and the class
+   itself declares NO min-height, so it can still be dragged to a 10px wrapper)
+   and for `note` would need per-shape values that were not measured here — so it
+   is left as the honest residue rather than a second invented number. `note`'s
+   CSS `min-width: 120px` (styles.css) still floors its WIDTH; `addNodeByLabel`'s
+   90px default height is only reachable at insert time and is not a drag. */
+/** `.node { min-width }` as declared in `src/styles.css`. Mirrored here for one
+ *  reason: so the floor below can be EXPRESSED FROM it rather than invented
+ *  beside it. `checks/round-r-label-resize.mjs` reads both and asserts they
+ *  agree, which is what stops the two numbers drifting apart again. */
+export const CSS_CONTENT_MIN_W = 190;
+/** Worst-case natural content height measured across the shapes sharing this
+ *  resizer — `queue` at 131px (see the header). */
+const CONTENT_MIN_H = 131;
+/** 10px of slack above the binding floor of each axis, for the reasons in the
+ *  header: on W it is what lifts 190 clear of the 199px queue content. */
+const FLOOR_SLACK_PX = 10;
+/** The resizer floors. 200x141 — see the header for each number's derivation. */
+export const NODE_MIN_W = CSS_CONTENT_MIN_W + FLOOR_SLACK_PX;
+export const NODE_MIN_H = CONTENT_MIN_H + FLOOR_SLACK_PX;
+
 /** L3a: handle orientation. A flowchart reads top-to-bottom, and a diamond with
  *  only left/right ports physically cannot express "Yes ↓ / No →". */
 export type HandleMode = 'lr' | 'tb';
@@ -142,8 +217,8 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   // React Flow writes width/height back into node.style, so the size persists.
   const resizer = selected && RESIZABLE.has(shape) ? (
     <NodeResizer
-      minWidth={140}
-      minHeight={80}
+      minWidth={NODE_MIN_W}
+      minHeight={NODE_MIN_H}
       lineClassName="resize-line"
       handleClassName="resize-handle"
     />
