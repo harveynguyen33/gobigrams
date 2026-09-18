@@ -384,9 +384,9 @@ const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteI
 
 const FLOWCHART_PALETTE: PaletteItem[] = [
   fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium'),
-  fc('Process', 'rect · action step', 'process', 'cyan', 'Process step', 'basic', FLOW, ['rect', 'step', 'action', 'task'], 'rect'),
+  fc('Process', 'rect · task', 'process', 'cyan', 'Process step', 'basic', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
   fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'basic', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', {width: 150, height: 96}),
-  fc('Input / Output', 'parallelogram · data', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
+  fc('Input / Output', 'parallelogram', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
   fc('Document', 'wavy base · output', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base'),
   fc('Predefined process', 'double-bar rect', 'subprocess', 'cyan', 'Subprocess', 'flowchart', FLOW, ['subprocess', 'subproc', 'subroutine', 'fr-rect', 'predefined'], 'double-bar rect'),
   fc('Preparation', 'hexagon · setup', 'preparation', 'cyan', 'Initialise', 'flowchart', FLOW, ['initialization', 'initialisation', 'setup', 'init', 'hex'], 'hexagon'),
