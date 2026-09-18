@@ -1,10 +1,18 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-18 (evening) · **Status:** edge-reshaping STEP 1 shipped + a pre-existing data-wipe bug
-fixed; both orchestrator-verified and pushed. **awaiting Harvey's Mac test of the bend slider.**
+**Last session:** 2026-09-18 (night) · **Status:** edge-reshaping **STEP 2 shipped** — a draw.io-style
+draggable midpoint on the selected edge. Orchestrator-verified live and pushed (**`6bb65c2`** on top of the
+coder's **`e1397c0`**). **awaiting Harvey's Mac test of the drag.**
+
+> **The bend SLIDER was geometrically INERT on his own board — his complaint was correct, and measured.**
+> `getSmoothStepPath`'s `stepPosition` slides the cross-bar along the split axis; between two nodes *level*
+> on the perpendicular axis that bar has zero length, so the parameter is discarded. Measured by
+> flattening both paths and comparing geometry: **`e1` (level right→left) = 0.000px across the whole
+> 0→1 sweep**, `e2` (0.5px stagger) = 0.50px, while a diagonal control moved 176px. The slider KEEPS its
+> UI and behaviour (it is real for diagonal edges) — only the drag supersedes it.
 
 > ⚠️ **THIS FILE HAS GIT.** The project became a git repo on 2026-09-18 — private
-> `github.com/harveynguyen33/goblin-diagrams.git`, branch `main`, 6 commits. **`boards/` is gitignored**, so a
+> `github.com/harveynguyen33/goblin-diagrams.git`, branch `main`. **`boards/` is gitignored**, so a
 > clean `git status` is NOT evidence the board file was untouched — compare a hash before/after instead.
 > Older sections below still say "no git"; that is historical, ignore it.
 
@@ -32,6 +40,21 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### Shipped this session (pushed)
 
+- **`e1397c0` — a draw.io-style draggable midpoint on step / smoothstep edges** (edge-reshaping STEP 2).
+  `src/edgeBend.ts` (NEW, pure maths: the generator's routing facts, the gate, the drag patch, and a
+  hand-built path for the collapsed-bar case). `getSmoothStepPath`'s centre is consulted ONLY in its
+  opposite-handle branch, so a stored point elsewhere is a place the line never goes (`effectiveMid`).
+  The one-axis rule is the point: `bendAxis` reads the split the generator ACTUALLY uses, so the drag writes
+  the coordinate it reads. Persisted as `data.bendX` / `data.bendY` — the owned axis ONLY (`applyDrag` also
+  drops the superseded `bend` fraction and the other axis's stale key, so a later node move cannot promote a
+  stale value into the one the generator reads). ONE history entry per gesture (`onBend` 'start'),
+  `onReconnect` clears all three keys. `checks/round-s-edge-bend.mjs` (NEW, all green) incl. a 400-geometry
+  parity sweep proving an untouched board renders byte-identical.
+- **`6bb65c2` — reveal the bend handle only on the SELECTED edge** (orchestrator correction). The first cut
+  showed a fully-opaque handle on EVERY step/smoothstep edge at once — measured: a two-orange-dot board at
+  rest, each dot exactly ON its edge's label, because the handle is painted at the path's
+  `labelX`/`labelY`, which IS the label's anchor. draw.io and Excalidraw both gate on selection, and so did
+  the approved spec. `selected` is React Flow's own flag: the click that selects reveals the handle.
 - **`2644477` — bend-position slider for step/smoothstep edges** (edge-reshaping STEP 1).
   `GoblinEdge` passes `stepPosition` from `data.bend` (absent → `undefined` → RF's 0.5, so old boards render
   unchanged). The inspector slider is **disabled with an honest reason** when the parameter would be silently
@@ -39,6 +62,7 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
   with `getDirection(source→target)` on the primary axis (verified over 9,600 geometries, 0 counterexamples).
   The app's canonical Right→Left flow IS active; Left→Right, same-side and vertical pairs are not. Also disabled
   for bezier/straight. A drag records ONE undo entry (via a new additive `coalesce` option on `updateEdge`).
+  **Measured later: on a LEVEL pair this control is inert (0.000px) — see the note at the top of this file.**
 - **`1cfc888` — stop the label-position and colour controls destroying sibling edge data.** Both passed
   `replaceData=true`, which replaced the WHOLE `data` object; changing label position took
   `{shape, offset, flow, flowCount, flowDuration, strokeKey, bend}` down to `{offset}`. Both patches are
@@ -46,17 +70,19 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**Harvey mouse-tests the bend slider on Mac.** Then decide **STEP 2**: a draggable midpoint dot on the SELECTED
-edge (draw.io's `mxEdgeSegmentHandler.getCurrentPoints` synthesises one for a 2-point edge in ~10 lines).
-Full research + recommendation: `/home/harvey/diagram-studio-research/edges/SYNTHESIS.md` (+ `E1-drawio`,
-`E2-excalidraw`, `E3-reactflow`, probes in `edges/probes/`). Key traps for step 2, already measured: render the
-handle in `EdgeLabelRenderer` (outside the edge's own click handler; needs `pointerEvents:'all'` + `scale(1/zoom)`),
-persist into `edge.data`, and note `GoblinEdge` rebases `labelX/labelY` onto the straight source→target line so a
-custom path's label coordinate gets shifted.
+**Harvey mouse-tests the midpoint drag on Mac.** Click a step/smoothstep line → an orange dot appears at the
+middle of it → drag it (one axis) and the line follows. Undo restores it in ONE step.
+Known behaviours to expect, all measured: the handle is **off-axis to the line and vertical** on his level
+`e1` (the horizontal bar is collapsed there, so vertical is the only direction that can bend it); the
+**label moves with the drag** — unavoidable, because the handle is painted at the generator's own path
+midpoint, which IS the label's anchor; the handle shows **only on the selected edge**, and the click that
+selects is the click that reveals it.
 
-**Vault debt:** steps 1–2 of edge reshaping (bend slider + data-wipe fix) are NOT yet in ADR-031 / Change Log —
-batch on the next go via pkm.
+**Vault debt:** edge reshaping — the bend slider (STEP 1 + the data-wipe fix) AND the drag (STEP 2) are NOT
+yet in ADR-031 / Change Log. Batch on the next go via pkm. `checks/round-s-edge-bend.mjs` is the new harness
+(9 files in `checks/` now).
 
+## ✅ ROUND S 2026-09-18 — draw.io-style draggable midpoint on the selected edge
 ## ✅ ROUND Q 2026-09-18 — edge endpoints draggable (reconnect)
 ## ✅ ROUND P 2026-09-18 — reload flicker, boot flash, checklist toast
 ## ✅ ROUND O 2026-09-17/18 — 2 borders, node toolbar removed, helper width, shape hints, sidebar badge, board dialog
