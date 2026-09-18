@@ -197,7 +197,10 @@ type Pending = {
 function resolveTarget(e: PointerEvent): LongPressTarget | null {
   const el = e.target as HTMLElement | null;
   if (!el || typeof el.closest !== 'function') return null;
-  if (el.closest('.react-flow__handle')) return null;
+  // ROUND S: a press that STARTS on the draggable midpoint of an edge is a bend
+  // drag, not a menu gesture — resolving it to nothing keeps the long-press
+  // menu from opening out of the middle of a line.
+  if (el.closest('.react-flow__handle') || el.closest('.edge-bend-handle')) return null;
 
   const nodeEl = el.closest('.react-flow__node') as HTMLElement | null;
   if (nodeEl) {

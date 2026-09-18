@@ -2,9 +2,17 @@ import {memo, useEffect, useMemo, useRef, useState} from 'react';
 import {
   BaseEdge, EdgeLabelRenderer,
   getBezierPath, getSmoothStepPath, getStraightPath,
+  useStore,
   type EdgeProps,
 } from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from './colors';
+import {
+  // ROUND S — the midpoint drag. `bendSupport` is the SAME gate the inspector's
+  // slider uses (moved into `edgeBend`, and now reached with the geometry this
+  // component already holds), so the two controls agree by construction.
+  bendGate, bendRender, drawnMid, needsCustom,
+  type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
+} from './edgeBend';
 
 /**
  * Inline SVG paths for the flow-icon animation. 24×24 viewBox, stroke geometry
@@ -63,6 +71,16 @@ const GoblinEdge = memo((props: EdgeProps) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  /** ROUND S — the pane this edge is drawn in: the drag converts pointer
+   *  positions against its rect, and the element is found from the handle
+   *  itself rather than from a prop, because an edge component is rendered by
+   *  React Flow and is handed no viewport reference. */
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  /** The live `[x, y, zoom]` — the same store value React Flow's own
+   *  `screenToFlowPosition` reads, and the same one the label's counter-scale
+   *  below needs. Subscribing here re-renders on pan/zoom only, exactly like
+   *  every other edge on the canvas. */
+  const t = useStore(s => s.transform);
 
   const d = (data ?? {}) as {
     shape?: string;
@@ -90,6 +108,15 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  resolves to React Flow's own 0.5 default inside the generator, so a
      *  board that has never carried a `bend` renders byte-identical. */
     bend?: number;
+    /** ROUND S (2026-09-18): the ABSOLUTE point the midpoint was dragged to,
+     *  one key per axis, and only ever the axis the drag owns — see
+     *  `edgeBend.dragPatch`. Absent means "never dragged". */
+    bendX?: number;
+    bendY?: number;
+    /** ROUND S: the drag callback, threaded per-edge exactly like
+     *  `onCommitLabel` — the handler lives in `App` because it writes `edges`
+     *  state; this component only reports where the pointer went. */
+    __onBend?: (id: string, W: Pt, phase: BendPhase) => void;
   };
 
   /** FB-L: one reader for the mode, used by both editor entry points. */
@@ -115,6 +142,35 @@ const GoblinEdge = memo((props: EdgeProps) => {
   let path = '';
   let labelX = (sourceX + targetX) / 2;
   let labelY = (sourceY + targetY) / 2;
+
+  /* ROUND S — the geometry this edge was handed, in the shape `edgeBend` models.
+     `sourcePosition`/`targetPosition` ARE the `Side4` values (React Flow hands
+     the edge the `Position` of each end), so no lookup is needed. */
+  const bGeo: BendGeo | null = kind === 'step' || kind === 'smoothstep'
+    ? {
+        s: {x: sourceX, y: sourceY}, t: {x: targetX, y: targetY},
+        sp: sourcePosition as Side4, tp: targetPosition as Side4,
+      }
+    : null;
+  /* The gate — the same predicate that enables the inspector's slider. `axis` is
+     the coordinate the drag owns on this geometry. */
+  const bendInfo = useMemo(
+    () => (bGeo ? bendGate(bGeo) : {active: false, axis: null as BendAxis | null}),
+    [kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
+  );
+  /** The drag is offered only on an edge whose bend reaches the path, and never
+   *  in review mode — the handle is an editing affordance (FB-L). */
+  const bendDraggable = bendInfo.active && !ro;
+  /** The point the edge is DRAWN through right now: the stored coordinate on the
+   *  axis the drag owns, the step-position fraction `bend` if the slider set one,
+   *  and the generator's own 0.5 midpoint otherwise. */
+  const W: Pt | null = bGeo ? drawnMid(bGeo, d.bendX, d.bendY, d.bend) : null;
+  // ROUND S — where the drag handle is drawn: the generator's own midpoint for
+  // this edge, which is what `bendRender` returns as `labelX`/`labelY` and what
+  // the label above is positioned on. On an untouched edge that is the middle of
+  // the line (the synthesised point draw.io starts the user from), so the handle
+  // cannot appear anywhere the line does not go.
+
   // STEP 1: the bend position is passed THROUGH, never defaulted here.
   // `getSmoothStepPath`'s own signature defaults `stepPosition = 0.5`
   // (@xyflow/system index.js:1411), and it reads the value only inside the
@@ -123,19 +179,81 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // board's path is unchanged — which is the whole reason this is passed as
   // `undefined` rather than an explicit 0.5.
   const stepPosition = d.bend;
+  /* ROUND S — HOW THE TWO ROUTES ARE KEPT APART, because they must not disagree:
+
+     A bend-capable edge with NO stored point takes the GENERATOR route below,
+     with `stepPosition` exactly as before — so a board that has never been
+     dragged renders byte-identical (harness (a)). A point exists only once the
+     user has dragged, and from then on the path goes through `bendRender`, which
+     passes the same generator an explicit centre AND takes its label from that
+     same call — so the label and the handle sit ON the line the user dragged,
+     instead of on the fraction the generator stopped reading. */
   try {
     if (kind === 'straight') {
       [path, labelX, labelY] = getStraightPath(pathOpts);
     } else if (kind === 'step') {
-      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 0, stepPosition});
+      if (bGeo && bendInfo.active) {
+        const r = bendRender(bGeo, W!, 0, needsCustom(bGeo, d.bendX, d.bendY));
+        [path, labelX, labelY] = [r.path, r.labelX, r.labelY];
+      } else {
+        [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 0, stepPosition});
+      }
     } else if (kind === 'smoothstep') {
-      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 12, stepPosition});
+      if (bGeo && bendInfo.active) {
+        const r = bendRender(bGeo, W!, 12, needsCustom(bGeo, d.bendX, d.bendY));
+        [path, labelX, labelY] = [r.path, r.labelX, r.labelY];
+      } else {
+        [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 12, stepPosition});
+      }
     } else {
       [path, labelX, labelY] = getBezierPath(pathOpts);
     }
   } catch {
     [path, labelX, labelY] = getStraightPath(pathOpts);
   }
+
+  // The handle's own position: the path's midpoint, which is the label's own
+  // anchor and the point on the line the user grabs.
+  const handleAt = {x: labelX, y: labelY};
+
+  /** ROUND S — pointerdown on the midpoint handle, draw.io's mechanic.
+   *
+   *  ONE history entry at the START of the gesture (`App.onBend`), never per
+   *  move. `stopPropagation` keeps React Flow's own edge click handler out of
+   *  the gesture; the pointer is captured so a fast drag survives leaving the
+   *  14px disc, and the listeners live on `document` because this element is
+   *  re-rendered by every write the drag itself triggers. */
+  const onBendDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const cb = d.__onBend;
+    if (!cb || !bGeo || !bendInfo.active) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const el = e.currentTarget;
+    el.setPointerCapture?.(e.pointerId);
+    cb(id, {x: 0, y: 0}, 'start');
+    /** Client → flow coordinates. The DOM rect is the PANE's (see the note by
+     *  the viewport `ref` in App), and RF's own `transform` is exactly the
+     *  `[x, y, zoom]` that maps flow coords into it, so this is RF's own
+     *  `screenToFlowPosition` arithmetic without needing the instance. */
+    const toFlow = (ev: PointerEvent): Pt | null => {
+      const b = paneRef.current?.getBoundingClientRect();
+      if (!b) return null;
+      return {x: (ev.clientX - b.left - t[0]) / t[2], y: (ev.clientY - b.top - t[1]) / t[2]};
+    };
+    const move = (ev: PointerEvent) => {
+      const p = toFlow(ev);
+      if (p) cb(id, p, 'move');
+    };
+    const up = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      el.releasePointerCapture?.(ev.pointerId);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+  };
 
   const labelOffset = {center: 0.5, start: 0.25, end: 0.75}[d.offset ?? 'center'];
   const lx = sourceX + (targetX - sourceX) * labelOffset + (labelX - (sourceX + targetX) / 2);
@@ -273,8 +391,30 @@ const GoblinEdge = memo((props: EdgeProps) => {
       {/* K1 perf-guard + K3 gating target the same wrapper class. */}
       {payloads && <g className="ds-animated-payload" pointerEvents="none">{payloads}</g>}
 
-      {(shown || editing || d.techn) && (
+      {(shown || editing || d.techn || bendDraggable) && (
         <EdgeLabelRenderer>
+          {/* ROUND S — the draggable midpoint, draw.io's mechanic: a SYNTHESISED
+              point, so even an edge that has never stored a waypoint is
+              immediately draggable, and a drag that moves along ONE axis (the
+              other coordinate is inherited from the line) so the result stays
+              square. Counter-scaled by `1/zoom` inside the transform like the
+              label: the hit target stays the same size on screen at every zoom,
+              and scaling about the element's own centre avoids the
+              transform-origin footgun the node resize grips work around. The
+              invisible `::after` ring in the stylesheet takes it to a ~32px tap
+              target. */}
+          {bendDraggable && (
+            <div
+              /* the pane is walked up to here rather than passed down: an edge
+                 component receives no viewport ref */
+              ref={el => {paneRef.current = el?.closest('.react-flow__pane') as HTMLDivElement | null;}}
+              className="edge-bend-handle"
+              data-edge-id={id}
+              title="Drag to bend this line"
+              style={{transform: `translate(-50%,-50%) translate(${handleAt.x}px, ${handleAt.y}px) scale(${1 / t[2]})`}}
+              onPointerDown={onBendDown}
+            />
+          )}
           <div
             className={`edge-label${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
             data-edge-id={id}

@@ -3087,3 +3087,28 @@ kbd {
   line-height: 1.5;
   color: var(--dim2);
 }
+
+/* ---------------------------------------------------------------------------
+   ROUND S — the draggable midpoint of a selected step / smoothstep edge.
+
+   draw.io's mechanic: click the line, one handle appears at the middle of the
+   line, drag it and the line follows — along ONE axis, so it stays square.
+
+   Tokens only, no literal colours, so the handle recolours with the theme like
+   every other canvas control. The stacking level is 6 because the node's own
+   controls occupy 5 and 2 (the connection dots and the resize grips), and this
+   disc has to be hittable where a line passes close to a node's edge.
+   `::after` is an invisible ring, the same technique as
+   `.react-flow__handle::after` and the resize grips: 14px painted, ~32px
+   tappable, with no layout effect.
+--------------------------------------------------------------------------- */
+.edge-bend-handle {
+  position: absolute; pointer-events: all; cursor: grab;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--elevated); border: 2px solid var(--acc);
+  touch-action: none; z-index: 6;
+}
+.edge-bend-handle:hover,
+.edge-bend-handle:active { background: var(--sel); border-color: var(--sel); }
+.edge-bend-handle:active { cursor: grabbing; }
+.edge-bend-handle::after { content: ''; position: absolute; inset: -9px; }

@@ -14,6 +14,13 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
+import {
+  // ROUND S — the bend predicate itself (`SIDE_OUT`, `OPPOSITE_SIDE`,
+  // `STEP_GAP_PX`, `isSide4`, `bendActive4`) lives in `edgeBend.ts` now, so the
+  // inspector's slider gate and the drag handle's gate are the SAME rule.
+  bendActive4, bendAxis, applyDrag, drawnMid, isSide4,
+  type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
+} from './edgeBend';
 
 import DiagramNode, {type NodeKind} from './DiagramNode';
 import LabelNode, {type LabelKind} from './LabelNode';
@@ -184,8 +191,15 @@ type EdgeData = {
   offset?: 'center' | 'start' | 'end';
   /** STEP 1 (2026-09-18): the stored bend position for a step / smoothstep
    *  route — the fraction `getSmoothStepPath` calls `stepPosition` (0..1).
-   *  Absent means "never set", which the generator resolves to its own 0.5. */
+   *  Absent means "never set", which the generator resolves to its own 0.5.
+   *  WRITTEN BY THE SLIDER ONLY — a drag supersedes it and deletes it. */
   bend?: number;
+  /** ROUND S (2026-09-18): the ABSOLUTE point the selected edge's midpoint was
+   *  dragged to, one key per axis and only ever the axis the drag owns (see
+   *  `edgeBend.dragPatch`). Absent means "never dragged", and the drawn W then
+   *  falls back to the fraction above. */
+  bendX?: number;
+  bendY?: number;
 };
 
 /* ---------------------------------------------------------------------------
@@ -357,22 +371,15 @@ const nodeH = (n: Node) => (n.measured?.height ?? n.height ?? 60) as number;
    `getSmoothStepPath({stepPosition: 0.1})` with `0.9` and asserts the path
    differs precisely when this predicate says it will — 0 counterexamples.
 --------------------------------------------------------------------------- */
-type Side4 = 'left' | 'right' | 'top' | 'bottom';
-
-const OPPOSITE_SIDE: Record<Side4, Side4> = {left: 'right', right: 'left', top: 'bottom', bottom: 'top'};
-/** The generator's own `handleDirections` table (@xyflow/system `index.js:1223`). */
-const SIDE_OUT: Record<Side4, {x: number; y: number}> = {
-  left: {x: -1, y: 0}, right: {x: 1, y: 0}, top: {x: 0, y: -1}, bottom: {x: 0, y: 1},
-};
-/** React Flow's own `offset` default in `getSmoothStepPath` (`index.js:1411`). */
-const STEP_GAP_PX = 20;
-
-const isSide4 = (v: unknown): v is Side4 =>
-  v === 'left' || v === 'right' || v === 'top' || v === 'bottom';
+/* ROUND S — `Side4`, the two side tables, `STEP_GAP_PX`, `isSide4` and the
+   predicate itself now live in `src/edgeBend.ts`. ONE definition of the rule,
+   shared by the slider's gate (`bendSupport` below) and the drag handle's gate
+   in `GoblinEdge`, so the two controls can never disagree about whether a bend
+   position reaches the path. */
 
 /** Midpoint of one named side of a node — the same anchor React Flow hands the
  *  edge component as `sourceX`/`sourceY` (see `GoblinEdge`'s props). */
-const sideAnchor = (n: Node, side: Side4): {x: number; y: number} => {
+const sideAnchor = (n: Node, side: Side4): Pt => {
   const w = nodeW(n), h = nodeH(n);
   if (side === 'right')  return {x: n.position.x + w,     y: n.position.y + h / 2};
   if (side === 'left')   return {x: n.position.x,         y: n.position.y + h / 2};
@@ -380,50 +387,48 @@ const sideAnchor = (n: Node, side: Side4): {x: number; y: number} => {
   return {x: n.position.x + w / 2, y: n.position.y + h};
 };
 
-/** Does this geometry route through a split at the SOURCE handle, and is that
- *  split perpendicular to the source handle's own direction? Only then does
- *  `stepPosition` reach the path. */
-function bendActive(s: {x: number; y: number}, t: {x: number; y: number}, sp: Side4, tp: Side4): boolean {
-  if (OPPOSITE_SIDE[sp] !== tp) return false;            // the opposite-handle case only
-  const od = SIDE_OUT[sp];
-  const sGap = {x: s.x + od.x * STEP_GAP_PX, y: s.y + od.y * STEP_GAP_PX};
-  const td = SIDE_OUT[tp];
-  const tGap = {x: t.x + td.x * STEP_GAP_PX, y: t.y + td.y * STEP_GAP_PX};
-  // The generator's `getDirection` (index.js:1229): left/right reads the X
-  // sign, top/bottom reads the Y sign.
-  const overall = (sp === 'left' || sp === 'right')
-    ? (sGap.x < tGap.x ? {x: 1, y: 0} : {x: -1, y: 0})
-    : (sGap.y < tGap.y ? {x: 0, y: 1} : {x: 0, y: -1});
-  const axis = overall.x !== 0 ? 'x' : 'y';
-  return od[axis] === overall[axis];
-}
-
-/** Is a bend position meaningful for this edge, and if not, why not? One honest
- *  line either way, so the inspector never ships a dead control. */
-const bendSupport = (e: Edge, nodes: Node[]): {active: boolean; why: string} => {
-  if (e.type !== 'step' && e.type !== 'smoothstep') {
-    return {active: false, why: 'Only step and smoothstep lines have a bend position.'};
-  }
+/** ROUND S — an edge's geometry as `edgeBend` wants it: the node sides it
+ *  actually leaves and arrives on. Null when either end is not a node side (an
+ *  ERD column handle, or a node that is not on this board). The stored handle id
+ *  IS the Position value (`DiagramNode` names its handles `left`/`right`/
+ *  `top`/`bottom`); when one was never stored, fall back to the connected node's
+ *  own `data.handles` — the same authority `migrateEdgeEnds` uses. */
+const edgeGeo = (e: Edge, nodes: Node[]): BendGeo | null => {
   const source = nodes.find(n => n.id === e.source);
   const target = nodes.find(n => n.id === e.target);
-  if (!source || !target) {
-    return {active: false, why: "This edge's routing ignores a bend position."};
-  }
-  // The stored handle id IS the Position value (DiagramNode.tsx names its
-  // handles `left` / `right` / `top` / `bottom`). When one was never stored,
-  // fall back to the connected node's own `data.handles` — the same authority
-  // `migrateEdgeEnds` uses — and treat anything else (an ERD column handle)
-  // as "no bend", since this predicate describes a node-side split only.
+  if (!source || !target) return null;
   const sFrom = handleSidesOf(source).source;
   const tFrom = handleSidesOf(target).target;
   const sp = isSide4(e.sourceHandle) ? e.sourceHandle : (isSide4(sFrom) ? sFrom : null);
   const tp = isSide4(e.targetHandle) ? e.targetHandle : (isSide4(tFrom) ? tFrom : null);
-  if (!sp || !tp) {
-    return {active: false, why: "This edge's routing ignores a bend position."};
+  if (!sp || !tp) return null;
+  return {s: sideAnchor(source, sp), t: sideAnchor(target, tp), sp, tp};
+};
+
+/** ROUND S — `edgeMid` (the W an edge is drawn through) lives in `GoblinEdge`,
+ *  which already holds the two anchors and the two handle sides; the app version
+ *  would have to re-derive them and could disagree. */
+
+/** Is a bend position meaningful for this edge, and if not, why not? One honest
+ *  line either way, so the inspector never ships a dead control.
+ *
+ *  ROUND S: this still gates the SLIDER and keeps its contract — it additionally
+ *  hands back the geometry and the axis the drag owns, so the handle in
+ *  `GoblinEdge` and this gate are one rule. `axis` is non-null exactly when
+ *  `active` is. */
+const bendSupport = (
+  e: Edge, nodes: Node[],
+): {active: boolean; why: string; geo: BendGeo | null; axis: BendAxis | null} => {
+  if (e.type !== 'step' && e.type !== 'smoothstep') {
+    return {active: false, why: 'Only step and smoothstep lines have a bend position.', geo: null, axis: null};
   }
-  return bendActive(sideAnchor(source, sp), sideAnchor(target, tp), sp, tp)
-    ? {active: true, why: ''}
-    : {active: false, why: "This edge's routing ignores a bend position."};
+  const geo = edgeGeo(e, nodes);
+  if (!geo) {
+    return {active: false, why: "This edge's routing ignores a bend position.", geo: null, axis: null};
+  }
+  return bendActive4(geo)
+    ? {active: true, why: '', geo, axis: bendAxis(geo)}
+    : {active: false, why: "This edge's routing ignores a bend position.", geo: null, axis: null};
 };
 
 /** The stored bend fraction, or React Flow's own default when never set. */
@@ -1642,7 +1647,15 @@ export default function App() {
   // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     pushHistory();
-    setEdges(es => reconnectEdge(oldEdge, newConnection, es));
+    // ROUND S: a waypoint measured against the OLD endpoints is nonsense the
+    // moment an end moves, so all three bend keys go with it. Nothing else on
+    // the edge's data is touched — type, styling, label and flow survive.
+    setEdges(es => reconnectEdge(oldEdge, newConnection, es).map(e => {
+      if (e.id !== oldEdge.id) return e;
+      const data = {...((e.data ?? {}) as EdgeData)};
+      delete data.bend; delete data.bendX; delete data.bendY;
+      return {...e, data};
+    }));
   }, [pushHistory, setEdges]);
 
   // ---- Part C: connect on drop over a NODE ------------------------------
@@ -1832,6 +1845,33 @@ export default function App() {
     setSelEdgeId(id);
   }, [tickTask, pushHistory, setEdges]);
 
+  /** ROUND S — the midpoint drag, draw.io's mechanic.
+   *
+   *  `'start'` records ONE history entry and selects the edge, exactly like
+   *  `onNodeDragStart` / `onReconnect`: history belongs at the start of a
+   *  gesture, never per pointermove, or a 200-event drag would bury the user's
+   *  older undo steps.
+   *
+   *  `'move'` writes ONLY the coordinate the drag owns (`dragPatch`) and drops
+   *  the stale `stepPosition` fraction — once an absolute point is stored the
+   *  generator stops reading the fraction, and a value nothing reads is a dead
+   *  control in the board file. It deliberately does NOT route through
+   *  `updateEdge`: that is keyed on `selEdgeId`, so on the very first move (the
+   *  one that selects the edge) it would write to the WRONG edge. */
+  const onBend = useCallback((id: string, W: Pt, phase: BendPhase) => {
+    if (phase === 'start') {
+      pushHistory();
+      setSelEdgeId(id);
+      return;
+    }
+    setEdges(es => es.map(e => {
+      if (e.id !== id) return e;
+      const geo = edgeGeo(e, nodesRef.current);
+      if (!geo) return e;
+      return {...e, data: applyDrag((e.data ?? {}) as EdgeData, bendAxis(geo), W)};
+    }));
+  }, [pushHistory, setEdges]);
+
   /* ROUND S (2026-09-18) — the Text node's in-place editor commits here.
 
      A DELIBERATE SIBLING OF `update()` (App.tsx:1682), not a second
@@ -1885,6 +1925,10 @@ export default function App() {
           ...((e.data ?? {}) as EdgeData),
           __type: e.type,
           onCommitLabel,
+          // ROUND S: the midpoint drag. Per-edge, like the two callbacks above
+          // — the edge renderer owns the handle and reports a pointer position;
+          // the handler lives here because it writes `edges` state.
+          __onBend: onBend,
           // FB-L: the edge renderer owns the label's inline editor, so the
           // review-mode flag has to reach it per-edge — same shape as the two
           // keys above. Read-only keeps the label readable; it never opens the
@@ -1893,7 +1937,7 @@ export default function App() {
         },
       };
     }),
-    [edges, onCommitLabel, readOnly],
+    [edges, onCommitLabel, readOnly, onBend],
   );
 
   /** L3c: the symbolic keys whose crow's-foot glyphs this board needs. Keyed by
@@ -3548,7 +3592,11 @@ export default function App() {
       </aside>
 
       {/* CENTER — canvas */}
-      <main className="canvas-wrap" ref={wrap} onDrop={onDrop} onDragOver={e => e.preventDefault()}>
+      <main
+          className="canvas-wrap"
+          ref={wrap}
+          onDrop={onDrop}
+          onDragOver={e => e.preventDefault()}>
         <div className="toolbar">
           <Tooltip label="Undo — Cmd/Ctrl+Z">
             <button className="tbtn-icon" aria-label="Undo" disabled={!canUndo} onClick={undo}><Undo2 size={15} /></button>
