@@ -7,12 +7,18 @@ import {
 } from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from './colors';
 import {
-  // ROUND T — the midpoint drag. A STORED waypoint routes through `freePath`
-  // (it reads both coordinates); no waypoint routes through the generator
-  // unchanged. That is `needsCustom` exactly, so the renderer and `App`'s
-  // condition cannot disagree, and an untouched board cannot move by a pixel.
-  // `bendDraggable4` is now only the HANDLE's gate.
-  bendDraggable4, dragAxis, drawnMid, freePath, needsCustom,
+  // ROUND T — the midpoint drag. A STORED waypoint routes through our own path
+  // for the edge's own kind (they all read both coordinates); no waypoint routes
+  // through the generator unchanged. That is `needsCustom` exactly, so the
+  // renderer and `App`'s condition cannot disagree, and an untouched board
+  // cannot move by a pixel. `bendDraggable4` is now only the HANDLE's gate, and
+  // only for the orthogonal kinds.
+  // ROUND U — `bezierPath`/`straightPath` are the free kinds' own routes, and
+  // `isFreeBendKind`/`bendAxisFor` are the ONE axis decision shared with `App`:
+  // `'free'` on those kinds (no lock, both keys written), draw.io's pointer rule
+  // on `step`/`smoothstep` (unchanged).
+  bendDraggable4, bendAxisFor, drawnMid, freePath, isFreeBendKind, needsCustom,
+  bezierPath, straightPath,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
 
@@ -158,31 +164,50 @@ const GoblinEdge = memo((props: EdgeProps) => {
 
   /* ROUND S — the geometry this edge was handed, in the shape `edgeBend` models.
      `sourcePosition`/`targetPosition` ARE the `Side4` values (React Flow hands
-     the edge the `Position` of each end), so no lookup is needed. */
-  const bGeo: BendGeo | null = kind === 'step' || kind === 'smoothstep'
-    ? {
-        s: {x: sourceX, y: sourceY}, t: {x: targetX, y: targetY},
-        sp: sourcePosition as Side4, tp: targetPosition as Side4,
-      }
-    : null;
+     the edge the `Position` of each end), so no lookup is needed.
+
+     ROUND U — BUILT FOR EVERY KIND, not just the orthogonal two: a bezier or a
+     straight edge has the same two anchors and the same two handle sides, so the
+     geometry is exactly as meaningful there, and `bendActive` below needs it to
+     offer a handle. It is no longer the `step`-only key that made `bGeo` null. */
+  const bGeo: BendGeo = {
+    s: {x: sourceX, y: sourceY}, t: {x: targetX, y: targetY},
+    sp: sourcePosition as Side4, tp: targetPosition as Side4,
+  };
   /* The gate — is a midpoint handle offered on this geometry at all? ROUND T:
      every OPPOSITE-side pair, and nothing else. There is no per-geometry axis
      any more: the drag is 2-D everywhere and the axis is decided per gesture
-     from the POINTER (see `onBendDown`/`edgeBend.dragAxis`). */
+     from the POINTER (see `onBendDown`/`edgeBend.bendAxisFor`).
+
+     ROUND U — EVERY KIND THIS COMPONENT RENDERS OFFERS ONE. `bendDraggable4` is
+     about the orthogonal split (it rejects a same-side pair, where a waypoint
+     would read as a second elbow); `bezier`/`straight` have no split at all, so
+     consulting it there would be meaningless — they are always draggable. The
+     `selected && !ro` gate below still applies to all four kinds. */
   const bendActive = useMemo(
-    () => (bGeo ? bendDraggable4(bGeo) : false),
+    () => (isFreeBendKind(kind) ? true : bendDraggable4(bGeo)),
     [kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
   );
   /** ROUND T — the cursor the handle shows, which is draw.io's own feedback for
    *  a locked axis and the detail that makes the lock readable rather than
    *  mysterious: `col-resize` while dragging horizontally, `row-resize`
    *  vertically, `grab` at rest, `grabbing` for the first pixels before the axis
-   *  is decided. */
+   *  is decided.
+   *
+   *  ROUND U — on the FREE kinds (`bezier`/`straight`) there is NO axis to
+   *  advertise, so the cursor stays `grabbing` for the whole gesture there (see
+   *  the lock below). Showing `col-resize`/`row-resize` would be a lie: both
+   *  coordinates move, always. */
   const [dragCursor, setDragCursor] = useState<'grab' | 'grabbing' | 'col-resize' | 'row-resize'>('grab');
   /** The axis of the gesture in flight: decided ONCE, on the first move whose
    *  delta passes the lock threshold, and held to the end — a per-move decision
    *  would flicker and make the line judder. A ref, not state: it is read inside
-   *  the pointermove closure and must not re-render on every move. */
+   *  the pointermove closure and must not re-render on every move.
+   *
+   *  ROUND U — this is ONLY a "has the gesture started moving" latch now, and it
+   *  holds `'free'` on the free kinds. No projection is decided here: the AXIS
+   *  ITSELF is re-derived per move by `bendAxisFor` at the one place that needs
+   *  it (the writer in `App`), so what is written is decided once, there. */
   const lockAxis = useRef<BendAxis | null>(null);
   /** The drag is offered only on an edge whose bend reaches the path, and never
    *  in review mode — the handle is an editing affordance (FB-L).
@@ -203,11 +228,14 @@ const GoblinEdge = memo((props: EdgeProps) => {
   /** The point the edge is DRAWN through right now: the stored coordinate per
    *  axis, the legacy step-position fraction an old board may still carry, and
    *  the generator's own 0.5 midpoint otherwise. */
-  const W: Pt | null = bGeo ? drawnMid(bGeo, d.bendX, d.bendY, d.bend) : null;
+  const W: Pt = drawnMid(bGeo, d.bendX, d.bendY, d.bend);
   /** ROUND T — does this edge route through OUR path or the generator's? The
    *  SAME condition `App` uses, and the one the drag is gated on: a stored bend
-   *  key means `freePath`, nothing stored means the generator untouched. */
-  const custom = bGeo ? needsCustom(bGeo, d.bendX, d.bendY) : false;
+   *  key means our own route, nothing stored means the generator untouched.
+   *  ROUND U: unchanged, and it is what gives the new kinds their parity for
+   *  free — it looks at the KEYS only, so an untouched bezier/straight edge
+   *  never leaves the generator. */
+  const custom = needsCustom(bGeo, d.bendX, d.bendY);
 
   // STEP 1: the legacy step fraction is passed THROUGH, never defaulted here.
   // `getSmoothStepPath`'s own signature defaults `stepPosition = 0.5`
@@ -229,24 +257,38 @@ const GoblinEdge = memo((props: EdgeProps) => {
      The gate is `custom`, NOT the handle's gate (`bendActive`): a board from an
      older pass may carry a stored key on a geometry that would not offer a
      handle today (the gate used to be narrower), and such a key must still be
-     drawn by the same route the drag writes. */
+     drawn by the same route the drag writes.
+
+     ROUND U — ONE ROUTE PER KIND, all four, chosen by `custom` alone. A kind
+     SWITCH with a point stored therefore keeps honouring the point (each kind's
+     own route reads `W`), and an untouched edge of any kind still calls its
+     generator verbatim — that is the whole of the parity claim. */
   try {
     if (kind === 'straight') {
-      [path, labelX, labelY] = getStraightPath(pathOpts);
+      if (custom) {
+        [path, labelX, labelY] = straightPath(bGeo, W);
+      } else {
+        [path, labelX, labelY] = getStraightPath(pathOpts);
+      }
     } else if (kind === 'step') {
-      if (bGeo && custom) {
-        [path, labelX, labelY] = freePath(bGeo, W!, 0);
+      if (custom) {
+        [path, labelX, labelY] = freePath(bGeo, W, 0);
       } else {
         [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 0, stepPosition});
       }
     } else if (kind === 'smoothstep') {
-      if (bGeo && custom) {
-        [path, labelX, labelY] = freePath(bGeo, W!, 12);
+      if (custom) {
+        [path, labelX, labelY] = freePath(bGeo, W, 12);
       } else {
         [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 12, stepPosition});
       }
     } else {
-      [path, labelX, labelY] = getBezierPath(pathOpts);
+      // bezier / goblinEdge / custom — the free curved kind.
+      if (custom) {
+        [path, labelX, labelY] = bezierPath(bGeo, W);
+      } else {
+        [path, labelX, labelY] = getBezierPath(pathOpts);
+      }
     }
   } catch {
     [path, labelX, labelY] = getStraightPath(pathOpts);
@@ -265,13 +307,19 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  re-rendered by every write the drag itself triggers.
    *
    *  ROUND T — THE AXIS IS DECIDED FROM THE POINTER, ONCE. `dx`/`dy` accumulate
-   *  from the gesture's own origin; the first move whose delta passes 3px picks
-   *  the axis (`edgeBend.dragAxis`) and `lockAxis` HOLDS it for the rest of the
-   *  gesture, so the line cannot judder between axes mid-drag. The cursor follows
-   *  the lock, which is the feedback that makes the lock readable. */
+   *  from the gesture's own origin; the first move whose delta passes 3px starts
+   *  the gesture and holds `lockAxis` for the rest of it, so the line cannot
+   *  judder between axes mid-drag. The cursor follows the lock, which is the
+   *  feedback that makes the lock readable.
+   *
+   *  ROUND U — the lock is decided by the KIND (`bendAxisFor`, the same call
+   *  `App` makes): `'h'`/`'v'` on `step`/`smoothstep` as before, `'free'` on
+   *  `bezier`/`straight`, where there is no axis — both coordinates are written on
+   *  every move and the cursor stays `grabbing` (no `col-resize`/`row-resize`,
+   *  because there is no axis to advertise). */
   const onBendDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const cb = d.__onBend;
-    if (!cb || !bGeo || !bendActive) return;
+    if (!cb || !bendActive) return;
     e.stopPropagation();
     e.preventDefault();
     const el = e.currentTarget;
@@ -302,8 +350,12 @@ const GoblinEdge = memo((props: EdgeProps) => {
         // has not chosen yet — which `applyDrag` now PRESERVES, so it would
         // survive as a real (tiny) bend on the axis the user never pulled.
         if (Math.hypot(dx, dy) <= LOCK_PX) return;
-        lockAxis.current = dragAxis(bGeo, dx, dy);
-        setDragCursor(lockAxis.current === 'h' ? 'col-resize' : 'row-resize');
+        lockAxis.current = bendAxisFor(kind, bGeo, dx, dy);
+        // the cursor only follows a REAL axis: on the free kinds the value is
+        // `'free'` and the handle keeps showing `grabbing`.
+        if (lockAxis.current !== 'free') {
+          setDragCursor(lockAxis.current === 'h' ? 'col-resize' : 'row-resize');
+        }
       }
       cb(id, p, 'move', dx, dy);
     };
@@ -469,9 +521,12 @@ const GoblinEdge = memo((props: EdgeProps) => {
           {/* ROUND S/T — the draggable midpoint, draw.io's mechanic: a SYNTHESISED
               point, so even an edge that has never stored a waypoint is
               immediately draggable. ROUND T: the drag is FREE IN 2-D — the axis
-              is locked per gesture from the POINTER and `freePath` reads BOTH
-              coordinates — so this handle moves up/down AND left/right, which is
-              the complaint this round exists to fix. Counter-scaled by `1/zoom`
+              is locked per gesture from the POINTER and the route reads BOTH
+              coordinates — so this handle moves up/down AND left/right.
+              ROUND U: the same affordance on ALL FOUR kinds; on `bezier`/
+              `straight` there is no axis lock at all and BOTH coordinates are
+              written on every move (the cursor stays `grabbing` there).
+              Counter-scaled by `1/zoom`
               inside the transform like the label: the hit target stays the same
               size on screen at every zoom, and scaling about the element's own
               centre avoids the transform-origin footgun the node resize grips

@@ -17,10 +17,14 @@ import '@xyflow/react/dist/style.css';
 import {
   // ROUND T — the bend rules (`SIDE_OUT`, `OPPOSITE_SIDE`, `STEP_GAP_PX`,
   // `isSide4`) and the drag's own maths live in `edgeBend.ts`: the geometry a
-  // handler needs, the axis rule the POINTER decides (`dragAxis`), the writer
-  // (`applyDrag`) and the base point (`drawnMid`). The renderer's route is
-  // `freePath` on a stored waypoint and the generator otherwise (`needsCustom`).
-  dragAxis, applyDrag, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
+  // handler needs, the axis rule the POINTER decides (`dragAxis`) and the
+  // kind-aware wrapper (`bendAxisFor`), the writer (`applyDrag`) and the base
+  // point (`drawnMid`). The renderer's route is our own path on a stored
+  // waypoint and the generator otherwise (`needsCustom`).
+  // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with
+  // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
+  // are written, and no axis is projected.
+  applyDrag, bendAxisFor, dragPoint, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
 
@@ -1822,21 +1826,26 @@ export default function App() {
    *  gesture, never per pointermove, or a 200-event drag would bury the user's
    *  older undo steps.
    *
-   *  `'move'` writes the waypoint the pointer is at, projected onto the ONE axis
-   *  the gesture owns. The axis is draw.io's rule and it comes from the POINTER
-   *  DELTA (`dragAxis`), NOT from the geometry — that was the ROUND S bug: the
-   *  generator's split decided the axis, so on any edge with more than 0.001px
-   *  of stagger the axis was `h` and up/down did nothing at all.
+   *  `'move'` writes the waypoint the pointer is at. On `step`/`smoothstep` that
+   *  is PROJECTED onto the ONE axis the gesture owns — draw.io's rule, decided
+   *  from the POINTER DELTA (`dragAxis`), NOT from the geometry (that was the
+   *  ROUND S bug: the generator's split decided the axis, so on any edge with
+   *  more than 0.001px of stagger the axis was `h` and up/down did nothing).
    *
-   *  THE PROJECTION MATTERS. `freePath` reads BOTH coordinates, so writing the
-   *  raw pointer into both would let a horizontal drag drift vertically. The
-   *  base point is `edgeDrawnMid` (where the edge is drawn right now, so the
-   *  first horizontal move does not also snap the other axis), and the axis the
-   *  gesture does NOT own is taken from it unchanged.
+   *  ROUND U — the axis is decided by `bendAxisFor` and it has THREE values:
+   *  `'h'`/`'v'` on the orthogonal kinds as before, and `'free'` on
+   *  `bezier`/`straight`, where draw.io moves BOTH coordinates together and there
+   *  is no axis to project onto. `dragPoint` is that projection in one place: the
+   *  pointer on the owned axis + `edgeDrawnMid` on the other (`'h'`/`'v'`), or the
+   *  raw pointer on BOTH (`'free'`). The base point matters on the orthogonal
+   *  kinds because their route reads BOTH coordinates too — a horizontal drag
+   *  must not drift vertically.
    *
    *  `'end'` is the auto-remove: a waypoint released within `BEND_SNAP_PX` of the
    *  generator's own default point deletes BOTH keys, so the edge goes back to
    *  the generator's clean route instead of storing a point that bends nothing.
+   *  It is kind-agnostic on purpose — `plainMidpoint` is the endpoints' geometric
+   *  midpoint on every kind.
    *
    *  It deliberately does NOT route through `updateEdge`: that is keyed on
    *  `selEdgeId`, so on the very first move (the one that selects the edge) it
@@ -1854,8 +1863,8 @@ export default function App() {
       const data = (e.data ?? {}) as EdgeData;
       const base = edgeDrawnMid(e, nodesRef.current);
       if (!base) return e;
-      const axis = dragAxis(geo, dx, dy);
-      const put: Pt = axis === 'h' ? {x: W.x, y: base.y} : {x: base.x, y: W.y};
+      const axis = bendAxisFor(e.type, geo, dx, dy);
+      const put: Pt = dragPoint(axis, W, base);
       if (phase === 'end') {
         const pm = plainMidpoint(geo);
         if (Math.hypot(put.x - pm.x, put.y - pm.y) <= BEND_SNAP_PX) {

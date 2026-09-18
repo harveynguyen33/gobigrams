@@ -1,5 +1,8 @@
 /**
  * ROUND T — the maths of a FREE 2-D midpoint waypoint, draw.io's model.
+ * ROUND U — the same afforance on EVERY edge kind: `bezier` and `straight` are
+ * the free 2-D kinds (no axis lock at all — both coordinates move together,
+ * always), `step`/`smoothstep` keep ROUND T's one-axis rule untouched.
  *
  * WHY THIS FILE EXISTS, and why it is pure (no React, no DOM): the rules below
  * are the whole of the drag's geometry, so `checks/round-s-edge-bend.mjs` can run
@@ -38,8 +41,10 @@
  * THE MODEL THAT REPLACES IT, and it is simpler:
  *
  *   NO stored bend point → the GENERATOR (unchanged, byte-identical).
- *   A stored bend point  → `freePath`, OUR OWN orthogonal staircase, which
- *                          reads BOTH coordinates.
+ *   A stored bend point  → OUR OWN route, which reads BOTH coordinates:
+ *                          `freePath` for the orthogonal kinds (a staircase),
+ *                          `straightPath` / `bezierPath` (ROUND U) for the free
+ *                          kinds.
  *
  * Parity is guaranteed by construction — an untouched board never leaves the
  * generator — and it is the only way both directions can work.
@@ -55,8 +60,13 @@
 export type Pt = {x: number; y: number};
 export type Side4 = 'left' | 'right' | 'top' | 'bottom';
 /** The coordinate a single drag owns. `'h'` = it writes `bendX`, `'v'` = `bendY`
- *  — decided from the POINTER delta (`dragAxis`), never from the routing. */
-export type BendAxis = 'h' | 'v';
+ *  — decided from the POINTER delta (`dragAxis`), never from the routing.
+ *
+ *  ROUND U adds `'free'`: the axis is IRRELEVANT on the free 2-D kinds
+ *  (`bezier`/`straight`), where draw.io moves both coordinates together. There
+ *  is no projection on those kinds — `applyDrag` writes BOTH keys — and no axis
+ *  cursor either, because there is no axis to advertise. */
+export type BendAxis = 'h' | 'v' | 'free';
 export type BendPhase = 'start' | 'move' | 'end';
 export type BendGeo = {s: Pt; t: Pt; sp: Side4; tp: Side4};
 
@@ -72,6 +82,18 @@ export const STEP_GAP_PX = 20;
 
 export const isSide4 = (v: unknown): v is Side4 =>
   v === 'left' || v === 'right' || v === 'top' || v === 'bottom';
+
+/** ROUND U — is this edge kind the FREE 2-D model (no axis lock)? `bezier` and
+ *  `straight` move both coordinates on every drag, so their drag writes both
+ *  keys and their path reads both; `step`/`smoothstep` keep the one-axis rule
+ *  (ROUND T) and are the ONLY kinds `bendDraggable4` has an opinion about.
+ *
+ *  ONE reader, shared by the renderer (`GoblinEdge`) and the writer (`App`), so
+ *  the axis the drag projects onto and the axis the path is drawn from can never
+ *  disagree. `custom` is the legacy alias the inspector still maps to
+ *  `goblinEdge`, so it resolves to the same free model. */
+export const isFreeBendKind = (kind?: string): boolean =>
+  kind === 'bezier' || kind === 'goblinEdge' || kind === 'straight';
 
 /** The two gapped endpoints — source/target pushed out along their own handle
  *  direction by `offset` (index.mjs:1243-1244). */
@@ -101,7 +123,11 @@ function splitInfo(geo: BendGeo) {
  *  generator computes for `stepPosition: 0.5` (:1266 / :1272). This is the point
  *  an edge with nothing stored is drawn through, so it is also the coordinate
  *  `freePath` invents for an axis the user has not dragged yet — a drag on one
- *  axis must not move the other. */
+ *  axis must not move the other.
+ *
+ *  ROUND U: it is ALSO the auto-remove reference for the free kinds — the
+ *  "geometric midpoint of the endpoints" is a kind-independent idea, so
+ *  `App.onBend('end')` needs no branch. */
 export function plainMidpoint(geo: BendGeo): Pt {
   const {sg, tg} = gapped(geo);
   return {x: (sg.x + tg.x) / 2, y: (sg.y + tg.y) / 2};
@@ -113,9 +139,15 @@ export function plainMidpoint(geo: BendGeo): Pt {
  *  so this is the ONLY condition left; the old axis model's collapsed-bar
  *  special-casing is gone with the axis model that needed it.
  *
+ *  THIS GATE IS ABOUT THE ORTHOGONAL SPLIT, so it only applies to the kinds the
+ *  split exists for (`step`/`smoothstep`). The free kinds (`bezier`/`straight`)
+ *  never consult it: they have no split to collapse, so they are always
+ *  draggable — see `GoblinEdge`'s `bendActive`.
+ *
  *  NOTE this is the HANDLE's gate, not the renderer's: the renderer routes
- *  through `freePath` whenever a bend key is STORED (`needsCustom`), including a
- *  key an older board stored on a geometry that would not offer a handle today. */
+ *  through our own path whenever a bend key is STORED (`needsCustom`), including
+ *  a key an older board stored on a geometry that would not offer a handle
+ *  today. */
 export function bendDraggable4(geo: BendGeo): boolean {
   return OPPOSITE_SIDE[geo.sp] === geo.tp;
 }
@@ -149,22 +181,39 @@ export function drawnMid(geo: BendGeo, bendX?: number, bendY?: number, bend?: nu
  *  fraction must keep rendering exactly as it did. */
 export type BendData = {bend?: number; bendX?: number; bendY?: number};
 
-/** The exact object a drag writes: the owned key ONLY. Modelled here rather
- *  than inline in `onBend` so the harness exercises the real writer — a patch
- *  that carried the other coordinate would let a drag leak into the axis the
- *  pointer never moved along. */
+/** The exact object a drag writes. Modelled here rather than inline in `onBend`
+ *  so the harness exercises the real writer.
+ *
+ *  `'h'`/`'v'` write the owned key ONLY — a drag must never leak into the axis
+ *  the pointer did not move along (the ROUND T projection).
+ *  `'free'` (ROUND U, the free 2-D kinds) writes BOTH keys: on `bezier`/
+ *  `straight` the pointer position IS the waypoint, on both axes, always. */
 export function dragPatch(axis: BendAxis, W: Pt): {bendX?: number; bendY?: number} {
-  return axis === 'h' ? {bendX: W.x} : {bendY: W.y};
+  if (axis === 'h') return {bendX: W.x};
+  if (axis === 'v') return {bendY: W.y};
+  return {bendX: W.x, bendY: W.y};
+}
+
+/** The point a drag writes: the pointer on the axis the gesture owns, the base
+ *  point (`drawnMid`) on the axis it does not — and the raw pointer on BOTH axes
+ *  for `'free'`.
+ *
+ *  ONE reader, shared by `App.onBend` and the harness, so the projection the app
+ *  performs is the projection that is measured. `'h'`/`'v'` are bit-identical to
+ *  the ROUND T inline expression. */
+export function dragPoint(axis: BendAxis, W: Pt, base: Pt): Pt {
+  if (axis === 'h') return {x: W.x, y: base.y};
+  if (axis === 'v') return {x: base.x, y: W.y};
+  return {x: W.x, y: W.y};
 }
 
 /** An edge's data after a drag: the owned key written, the OTHER axis's key
  *  PRESERVED, and the legacy fraction dropped.
  *
- *  Both coordinates are meaningful now — `freePath` reads `W.x` AND `W.y` — so
- *  a drag must not clear the key it does not own: clearing it would snap the
- *  other axis back to the generator's default mid-drag. (ROUND S deleted it, and
- *  ROUND S was wrong to: the generator read one coordinate, `freePath` reads
- *  two.)
+ *  Both coordinates are meaningful now — the custom routes read `W.x` AND `W.y`
+ *  — so a drag must not clear the key it does not own: clearing it would snap
+ *  the other axis back to the generator's default mid-drag. (ROUND S deleted it,
+ *  and ROUND S was wrong to.)
  *
  *  `bend` goes because the slider that wrote it is gone and an absolute point
  *  supersedes it; `drawnMid` still honours a stored fraction for an old board,
@@ -175,16 +224,29 @@ export function applyDrag<T extends BendData>(data: T, axis: BendAxis, W: Pt): T
   return out;
 }
 
-/** draw.io's axis rule: the axis the POINTER is moving along wins, decided from
- *  the delta alone. `Math.abs(dx) >= Math.abs(dy)` makes a 45° drag horizontal
- *  and a mostly-vertical one vertical, which is what a user means by "I pulled
- *  it up".
+/** draw.io's axis rule for the ORTHOGONAL kinds: the axis the POINTER is moving
+ *  along wins, decided from the delta alone. `Math.abs(dx) >= Math.abs(dy)`
+ *  makes a 45° drag horizontal and a mostly-vertical one vertical, which is what
+ *  a user means by "I pulled it up".
  *
  *  The geometry is deliberately NOT consulted — that was the ROUND S bug. The
  *  parameter stays in the signature so every call site reads the same shape
- *  (geometry, delta) and a future rule can use it without a call-site churn. */
+ *  (geometry, delta) and a future rule can use it without a call-site churn.
+ *
+ *  ROUND U: this is NOT called for the free kinds. `bendAxisFor` below is the
+ *  single decision point, and it returns `'free'` there — running `dragAxis` on a
+ *  `bezier`/`straight` edge would project a free 2-D drag onto one axis, which is
+ *  exactly the lie this round removes. */
 export function dragAxis(_geo: BendGeo, dx: number, dy: number): BendAxis {
   return Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+}
+
+/** ROUND U — the axis a gesture owns, kind-aware and decided in ONE place:
+ *  `'free'` on the free 2-D kinds (`bezier`/`straight`), otherwise draw.io's
+ *  pointer rule. `App.onBend` (the writer) and `GoblinEdge` (the cursor) both
+ *  call this, so the axis written and the axis advertised cannot disagree. */
+export function bendAxisFor(kind: string | undefined, geo: BendGeo, dx: number, dy: number): BendAxis {
+  return isFreeBendKind(kind) ? 'free' : dragAxis(geo, dx, dy);
 }
 
 /** ROUND T — the auto-remove threshold (px, FLOW units). `App.onBend('end')`
@@ -211,10 +273,16 @@ function getBend(a: Pt, b: Pt, c: Pt, size: number): string {
   return `L ${x},${y + bendSize * yDir}Q ${x},${y} ${x + bendSize * xDir},${y}`;
 }
 
-/** THE FREE ROUTE — an orthogonal staircase through the waypoint, using BOTH of
- *  `W.x` and `W.y`. This is what makes up/down AND left/right reachable on the
- *  same edge, which `getSmoothStepPath` can never do (one coordinate only, see
- *  the sweep at the top of this file).
+/** A finite waypoint or the generator's own midpoint. The SAME guard in every
+ *  route below (`freePath`, `straightPath`, `bezierPath`): a non-finite stored
+ *  coordinate must never reach an `M`/`L`/`Q` command as `NaN`. */
+const finiteMid = (geo: BendGeo, W: Pt): Pt =>
+  Number.isFinite(W.x) && Number.isFinite(W.y) ? W : plainMidpoint(geo);
+
+/** THE FREE ROUTE (orthogonal kinds) — an orthogonal staircase through the
+ *  waypoint, using BOTH of `W.x` and `W.y`. This is what makes up/down AND
+ *  left/right reachable on the same edge, which `getSmoothStepPath` can never do
+ *  (one coordinate only, see the sweep at the top of this file).
  *
  *  Routed by the SOURCE handle's own axis, so the line leaves the handle in the
  *  direction the handle points:
@@ -235,7 +303,7 @@ function getBend(a: Pt, b: Pt, c: Pt, size: number): string {
  *  `step` edge — the corner is exact to the last bit. */
 export function freePath(geo: BendGeo, W: Pt, borderRadius: number): [string, number, number] {
   const {sg, tg} = gapped(geo);
-  const w = Number.isFinite(W.x) && Number.isFinite(W.y) ? W : plainMidpoint(geo);
+  const w = finiteMid(geo, W);
   const horizontal = geo.sp === 'left' || geo.sp === 'right';
   const raw: Pt[] = horizontal
     ? [geo.s, sg, {x: w.x, y: sg.y}, {x: w.x, y: w.y}, {x: tg.x, y: w.y}, tg, geo.t]
@@ -251,12 +319,53 @@ export function freePath(geo: BendGeo, W: Pt, borderRadius: number): [string, nu
   return [path, w.x, w.y];
 }
 
+/** ROUND U — THE STRAIGHT ROUTE: `M s L W L t`, the line bent AT the waypoint.
+ *  draw.io's own model for a straight edge: the waypoint is a VERTEX, both
+ *  coordinates move together (free 2-D), and the label — and therefore the
+ *  handle — is the waypoint itself, so the handle sits exactly where the corner
+ *  is. A non-finite `W` falls back to `plainMidpoint` (never `NaN`).
+ *
+ *  MEASURED (300 geometries, orchestrator): a horizontal delta moves the drawn
+ *  line 299/300 and a vertical delta 300/300 — the 1/300 is a delta collinear
+ *  with the segment, where the line is straight either way. */
+export function straightPath(geo: BendGeo, W: Pt): [string, number, number] {
+  const w = finiteMid(geo, W);
+  const {s, t} = geo;
+  return [`M ${s.x},${s.y} L ${w.x},${w.y} L ${t.x},${t.y}`, w.x, w.y];
+}
+
+/** ROUND U — THE BEZIER ROUTE: the quadratic through W.
+ *
+ *  A quadratic `M S Q C T` passes through its own midpoint control point
+ *  `(S + 2C + T)/4`, so solving that for `C` gives `C = 2W − (S+T)/2` — and the
+ *  curve then passes through the stored waypoint EXACTLY (measured: 0.0000px
+ *  deviation on 300/300 geometries). The label is that same identity, returned as
+ *  `w` ITSELF rather than re-evaluated from `c`: the two agree algebraically but
+ *  NOT bit-for-bit in IEEE754 doubles (the two-step arithmetic drifts by ~1e-14
+ *  px, e.g. 123.456 → 123.45599999999998), and the label is the handle's anchor,
+ *  so it must BE the stored point, exactly. `getBezierPath`'s own label
+ *  convention (the midpoint of the source/target line) is what this reduces to
+ *  when `W` is the plain midpoint.
+ *
+ *  NOTE it is NOT React Flow's cubic bezier in general — parity can NOT come from
+ *  matching its shape. It comes from "nothing stored → the generator", as
+ *  everywhere else in this file: an untouched bezier edge calls
+ *  `getBezierPath` verbatim.
+ *
+ *  A non-finite `W` falls back to `plainMidpoint` (never `NaN`). */
+export function bezierPath(geo: BendGeo, W: Pt): [string, number, number] {
+  const w = finiteMid(geo, W);
+  const {s, t} = geo;
+  const c = {x: 2 * w.x - (s.x + t.x) / 2, y: 2 * w.y - (s.y + t.y) / 2};
+  return [`M ${s.x},${s.y} Q ${c.x},${c.y} ${t.x},${t.y}`, w.x, w.y];
+}
+
 /** Does this edge need OUR route rather than the generator's? A stored bend key
  *  and nothing else — an untouched board (and an old board that only carries the
  *  legacy `bend` fraction) stays on the generator, so nothing already on a
  *  canvas moves by a pixel. The geometry is not consulted: a stored waypoint is
- *  drawn by `freePath` on ANY geometry, which is the only rule that keeps the
- *  path and the handle on the same point. */
+ *  drawn by the kind's own route on ANY geometry, which is the only rule that
+ *  keeps the path and the handle on the same point. */
 export function needsCustom(_geo: BendGeo, bendX?: number, bendY?: number): boolean {
   return bendX !== undefined || bendY !== undefined;
 }

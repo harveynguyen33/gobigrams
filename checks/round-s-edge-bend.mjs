@@ -20,10 +20,11 @@
  * it. Node's own type-stripping loads `src/edgeBend.ts` directly.
  */
 import {readFileSync, readdirSync} from 'node:fs';
-import {getSmoothStepPath} from '@xyflow/system';
+import {getBezierPath, getSmoothStepPath, getStraightPath} from '@xyflow/system';
 import {
   SIDE_OUT, OPPOSITE_SIDE, STEP_GAP_PX, BEND_SNAP_PX,
-  applyDrag, dragAxis, drawnMid, freePath, needsCustom, plainMidpoint, dragPatch,
+  applyDrag, bendAxisFor, dragAxis, dragPatch, dragPoint, drawnMid, freePath,
+  isFreeBendKind, needsCustom, plainMidpoint, bezierPath, straightPath,
   bendDraggable4,
 } from '../src/edgeBend.ts';
 
@@ -181,19 +182,25 @@ console.log(`     ${at('centerX = (sourceGapPoint.x + targetGapPoint.x) / 2')}  
 console.log('     OUR rules that ship, read from src/:');
 for (const [f, needle] of [
   ['edgeBend.ts', 'export function freePath('],
+  ['edgeBend.ts', 'export function straightPath('],
+  ['edgeBend.ts', 'export function bezierPath('],
   ['edgeBend.ts', 'export function dragAxis('],
+  ['edgeBend.ts', 'export function bendAxisFor('],
+  ['edgeBend.ts', 'export function dragPoint('],
   ['edgeBend.ts', 'export function applyDrag<T extends BendData>('],
   ['edgeBend.ts', 'export function needsCustom('],
   ['edgeBend.ts', 'export const BEND_SNAP_PX'],
   ['GoblinEdge.tsx', 'const LOCK_PX'],
   ['GoblinEdge.tsx', 'if (!lockAxis.current) {'],
-  ['GoblinEdge.tsx', "lockAxis.current = dragAxis(bGeo, dx, dy)"],
+  ['GoblinEdge.tsx', 'lockAxis.current = bendAxisFor(kind, bGeo, dx, dy)'],
   ['GoblinEdge.tsx', 'releasePointerCapture?.(ev.pointerId)'],
-  ['GoblinEdge.tsx', "cursor: dragCursor"],
-  ['GoblinEdge.tsx', 'if (bGeo && custom) {'],
-  ['GoblinEdge.tsx', '[path, labelX, labelY] = freePath(bGeo, W!, 0)'],
+  ['GoblinEdge.tsx', 'cursor: dragCursor'],
+  ['GoblinEdge.tsx', 'if (custom) {'],
+  ['GoblinEdge.tsx', '[path, labelX, labelY] = freePath(bGeo, W, 0)'],
+  ['GoblinEdge.tsx', '[path, labelX, labelY] = straightPath(bGeo, W)'],
+  ['GoblinEdge.tsx', '[path, labelX, labelY] = bezierPath(bGeo, W)'],
   ['App.tsx', "if (phase === 'start')"],
-  ['App.tsx', 'const axis = dragAxis(geo, dx, dy)'],
+  ['App.tsx', 'const axis = bendAxisFor(e.type, geo, dx, dy)'],
   ['App.tsx', 'BEND_SNAP_PX'],
   ['App.tsx', 'delete out.bendX'],
 ]) {
@@ -605,6 +612,360 @@ head('(j) NO PAINTED GRABBER — the endpoint circle paints nothing, ever');
   ok(stray.length === 0, 'no rule anywhere gives the circle a non-zero opacity', stray.length ? JSON.stringify(stray[0]) : 'every opacity is 0');
   ok(!/react-flow__edgeupdater:hover/.test(css), 'no `:hover` reveal rule survives');
   ok(!/react-flow__edge\.(updating|:hover)[^{}]*edgeupdater/.test(css), 'no edge-state reveal rule survives either');
+}
+
+/* ================================================================== ROUND U
+   THE SAME AFFORDANCE ON EVERY EDGE KIND. `bezier` and `straight` are the FREE
+   2-D kinds — draw.io's own rule (E1-drawio-waypoints.md:1222-1225) is one axis
+   per drag for `step`/`smoothstep` and FREE 2-D for `straight`/bezier — so there
+   is no axis lock to apply on the latter, on either axis, ever.
+
+   `renderKind` is a faithful model of the branch `GoblinEdge` now takes for ALL
+   FOUR kinds (`custom` → the kind's own path, else that kind's generator
+   verbatim), and `appDrag` is the app's OWN chain (`bendAxisFor` → `dragPoint` →
+   `applyDrag`), so every claim below is about the shipped code rather than a
+   parallel copy of it. */
+
+/** THE BRANCH `GoblinEdge` TAKES, per kind: a stored bend key routes through the
+ *  KIND's own path (each reads `W` on BOTH axes); nothing stored calls that
+ *  kind's generator with the arguments it always got. `stepPosition` is passed
+ *  through only for the orthogonal kinds, exactly as the component does. */
+function renderKind(kind, g, data = {}) {
+  const custom = needsCustom(g, data.bendX, data.bendY);
+  const W = drawnMid(g, data.bendX, data.bendY, data.bend);
+  const opts = {
+    sourceX: g.s.x, sourceY: g.s.y, sourcePosition: g.sp,
+    targetX: g.t.x, targetY: g.t.y, targetPosition: g.tp,
+  };
+  if (kind === 'straight') return custom ? straightPath(g, W)[0] : getStraightPath(opts)[0];
+  if (kind === 'step') {
+    return custom ? freePath(g, W, 0)[0]
+      : getSmoothStepPath({...opts, borderRadius: 0, stepPosition: data.bend})[0];
+  }
+  if (kind === 'smoothstep') {
+    return custom ? freePath(g, W, 12)[0]
+      : getSmoothStepPath({...opts, borderRadius: 12, stepPosition: data.bend})[0];
+  }
+  // bezier / goblinEdge / custom — the free curved kind.
+  return custom ? bezierPath(g, W)[0] : getBezierPath(opts)[0];
+}
+
+/** The app's own drag chain, verbatim: the kind-aware axis, the projection
+ *  (`dragPoint`) and the writer (`applyDrag`). */
+function appDrag(kind, g, pointer, base, data = {}) {
+  const dx = pointer.x - base.x, dy = pointer.y - base.y;
+  const axis = bendAxisFor(kind, g, dx, dy);
+  const put = dragPoint(axis, pointer, base);
+  return {axis, put, data: applyDrag(data, axis, put)};
+}
+
+/** THE DRAWN INK of a path: every M/L vertex, and every Q curve sampled at 64
+ *  points. `vertices()` only sees M/L, and a quadratic's shape lives in its
+ *  `Q` command — so a claim about "the curve passes through W" has to be
+ *  measured on the sampled geometry, not on the control points. */
+function curvePoints(d) {
+  const toks = d.match(/[MLQ]|-?\d*\.?\d+(?:e[+-]?\d+)?/gi) ?? [];
+  const out = [];
+  let cur = [0, 0], i = 0;
+  while (i < toks.length) {
+    const c = toks[i++].toUpperCase();
+    if (c === 'M' || c === 'L') {
+      cur = [Number(toks[i++]), Number(toks[i++])];
+      out.push(cur.slice());
+    } else if (c === 'Q') {
+      const cx = Number(toks[i++]), cy = Number(toks[i++]);
+      const tx = Number(toks[i++]), ty = Number(toks[i++]);
+      for (let s = 1; s <= 64; s++) {
+        const u = s / 64, v = 1 - u;
+        out.push([v * v * cur[0] + 2 * v * u * cx + u * u * tx, v * v * cur[1] + 2 * v * u * cy + u * u * ty]);
+      }
+      cur = [tx, ty];
+    }
+  }
+  return out;
+}
+const distToCurve = (d, p) => {
+  const P = curvePoints(d);
+  let best = Infinity;
+  for (let i = 1; i < P.length; i++) best = Math.min(best, distToSeg(p, P[i - 1], P[i]));
+  return best;
+};
+/** Symmetric max deviation between two paths as SAMPLED CURVES (Q included). */
+function curveDev(a, b) {
+  const A = curvePoints(a), B = curvePoints(b);
+  let worst = 0;
+  for (const p of A) worst = Math.max(worst, distToCurve(b, p));
+  for (const p of B) worst = Math.max(worst, distToCurve(a, p));
+  return worst;
+}
+
+/* ------------------------------------------------------- (k) BEZIER THROUGH
+   The quadratic `M S Q C T` with `C = 2W − (S+T)/2` passes through W EXACTLY:
+   its own midpoint is `(S + 2C + T)/4`, which is the label this route returns.
+   Measured on the SAMPLED curve, and the label is asserted to BE W (not merely
+   close to it). */
+head('(k) BEZIER THROUGH THE POINT — the drawn quadratic passes through the stored W');
+{
+  const rnd = rndFrom(20250918);
+  let n = 0, worstCurve = 0, worstLabel = 0, nan = 0, firstBad = null;
+  for (let i = 0; i < 240; i++) {
+    const sp = SIDES[i % 4], tp = SIDES[(i + 1 + (i % 3)) % 4];
+    const s = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    const t = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    if (i % 5 === 0) t.y = s.y;
+    if (i % 7 === 0) { t.x = s.x; t.y = s.y; }
+    const g = geo(s, t, sp, tp);
+    const pm = plainMidpoint(g);
+    const W = {x: pm.x + Math.round(rnd() * 200 - 100), y: pm.y + Math.round(rnd() * 200 - 100)};
+    const [d, lx, ly] = bezierPath(g, W);
+    const dev = distToCurve(d, [W.x, W.y]);
+    if (!Number.isFinite(dev) || /NaN|Infinity/.test(d)) nan++;
+    if (dev > worstCurve) { worstCurve = dev; firstBad ??= {sp, tp, W, d}; }
+    worstLabel = Math.max(worstLabel, Math.abs(lx - W.x), Math.abs(ly - W.y));
+    n++;
+  }
+  console.log(`     ${n} geometries (all side pairs, level / degenerate / staggered), W up to 100px off the midpoint`);
+  ok(n >= 200, 'sample size >= 200', `${n}`);
+  ok(nan === 0, 'no NaN / Infinity in the emitted path', `${nan} bad`);
+  ok(worstCurve <= 0.01, 'the drawn quadratic passes through W', `worst ${worstCurve}px`);
+  ok(worstLabel <= 0.01, 'and the returned label IS W', `worst ${worstLabel}px`);
+  // the analytic identity, asserted directly on a case with awkward numbers
+  const g0 = geo({x: -176, y: 144}, {x: 870, y: 660}, 'right', 'left');
+  const W0 = {x: 123.456, y: -78.9};
+  const [, bx, by] = bezierPath(g0, W0);
+  ok(bx === W0.x && by === W0.y, 'label === W to the last bit (the quadratic midpoint identity)', `(${bx}, ${by})`);
+  const nanCase = bezierPath(g0, {x: NaN, y: 5});
+  ok(!/NaN|Infinity/.test(nanCase[0]) && Number.isFinite(nanCase[1]) && Number.isFinite(nanCase[2]),
+    'a non-finite W falls back to plainMidpoint (never NaN)',
+    `label (${nanCase[1]}, ${nanCase[2]})`);
+}
+
+/* ------------------------------------------------------ (l) STRAIGHT THROUGH
+   The corner path `M S L W L T`: W is a VERTEX, so the line is bent AT the
+   waypoint, the label is W, and both coordinates of the drag are written. */
+head('(l) STRAIGHT THROUGH THE POINT — the corner path honours W on both axes');
+{
+  const rnd = rndFrom(424242);
+  let n = 0, worst = 0, worstLabel = 0, notVertex = 0;
+  for (let i = 0; i < 240; i++) {
+    const sp = SIDES[i % 4], tp = SIDES[(i + 2 + (i % 3)) % 4];
+    const s = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    const t = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    if (i % 5 === 0) t.y = s.y;
+    const g = geo(s, t, sp, tp);
+    const pm = plainMidpoint(g);
+    const W = {x: pm.x + Math.round(rnd() * 200 - 100), y: pm.y + Math.round(rnd() * 200 - 100)};
+    const [d, lx, ly] = straightPath(g, W);
+    const dev = distToCurve(d, [W.x, W.y]);
+    const verts = dedup(vertices(d));
+    // W must be an actual VERTEX of the polyline (not merely on it)
+    if (!verts.some(p => Math.abs(p[0] - W.x) < 1e-9 && Math.abs(p[1] - W.y) < 1e-9)) notVertex++;
+    worst = Math.max(worst, dev);
+    worstLabel = Math.max(worstLabel, Math.abs(lx - W.x), Math.abs(ly - W.y));
+    n++;
+  }
+  console.log(`     ${n} geometries (all side pairs, level / staggered), W up to 100px off the midpoint`);
+  ok(n >= 200, 'sample size >= 200', `${n}`);
+  ok(worst <= 0.01, 'the drawn corner path passes through W', `worst ${worst}px`);
+  ok(notVertex === 0, 'and W is a real VERTEX of the polyline (the line is bent AT the waypoint)', `${notVertex} not a vertex`);
+  ok(worstLabel <= 0.01, 'the returned label IS W', `worst ${worstLabel}px`);
+  const nanCase = straightPath(geo({x: 0, y: 0}, {x: 100, y: 0}, 'right', 'left'), {x: 5, y: Infinity});
+  ok(!/NaN|Infinity/.test(nanCase[0]), 'a non-finite W falls back to plainMidpoint (never NaN)');
+  // a `'free'` drag writes BOTH keys
+  const free = applyDrag({}, 'free', {x: 31.5, y: -12.25});
+  ok(free.bendX === 31.5 && free.bendY === -12.25, 'a `\'free\'` drag writes BOTH `bendX` and `bendY`', JSON.stringify(free));
+  const kept = applyDrag({bendX: 1, bendY: 2, bend: 0.3, strokeKey: 'blue'}, 'free', {x: 7, y: 8});
+  ok(kept.bendX === 7 && kept.bendY === 8 && kept.bend === undefined && kept.strokeKey === 'blue',
+    'and it overwrites both coordinates while dropping only the legacy fraction', JSON.stringify(kept));
+  const put = dragPoint('free', {x: 9, y: 10}, {x: 999, y: 999});
+  ok(put.x === 9 && put.y === 10, '`dragPoint(\'free\')` is the raw pointer — the base point is NOT projected in', JSON.stringify(put));
+}
+
+/* ---------------------------------------------------- (m) FREE 2-D ON THE NEW
+   THE CENTRAL ASSERTION OF ROUND U. On `bezier`/`straight` the axis is `'free'`
+   on EVERY delta (a horizontal one, a vertical one, a 45° one), the pointer is
+   written on BOTH coordinates with no projection, and the drawn route passes
+   THROUGH the pointer on both axes. Contrasted with `step`, where one axis is
+   still held at the base point.
+
+   THE ONE HONEST EXCEPTION, and it is geometric rather than a lock: a delta
+   COLLINEAR with the segment moves the waypoint ALONG the line, where the drawn
+   line is correctly unchanged (the orchestrator measured the same thing as its
+   1/300). Those deltas are classified and reported separately — the "the line
+   moved" assertion is made only on the non-collinear ones. */
+head('(m) FREE 2-D ON THE NEW KINDS — no axis lock on bezier/straight, and step is unchanged');
+{
+  /** Perpendicular distance from `p` to the INFINITE line a→b. A drag whose
+   *  perpendicular offset is ~0 barely changes the line whatever the route. */
+  const linePerp = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const L = Math.hypot(dx, dy);
+    return L ? Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / L : 0;
+  };
+  const rnd = rndFrom(555);
+  const FREE_KINDS = ['bezier', 'straight', 'goblinEdge'];
+  let axes = 0, notFree = 0, notMoved = 0, collinear = 0, offPointer = 0;
+  let badFree = null;
+  let stepAxes = 0, stepFree = 0, stepBoth = 0, notHeld = 0;
+  let badStep = null;
+  for (let i = 0; i < 240; i++) {
+    const sp = SIDES[i % 4], tp = OPPOSITE_SIDE[sp];
+    const s = {x: Math.round(rnd() * 500), y: Math.round(rnd() * 500)};
+    const t = {x: Math.round(rnd() * 500), y: Math.round(rnd() * 500)};
+    if (i % 4 === 0) t.y = s.y;                       // LEVEL — the axis-lock trap
+    if (i % 9 === 0 && (sp === 'left' || sp === 'right')) t.x = s.x - 180;
+    const g = geo(s, t, sp, tp);
+    const base = drawnMid(g);
+    for (const kind of FREE_KINDS) {
+      for (const [dx, dy] of [[60, 7], [7, 60], [40, 40], [-60, -7], [-7, -60]]) {
+        const pointer = {x: base.x + dx, y: base.y + dy};
+        const {axis, data} = appDrag(kind, g, pointer, base);
+        axes++;
+        if (axis !== 'free') { notFree++; badFree ??= {kind, sp, tp, dx, dy, axis}; }
+        // BOTH keys written from the pointer: this is what "no projection" means
+        if (data.bendX !== pointer.x || data.bendY !== pointer.y) { offPointer++; badFree ??= {kind, data, pointer}; }
+        const before = kind === 'straight' ? straightPath(g, base)[0] : bezierPath(g, base)[0];
+        const after = kind === 'straight' ? straightPath(g, pointer)[0] : bezierPath(g, pointer)[0];
+        // THE POINTER IS HONOURED ON BOTH AXES, measured on the drawn route: the
+        // straight corner has W as a vertex, the bezier passes through it at u=½.
+        // This is the claim an axis lock would break — and it holds on EVERY
+        // delta, collinear ones included.
+        if (!(distToCurve(after, [pointer.x, pointer.y]) <= 0.01)) { offPointer++; badFree ??= {kind, sp, tp, dx, dy, after}; }
+        // ...and for a delta that actually leaves the line, the drawn line moves.
+        if (linePerp([pointer.x, pointer.y], [s.x, s.y], [t.x, t.y]) <= 1) collinear++;
+        else if (!(curveDev(after, before) > 0.5)) { notMoved++; badFree ??= {kind, sp, tp, dx, dy, pointer, base}; }
+      }
+    }
+    // CONTRAST: `step` keeps draw.io's one-axis rule — a REAL axis, never 'free'
+    for (const [dx, dy] of [[60, 7], [7, 60]]) {
+      const pointer = {x: base.x + dx, y: base.y + dy};
+      const {axis, put, data} = appDrag('step', g, pointer, base);
+      stepAxes++;
+      if (axis === 'free') { stepFree++; badStep ??= {axis}; }
+      // exactly ONE key is written, and the un-owned axis is HELD at the base
+      const keys = Object.keys(data).sort().join(',');
+      if (keys !== 'bendX' && keys !== 'bendY') { stepBoth++; badStep ??= {keys}; }
+      const wantX = axis === 'h' ? pointer.x : base.x;
+      const wantY = axis === 'h' ? base.y : pointer.y;
+      if (put.x === wantX && put.y === wantY) { /* held */ } else { notHeld++; badStep ??= {axis, put, wantX, wantY}; }
+    }
+  }
+  console.log(`     ${axes} free-kind drags across 240 geometries × 3 free kinds × 5 deltas (60/7, 7/60, 40/40 and both negated)`);
+  console.log(`     ${collinear} of them were effectively COLLINEAR with their segment (perpendicular offset <= 1px) — reported, not asserted on`);
+  ok(axes >= 200, 'sample size >= 200', `${axes}`);
+  ok(notFree === 0, 'the axis is `\'free\'` on EVERY bezier/straight delta — no axis lock, no projection', notFree ? JSON.stringify(badFree) : `${axes}/${axes}`);
+  ok(offPointer === 0, 'and the drawn route passes THROUGH the pointer on both axes on every one of them (no cross-axis component discarded)', offPointer ? JSON.stringify(badFree) : `${axes}/${axes}`);
+  ok(notMoved === 0, 'and a delta that leaves the line moves it — 0 counterexamples', notMoved ? JSON.stringify(badFree) : `${axes - collinear}/${axes - collinear}`);
+  console.log(`\n     CONTRAST — the same deltas on a \`step\` edge (${stepAxes} drags):`);
+  ok(stepFree === 0, '`step` never reports `\'free\'` — the KIND rule did not leak into it', `${stepAxes - stepFree}/${stepAxes}`);
+  ok(stepBoth === 0, 'and it still writes exactly ONE key (the owned axis)', `${stepAxes - stepBoth}/${stepAxes}`);
+  ok(notHeld === 0, 'the un-owned coordinate is held at the base point — one axis per drag, unchanged', notHeld ? JSON.stringify(badStep) : `${stepAxes}/${stepAxes}`);
+  // the named control: a level step edge keeps its y, a level straight edge does not
+  const level = geo({x: 0, y: 0}, {x: 212, y: 0}, 'right', 'left');
+  const lb = drawnMid(level);
+  const sH = appDrag('step', level, {x: lb.x + 60, y: lb.y + 7}, lb);
+  const fH = appDrag('straight', level, {x: lb.x + 60, y: lb.y + 7}, lb);
+  console.log(`     level right->left 212px, pointer at (+60, +7) from the midpoint:`);
+  console.log(`       step     -> axis '${sH.axis}', stored point ${JSON.stringify(sH.put)}  (y held at the base)`);
+  console.log(`       straight -> axis '${fH.axis}', stored point ${JSON.stringify(fH.put)}  (the pointer itself)`);
+  ok(sH.put.y === lb.y && sH.axis === 'h', '`step` holds the un-owned axis (no diagonal drift)');
+  ok(fH.put.y !== lb.y && fH.axis === 'free', '`straight` follows the pointer on both axes (free 2-D)');
+  ok(distToCurve(straightPath(level, {x: 0, y: 60})[0], [0, 60]) <= 0.01 && distToCurve(bezierPath(level, {x: 0, y: 60})[0], [0, 60]) <= 0.01,
+    'both free routes pass through their waypoint (the handle is ON the line on either kind)',
+    `straight ${distToCurve(straightPath(level, {x: 0, y: 60})[0], [0, 60]).toFixed(4)}px, bezier ${distToCurve(bezierPath(level, {x: 0, y: 60})[0], [0, 60]).toFixed(4)}px`);
+}
+
+/* ------------------------------------------------------------- (n) PARITY
+   NOTHING STORED → STILL THE GENERATOR, byte for byte, on the two kinds that
+   gained the handle. This is where the bezier route's parity comes from: it can
+   NOT come from matching React Flow's cubic, so it comes from never being
+   called on an untouched board. */
+head('(n) PARITY UNCHANGED — no stored key still renders byte-identical to the generator');
+{
+  const rnd = rndFrom(31);
+  let n = 0, bz = 0, st = 0, ge = 0, firstBz = '', firstSt = '';
+  for (let i = 0; i < 240; i++) {
+    const sp = SIDES[i % 4], tp = OPPOSITE_SIDE[sp];
+    const s = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    const t = {x: Math.round(rnd() * 600 - 300), y: Math.round(rnd() * 600 - 300)};
+    if (i % 6 === 0) { t.x = s.x; t.y = s.y; }
+    const g = geo(s, t, sp, tp);
+    const opts = {
+      sourceX: s.x, sourceY: s.y, sourcePosition: sp,
+      targetX: t.x, targetY: t.y, targetPosition: tp,
+    };
+    const b = renderKind('bezier', g, {});
+    const w1 = getBezierPath(opts)[0];
+    if (b !== w1) { bz++; if (!firstBz) firstBz = `${sp}->${tp}: ${b} vs ${w1}`; }
+    const c = renderKind('goblinEdge', g, {});
+    if (c !== w1) ge++;
+    const st2 = renderKind('straight', g, {});
+    const w2 = getStraightPath(opts)[0];
+    if (st2 !== w2) { st++; if (!firstSt) firstSt = `${sp}->${tp}: ${st2} vs ${w2}`; }
+    n++;
+  }
+  console.log(`     ${n} geometries × {bezier, goblinEdge, straight}, no bend key stored`);
+  ok(n >= 200, 'sample size >= 200', `${n}`);
+  ok(bz === 0, '`bezier` with nothing stored === getBezierPath (string equality)', bz ? `${bz} differ, first ${firstBz}` : `${n}/${n}`);
+  ok(ge === 0, '`goblinEdge` (the `custom` alias) likewise === getBezierPath', ge ? `${ge} differ` : `${n}/${n}`);
+  ok(st === 0, '`straight` with nothing stored === getStraightPath (string equality)', st ? `${st} differ, first ${firstSt}` : `${n}/${n}`);
+  ok(/[MQ]/.test(getBezierPath({sourceX: 0, sourceY: 0, sourcePosition: 'right', targetX: 100, targetY: 60, targetPosition: 'left'})[0]),
+    'sanity: the generator\'s bezier is a real curve (so the equality above is not two empty strings)');
+}
+
+/* ------------------------------------------------------- (o) KIND SWITCH
+   Switching an edge's type must not orphan a stored waypoint: every kind's own
+   route reads the same two keys, so a stored point renders through the newly
+   chosen kind — never a NaN, never silently dropped. */
+head('(o) KIND SWITCH — a stored point survives step → bezier → straight');
+{
+  const KINDS = ['step', 'smoothstep', 'bezier', 'straight', 'goblinEdge'];
+  const rnd = rndFrom(6060);
+  let n = 0, bad = 0, dropped = 0, offPath = 0, labelOff = 0;
+  let firstBad = null;
+  for (let i = 0; i < 240; i++) {
+    const sp = SIDES[i % 4], tp = SIDES[(i + 1 + (i % 3)) % 4];   // incl. same-side pairs
+    const s = {x: Math.round(rnd() * 500), y: Math.round(rnd() * 500)};
+    const t = {x: Math.round(rnd() * 500), y: Math.round(rnd() * 500)};
+    if (i % 4 === 0) t.y = s.y;
+    if (i % 8 === 0) { t.x = s.x; t.y = s.y; }
+    const g = geo(s, t, sp, tp);
+    const pm = plainMidpoint(g);
+    const W = {x: pm.x + Math.round(rnd() * 160 - 80), y: pm.y + Math.round(rnd() * 160 - 80)};
+    const data = {bendX: W.x, bendY: W.y};
+    for (const kind of KINDS) {
+      n++;
+      // the point is never dropped: both keys survive the switch and `drawnMid` reads them back
+      if (!needsCustom(g, data.bendX, data.bendY)) { dropped++; continue; }
+      const back = drawnMid(g, data.bendX, data.bendY);
+      if (back.x !== W.x || back.y !== W.y) { dropped++; firstBad ??= {kind, back, W}; }
+      const d = renderKind(kind, g, data);
+      if (!d || !d.startsWith('M') || /NaN|Infinity|undefined|null/.test(d)) { bad++; firstBad ??= {kind, sp, tp, d}; continue; }
+      // the point is HONOURED — on the drawn path, for every kind
+      const tol = kind === 'smoothstep' ? 12.01 : 0.01;   // a rounded corner cuts the vertex
+      const dev = distToCurve(d, [W.x, W.y]);
+      if (!(dev <= tol)) { offPath++; firstBad ??= {kind, dev, d, W}; }
+      // and where the route returns a label, it IS the waypoint
+      if (kind === 'straight') {
+        const [dd, lx, ly] = straightPath(g, W);
+        if (dd !== d || lx !== W.x || ly !== W.y) labelOff++;
+      }
+    }
+  }
+  console.log(`     ${n} (geometry × kind) cases across all four kinds + the \`goblinEdge\` alias (240 geometries)`);
+  ok(n >= 200, 'sample size >= 200', `${n}`);
+  ok(bad === 0, 'switching kinds never emits NaN / Infinity / an empty path', bad ? JSON.stringify(firstBad) : `${n}/${n}`);
+  ok(dropped === 0, 'and never drops the point — both keys survive the switch and `drawnMid` reads them back', `${n - dropped}/${n}`);
+  ok(offPath === 0, 'and every kind HONOURS it: the stored point is on the drawn path of the newly-chosen kind', offPath ? JSON.stringify(firstBad) : `${n}/${n}`);
+  ok(labelOff === 0, '`straight` renders exactly the point it is handed (label === W)', `${labelOff} off`);
+  // the switch sequence the task names, on one geometry, printed
+  const g1 = geo({x: 0, y: 0}, {x: 240, y: 120}, 'right', 'left');
+  const W1 = {x: 100, y: 60};
+  console.log('\n     the same stored point (100, 60) on a 240×120 right->left edge, per kind:');
+  for (const kind of ['step', 'bezier', 'straight', 'smoothstep']) {
+    const d = renderKind(kind, g1, {bendX: W1.x, bendY: W1.y});
+    console.log(`       ${kind.padEnd(10)} dev ${distToCurve(d, [W1.x, W1.y]).toFixed(3)}px   ${d.slice(0, 72)}`);
+  }
 }
 
 console.log(`\n${failures === 0 ? 'ALL GREEN' : `${failures} FAILURE(S)`} — round-s-edge-bend\n`);
