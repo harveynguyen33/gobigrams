@@ -960,12 +960,25 @@ body {
 }
 .node-metric small { font-size: 11px; color: var(--dim); font-weight: 400; margin-left: 3px; }
 
-/* ---------- label node (free text annotation) ---------- */
+/* ---------- label node (free text annotation) ----------
+   ROUND R — `width: 100%` + `min-height: 100%` are the I5 fix applied to this
+   kind. The resizer writes width/height onto the React Flow WRAPPER
+   (`node.style`), not onto this div, so without them a resize would grow an
+   empty box and the text would never reflow. They are also harmless when the
+   wrapper has NO explicit size (the demo board's `n100`, the flowchart `a11`
+   annotation): a percentage against a shrink-to-fit parent resolves to `auto`,
+   so the box still sizes to its own content exactly as before.
+
+   `min-width: 60px` is KEPT. It no longer competes with the resizer: the
+   resizer's own floor is 80px, so 60 is never the binding constraint once a size
+   exists — and when no size exists (no style on the node) it is the ONLY floor,
+   which is what preserves `n100`'s measured 60x28. */
 .label-node {
   font-family: var(--mono); font-size: 13px; line-height: 1.5;
   color: var(--fg); background: transparent; border: none; outline: none;
   padding: 4px 6px; min-width: 60px; white-space: pre-wrap;
   border-radius: 4px;
+  width: 100%; min-height: 100%;
 }
 .label-node.selected {
   box-shadow: 0 0 0 2px var(--sel);

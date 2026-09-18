@@ -111,6 +111,15 @@ export const PALETTE: PaletteItem[] = [
   {
     label: 'Text', hint: 'free-floating label', shape: 'note', colorKey: 'slate', kind: 'label',
     category: 'basic', types: ['architecture'], aliases: ['label', 'plain'], geometry: 'free text label',
+    // ROUND R — a default box so a fresh label is usable rather than collapsing
+    // to its content width. 180px is ~21 monospace characters of run at 13px
+    // (180 - 12px padding, ~7.8px per char), so the default string fits on ONE
+    // line with room to roughly double before it wraps; 64px is 2.87 line boxes
+    // (64 - 8px padding, 19.5px per line), i.e. two typed lines with slack, and
+    // sits comfortably ABOVE the 48px resizer floor so a new label never renders
+    // at its own minimum. `addNodeByLabel` already honours `item.size`, so
+    // nothing in App.tsx has to change.
+    size: {width: 180, height: 64},
     make: () => ({text: 'Text label'}),
   },
 ];
