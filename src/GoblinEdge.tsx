@@ -83,6 +83,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
     /** FB-L: review mode, threaded through per-edge data exactly like `__type`.
      *  The label stays readable; its editor must stay shut. */
     readOnly?: boolean;
+    /** STEP 1 (2026-09-18): where the step's cross-bar sits along the split
+     *  axis — the fraction `getSmoothStepPath` calls `stepPosition` (0..1).
+     *  Only the step / smoothstep generators have this parameter at all.
+     *  ABSENT (not 0.5) is the default on purpose: `stepPosition: undefined`
+     *  resolves to React Flow's own 0.5 default inside the generator, so a
+     *  board that has never carried a `bend` renders byte-identical. */
+    bend?: number;
   };
 
   /** FB-L: one reader for the mode, used by both editor entry points. */
@@ -108,13 +115,21 @@ const GoblinEdge = memo((props: EdgeProps) => {
   let path = '';
   let labelX = (sourceX + targetX) / 2;
   let labelY = (sourceY + targetY) / 2;
+  // STEP 1: the bend position is passed THROUGH, never defaulted here.
+  // `getSmoothStepPath`'s own signature defaults `stepPosition = 0.5`
+  // (@xyflow/system index.js:1411), and it reads the value only inside the
+  // opposite-handle branch (:1263). An edge with no stored `bend` therefore
+  // hands over `undefined`, the generator substitutes 0.5, and every existing
+  // board's path is unchanged — which is the whole reason this is passed as
+  // `undefined` rather than an explicit 0.5.
+  const stepPosition = d.bend;
   try {
     if (kind === 'straight') {
       [path, labelX, labelY] = getStraightPath(pathOpts);
     } else if (kind === 'step') {
-      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 0});
+      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 0, stepPosition});
     } else if (kind === 'smoothstep') {
-      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 12});
+      [path, labelX, labelY] = getSmoothStepPath({...pathOpts, borderRadius: 12, stepPosition});
     } else {
       [path, labelX, labelY] = getBezierPath(pathOpts);
     }

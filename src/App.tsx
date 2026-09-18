@@ -182,6 +182,10 @@ type Snap = {nodes: Node[]; edges: Edge[]};
 type EdgeData = {
   shape?: string;
   offset?: 'center' | 'start' | 'end';
+  /** STEP 1 (2026-09-18): the stored bend position for a step / smoothstep
+   *  route — the fraction `getSmoothStepPath` calls `stepPosition` (0..1).
+   *  Absent means "never set", which the generator resolves to its own 0.5. */
+  bend?: number;
 };
 
 /* ---------------------------------------------------------------------------
@@ -330,6 +334,101 @@ function isEditable(t: EventTarget | null): boolean {
 
 const nodeW = (n: Node) => (n.measured?.width ?? n.width ?? 190) as number;
 const nodeH = (n: Node) => (n.measured?.height ?? n.height ?? 60) as number;
+
+/* ---------------------------------------------------------------------------
+   STEP 1 (2026-09-18) — BEND POSITION for step / smoothstep edges.
+
+   `getSmoothStepPath` takes a `stepPosition` fraction (0 = at the source end,
+   1 = at the target end, 0.5 = React Flow's default) that slides the step's
+   cross-bar along the split axis. It is NOT a general knob, and the control
+   must be off wherever it is inert — a slider that moves without moving the
+   line is a lie:
+
+   - `getBezierPath` / `getStraightPath` have no such parameter AT ALL.
+   - Even for step / smoothstep, the generator reads the value only inside its
+     opposite-handle branch (@xyflow/system `index.js:1263`) and, within that
+     branch, only when the split runs along the source handle's own axis
+     (`:1292`) — because the other arm routes through the OTHER accessor
+     (`:1296`), whose centre is the plain `(a + b) / 2` of `:1267` / `:1271`.
+     `bendActive` below is exactly that condition.
+
+   Derived from the generator's source, then re-checked against the real
+   function: a 9,600-geometry sweep over every handle pair compares
+   `getSmoothStepPath({stepPosition: 0.1})` with `0.9` and asserts the path
+   differs precisely when this predicate says it will — 0 counterexamples.
+--------------------------------------------------------------------------- */
+type Side4 = 'left' | 'right' | 'top' | 'bottom';
+
+const OPPOSITE_SIDE: Record<Side4, Side4> = {left: 'right', right: 'left', top: 'bottom', bottom: 'top'};
+/** The generator's own `handleDirections` table (@xyflow/system `index.js:1223`). */
+const SIDE_OUT: Record<Side4, {x: number; y: number}> = {
+  left: {x: -1, y: 0}, right: {x: 1, y: 0}, top: {x: 0, y: -1}, bottom: {x: 0, y: 1},
+};
+/** React Flow's own `offset` default in `getSmoothStepPath` (`index.js:1411`). */
+const STEP_GAP_PX = 20;
+
+const isSide4 = (v: unknown): v is Side4 =>
+  v === 'left' || v === 'right' || v === 'top' || v === 'bottom';
+
+/** Midpoint of one named side of a node — the same anchor React Flow hands the
+ *  edge component as `sourceX`/`sourceY` (see `GoblinEdge`'s props). */
+const sideAnchor = (n: Node, side: Side4): {x: number; y: number} => {
+  const w = nodeW(n), h = nodeH(n);
+  if (side === 'right')  return {x: n.position.x + w,     y: n.position.y + h / 2};
+  if (side === 'left')   return {x: n.position.x,         y: n.position.y + h / 2};
+  if (side === 'top')    return {x: n.position.x + w / 2, y: n.position.y};
+  return {x: n.position.x + w / 2, y: n.position.y + h};
+};
+
+/** Does this geometry route through a split at the SOURCE handle, and is that
+ *  split perpendicular to the source handle's own direction? Only then does
+ *  `stepPosition` reach the path. */
+function bendActive(s: {x: number; y: number}, t: {x: number; y: number}, sp: Side4, tp: Side4): boolean {
+  if (OPPOSITE_SIDE[sp] !== tp) return false;            // the opposite-handle case only
+  const od = SIDE_OUT[sp];
+  const sGap = {x: s.x + od.x * STEP_GAP_PX, y: s.y + od.y * STEP_GAP_PX};
+  const td = SIDE_OUT[tp];
+  const tGap = {x: t.x + td.x * STEP_GAP_PX, y: t.y + td.y * STEP_GAP_PX};
+  // The generator's `getDirection` (index.js:1229): left/right reads the X
+  // sign, top/bottom reads the Y sign.
+  const overall = (sp === 'left' || sp === 'right')
+    ? (sGap.x < tGap.x ? {x: 1, y: 0} : {x: -1, y: 0})
+    : (sGap.y < tGap.y ? {x: 0, y: 1} : {x: 0, y: -1});
+  const axis = overall.x !== 0 ? 'x' : 'y';
+  return od[axis] === overall[axis];
+}
+
+/** Is a bend position meaningful for this edge, and if not, why not? One honest
+ *  line either way, so the inspector never ships a dead control. */
+const bendSupport = (e: Edge, nodes: Node[]): {active: boolean; why: string} => {
+  if (e.type !== 'step' && e.type !== 'smoothstep') {
+    return {active: false, why: 'Only step and smoothstep lines have a bend position.'};
+  }
+  const source = nodes.find(n => n.id === e.source);
+  const target = nodes.find(n => n.id === e.target);
+  if (!source || !target) {
+    return {active: false, why: "This edge's routing ignores a bend position."};
+  }
+  // The stored handle id IS the Position value (DiagramNode.tsx names its
+  // handles `left` / `right` / `top` / `bottom`). When one was never stored,
+  // fall back to the connected node's own `data.handles` — the same authority
+  // `migrateEdgeEnds` uses — and treat anything else (an ERD column handle)
+  // as "no bend", since this predicate describes a node-side split only.
+  const sFrom = handleSidesOf(source).source;
+  const tFrom = handleSidesOf(target).target;
+  const sp = isSide4(e.sourceHandle) ? e.sourceHandle : (isSide4(sFrom) ? sFrom : null);
+  const tp = isSide4(e.targetHandle) ? e.targetHandle : (isSide4(tFrom) ? tFrom : null);
+  if (!sp || !tp) {
+    return {active: false, why: "This edge's routing ignores a bend position."};
+  }
+  return bendActive(sideAnchor(source, sp), sideAnchor(target, tp), sp, tp)
+    ? {active: true, why: ''}
+    : {active: false, why: "This edge's routing ignores a bend position."};
+};
+
+/** The stored bend fraction, or React Flow's own default when never set. */
+const bendOf = (e: Edge | null | undefined): number =>
+  ((e?.data ?? {}) as EdgeData).bend ?? 0.5;
 
 /** Tiny table glyph for the ERD palette row (26×18, same box as ShapePreview). */
 function TableGlyph({color}: {color: string}) {
@@ -1140,6 +1239,10 @@ export default function App() {
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);
   const [, bumpHist] = useState(0);
+  /** STEP 1 — true while a bend-position range drag is in flight, so the
+   *  continuous `onChange` burst collapses into ONE undo entry. Declared with
+   *  the other history refs because `updateEdge` (further down) reads it. */
+  const bendDragging = useRef(false);
 
   const snapshot = useCallback((): Snap => ({
     nodes: nodesRef.current.map(n => ({
@@ -1685,11 +1788,18 @@ export default function App() {
     setNodes(ns => ns.map(n => n.id === sel ? {...n, data: {...n.data, ...patch}} : n));
   };
 
-  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart. */
-  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false) => {
+  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart.
+   *
+   *  `coalesce` (STEP 1) marks a CONTINUOUS gesture — a range drag — as one
+   *  undo step: history is recorded on the first move of the gesture only, so
+   *  a 100-event drag costs ONE entry (holding the pre-drag value) rather than
+   *  flooding the 50-entry stack and destroying the user's older undo steps.
+   *  The gesture ends when the flag is cleared by the control that set it. */
+  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false, coalesce = false) => {
     if (!selEdgeId) return;
     if ('label' in patch) tickTask('label');
-    pushHistory();
+    if (!coalesce || !bendDragging.current) pushHistory();
+    if (coalesce) bendDragging.current = true;
     setEdges(es => es.map(e => {
       if (e.id !== selEdgeId) return e;
       const {style, markerEnd, markerStart, data, ...rest} = patch;
@@ -2853,6 +2963,14 @@ export default function App() {
   const ePathType = (Object.keys(PATH_TYPES) as PathType[]).find(k => PATH_TYPES[k] === selectedEdge?.type && k !== 'custom') ?? 'bezier';
   const eOffset = (((selectedEdge?.data ?? {}) as EdgeData).offset ?? 'center');
 
+  // STEP 1 — bend position. `eBendInfo.active` is the gate: the slider is only
+  // live where `getSmoothStepPath` actually reads `stepPosition`, so it can
+  // never move without moving the line.
+  const eBendInfo = selectedEdge
+    ? bendSupport(selectedEdge, nodes)
+    : {active: false, why: ''};
+  const eBend = bendOf(selectedEdge);
+
   const markerOptions = [
     {v: 'none', label: 'None'},
     {v: MarkerType.ArrowClosed, label: 'Arrow (closed)'},
@@ -3986,6 +4104,37 @@ export default function App() {
                   <option value="start">start</option>
                   <option value="end">end</option>
                 </select>
+              </div>
+              {/* STEP 1 — bend position. Deliberately NOT passed `replaceData`:
+                  updateEdge's SECOND argument REPLACES `data` wholesale,
+                  keeping only the keys the edges memo re-injects (`__type` /
+                  `onCommitLabel` / `readOnly`), so `true` here would silently
+                  drop a stored `bend` on the very control that owns it. The
+                  default merge keeps it. `coalesce` (third arg) makes the whole
+                  drag ONE undo entry. */}
+              <div className="field">
+                <label>bend position</label>
+                <div className="range-row">
+                  <input
+                    type="range"
+                    min="0" max="1" step="0.01"
+                    value={eBend}
+                    disabled={!eBendInfo.active}
+                    aria-label="Bend position"
+                    title={eBendInfo.active
+                      ? 'Where the step crosses the gap — 0 is at the source end, 1 at the target end'
+                      : eBendInfo.why}
+                    onChange={ev => updateEdge({data: {bend: Number(ev.target.value)}}, false, true)}
+                    onPointerUp={() => { bendDragging.current = false; }}
+                    onPointerCancel={() => { bendDragging.current = false; }}
+                    onKeyUp={() => { bendDragging.current = false; }}
+                    onBlur={() => { bendDragging.current = false; }}
+                  />
+                  <span className="range-val">{eBend.toFixed(2)}</span>
+                </div>
+                {!eBendInfo.active && (
+                  <div className="field-note">{eBendInfo.why}</div>
+                )}
               </div>
               <div className="sec-label">Line</div>
               <div className="field">

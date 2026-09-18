@@ -2986,3 +2986,104 @@ kbd {
    renders in any node kind, and its rules were removed with it. -------- */
 
 /* ---- 6. SWATCHES — .swatches / .swatch already carry their rules. ----- */
+
+/* ---- 7. RANGE — STEP 1 (2026-09-18) bend position. ---------------------
+   The app's first range input. Tokens only — no new colour literal (the
+   sheet's hex count is a gate and must stay 127).
+
+   `appearance: none` + an explicit track and thumb, because a native range
+   cannot follow the five themes on any engine; the same reasoning as the
+   select kit above. The track is a 4px pill painted from `--border` /
+   `--dim2` so it reads at rest; the thumb is a 15px `--elevated` disc with a
+   `--acc` ring — the focus/hover colour the rest of the kit uses. Height is
+   fixed at 15px so the row height does not depend on the engine's default. */
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.range-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 15px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+.range-row input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.range-row input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.range-row input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: -5.5px;             /* centre the 15px thumb on the 4px track */
+  border-radius: 50%;
+  background: var(--elevated);
+  border: 2px solid var(--acc);
+  transition: border-color .15s, box-shadow .15s;
+}
+.range-row input[type="range"]::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--elevated);
+  border: 2px solid var(--acc);
+  transition: border-color .15s, box-shadow .15s;
+}
+.range-row input[type="range"]:hover::-webkit-slider-thumb { border-color: var(--sel); }
+.range-row input[type="range"]:hover::-moz-range-thumb { border-color: var(--sel); }
+.range-row input[type="range"]:focus-visible::-webkit-slider-thumb {
+  border-color: var(--sel);
+  box-shadow: 0 0 0 3px var(--acc-soft);
+}
+.range-row input[type="range"]:focus-visible::-moz-range-thumb {
+  border-color: var(--sel);
+  box-shadow: 0 0 0 3px var(--acc-soft);
+}
+/* DISABLED = "this edge's routing ignores a bend position". Dimmed so it
+   cannot be mistaken for a live control, and its reason is the `.field-note`
+   line rendered beneath it. */
+.range-row input[type="range"]:disabled { cursor: not-allowed; }
+.range-row input[type="range"]:disabled::-webkit-slider-thumb {
+  border-color: var(--dim2);
+  background: var(--surface);
+}
+.range-row input[type="range"]:disabled::-moz-range-thumb {
+  border-color: var(--dim2);
+  background: var(--surface);
+}
+
+/* the numeric read-out — mono + tabular so the digits do not jitter as the
+   value changes under a drag. */
+.range-val {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+.range-row:has(input[type="range"]:disabled) .range-val { color: var(--dim2); }
+
+/* the one-line honest reason a control is off. Not `.hint` (that is a padded
+   block used for multi-line inspector notes) — this hugs its field. */
+.field-note {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--dim2);
+}
