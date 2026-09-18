@@ -159,8 +159,21 @@ const GoblinEdge = memo((props: EdgeProps) => {
     [kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
   );
   /** The drag is offered only on an edge whose bend reaches the path, and never
-   *  in review mode — the handle is an editing affordance (FB-L). */
-  const bendDraggable = bendInfo.active && !ro;
+   *  in review mode — the handle is an editing affordance (FB-L).
+   *
+   *  AND ONLY ON THE SELECTED EDGE. This is draw.io's and Excalidraw's own
+   *  entry rule ("click the line, handles appear"), and it is a deliberate
+   *  ORCHESTRATOR correction of the first implementation, which offered a
+   *  fully-opaque handle on every step/smoothstep edge at once. Measured
+   *  consequence of that: a two-orange-dot board at rest, each dot sitting
+   *  exactly ON its edge's label — the handle is painted at the path's
+   *  `labelX`/`labelY`, which IS the label's anchor — so the resting canvas
+   *  gained a dot over every label before the user had clicked anything.
+   *
+   *  `selected` is React Flow's own per-edge selection flag, so this adds no
+   *  new state: the click that selects the edge is also the click that reveals
+   *  the handle, in one gesture and with no second source of truth. */
+  const bendDraggable = bendInfo.active && !ro && !!selected;
   /** The point the edge is DRAWN through right now: the stored coordinate on the
    *  axis the drag owns, the step-position fraction `bend` if the slider set one,
    *  and the generator's own 0.5 midpoint otherwise. */
