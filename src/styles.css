@@ -1,0 +1,2892 @@
+/* Diagram Studio — terminal-goblin theme
+   Design tokens khớp tech-goblin.com
+
+   L1 — TWO-LAYER TOKENS
+     Layer 1: semantic tokens (surfaces, text, actions) + the new chrome tokens
+              (glass, scrim, shadows, dots, danger, edge-label background).
+     Layer 2: the six shape accents, SYMBOLIC (`--c-*`). Node colours are stored
+              in board JSON as a key, resolved to `var(--c-*)` at render time, so
+              a theme recolours existing boards without touching shapes.tsx.
+
+   The dark block is byte-identical to the shipped values — nothing may move. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --surface: #131316;
+  --elevated: #1a1b1f;
+  --border: #26272c;
+  --border-strong: #33343a;
+  --fg: #e8e8ea;
+  --dim: #8a8a92;
+  --dim2: #63636b;
+  --acc: #f54e00;
+  --sel: #3b82f6;
+  --sel-soft: rgba(59, 130, 246, 0.14);
+  /* M / D2 — this pair used to be a self-reference cycle (var(--acc-tint)),
+     so BOTH resolved to the empty string and every `--acc-soft` fill in the
+     dark theme painted transparent. Real values now. INTENTIONAL visual
+     side effect: any `.on` surface tinted with `--acc-soft` shows the accent
+     tint in dark again (it did not before). */
+  --acc-soft: rgba(245, 78, 0, 0.14);
+  --acc-tint: rgba(245, 78, 0, 0.14);
+  --green: #4ade80;
+  --red: #f87171;
+  --danger: #ef4444;
+  /* card surface used by edge payloads (envelope flap); alias so it is never undeclared */
+  --card: #1a1b1f;
+  /* L1 chrome tokens — every literal from the audit now lives here */
+  --canvas-glow: rgba(245, 78, 0, 0.06);
+  --panel-glass: rgba(19, 19, 22, 0.86);
+  --panel-glass-strong: rgba(19, 19, 22, 0.92);
+  --scrim: rgba(11, 11, 13, 0.45);
+  --minimap-mask: rgba(11, 11, 13, 0.7);
+  --dots: rgba(255, 255, 255, 0.14);
+  --shadow: rgba(0, 0, 0, 0.6);
+  --shadow-strong: 0 18px 40px -10px rgba(0, 0, 0, 0.75);
+  --shadow-pop: 0 30px 70px -12px rgba(0, 0, 0, 0.85);
+  --shadow-sm: 0 6px 20px -6px rgba(0, 0, 0, 0.6);
+  --shadow-toolbar: 0 10px 28px -8px rgba(0, 0, 0, 0.7);
+  --scroll-hover: #43444a;
+  --on-acc: #fff;
+  --on-acc-hover: #ff5f12;
+  --edge-text-bg: #1a1b1f;
+  /* Layer 2 — the six shape accents (symbolic; boards store the key) */
+  --c-accent: #f54e00;
+  --c-green: #4ade80;
+  --c-cyan: #22d3ee;
+  --c-violet: #a78bfa;
+  --c-amber: #fbbf24;
+  --c-slate: #94a3b8;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --elevated: #f2f2f4;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --fg: #18181b;
+  --dim: #52525b;
+  --dim2: #82828c;
+  --acc: #c2410c;
+  --acc-soft: color-mix(in srgb, var(--acc) 10%, transparent);
+  --sel: #2563eb;
+  --sel-soft: color-mix(in srgb, var(--sel) 12%, transparent);
+  --green: #15803d;
+  --red: #b91c1c;
+  --danger: #b91c1c;
+  --card: #f2f2f4;
+  --canvas-glow: rgba(194, 65, 12, 0.05);
+  --panel-glass: rgba(255, 255, 255, 0.86);
+  --panel-glass-strong: rgba(255, 255, 255, 0.94);
+  --scrim: rgba(24, 24, 27, 0.28);
+  --minimap-mask: rgba(24, 24, 27, 0.15);
+  --dots: rgba(24, 24, 27, 0.18);
+  --shadow: rgba(24, 24, 27, 0.12);
+  --shadow-strong: 0 14px 34px -12px rgba(24, 24, 27, 0.18);
+  --shadow-pop: 0 24px 48px -14px rgba(24, 24, 27, 0.22);
+  --shadow-sm: 0 4px 14px -6px rgba(24, 24, 27, 0.14);
+  --shadow-toolbar: 0 8px 22px -8px rgba(24, 24, 27, 0.18);
+  --scroll-hover: #a1a1aa;
+  --on-acc: #fff;
+  --on-acc-hover: #9a3412;
+  --edge-text-bg: #ffffff;
+  --acc-tint: rgba(194, 65, 12, 0.10);
+  /* Layer 2 — dark INKS. The bright dark accents measure 1.7–3.5 on white and
+     fail WCAG; these are the measured ≥5.0 replacements (see the token table). */
+  --c-accent: #9a3412;
+  --c-green: #166534;
+  --c-cyan: #0e7490;
+  --c-violet: #5b21b6;
+  --c-amber: #92400e;
+  --c-slate: #475569;
+}
+
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: #f6f1e7;
+  --surface: #fffaf1;
+  --elevated: #efe8da;
+  --border: #e2d8c6;
+  --border-strong: #cfc2ab;
+  --fg: #2b2620;
+  --dim: #7a6f60;
+  --dim2: #9c9184;
+  --acc: #8a2e05;
+  --acc-soft: color-mix(in srgb, var(--acc) 10%, transparent);
+  --sel: #1e3a8a;
+  --sel-soft: color-mix(in srgb, var(--sel) 12%, transparent);
+  --green: #14532d;
+  --red: #991b1b;
+  --danger: #991b1b;
+  --card: #efe8da;
+  --canvas-glow: rgba(138, 46, 5, 0.05);
+  --panel-glass: rgba(255, 250, 241, 0.86);
+  --panel-glass-strong: rgba(255, 250, 241, 0.94);
+  --scrim: rgba(43, 38, 32, 0.28);
+  --minimap-mask: rgba(43, 38, 32, 0.16);
+  --dots: rgba(80, 60, 30, 0.22);
+  --shadow: rgba(80, 60, 30, 0.14);
+  --shadow-strong: 0 14px 34px -12px rgba(80, 60, 30, 0.20);
+  --shadow-pop: 0 24px 48px -14px rgba(80, 60, 30, 0.24);
+  --shadow-sm: 0 4px 14px -6px rgba(80, 60, 30, 0.16);
+  --shadow-toolbar: 0 8px 22px -8px rgba(80, 60, 30, 0.20);
+  --scroll-hover: #b8ab93;
+  --on-acc: #fffaf1;
+  --on-acc-hover: #6f2604;
+  --edge-text-bg: #fffaf1;
+  --acc-tint: rgba(138, 46, 5, 0.10);
+  --c-accent: #8a2e05;
+  --c-green: #14532d;
+  --c-cyan: #115e59;
+  --c-violet: #5b21b6;
+  --c-amber: #92400e;
+  --c-slate: #44403c;
+}
+
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --bg: #0a0f1e;
+  --surface: #121a2e;
+  --elevated: #18233c;
+  --border: #1e2a45;
+  --border-strong: #2b3a5e;
+  --fg: #dbe4ff;
+  --dim: #8b9ac0;
+  --dim2: #6b7a9e;
+  --acc: #ff7a45;
+  --acc-soft: color-mix(in srgb, var(--acc) 12%, transparent);
+  --sel: #6c9dff;
+  --sel-soft: color-mix(in srgb, var(--sel) 16%, transparent);
+  --green: #5eead4;
+  --red: #ff8a80;
+  --danger: #ff8a80;
+  --card: #18233c;
+  --canvas-glow: rgba(255, 122, 69, 0.06);
+  --panel-glass: rgba(18, 26, 46, 0.88);
+  --panel-glass-strong: rgba(18, 26, 46, 0.94);
+  --scrim: rgba(10, 15, 30, 0.5);
+  --minimap-mask: rgba(10, 15, 30, 0.7);
+  --dots: rgba(219, 228, 255, 0.15);
+  --shadow: rgba(0, 0, 0, 0.7);
+  --shadow-strong: 0 18px 40px -10px rgba(0, 0, 0, 0.8);
+  --shadow-pop: 0 30px 70px -12px rgba(0, 0, 0, 0.9);
+  --shadow-sm: 0 6px 20px -6px rgba(0, 0, 0, 0.7);
+  --shadow-toolbar: 0 10px 28px -8px rgba(0, 0, 0, 0.8);
+  --scroll-hover: #33436b;
+  --on-acc: #0a0f1e;
+  --on-acc-hover: #ff9761;
+  --edge-text-bg: #121a2e;
+  --acc-tint: rgba(255, 122, 69, 0.12);
+  --c-accent: #ff7a45;
+  --c-green: #86efac;
+  --c-cyan: #5eead4;
+  --c-violet: #c4b5fd;
+  --c-amber: #fcd34d;
+  --c-slate: #94a3b8;
+}
+
+[data-theme="contrast"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #000000;
+  --elevated: #141414;
+  --border: #808080;
+  --border-strong: #c0c0c0;
+  --fg: #ffffff;
+  --dim: #c8c8c8;
+  --dim2: #a0a0a0;
+  --acc: #ffff00;
+  --acc-soft: color-mix(in srgb, var(--acc) 20%, transparent);
+  --sel: #00ffff;
+  --sel-soft: color-mix(in srgb, var(--sel) 20%, transparent);
+  --green: #80ff80;
+  --red: #ff8080;
+  --danger: #ff8080;
+  --card: #141414;
+  --canvas-glow: transparent;
+  --panel-glass: rgba(0, 0, 0, 0.92);
+  --panel-glass-strong: rgba(0, 0, 0, 0.96);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --minimap-mask: rgba(0, 0, 0, 0.75);
+  --dots: rgba(255, 255, 255, 0.25);
+  --shadow: rgba(0, 0, 0, 0.85);
+  --shadow-strong: 0 0 0 1px #808080;
+  --shadow-pop: 0 0 0 1px #808080;
+  --shadow-sm: 0 0 0 1px #808080;
+  --shadow-toolbar: 0 0 0 1px #808080;
+  --scroll-hover: #a0a0a0;
+  --on-acc: #000000;
+  --on-acc-hover: #ffff66;
+  --edge-text-bg: #000000;
+  --acc-tint: rgba(255, 255, 0, 0.2);
+  --c-accent: #ffff00;
+  --c-green: #80ff80;
+  --c-cyan: #00ffff;
+  --c-violet: #c0c0ff;
+  --c-amber: #ffe066;
+  --c-slate: #c8c8c8;
+}
+
+/* L1 — React Flow only themes its own ~24 --xy-* variables (and only via its
+   `.dark` class). Re-point the handful we actually use at our own tokens, so
+   RF's chrome (dots, minimap, controls, edge-label background, selection) tracks
+   EVERY theme instead of just dark/light. */
+.ds-flow-wrap {
+  --xy-background-pattern-color: var(--dots);
+  --xy-minimap-background-color: var(--surface);
+  --xy-minimap-mask-background-color: var(--minimap-mask);
+  --xy-minimap-node-background-color: var(--border-strong);
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--elevated);
+  --xy-controls-button-color: var(--dim);
+  --xy-controls-button-color-hover: var(--fg);
+  --xy-controls-button-border-color: var(--border);
+  --xy-edge-label-background-color: var(--surface);
+  --xy-edge-label-color: var(--fg);
+  --xy-selection-background-color: var(--sel-soft);
+  --xy-selection-border: 1px dotted var(--sel);
+  --xy-handle-background-color: var(--elevated);
+  --xy-handle-border-color: var(--border-strong);
+  /* ITEM 1 — deliberately NOT overridden to `var(--sel)` any more. React Flow
+     paints the four `resize-control.line` borders from this variable, so
+     pointing it at the selection colour drew a full-perimeter blue line ON the
+     node's own edge: a second selection-coloured border beside the real ring.
+     Left to React Flow's own default (#3367d9) because the line controls now
+     paint no border-width at all (see `.resize-line` below) — the value is
+     unreachable either way, and NOT declaring it means re-enabling the lines
+     later cannot silently restore the double border.
+     The corner GRIPS do not read this variable: our own
+     `.react-flow__resize-control.handle` rule paints them from `--sel`. */
+}
+
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+/* M3/S5: where supported, the page shell is sized in `dvh`. On iOS Safari
+   `vh` (and plain `100%` against the layout viewport) is the LARGE viewport,
+   so a bottom-anchored bar is pushed behind the collapsing URL chrome and the
+   home indicator. The `100%` line above is the fallback for engines without
+   `dvh`; `vh` is never used for this shell. */
+html, body, #root { height: 100dvh; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+/* ---------- app shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: var(--left-w, 232px) 1fr var(--right-w, 288px);
+  height: 100%;
+  transition: grid-template-columns .22s ease;
+}
+/* M3/S1: the embed host measured by useEditorInterface(). It is the ONLY
+   element the layout hook observes — a resize of THIS box (not the window)
+   flips the compact layout, which is what makes the editor embeddable. It is
+   also the positioning context for the two panel-edge chevrons. */
+.app-host { position: relative; height: 100%; }
+/* Compact layout below the canonical 3-column threshold.
+   1229 is Excalidraw's MQ_RIGHT_SIDEBAR_MIN_WIDTH and is mirrored by
+   `dockedSidebarBreakpoint` in src/useEditorInterface.ts (which gates the
+   panel-collapse affordances on the CONTAINER width, not the window). One
+   number, two runtimes: never add a third. */
+@media (max-width: 1228.98px) {
+  .app { --left-w: 200px; --right-w: 248px; }
+  .app.right-hidden { --left-w: 200px; --right-w: 0px; }
+}
+/* M3/S2d: the RIGHT panel is collapsed ONLY by the user's own flag now — the
+   old C4 "hide while nothing is selected" rule is gone (it made the inspector
+   appear to glitch when no element was selected). Symmetric with the left. */
+.app.right-hidden { --right-w: 0px; }
+.app.right-hidden .panel.right { border-left: none; opacity: 0; }
+/* M3/S2: the same width collapse for the LEFT palette (manual chevron, or the
+   Shift+Mod+\ group toggle). Both are written through the ONE existing
+   `grid-template-columns` transition above — no second mechanism. */
+.app.left-hidden { --left-w: 0px; }
+/* `:not(.right)` is required: a bare `.panel` also matches the INSPECTOR, so a
+   left-only collapse used to blank the right panel's content while its column
+   was still 288px wide — an empty bar. The rest of the file already scopes the
+   two panels this way (see the tablet/phone rules below). */
+.app.left-hidden .panel:not(.right) { border-right: none; opacity: 0; }
+
+/* =====================================================================
+   PACKAGE-M3 / Step 4 + Step 5 — tablet drawers, phone shell.
+   Both tiers are driven by the attributes the interface hook already
+   writes onto `.app` / `.app-host`: [data-form-factor], [data-orientation],
+   [data-overlay]. No second set of breakpoints — src/useEditorInterface.ts
+   stays the single source of truth. The `grid-template-columns` declaration
+   in `.app` above stays the ONLY writer of that property: these tiers zero
+   the `--left-w` / `--right-w` inputs it consumes and lift the two panels
+   out of the grid flow instead.
+   ===================================================================== */
+
+/* The scrim behind a drawer / sheet: above the canvas and everything on it,
+   below the panel it belongs to. Tokens only — `--scrim` exists in all five
+   themes (dark / light / paper / midnight / contrast). */
+.scrim {
+  position: absolute; inset: 0; z-index: 7;
+  appearance: none; border: 0; padding: 0; margin: 0;
+  background: var(--scrim);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Step 4 — tablet PORTRAIT: both panels are sliding drawers ---- */
+.app[data-form-factor="tablet"][data-orientation="portrait"] {
+  --left-w: 0px; --right-w: 0px;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .panel {
+  position: absolute; top: 0; bottom: 0; z-index: 8;
+  width: min(320px, calc(100% - 56px));
+  box-shadow: var(--shadow-sm);
+  /* same .22s/ease language as the grid-column transition above */
+  transition: transform .22s ease;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .panel:not(.right) {
+  left: 0; transform: translateX(-101%);
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .panel.right {
+  left: auto; right: 0; transform: translateX(101%);
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"][data-overlay="left"] .panel:not(.right),
+.app[data-form-factor="tablet"][data-orientation="portrait"][data-overlay="right"] .panel.right {
+  transform: translateX(0);
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .panel-toggle { z-index: 9; }
+
+/* ---- Step 5 — phone: one column, bottom sheets, toolbar at the BOTTOM ---- */
+/* The shell is 100dvh, never 100vh: on iOS Safari the `vh` unit is the
+   LARGE viewport, so a bottom-anchored bar lands behind the home indicator
+   and below the collapsing URL chrome. `--safe-bottom` factors the inset
+   once; `--safe-area-bottom` is a test seam so the inset can be faked
+   without a device (env() cannot be overridden from CSS). */
+.app-host[data-form-factor="phone"] {
+  --safe-bottom: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
+  /* Worst-case WRAPPED height of the bottom bar at 360px, measured in
+     Chrome (2 rows + 12px padding). CSS cannot read the real height, so every
+     element that has to sit ABOVE the bar derives its offset from this one
+     number — change it here, not at each call site. */
+  --toolbar-h: 96px;
+}
+/* The compact tiers position the panels absolutely and slide them off-screen
+   when closed. An unclipped off-screen panel still occupies the document, so
+   the page grows a real scroll range the user can drag into (measured before
+   this rule: 433px vertical at 360x740, 323px horizontal at 768x1024, 252px
+   vertical at 932x430). `clip` removes the scroll range without creating a
+   scroll CONTAINER (unlike `hidden`, it never becomes programmatically
+   scrollable), which matters for a component meant to be embedded in someone
+   else's page. */
+.app-host { overflow: clip; }
+/* Both compact tiers take the panels OUT of the grid flow, so the canvas must
+   be told to span all three columns instead of sitting in track 2. Without
+   this it lands in a 0px track as soon as the panels go absolute. */
+.app[data-form-factor="tablet"][data-orientation="portrait"] .canvas-wrap,
+.app[data-form-factor="phone"] .canvas-wrap { grid-area: 1 / 1 / 2 / -1; }
+.app[data-form-factor="phone"] { --left-w: 0px; --right-w: 0px; }
+
+/* the toolbar moves out of thumb-hostile top-center to the bottom edge. It
+   WRAPS rather than scrolling sideways: a hidden horizontal overflow is an
+   affordance nobody discovers on a phone, and every tool must stay reachable
+   at 360px. */
+.app[data-form-factor="phone"] .toolbar {
+  top: auto;
+  bottom: 0;
+  left: 0; right: 0; transform: none;
+  max-width: none;
+  height: auto; min-height: 44px;
+  border-radius: 0;
+  border-left: 0; border-right: 0; border-bottom: 0;
+  padding: 6px 6px calc(6px + var(--safe-bottom));
+  justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+/* palette + inspector become partial-height bottom sheets, so the canvas
+   keeps the top of the screen. The grab handle is a pseudo-element first
+   child (`.panel` is already a flex column). */
+.app[data-form-factor="phone"] .panel {
+  position: absolute; top: auto; left: 0; right: 0; bottom: 0; z-index: 8;
+  width: auto; max-height: 58%;
+  border-left: 0; border-right: 0; border-bottom: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  padding-bottom: var(--safe-bottom);
+  box-shadow: var(--shadow-sm);
+  transition: transform .22s ease;
+  transform: translateY(101%);
+}
+.app[data-form-factor="phone"] .panel::before {
+  content: ''; flex: none;
+  width: 36px; height: 4px; border-radius: 999px;
+  margin: 8px auto 4px;
+  background: var(--border-strong);
+}
+.app[data-form-factor="phone"][data-overlay="left"] .panel:not(.right),
+.app[data-form-factor="phone"][data-overlay="right"] .panel.right {
+  transform: translateY(0);
+}
+/* the two chevrons survive as the sheet openers, re-anchored just above the
+   bottom bar (a 50 %-height control is unreachable with a thumb). `--toolbar-h`
+   is measured in App.tsx, so this tracks the real wrapped height instead of a
+   guess. */
+.app[data-form-factor="phone"] .panel-toggle[data-panel-toggle] {
+  top: auto; transform: none; z-index: 9;
+  bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 8px);
+  width: 32px; height: 32px;
+}
+.app[data-form-factor="phone"] .panel-toggle[data-panel-toggle="left"] { left: 8px; right: auto; }
+.app[data-form-factor="phone"] .panel-toggle[data-panel-toggle="right"] { right: 8px; left: auto; }
+
+/* The boards menu opens INSIDE that bottom sheet, and the sheet is capped at
+   `max-height: 58%` with `overflow-y: hidden` — so a menu taller than the space
+   left under the panel header renders at full content height and spills out of
+   its own parent, off the screen edge (spill 114px at 932x430, 137px at
+   844x390) with the last board unreachable. The base rule's `max-height: 420px`
+   could never help: it is LARGER than the space available, so the menu's own
+   `overflow-y: auto` never engaged.
+   The fix is derived, not guessed: the menu's top sits exactly 90px below the
+   panel's top at every size measured (932x430, 844x390, 360x740) — grab handle
+   + panel header + board button + 6px gap — so the space the menu really has is
+   `panelHeight - 90px`, and the panel is 58% of the viewport, hence
+   `58dvh - 90px`. With it the menu scrolls instead of spilling (scrollRange
+   114/137 at the landscape sizes), so every item stays reachable.
+   Do NOT "tidy" either number without re-measuring: 420px was arbitrary, the
+   90px is real geometry. The base `.boards-pop` rule below stays untouched for
+   desktop/tablet, where 420px is correct. */
+.app[data-form-factor="phone"] .boards-pop {
+  max-height: calc(58dvh - 90px);
+}
+
+/* "Collapsed" is a DESKTOP column concept. In the compact tiers the panels are
+   drawers/sheets, so the Step 2 hide-opacity must not apply — otherwise a
+   genuinely collapsed panel would slide its sheet in fully transparent.
+   `[data-overlay]` is always present on `.app` (empty when nothing is open), so
+   this is a tier-scoped rule, which is exactly the intent.
+   0,4,0 beats `.app.right-hidden .panel.right` (0,3,0). */
+.app[data-form-factor="phone"][data-overlay] .panel,
+.app[data-form-factor="tablet"][data-orientation="portrait"][data-overlay] .panel {
+  opacity: 1;
+}
+
+/* Motion gate: the drawer/sheet must not animate when the project's own
+   animation switch is off (`NO_ANIM` / `.ds-no-anim`) or when the OS asks for
+   less motion. Same gate as the rest of the choreography, no new one.
+   `!important` is deliberate: an accessibility/motion override must never lose
+   a specificity fight to the tier rules above (a 0,4,0 tier selector beats a
+   plain `.app.ds-no-anim .panel`), and that failure is silent. */
+@media (prefers-reduced-motion: reduce) {
+  .app .panel, .app .scrim { transition: none !important; }
+}
+.app.ds-no-anim .panel,
+.app.ds-no-anim .scrim { transition: none !important; }
+
+/* The bottom bar owns the bottom edge on a phone. Every other bottom-anchored
+   HUD (toast, shortcut help, selection bar, zoom controls, minimap, legend)
+   is lifted above it so none of them ends up underneath the bar. */
+.app[data-form-factor="phone"] .toast { bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 8px); }
+.app[data-form-factor="phone"] .help-btn {
+  right: 10px;
+  bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 8px);
+}
+.app[data-form-factor="phone"] .help-pop {
+  right: 10px; left: 10px; width: auto;
+  bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 40px);
+  max-height: 60dvh; overflow-y: auto;
+}
+.app[data-form-factor="phone"] .sel-bar {
+  top: auto;
+  bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 8px);
+  margin-top: 0;
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+}
+/* React Flow's own bottom-anchored overlays (Controls, MiniMap, bottom Panels
+   such as the legend). Same lift, one definition. */
+.app[data-form-factor="phone"] .react-flow__controls,
+.app[data-form-factor="phone"] .react-flow__minimap,
+.app[data-form-factor="phone"] .react-flow__panel.bottom {
+  bottom: calc(var(--toolbar-h, 96px) + var(--safe-bottom) + 10px);
+}
+
+/* M3/S2: panel-edge collapse control (one per panel side).
+   Control-kit styling: 7px radius, appearance:none, focus ring --acc +
+   3px --acc-soft. Tokens only. */
+.panel-toggle {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  z-index: 6;
+  width: 20px; height: 44px; padding: 0;
+  display: grid; place-items: center;
+  appearance: none;
+  font: inherit; color: var(--dim); cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 7px;
+  transition: color .15s, border-color .15s, background .15s, left .22s ease, right .22s ease;
+}
+.panel-toggle:hover { color: var(--fg); border-color: var(--border-strong); background: var(--elevated); }
+.panel-toggle:focus-visible { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+/* the chevron sits ON the seam, riding the animated column edge. Clamped to
+   ≥4px so it stays tappable/visible when its panel column is 0px wide. */
+.panel-toggle[data-panel-toggle="left"] { left: max(4px, calc(var(--left-w, 232px) - 10px)); }
+.panel-toggle[data-panel-toggle="right"] { right: max(4px, calc(var(--right-w, 288px) - 10px)); }
+/* M3/S2d deleted the `.panel-toggle.auto` tint. It existed to tell apart the C4
+   auto-hide ("I hid myself") from a user collapse ("you hid me"); the auto-hide
+   is gone, so nothing can emit the class and the two rules were dead selectors. */
+.panel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel.right { border-right: none; border-left: 1px solid var(--border); }
+
+.panel-head {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.brand .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--acc); box-shadow: 0 0 8px var(--acc);
+}
+.brand .path { color: var(--dim); font-weight: 400; font-size: 11px; margin-left: 2px; }
+
+.panel-body { padding: 12px; overflow-y: auto; flex: 1; }
+.sec-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim);
+  margin: 4px 0 10px 2px;
+}
+
+/* ---------- palette ---------- */
+.palette { display: flex; flex-direction: column; gap: 6px; }
+.pal-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--elevated);
+  cursor: grab; transition: border-color .15s, transform .1s;
+  font-size: 12.5px;
+}
+.pal-item:hover { border-color: var(--sel); transform: translateX(2px); }
+.pal-item:active { cursor: grabbing; }
+.pal-swatch {
+  width: 30px; height: 24px; border-radius: 6px; flex: none;
+  display: grid; place-items: center;
+  /* No background. A filled swatch painted `--surface` on top of the row's
+     `--elevated`, which reads as a stray WHITE chip inside the light theme
+     (`--surface` is #ffffff there) — a card-on-card look Harvey rejected.
+     The shape preview carries its own `--nc` stroke, so it needs no plate. */
+  background: transparent;
+}
+.pal-swatch span { font-family: var(--mono); font-size: 10.5px; font-weight: 700; }
+.shape-preview { display: block; overflow: visible; }
+.pal-meta { display: flex; flex-direction: column; line-height: 1.25; }
+.pal-meta small { color: var(--dim); font-size: 10.5px; font-family: var(--mono); }
+
+/* ---------- library: search + collapsible categories (PACKAGE-N 2b, 2c) ----------
+   The section body scrolls inside `.panel-body` (overflow-y: auto); nothing here
+   sets a width, so the fixed panel layout is untouched.
+
+   REVISION 3 DELETED `.lib-filter` / `.lib-chip` (the 6-chip type filter) and
+   `.pal-badges` / `.tb*` (the per-row type badges). 33 of 34 elements belong to
+   exactly one type, so that chrome cost 77px of permanently wrapped height to
+   restate each row's own category. What replaces it is ONE search field. */
+.lib-search { margin: 0 0 12px 0; }
+.lib-search-input {
+  width: 100%;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 11px; font-size: 12.5px; font-family: var(--sans);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.lib-search-input::placeholder { color: var(--dim2); }
+.lib-search-input:hover { border-color: var(--border-strong); }
+.lib-search-input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+/* `type="search"` draws a UA clear button that clashes with the control kit and
+   cannot be themed; the field's own Escape-to-clear is the affordance instead. */
+.lib-search-input::-webkit-search-cancel-button { display: none; }
+
+/* A search-result category HEADER. Not a button (there is nothing to fold while
+   a query narrows the list) — just the category name and its hit count. */
+.lib-search-head {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  font: inherit; font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 4px; color: var(--dim);
+}
+/* §9 — a search hit whose category is COLLAPSED renders DIMMED. Never hidden:
+   the hit must stay visible, or the user concludes the shape does not exist.
+   Set on the row AND its swatch/meta so the reduction reads as "de-emphasised"
+   rather than "disabled" — the row is still fully draggable and clickable. */
+.pal-item.pal-dimmed { opacity: .45; }
+.pal-item.pal-dimmed:hover { opacity: .8; }
+.lib-no-match {
+  padding: 10px 4px; font-size: 12px; color: var(--dim2); font-family: var(--mono);
+}
+
+.lib-cats { display: flex; flex-direction: column; gap: 8px; }
+.lib-cat-head {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  font: inherit; font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer;
+  padding: 6px 4px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--dim);
+}
+.lib-cat-head:hover { background: var(--surface); color: var(--fg); }
+.lib-chev { flex: none; transition: transform .15s; }
+.lib-chev.open { transform: rotate(0deg); }
+.lib-chev:not(.open) { transform: rotate(-90deg); }
+.lib-cat-name { flex: 1; text-align: left; }
+.lib-cat-n {
+  font-size: 9.5px; padding: 1px 5px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--dim2);
+}
+.lib-cat .palette { margin-top: 6px; }
+
+/* star / pin control on every palette row (PACKAGE-N §6.3).
+   `margin-left: auto` pins it to the row's right edge past the badges. The
+   badges (`.pal-meta`) size to their content, so a fixed offset let short
+   labels pull the star inward and it landed 19px left on those rows;
+   `auto` absorbs whatever width the label block happens to take. */
+.pal-star {
+  flex: none; margin-left: auto;
+  width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center;
+  font: inherit; font-size: 14px; line-height: 1;
+  cursor: pointer; border-radius: 6px;
+  border: 1px solid transparent; background: transparent; color: var(--dim2);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.pal-star:hover { color: var(--acc); border-color: var(--border); background: var(--surface); }
+.pal-star.on { color: var(--acc); }
+
+/* ---------- favourites: the panel section + the tile grid (PACKAGE-N §6) ---------- */
+.fav-sec { margin-bottom: 14px; }
+.fav-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.fav-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 7px 4px; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 10px; line-height: 1.15; text-align: center;
+  border: 1px solid var(--border); background: var(--elevated); color: var(--dim);
+  transition: border-color .15s, color .15s, transform .1s;
+}
+.fav-tile:hover { border-color: var(--sel); color: var(--fg); transform: translateY(-1px); }
+.fav-tile:active { cursor: grabbing; }
+.fav-glyph {
+  width: 34px; height: 25px; border-radius: 6px; flex: none;
+  display: grid; place-items: center; background: var(--surface);
+}
+.fav-glyph span { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.fav-name {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 9.5px;
+}
+/* §6.4 — the pending `+`: visibly a call to action, not a stored item. The
+   pulse is a box-shadow ring in the accent token (no literal rgba), so it
+   themes with everything else; reduced-motion switches it off below. */
+.fav-pending {
+  border-style: dashed; border-color: var(--acc); background: var(--acc-soft); color: var(--acc);
+  animation: fav-pending-pulse 1.8s ease-in-out infinite;
+}
+.fav-pending .fav-glyph { background: transparent; font-size: 16px; font-weight: 700; color: var(--acc); }
+.fav-pending:hover { border-color: var(--acc); color: var(--acc); }
+@keyframes fav-pending-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--acc-soft); }
+  50% { box-shadow: 0 0 0 3px var(--acc-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fav-pending { animation: none; }
+}
+
+/* ---------- custom shapes: import + tiles (PACKAGE-N §4.1, §8.1–§8.3) ----------
+   Tokens only — every colour here resolves through a theme variable, so the
+   section follows the theme like the rest of the panel does. The section
+   spacing matches `.fav-sec` so the two grids read as siblings. */
+.cust-shapes { margin-bottom: 14px; }
+.cust-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* `.sec-label` carries a bottom margin for the standalone "Shapes" heading;
+   inside the flex row the header's own gap owns that space instead. */
+.cust-head .sec-label { margin: 0 0 0 2px; }
+.cust-import {
+  flex: none; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  padding: 4px 9px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--elevated); color: var(--dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.cust-import:hover { border-color: var(--acc); color: var(--fg); background: var(--acc-soft); }
+/* The picker is opened programmatically by the button and the drop zone, so it
+   never needs to occupy layout space. */
+.cust-file { display: none; }
+.cust-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px; margin-top: 10px;
+}
+/* The remove control is positioned against the tile, not the grid cell. */
+.cust-tile { position: relative; }
+.cust-art { display: block; width: 100%; height: 100%; object-fit: contain; }
+.cust-remove {
+  position: absolute; top: 2px; right: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  color: var(--dim); background: var(--surface); border: 1px solid var(--border);
+  opacity: .6; transition: opacity .15s, color .15s, border-color .15s;
+}
+.cust-remove:hover { opacity: 1; color: var(--fg); border-color: var(--acc); }
+.cust-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 10px 6px; cursor: pointer;
+  font: inherit; font-size: 10px; line-height: 1.2; text-align: center;
+  border: 1px dashed var(--border-strong); border-radius: 8px;
+  background: var(--elevated); color: var(--dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+/* Empty library: the zone IS the row, so it must look like a real target.
+   With shapes: it shrinks to one more grid cell, keeping the "add another"
+   affordance on screen. */
+.cust-drop { grid-column: 1 / -1; min-height: 56px; }
+.cust-drop-compact { grid-column: auto; min-height: 0; }
+.cust-drop-compact .cust-drop-text { display: none; }
+.cust-drop:hover, .cust-drop:focus-visible {
+  border-color: var(--acc); color: var(--acc); background: var(--acc-soft);
+}
+.cust-drop-glyph { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+
+/* diagram-type badges — DELETED in PACKAGE-N Revision 3 (`.pal-badges`, `.tb`,
+   `.tb-architecture`, `.tb-flowchart`, `.tb-c4`, `.tb-erd`). They restated each
+   row's own category for 33 of the 34 elements; `types[]` stays in the data. */
+
+/* scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); }
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* ---------- canvas ---------- */
+.canvas-wrap { position: relative; background:
+  radial-gradient(1200px 600px at 20% -10%, var(--canvas-glow), transparent 60%),
+  var(--bg); }
+.react-flow__attribution { display: none; }
+
+/* controls (zoom) — dark theme */
+.react-flow__controls {
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  border-radius: 9px; overflow: hidden;
+  background: var(--surface);
+}
+.react-flow__controls-button {
+  background: var(--surface); border: none;
+  border-bottom: 1px solid var(--border);
+  width: 30px; height: 30px;
+}
+.react-flow__controls-button:last-child { border-bottom: none; }
+.react-flow__controls-button:hover { background: var(--elevated); }
+.react-flow__controls-button svg { fill: var(--dim); }
+.react-flow__controls-button:hover svg { fill: var(--fg); }
+
+/* minimap */
+.react-flow__minimap { border-radius: 9px; overflow: hidden; }
+
+/* toolbar — single compact row */
+.toolbar {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 5; display: flex; gap: 5px; align-items: center;
+  justify-content: center;
+  max-width: calc(100% - 34px);
+  background: var(--panel-glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  height: 40px;
+}
+.tbtn-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim); padding: 0 4px;
+}
+.tbtn {
+  font-family: var(--mono); font-size: 12px;
+  background: transparent; color: var(--fg);
+  border: 1px solid transparent; border-radius: 6px;
+  padding: 6px 11px; cursor: pointer; transition: all .15s;
+}
+.tbtn:hover { background: var(--elevated); border-color: var(--border-strong); }
+.tbtn:disabled { opacity: .5; cursor: not-allowed; }
+/* compact 28x28 icon button */
+.tbtn-icon {
+  width: 28px; height: 28px; padding: 0;
+  display: grid; place-items: center; flex: none;
+  background: transparent; color: var(--fg);
+  border: 1px solid transparent; border-radius: 6px;
+  cursor: pointer; transition: all .15s;
+}
+.tbtn-icon:hover { background: var(--elevated); border-color: var(--border-strong); }
+.tbtn-icon:disabled { opacity: .4; cursor: not-allowed; }
+/* active-state icon toggle (Snap, etc.) — selection blue, never accent */
+.tbtn-icon.on {
+  color: var(--sel); border-color: var(--sel); background: var(--sel-soft);
+}
+
+/* custom tooltip (Tooltip.tsx) — position:fixed via inline style, portal'd to body */
+.tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  box-shadow: var(--shadow-toolbar);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* export / import dropdown */
+.tbtn-dd {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 12px;
+  background: transparent; color: var(--fg);
+  border: 1px solid transparent; border-radius: 6px;
+  padding: 6px 10px; cursor: pointer; transition: all .15s;
+}
+.tbtn-dd:hover { background: var(--elevated); border-color: var(--border-strong); }
+.pop {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  min-width: 168px; z-index: 30;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 9px; padding: 5px;
+  box-shadow: var(--shadow-strong);
+}
+.pop-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: transparent; color: var(--fg);
+  border: none; border-radius: 6px;
+  padding: 7px 10px; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; text-align: left;
+  transition: background .12s;
+}
+.pop-item:hover { background: var(--elevated); }
+.pop-item.primary { background: var(--acc); color: var(--on-acc); font-weight: 600; }
+.pop-item.primary:hover { background: var(--on-acc-hover); }
+
+/* ---------- toast ---------- */
+.toast {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 25; pointer-events: none;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 7px 14px;
+  font-family: var(--mono); font-size: 12px;
+  animation: toast-in .18s ease-out;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---------- custom node ---------- */
+.node {
+  min-width: 190px; position: relative; padding: 0;
+  font-size: 13px;
+  /* I5: fill the React Flow wrapper (which carries the resized width/height in
+     node.style) so a vertical resize visibly grows the node, not just the
+     invisible wrapper. Fall back to content height when no size is set yet. */
+  width: 100%; min-height: 100%;
+}
+/* architectural frame drawn behind the content (scales to any node size) */
+.shape-frame {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible; pointer-events: none;
+}
+/* selection = crisp blue ring, visible on any node colour (incl. orange).
+   F: `outline` is gone. `outline-radius` is not supported here, so the ring was
+   ALWAYS a sharp rectangle and this rule's `border-radius` never applied to it.
+   The four sibling node kinds (label / note / group / tnode) all ring with
+   `box-shadow`, which follows `border-radius` and renders softer; this is the
+   same ring in the same 2px weight and the same var(--sel) colour, just
+   rounded. `.node` itself sets NO box-shadow, so there is nothing to compose
+   with. `outline-offset: 2px` was a 2px gap, reproduced by the two-layer
+   shadow: the first 2px is painted in the board colour (invisible gap), the
+   second carries the ring. */
+.node.selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--sel);
+  border-radius: 8px;
+}
+.node-body { position: relative; padding: 15px 18px 14px; }
+.node.shape-database .node-body { padding: 26px 18px 26px; }
+.node.shape-queue .node-body { padding: 30px 18px 16px; }
+.node.shape-actor .node-body { padding: 22px 16px 18px; }
+.node.shape-storage .node-body { padding: 26px 18px 20px; }
+.node.shape-gateway .node-body { padding: 18px 30px 16px; }
+.node .glyph { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.node-kicker {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 5px;
+}
+.node-title {
+  font-family: var(--sans);
+  font-size: 14.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--fg);
+  display: flex; align-items: center; gap: 7px;
+}
+.node-ico {
+  width: 17px; height: 17px; flex: none; border-radius: 4px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  background: color-mix(in srgb, var(--nc, var(--acc)) 18%, transparent);
+  color: var(--nc, var(--acc));
+}
+.node-sub {
+  font-family: var(--mono); font-size: 11.5px; color: var(--dim); margin-top: 6px;
+}
+.node-metric {
+  font-family: var(--mono); font-size: 20px; font-weight: 700;
+  color: var(--nc, var(--acc)); margin-top: 7px; letter-spacing: -0.02em;
+}
+.node-metric small { font-size: 11px; color: var(--dim); font-weight: 400; margin-left: 3px; }
+
+/* ---------- label node (free text annotation) ---------- */
+.label-node {
+  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  color: var(--fg); background: transparent; border: none; outline: none;
+  padding: 4px 6px; min-width: 60px; white-space: pre-wrap;
+  border-radius: 4px;
+}
+.label-node.selected {
+  box-shadow: 0 0 0 2px var(--sel);
+}
+
+/* ---------- custom-shape node (PACKAGE-N §8, imported SVG artwork) ----------
+   The user's SVG IS the artwork: no app frame is painted behind it, and the
+   <img> fills the node on both axes so `object-fit: contain` letterboxes a
+   non-matching aspect ratio instead of distorting it. Tokens only. */
+.custom-shape-node {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+.custom-shape-node.selected {
+  outline: none;
+}
+
+/* react-flow handles — quiet at rest, appear on node hover / selection.
+   F: ONE size for all eight sites. The midpoints were 14px and the corners 9px
+   (12px vs 8px measured at the app's current zoom) and Harvey called the mixed
+   set "lỗ to lỗ nhỏ": every site is now a 12px / 2px-border dot, so the eight
+   points read as one set. F: the border also drops to the quieter `--border`
+   token (was `--border-strong`) so eight equally-loud rings settle into quiet
+   anchors; the `--nc` hover emphasis below is untouched. */
+.react-flow__handle {
+  width: 12px; height: 12px; background: var(--elevated);
+  border: 2px solid var(--border);
+  opacity: 0; transition: opacity .15s, transform .12s, border-color .12s;
+  /* C: the grab target must outrank the node's own resize grips, which carry
+     no z-index — 5 puts every connect point above them at its own centre. */
+  z-index: 5;
+  /* C: a hover scale must grow about the dot's own centre. */
+  transform-origin: center;
+}
+/* M3/S3.6 — GATE, don't delete. Hover is the only way a MOUSE reaches a
+   handle, so the reveal stays exactly as it was for fine pointers; on a
+   (hover: none) device it would never fire, and the touch reveal below takes
+   over. */
+@media (hover: hover) {
+  .react-flow__node:hover .react-flow__handle { opacity: 1; }
+  /* C — FIX 1, the "giật giật". React Flow centres every handle with a
+     per-side `transform`: `.react-flow__handle-right` is
+     translate(50%, -50%), `-left` / `-top` are translate(-50%, -50%) and
+     `-bottom` is translate(-50%, 50%). A BARE `scale()` in a hover rule
+     REPLACES that translate, so the dot jumped half its own size the moment
+     the pointer touched it and jumped back on exit. Each hover value below
+     restates that side's own translate and appends the scale, so the centre
+     never moves. The ring is paint-only — box-shadow takes no part in hit
+     testing — so the hit box stays exactly the dot. */
+  .react-flow__handle:hover {
+    opacity: 1;
+    border-color: var(--nc, var(--sel));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--nc, var(--sel)) 30%, transparent);
+  }
+  .react-flow__handle-left:hover { transform: translate(-50%, -50%) scale(1.35); }
+  .react-flow__handle-right:hover { transform: translate(50%, -50%) scale(1.35); }
+  .react-flow__handle-top:hover { transform: translate(-50%, -50%) scale(1.35); }
+  .react-flow__handle-bottom:hover { transform: translate(-50%, 50%) scale(1.35); }
+}
+/* K — REVIEW MODE silences the hover-DERIVED reveals in the block above.
+   In review mode a node's connection points cannot be used at all
+   (`nodesConnectable` / `nodesDraggable` / `elementsSelectable` are all false),
+   so popping the dots on hover promises an action that does not exist. The mode
+   class rides `.ds-flow-wrap` (App.tsx), so both arms are re-scoped and an
+   edit-mode hover is byte-for-byte unchanged. The handle's OWN `:hover` arm is
+   silenced with the node-hover arm: `opacity: 0` does not remove an element from
+   hit testing, so without it a pointer landing directly on an invisible dot
+   would still reveal it. Its other hover properties (ring colour, 3px shadow,
+   the per-side 1.35x scale) need no override — all three are paint-only and an
+   `opacity: 0` box paints none of them.
+   DELIBERATELY NOT silenced: the `@media (hover: none)` reveal further down
+   (`.selected` / `.valid` / `.connecting`). That one is state-driven rather than
+   hover-driven, and none of those three states can arise while the mode is on —
+   selection is cleared on entry and cannot be re-made with
+   `elementsSelectable` false, and a connection needs `nodesConnectable`.
+   The FOURTH arm lives on the ERD table node (`.tnode:hover .tnode-h`, the
+   per-column dots) and is silenced in the same block for the same reason: the
+   table's column connection points are just as unusable while the mode is on. */
+@media (hover: hover) {
+  .ds-flow-wrap.ds-read-only .react-flow__node:hover .react-flow__handle,
+  .ds-flow-wrap.ds-read-only .react-flow__handle:hover,
+  .ds-flow-wrap.ds-read-only .tnode:hover .react-flow__handle.tnode-h { opacity: 0; }
+}
+/* Not hover-derived — selection and in-flight connection state, so they must
+   stay live on touch. This is also the touch alternative reveal: a SELECTED
+   node shows its handles without any hover (see the coarse block at EOF). */
+.react-flow__node.selected .react-flow__handle,
+.react-flow__handle.connecting,
+.react-flow__handle.valid { opacity: 1; }
+.react-flow__handle.valid { border-color: var(--sel); }
+/* H — FIX 2: the connector sits as close to the shape border as React Flow's
+   geometry allows. The `-6px` (and the coarse `-10px`) nudges were LEFTOVER
+   geometry from the K4 design, where a decorative glow disc sat beside every
+   handle; fix F deleted that disc, which left the nudge with no partner — it
+   only pushed the wire away from the node. MEASURED before: dot centre 6px
+   outboard of the border, edge path start 12px out, symmetric at the target end.
+   WHY REMOVING 6px GAINS 12px ON THE WIRE — both steps are in `@xyflow/system`
+   and the arithmetic is exact, not empirical:
+     1. `getHandleBounds` (dist/esm/index.js:939) measures each handle on the
+        DOM: `x: (handle.getBoundingClientRect().left - nodeBounds.left) / zoom`
+        plus `...getDimensions(handle)`, which is
+        `{width: handle.offsetWidth}` (:909). The BOUNDING RECT is the painted,
+        TRANSFORMED box; `width` is the UNtransformed border box (12px).
+     2. `getHandlePosition` (:1489) returns, for `Position.Right`,
+        `{x: x + width, y: y + height / 2}` — the box's left edge PLUS its full
+        measured width, i.e. half a handle FURTHER out than the painted centre.
+     With `right: -6px` + `translate(50%, -50%)` the painted box sat entirely
+     outboard, [border, border + 12], so `rect.left === border` and the endpoint
+     came out at border + 12 while the painted centre was border + 6 — the 6 → 12
+     doubling, reproduced exactly by the two lines above.
+   With the nudge gone, RF's own `right: 0` + `translate(50%, -50%)`
+   (@xyflow/react/dist/style.css:279) centres the dot ON the border: painted box
+   [border − 6, border + 6], centre = border (0px). The endpoint is then
+   `rect.left + width` = (border − 6) + 12 = border + 6.
+   SO THE RESULTING GAP IS 6px (it was 12px) — one handle radius, RF's floor for
+   a dot whose centre is on the border. A true 0 is reachable only by anchoring
+   the dot 6px INBOARD (`right: 6px`: endpoint flush, but the dot paints 6px
+   inside the body) or by moving the dot's paint to a pseudo-element (not a
+   position-only change — the element box IS the hit target). Both rejected:
+   6px is the closest gap that leaves fix F's dot where it is. */
+
+/* G — the 4-point scheme: the four midpoints above and nothing else. The four
+   CORNER sites that used to be styled from here (12px dots at 27% / 73% along
+   an edge, plus the per-position transforms and the hover scales that kept a
+   dot growing about its own centre) are gone, and so is every rule that named
+   them. Size, colour, reveal and z-index of the four surviving midpoints are
+   untouched from F. */
+
+/* edges */
+.react-flow__edge-path { stroke-width: 1.8; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--sel) !important; }
+.react-flow__edge-text {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  fill: var(--fg);
+}
+.react-flow__edge.selected .react-flow__edge-text { fill: var(--sel); }
+
+/* ---------- Q: the edge ENDPOINT grab affordance ----------
+   WHAT WAS WRONG: reconnect was fully wired (`onReconnect` + `edgesReconnectable`
+   in App.tsx) and had no face. React Flow renders one `react-flow__edgeupdater`
+   circle per endpoint and paints it `stroke="transparent" fill="transparent"`
+   (@xyflow/react/dist/esm/index.js, EdgeAnchor), so the only way to find the
+   gesture was to hit an invisible disc of `reconnectRadius` (10px by RF's own
+   default — raised to 14 by `RECONNECT_RADIUS` in App.tsx).
+
+   THIS IS THE GRABBER ITSELF, NOT A LOOK-ALIKE. RF styles the circle as
+   `cursor: move; pointer-events: all` (node_modules/@xyflow/react/dist/style.css),
+   and this block only supplies the paint. So the dot the user aims at and the dot
+   that receives the pointerdown are the SAME element at the SAME centre — the
+   "two overlapping discs" defect fix F had to delete (see the handle rules above)
+   cannot arise, because there is no second element and no offset to get wrong.
+   That is also why nothing here translates: a decorative dot shifted onto the
+   endpoint would leave the real hit area `radius` away from it, i.e. it would paint
+   a lie. RF places the disc with `cx = shiftX(endpointX, radius, side)` /
+   `cy = shiftY(...)`, which pushes it `radius` OUTWARD along its own side (Right is
+   `x + radius`), so the disc is TANGENT to the endpoint and hangs in the gap clear
+   of the node. Taking the wire attachment point J (the outer edge of the connect dot RF
+   centres on the node border), the dot occupies one side of J and the disc the other:
+   dot [J-12, J], disc [J, J+28] at radius 14 — adjacent, never overlapping, so the visible
+   grabber cannot cover the connect handle it belongs to. The disc's own width IS its hit
+   width (it is the same element), so the paint is deliberately a little larger than the
+   12px handle: a target that can be FOUND. Note the disc hangs OUTWARD, so where a node
+   sits very close the node's own body (a higher layer, opaque, above the edge renderer)
+   clips it; at normal spacing the disc sits in open canvas.
+
+   REVEAL — hover, and only hover. `.updating` is React Flow's own state, stamped on
+   the edge GROUP by EdgeWrapper (`updating: updateHover`), and `updateHover` is set
+   by the anchor's `onMouseEnter`/`onMouseOut` — so it is already live exactly while
+   the pointer is on the wire or on a grabber, with no JS of ours in the path. The
+   trailing `:hover` arms cover the moment before any pointer has entered a grabber
+   (RF's handler runs on the circle, `:hover` on the group is true for the whole
+   wire). At rest nothing paints, so the canvas stays clean. `opacity .15s` matches
+   the handle transitions above and is silenced by the reduced-motion block at EOF. */
+.react-flow__edgeupdater {
+  fill: var(--elevated);
+  stroke: var(--sel);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity .15s;
+}
+@media (hover: hover) {
+  .ds-flow-wrap .react-flow__edge:hover .react-flow__edgeupdater,
+  .ds-flow-wrap .react-flow__edge.updating .react-flow__edgeupdater,
+  .ds-flow-wrap .react-flow__edgeupdater:hover { opacity: 1; }
+}
+/* K/Q — REVIEW MODE. `edgesReconnectable={!readOnly}` means RF renders no anchors
+   at all while the mode is on, so there is nothing to reveal; this block is the
+   same belt-and-braces the handle rules above carry, so the affordance stays dark
+   even if a future change re-enables the prop. `opacity: 0` is paint-only — the
+   circle's `pointer-events: all` is untouched by it, which is harmless here because
+   the element does not exist under the gate. */
+@media (hover: hover) {
+  .ds-flow-wrap.ds-read-only .react-flow__edge:hover .react-flow__edgeupdater,
+  .ds-flow-wrap.ds-read-only .react-flow__edge.updating .react-flow__edgeupdater,
+  .ds-flow-wrap.ds-read-only .react-flow__edgeupdater:hover { opacity: 0; }
+}
+
+/* ---------- group boundary node ---------- */
+.group-node {
+  width: 100%; height: 100%; min-width: 220px; min-height: 140px;
+  border: 1.5px dashed var(--nc, var(--border-strong));
+  border-radius: 14px; position: relative;
+  background: color-mix(in srgb, var(--nc, var(--border-strong)) 7%, transparent);
+  font-family: var(--mono);
+}
+.group-node.selected { border-color: var(--sel); box-shadow: 0 0 0 2px var(--sel); }
+.group-label {
+  position: absolute; top: -11px; left: 14px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--nc, var(--border-strong));
+  color: var(--nc, var(--fg)); font-size: 11px; font-weight: 600;
+  white-space: nowrap; max-width: calc(100% - 28px); overflow: hidden;
+}
+.group-label small { color: var(--dim); font-size: 10px; font-weight: 400; }
+.group-ico { display: grid; place-items: center; }
+
+/* ---------- note node (plain text annotation) ---------- */
+.note-node {
+  min-width: 120px; max-width: 320px; padding: 2px 4px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  color: var(--fg); background: transparent; border: none;
+  border-left: 2px solid var(--nc, var(--border-strong)); padding-left: 10px;
+  white-space: pre-wrap;
+}
+.note-node.selected { box-shadow: 0 0 0 2px var(--sel); border-radius: 4px; }
+.note-title { font-weight: 650; }
+
+/* ---------- editable edge label ---------- */
+.edge-label {
+  position: absolute; pointer-events: all;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--fg); background: var(--surface);
+  border: 1px solid transparent; border-radius: 5px;
+  padding: 1px 6px; cursor: text; white-space: nowrap;
+}
+.edge-label:hover { border-color: var(--border-strong); background: var(--elevated); }
+.edge-label.selected { border-color: var(--sel); color: var(--sel); }
+.edge-label-input {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--sel); border-radius: 5px;
+  padding: 1px 6px; outline: none; min-width: 70px;
+}
+
+/* ---------- toggles ---------- */
+.toggle {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; cursor: pointer;
+  background: var(--elevated); color: var(--dim);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 7px 12px; min-width: 60px;
+}
+.toggle.on { background: var(--sel-soft); color: var(--sel); border-color: var(--sel); }
+
+/* ---------- icon picker ---------- */
+.icon-field { position: relative; }
+.icon-trigger {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 8px 10px; cursor: pointer; transition: border-color .15s;
+}
+.icon-trigger:hover, .icon-trigger.on { border-color: var(--sel); }
+.icon-trigger-glyph { display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--nc, var(--acc)); font-family: var(--mono); font-size: 13px; }
+.icon-trigger-name { font-family: var(--mono); font-size: 12px; color: var(--fg); flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.icon-trigger-caret { color: var(--dim); font-size: 10px; }
+.icon-pop {
+  position: absolute; z-index: 20; top: calc(100% + 6px);
+  left: auto; right: 12px; width: 264px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 8px;
+  box-shadow: var(--shadow-strong);
+}
+.icon-search {
+  width: 100%; background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 7px 9px; font-family: var(--mono); font-size: 12px; outline: none;
+  margin-bottom: 7px;
+}
+.icon-search:focus { border-color: var(--sel); }
+.icon-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
+  max-height: 232px; overflow-y: auto; padding-right: 2px;
+}
+.icon-cell {
+  height: 38px; display: grid; place-items: center;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.icon-cell:hover { border-color: var(--sel); color: var(--sel); }
+.icon-cell.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
+.icon-cell.none { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.icon-empty { grid-column: 1 / -1; color: var(--dim); font-family: var(--mono); font-size: 11px; padding: 10px 2px; }
+.icon-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.icon-raw {
+  flex: 1; background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 5px 8px; font-family: var(--mono); font-size: 12px; outline: none;
+}
+.icon-raw:focus { border-color: var(--sel); }
+
+/* ---------- inspector ---------- */
+.field { margin-bottom: 13px; }
+.field label {
+  display: block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim);
+  margin-bottom: 5px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 10px; font-size: 12.5px; font-family: var(--sans);
+  outline: none; transition: border-color .15s;
+}
+/* focus/hover chrome for these lives in the CONTROL KIT section at the end of
+   this file (it wins on equal specificity, being later). */
+.swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+.swatch {
+  width: 26px; height: 26px; border-radius: 7px; cursor: pointer;
+  border: 2px solid transparent; transition: transform .1s;
+}
+.swatch:hover { transform: scale(1.1); }
+.swatch.on { border-color: var(--sel); }
+.empty {
+  color: var(--dim); font-size: 12px; font-family: var(--mono);
+  text-align: center; padding: 24px 10px; line-height: 1.6;
+}
+.hint {
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  padding: 10px 2px; line-height: 1.6;
+}
+/* The UA stylesheet ships `kbd { font-family: monospace }`, which BEATS inheritance — so chips
+   rendered in the browser's generic monospace while every neighbour used `--mono`. Name the token. */
+kbd {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  padding: 2.5px 7px;
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  line-height: 1.5;
+  white-space: nowrap;
+  border-radius: 5px;
+  background: var(--elevated); border: 1px solid var(--border-strong);
+  color: var(--fg);
+}
+.badge {
+  display: inline-block; font-family: var(--mono); font-size: 10.5px;
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border-strong); color: var(--dim);
+}
+
+/* ---------- C1: inspector grouping ---------- */
+.field + .sec-label {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ---------- C3: node resize ----------
+   ITEM 1 (2026-09-17) — THE SELECTED NODE MUST SHOW ONE BORDER, NOT TWO.
+
+   MEASURED DEFECT (reproduced by `checks/package-o-selection-stack.mjs`, which
+   reads the installed React Flow + this sheet): a selected node painted TWO
+   selection-coloured lines across its top edge —
+
+     2px  @ -4..-2px  `.node.selected` box-shadow layer 2   (the blue ring)
+     1px  @  0.. 1px  `.react-flow__resize-control.line.top` (a second blue line)
+
+   The second one was not painted by the `stroke` declarations below. React
+   Flow's `<NodeResizer>` renders FOUR `variant: Line` controls at
+   `top/right/bottom/left`, and their paint comes from
+   `border-color: var(--xy-resize-background-color, …)` with
+   `border-top-width: 1px` at `top: 0` (installed `@xyflow/react/dist/style.css`
+   lines 585 and 612). Our sheet set `--xy-resize-background-color: var(--sel)`
+   further up this file, so every one of those four borders was `--sel` — one
+   full-perimeter blue line lying exactly on the node's own edge, i.e. right
+   against the outside of the box-shadow ring.
+
+   The `stroke` declaration that used to sit here was DEAD CODE: `stroke` and
+   `stroke-width` are SVG presentation properties, and these controls are HTML
+   `<div>`s painting a CSS border. It never painted anything, which is why the
+   blue line survived the previous attempt at this fix. Replaced by the
+   `border-width: 0` override below, which targets what actually paints.
+
+   WHY `transparent` AND NOT `display: none`. The LINE control is the
+   EDGE-DRAG resize target — a 1px strip you can grab to resize without
+   hunting for a corner. `display: none` would remove that affordance, so the
+   control keeps its box and its hit area and merely stops painting. The four
+   corner grips (`.react-flow__resize-control.handle`, below) are the visible
+   affordance and are untouched.
+
+   THE RING IS THE ONLY SELECTION SIGNAL. `.node.selected` (and the four sibling
+   kinds: label / note / group / tnode) each carry the one `box-shadow` ring.
+   The shape's own 1.5px border is NOT part of the selection signal and keeps its
+   normal weight in BOTH states — there is deliberately no `.selected` override
+   on `.shape-frame` or on the `ShapeFrame` stroke. */
+.resize-line { border-width: 0 !important; }
+/* C — FIX 3, "khó kéo thấy". The visible grip goes 8px → 10px, and it carries
+   a bigger INVISIBLE hit area: `::after` is a pseudo-element, so it takes part
+   in hit testing and its 6px negative insets grow the box to 22x22 — the
+   largest box that still clears the connect points (RF's own min-width/
+   min-height: 5px do NOT act as a floor here, because the rule above sets an
+   explicit width/height). `outline` / `box-shadow` are paint-only and would
+   NOT have worked. The corners keep the larger area on purpose — the midpoints
+   stay at 10x10 so they never reach our edge connect points. `translate:
+   -50% -50%` is RF's own centring and is untouched: it is a separate property
+   from `transform`, which nothing here overrides. */
+/* C — FIX 3b, the "khó kéo thấy" half. `.node-body` is `position: relative` with
+   no z-index, and it comes AFTER the resize controls in the DOM, so it won the
+   hit-test at the node's own edge: measured `elementFromPoint()` at a grip's
+   centre returned `.node-body`, i.e. the grip was buried under the node's own
+   body and only its outermost sliver was grabbable. Lifting the controls above
+   the body makes the whole 10px grip + its ::after hit area reachable. 2 is
+   enough (the body has no z-index) and stays UNDER `.react-flow__handle`'s 5,
+   so a connect point is still the top-most thing at its own centre. */
+.react-flow__resize-control.handle {
+  width: 10px !important; height: 10px !important;
+  border-radius: 2px;
+  border: 1px solid var(--sel) !important;
+  background: var(--surface) !important;
+  z-index: 2;
+}
+.react-flow__resize-control.handle::after {
+  content: ''; position: absolute; inset: -6px;
+}
+
+/* ---------- C5: zoom pill ---------- */
+.zoom-pill {
+  position: absolute; bottom: 16px; left: 56px; z-index: 6;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--fg); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 10px; cursor: pointer; transition: all .15s;
+}
+.zoom-pill:hover { border-color: var(--sel); color: var(--sel); }
+
+/* ---------- C6: edge label capsule ---------- */
+/* Single declaration (a duplicate earlier in the file used to be silently lost). */
+.react-flow__edge-textbg { fill: var(--edge-text-bg); rx: 5; }
+.react-flow__edge-text { font-size: 11px; }
+
+/* ---------- D1: search palette ---------- */
+.sp-overlay {
+  position: absolute; inset: 0; z-index: 40;
+  display: grid; place-items: center;
+  background: var(--scrim);
+}
+.sp-card {
+  width: 380px; max-width: calc(100% - 48px);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 10px;
+  box-shadow: var(--shadow-pop);
+}
+.sp-input {
+  width: 100%; background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 9px 11px; font-family: var(--mono); font-size: 13px;
+  outline: none; transition: border-color .15s;
+}
+.sp-input:focus { border-color: var(--sel); }
+.sp-list { margin-top: 8px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.sp-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; color: var(--fg);
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; text-align: left; font-size: 12.5px;
+}
+/* The insert modal re-painted the swatch even darker on hover (`--bg`, i.e.
+   #f7f7f8 in light) — the same card-on-card defect one step worse, so it goes
+   with the base rule. The selected ROW already reads via `--elevated` +
+   `--sel` border; the swatch must stay transparent in both states. */
+.sp-item.on { background: var(--elevated); border-color: var(--sel); }
+.sp-item.on .pal-swatch { background: transparent; }
+.sp-empty { color: var(--dim); font-family: var(--mono); font-size: 11.5px; padding: 14px 4px; text-align: center; }
+.sp-foot {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 8px; padding: 2px 2px 0;
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+}
+
+/* ---------- ITEM 6b: the board dialog (create / rename / delete) ----------
+   ONE designed dialog replaces three `window.prompt` / `window.confirm` calls.
+
+   IT REUSES THE VOCABULARY IT WAS ASKED TO REUSE, not a new one: `.sp-overlay`
+   is the search palette's scrim (and `.sp-card` below it is that palette's card,
+   narrowed by `.bd-card`), and `.sp-input` is that palette's field. The only new
+   class names are the ones this dialog alone needs.
+
+   TOKENS ONLY — no literal colour appears in this block. The palette is
+   `--surface` / `--elevated` / `--border` / `--border-strong` / `--sel` /
+   `--acc` / `--acc-tint` / `--danger` / `--on-acc` / `--dim` / `--fg` /
+   `--shadow-pop`, and the radii (12px card / 8px row / 7px field) are the ones
+   `.sp-card`, `.sp-item` and `.sp-input` already use one rule above. */
+.bd-overlay {
+  /* Above `.sp-overlay`'s 40: a modal dialog must outrank the insert palette if
+     both are somehow up. Still below Settings (70) and the tour (10000). */
+  z-index: 45;
+}
+.bd-card {
+  width: 440px;
+  padding: 14px 16px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.bd-head { display: flex; align-items: flex-start; gap: 10px; }
+.bd-title {
+  margin: 0; font-family: var(--mono); font-size: 14px; font-weight: 700;
+  letter-spacing: .02em; color: var(--fg);
+}
+.bd-sub {
+  margin: 3px 0 0; font-family: var(--mono); font-size: 10.5px;
+  line-height: 1.5; color: var(--dim);
+}
+.bd-x {
+  margin-left: auto; flex: none;
+  width: 24px; height: 24px; display: grid; place-items: center;
+  background: transparent; color: var(--dim);
+  border: 1px solid transparent; border-radius: 7px;
+  cursor: pointer; transition: all .12s;
+}
+.bd-x:hover { color: var(--fg); border-color: var(--border-strong); }
+.bd-body { display: flex; flex-direction: column; }
+.bd-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim);
+  margin: 0 0 5px 2px;
+}
+.bd-label-gap { margin-top: 12px; }
+
+/* The start-from list. Same row grammar as `.sp-item` (one bordered row, the
+   selected one tinted + outlined) so the two pickers read as siblings. */
+.bd-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 210px; overflow-y: auto;
+}
+.bd-opt {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: transparent; color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; text-align: left;
+  font-family: var(--sans); font-size: 12.5px;
+  transition: background .12s, border-color .12s;
+}
+.bd-opt:hover { background: var(--elevated); }
+.bd-opt.on { background: var(--elevated); border-color: var(--sel); }
+/* The radio tick. A ring that fills with the accent when chosen — the same
+   "selected = accent" language `.settings-nav-item.on` and `.sp-item.on` use. */
+.bd-tick {
+  flex: none; width: 13px; height: 13px; border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+}
+.bd-opt.on .bd-tick { border-color: var(--sel); background: var(--sel); box-shadow: inset 0 0 0 2px var(--surface); }
+.bd-opt-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.bd-opt-name { font-weight: 600; }
+.bd-opt-hint {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bd-danger-note {
+  font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  color: var(--fg);
+  background: var(--acc-tint); border: 1px solid var(--danger);
+  border-radius: 8px; padding: 10px 12px;
+}
+.bd-danger-note b { color: var(--danger); }
+
+/* The action row. Cancel is FIRST in the DOM for every mode — including the
+   destructive one, where that is what makes the safe choice the one the eye and
+   the Tab order reach first. */
+.bd-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.bd-btn {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 7px 13px; cursor: pointer; transition: all .12s;
+}
+.bd-btn:hover { border-color: var(--sel); color: var(--sel); }
+.bd-btn.primary {
+  background: var(--acc); color: var(--on-acc); border-color: var(--acc);
+  font-weight: 600;
+}
+.bd-btn.primary:hover { color: var(--on-acc); filter: brightness(1.08); }
+.bd-btn.primary[disabled] { opacity: .45; cursor: not-allowed; filter: none; }
+/* The destructive action is a SOLID danger fill: it must not be mistakable for
+   its neighbour, and a hover-only tint would read as a normal button at rest. */
+.bd-btn.danger {
+  background: var(--danger); color: var(--on-acc); border-color: var(--danger);
+  font-weight: 600;
+}
+.bd-btn.danger:hover { color: var(--on-acc); filter: brightness(1.08); }
+
+/* ---------- D2: cheat sheet ---------- */
+.help-btn {
+  position: absolute; bottom: 16px; right: 208px; z-index: 6;
+  width: 28px; height: 28px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--fg); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 50%;
+  cursor: pointer; transition: all .15s;
+}
+.help-btn:hover, .help-btn.on { border-color: var(--sel); color: var(--sel); }
+.help-pop {
+  position: absolute; bottom: 52px; right: 208px; z-index: 30;
+  /* ITEM 3 (2026-09-17) — WIDE ENOUGH THAT NO ROW WRAPS.
+
+     Harvey: "ở cái helper bạn có thể làm to hơn để các dòng chữ dài có thể chung
+     1 line" — make the helper wider so the long rows share one line.
+
+     MEASURED (checks/package-o-metrics.mjs, which reads THIS rule and computes
+     each row's max-content width from real font advance tables): at the old
+     `width: 280px` the content box was 254px and THREE rows exceeded it —
+
+       Copy / paste / duplicate    289px   (+35)
+       Collapse / expand panels    303px   (+49)  <- the binding constraint
+       Rename connection           276px   (+22)
+
+     The widest requirement is 303px (`Collapse / expand panels` + ⌘/Ctrl ⇧ \).
+     `340px` is that 303px plus 24px of horizontal padding, 2px of border and
+     ~11px of slack, so the row fits with room for a wider fallback font than
+     this box resolves (Menlo vs DejaVu Sans Mono — both are 0.602 em for these
+     glyphs, so the width is stable across the two platforms). Verified: 0 rows
+     wrap on Linux metrics; on macOS Menlo advances are within 0.1% so the same
+     340px holds.
+
+     A FIXED WIDTH, not `max-content`. `max-content` would let the sheet grow
+     with its longest string forever, and it was the fixed width that made the
+     earlier overflow bug reproducible and testable in the first place. The
+     sheet is anchored to the BOTTOM-RIGHT (`bottom: 52px; right: 208px`), so a
+     wider box grows LEFTWARD into the canvas and can never push off-screen.
+
+     The `max-height` + vertical-scroll guard is kept verbatim — a tall sheet
+     must still scroll rather than spill, and the phone tier below still
+     overrides left/right/width entirely. */
+  width: 340px;
+  max-height: min(70dvh, 520px);
+  overflow-y: auto; overflow-x: hidden;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 10px 12px;
+  box-shadow: var(--shadow-strong);
+}
+.help-pop h4 {
+  margin: 0 0 8px; font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+}
+.help-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 4px 0; font-size: 12px; color: var(--fg);
+}
+/* Item 3: the label is the shrinking side — `flex: 1; min-width: 0` is exactly
+   what `.settings-row-label` does. Without the zero floor a long label sits at
+   its max-content width and pushes the key column past the popover's box. */
+.help-row > span:first-child { flex: 1; min-width: 0; }
+.help-row + .help-row { border-top: 1px solid var(--border); }
+/* Item 3: the key column must shrink AND wrap. `flex: none` (the old value)
+   meant a wide chip group could never give way, so the row grew past the box;
+   `min-width: min-content` is the floor that lets the chip group reflow onto a
+   second line without ever squeezing one chip below its own content width. */
+.help-keys {
+  display: flex; gap: 4px; flex: 0 1 auto; min-width: min-content;
+  flex-wrap: wrap; justify-content: flex-end;
+}
+/* Item 4: the `?` sheet's group heading — the same treatment as Settings'
+   `.settings-group` (mono, 10.5px, uppercase, wide-tracked, --dim) so the two
+   surfaces read as the same product. Deliberately not row-shaped: no border,
+   no value column. */
+.help-group {
+  margin: 16px 2px 4px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+}
+/* the first group sits right under the title — no double gap */
+.help-pop h4 + .help-group { margin-top: 2px; }
+/* Item 4: the row hint, same treatment as Settings' `.settings-row-hint`
+   (mono 10.5px `--dim`, block under the label) so a hint reads the same on
+   both surfaces. */
+.help-hint {
+  display: block; color: var(--dim); font-size: 10.5px;
+  font-family: var(--mono); margin-top: 2px;
+}
+
+/* ---------- C2: multi-select summary ---------- */
+.multi-head {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--fg); padding: 2px 0 6px;
+}
+.multi-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 4px; }
+.mbtn {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 5px 8px; cursor: pointer; transition: all .12s;
+}
+.mbtn:hover { border-color: var(--sel); color: var(--sel); }
+.mbtn.danger:hover { border-color: var(--acc); color: var(--acc); }
+/* ---------- floating selection action bar ---------- */
+.sel-bar {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  margin-top: 44px;
+  z-index: 6; display: flex; gap: 5px; align-items: center;
+  background: var(--panel-glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: 10px; padding: 5px;
+}
+.sel-bar .tbtn-label { padding: 0 2px; }
+/* ---------- edge flow animations ("message being sent") ---------- */
+.edge-flow-dot { pointer-events: none; }
+
+/* marching-ants flow: dashes travel along the path */
+.edge-flow-dash {
+  pointer-events: none;
+  stroke-dasharray: 2 10;
+  stroke-linecap: round;
+  animation: edge-dash-run linear infinite;
+  opacity: .95;
+}
+@keyframes edge-dash-run {
+  to { stroke-dashoffset: -240; }
+}
+
+/* pulse: a short bright segment sweeps the line */
+.edge-flow-pulse {
+  pointer-events: none;
+  stroke-dasharray: 14 220;
+  stroke-linecap: round;
+  animation: edge-pulse-run linear infinite;
+  opacity: .9;
+}
+@keyframes edge-pulse-run {
+  to { stroke-dashoffset: -234; }
+}
+
+/* respect reduced-motion: freeze all edge flow */
+@media (prefers-reduced-motion: reduce) {
+  .edge-flow-dash, .edge-flow-pulse { animation: none; }
+  /* Q — the endpoint grab affordance's opacity fade. Same treatment as the
+     handle transitions (opacity only, no movement), silenced under the same
+     query so a reduced-motion user gets the dot instantly or not at all. */
+  .react-flow__edgeupdater { transition: none; }
+}
+
+/* ---------- snap-to-grid affordance ---------- */
+/* I7: at rest the cursor is normal (default pane arrow, grab on nodes) even
+   when snap is on. The snap cursors appear only while an active drag is in
+   progress (:active), and return to normal when it ends. */
+.react-flow__pane { cursor: default; }
+.react-flow__node { cursor: grab; }
+.react-flow__node:active { cursor: grabbing; }
+.react-flow.snap-on .react-flow__pane:active { cursor: crosshair; }
+.react-flow.snap-on .react-flow__node:active { cursor: cell; }
+/* subtle grid boost while snapping so the alignment target is obvious.
+   (was `opacity: 1.6` — invalid, clamped to 1, so it never did anything.) */
+.react-flow.snap-on .react-flow__background { opacity: 1; }
+
+/* FB-L: review mode — the cursors must stop promising interactions the mode
+   refuses. Nothing SHOULD happen when an element is touched in review mode;
+   the defect was that `grab` on a node and `grab`/`text` elsewhere advertised
+   dragging and renaming anyway.
+
+   Specificity: every rule below is (0,3,0) or higher, so it beats the
+   `.react-flow__node` (0,1,0) / `.react-flow__pane` (0,1,0) / `.edge-label`
+   (0,1,0) rules above, and also beats the `:active` pair at (0,2,0). The two
+   explicit `:active` rules are (0,5,0) so they in turn beat
+   `.react-flow.snap-on .react-flow__pane:active` (0,4,0), the only remaining
+   rule that could otherwise re-advertise a grab mid-drag. Nothing here is
+   reachable outside review mode, so the edit-mode cursors are unchanged. */
+.ds-flow-wrap.ds-read-only .react-flow__node,
+.ds-flow-wrap.ds-read-only .react-flow__node:active,
+.ds-flow-wrap.ds-read-only .react-flow__edge { cursor: default; }
+/* The pane is the one place a grab cursor is TRUE in review mode: a pane drag
+   still pans the canvas, so the cursor describes movement rather than a drag
+   of the element. `grabbing` while the pan is in progress, mirroring the
+   node-drag grammar. This also makes pane ≠ node, which was the real problem:
+   both used to read `grab` and meant different things. */
+.ds-flow-wrap.ds-read-only .react-flow__pane { cursor: grab; }
+.ds-flow-wrap.ds-read-only .react-flow__pane:active { cursor: grabbing; }
+/* A caret here invited editing; the editor no longer opens, so it must not. */
+.ds-flow-wrap.ds-read-only .edge-label { cursor: default; }
+
+/* ---------- boards menu ---------- */
+.panel-head { position: relative; }
+.boards-btn { width: 100%; justify-content: flex-start; gap: 7px; }
+.boards-btn .boards-name {
+  flex: 1; text-align: left; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.boards-btn.on { background: var(--elevated); border-color: var(--border-strong); }
+/* ITEM 6a (2026-09-17) — THE POPUP MUST NOT OVERFLOW THE BUTTON.
+
+   MEASURED (checks/package-o-metrics.mjs): `.pop` anchors with `right: 0`, but
+   this rule ALSO set `min-width: 240px`. A 240px floor beats a right-anchor on a
+   narrower button, so the box grew to 240px and hung off the right edge —
+   overflow-right 40px at a 232px panel (button 200px), 72px at a 200px panel
+   (button 168px). This is the same defect class as the earlier `.help-pop`
+   overflow: a `min-width` on a right-anchored popup.
+
+   THE FIX is to drop the floor and let the popup fit the button it hangs off —
+   `left: 0; right: 0` already pins BOTH edges to the button's own box, so with
+   no `min-width` the popup resolves to exactly the button width and the
+   measured overflow is 0 at every tier. This was chosen over widening the
+   button because the button is `width: 100%` inside `.panel-head`'s 16px
+   padding: there is no room to widen it without eating the panel's own gutter,
+   and the popup should follow the control rather than the control be resized to
+   fit a popup.
+
+   The board NAME inside a row already ellipsises (`.boards-btn .boards-name`)
+   and so does `.boards-item-name`, so a narrower popup truncates gracefully.
+
+   `max-height` is kept, and the phone tier below still overrides `max-height`
+   with its own `calc(58dvh - 90px)`. */
+.boards-pop {
+  /* `min-width: 0` explicitly cancels `.pop`'s own `min-width: 168px` floor —
+     without it, a button narrower than 168px would still overflow. With both
+     floors gone, `left: 0; right: 0` alone decides the width and the popup can
+     never be wider than the button at any tier. */
+  left: 0; right: 0; min-width: 0; max-height: 420px; overflow-y: auto;
+}
+.boards-list { display: flex; flex-direction: column; gap: 2px; }
+.boards-item { flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 10px; }
+.boards-item.current { background: var(--elevated); box-shadow: inset 2px 0 0 var(--acc); }
+.boards-item .boards-item-name { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boards-item .boards-item-meta { color: var(--dim); font-size: 10.5px; }
+.boards-empty { color: var(--dim); font-size: 11.5px; padding: 8px 10px; }
+.boards-actions { border-top: 1px solid var(--border); margin-top: 5px; padding-top: 5px; display: flex; flex-direction: column; gap: 2px; }
+.boards-actions .pop-item[disabled] { opacity: 0.45; cursor: not-allowed; }
+.save-ind {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  margin-top: 6px; min-height: 12px; text-align: right;
+}
+.save-ind.busy { color: var(--acc); }
+.save-ind.err { color: var(--danger); }
+
+/* ---------- F2: context menu ---------- */
+.ctx-menu {
+  position: fixed; z-index: 60; min-width: 172px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 9px; padding: 5px;
+  box-shadow: var(--shadow-strong);
+}
+.ctx-title {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim); padding: 3px 10px 5px;
+}
+.ctx-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: transparent; color: var(--fg);
+  border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; text-align: left;
+  transition: background .12s;
+}
+.ctx-item:hover { background: var(--elevated); }
+.ctx-item.danger { color: var(--acc); }
+.ctx-item.danger:hover { background: var(--acc-tint); }
+.ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
+/* ---- F3: helper lines ---- */
+.helper-line {
+  position: absolute; z-index: 4; pointer-events: none;
+  background: var(--sel);
+}
+.helper-v { width: 1px; border-left: 1px dashed var(--sel); background: transparent; }
+.helper-h { height: 1px; border-top: 1px dashed var(--sel); background: transparent; }
+
+/* ---------- F5: node toolbar — REMOVED, ITEM 2b (2026-09-18) ----------
+   The floating action strip above a selected node is gone from all three node
+   kinds (`DiagramNode.tsx` / `CustomShapeNode.tsx` / `LabelNode.tsx` document
+   why, and map every button to the hot key or context-menu row that still
+   reaches it). The four rules that painted it — the container, its `button`
+   base, its hover pair and the separator — were dead the moment the last
+   render went, so they went with it. Nothing else in the sheet used these
+   class names (checked: zero remaining occurrences in `src/`). */
+
+/* ---------- F9: proximity connect candidate ---------- */
+.prox-edge {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; overflow: visible; z-index: 4;
+}
+
+/* ---------- empty state (new / empty board) ---------- */
+.canvas-empty {
+  text-align: center;
+  pointer-events: none;      /* never blocks clicking the canvas */
+  max-width: 440px;
+}
+.ce-title {
+  font-size: 15px; font-weight: 650; color: var(--fg);
+  margin-bottom: 8px;
+}
+.ce-sub {
+  font-size: 12.5px; color: var(--dim); line-height: 1.7;
+}
+.ce-sub b { color: var(--fg); font-weight: 600; }
+.ce-hint {
+  margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--dim);
+  opacity: .85;
+}
+.ce-hint kbd {
+  background: var(--elevated); border: 1px solid var(--border-strong);
+  border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--fg);
+}
+
+/* ---------- H1: guided tour ---------- */
+.tour-overlay { position: fixed; inset: 0; z-index: 10000; }
+.tour-spot {
+  position: absolute; border-radius: 10px;
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--bg) 55%, transparent), 0 0 0 4px var(--sel);
+  pointer-events: none;
+  transition: all .2s ease;
+}
+.tour-card {
+  position: absolute; width: 340px; max-width: calc(100vw - 24px);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 14px 16px 12px;
+  box-shadow: var(--shadow-pop);
+  z-index: 10001;
+}
+.tour-count {
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .08em;
+}
+.tour-title { font-size: 14.5px; font-weight: 650; color: var(--fg); margin-top: 3px; }
+.tour-body { font-size: 12.5px; line-height: 1.5; color: var(--dim); margin-top: 7px; }
+.tour-actions { display: flex; align-items: center; gap: 6px; margin-top: 14px; }
+.tour-btn {
+  font-family: var(--mono); font-size: 11.5px;
+  background: transparent; color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 5px 11px; cursor: pointer; transition: all .15s;
+}
+.tour-btn:hover { background: var(--elevated); border-color: var(--dim); }
+.tour-btn:disabled { opacity: .4; cursor: not-allowed; }
+.tour-btn:disabled:hover { background: transparent; border-color: var(--border-strong); }
+.tour-primary { background: var(--acc); border-color: var(--acc); color: var(--on-acc); font-weight: 600; }
+.tour-primary:hover { background: var(--on-acc-hover); border-color: var(--on-acc-hover); }
+.tour-replay { border-color: transparent; color: var(--dim); padding-left: 0; }
+.tour-replay:hover { color: var(--sel); background: transparent; border-color: transparent; }
+
+/* ---------- H2: getting-started checklist ---------- */
+.gsc {
+  position: absolute; bottom: 64px; left: 16px; z-index: 6;
+  width: 236px;
+  background: var(--panel-glass-strong); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-strong);
+}
+.gsc.collapsed {
+  width: auto; border-radius: 999px; overflow: hidden;
+}
+.gsc-pill {
+  font-family: var(--mono); font-size: 11px; color: var(--fg);
+  background: transparent; border: none; padding: 6px 12px;
+  border-radius: 999px; cursor: pointer; transition: all .15s;
+}
+.gsc-pill:hover { color: var(--sel); }
+.gsc-head { display: flex; align-items: center; padding: 8px 8px 2px 10px; }
+.gsc-head-btn {
+  display: flex; align-items: center; gap: 7px; flex: 1;
+  background: transparent; border: none; cursor: pointer; padding: 0;
+  color: var(--fg); font-size: 12px; font-weight: 600;
+}
+.gsc-head-btn:hover .gsc-title { color: var(--sel); }
+.gsc-count { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.gsc-n { color: var(--green); }
+.gsc-chev { color: var(--dim); transform: rotate(-90deg); }
+.gsc-x {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; background: transparent;
+  border: none; border-radius: 6px; color: var(--dim); cursor: pointer;
+  transition: all .15s;
+}
+.gsc-x:hover { color: var(--fg); background: var(--elevated); }
+.gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; }
+.gsc-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: var(--fg); padding: 4px 2px;
+  transition: color .2s;
+}
+.gsc-item .gsc-check {
+  flex: none; width: 14px; height: 14px; display: grid; place-items: center;
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  color: transparent; transition: all .2s;
+}
+.gsc-item.done { color: var(--dim); text-decoration: line-through; }
+.gsc-item.done .gsc-check {
+  background: var(--green); border-color: var(--green); color: var(--bg);
+}
+
+/* help popover: Take a tour item */
+.help-tour-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  /* Item 3a: the button is now the FIRST element under the <h4>, so its spacing
+     moved from ABOVE it (margin-top: 8px, when it sat at the bottom of the
+     sheet) to BELOW it — that gap is what separates it from the Keyboard group.
+     The `h4` keeps its own 8px bottom margin, and `.help-pop h4 + .help-group`
+     only matches a group, so the first group still gets its normal 16px. */
+  margin-top: 0; margin-bottom: 8px; padding: 7px 8px;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 7px;
+  color: var(--fg); font-family: var(--mono); font-size: 11.5px;
+  cursor: pointer; transition: all .15s;
+}
+.help-tour-btn:hover { border-color: var(--acc); color: var(--acc); }
+
+/* =====================================================================
+   PACKAGE-K — EventCatalog visual techniques
+   K1 hover choreography + interaction perf guard
+   K2 payload container
+   K3 CSS-only re-layout transition + animation gating
+   K4 glow handles (one keyframe + accent variable)
+   K5 post-it treatment (actor / note) + group header badge
+   ===================================================================== */
+
+/* ---- K1: electric edge (hovered edge, or an edge attached to a hovered node) ---- */
+.ds-electric .react-flow__edge-path {
+  stroke: var(--sel) !important;
+  stroke-width: 4 !important;
+  filter: drop-shadow(0 0 8px var(--sel));
+  stroke-dasharray: 5 5;
+  animation: ds-edge-dash .5s linear infinite;
+}
+@keyframes ds-edge-dash {
+  to { stroke-dashoffset: -10; }
+}
+/* the label of an electric edge is emphasised. NOTE: React Flow's
+   EdgeLabelRenderer renders the label div into .react-flow__edgelabel-renderer,
+   a SIBLING of the edge group — so the class is added to the label itself and
+   matched with a compound selector, not a descendant one. */
+.edge-label.ds-electric {
+  font-weight: 700;
+  color: var(--sel);
+  border-color: var(--sel);
+}
+
+/* ---- K1: the node PULSE was REMOVED (Harvey, 2026-09-17) ----------------
+   `.ds-pulse` used to outline the hovered node AND every peer, in `--sel` — the
+   SAME colour and the same ring geometry as `.node.selected`. One visual signal
+   was therefore carrying two different meanings ("hovering" / "selected"), and a
+   single hover lit up a whole neighbourhood. That is the "2 outlines / UI
+   confused" report, and it survived fix D because matching the geometry made the
+   two rings identical rather than distinguishing them — the ambiguity was the
+   colour and the scope, not the size.
+
+   The ELECTRIC half below is what carried the information worth keeping
+   ("what does this node connect to?"), so it stays. `choreography.ts` no longer
+   exports PULSE and no longer paints node rings.
+
+   Do NOT re-add a hover NODE outline here. If hover must say something about a
+   node, it must not reuse the selection colour or the selection ring geometry. */
+
+/* ---- K1: interaction perf guard -------------------------------------
+   SMIL animateMotion cannot be paused via CSS, so while the user pans,
+   zooms or drags we hide every animated payload (visibility, not display:
+   the SMIL timeline keeps running, we just stop repainting it). The class
+   lives on Diagram Studio's own canvas wrapper (never on <body>), and is
+   ref-counted so overlapping start/end events never clear it early. */
+.ds-interaction-active .ds-animated-payload { visibility: hidden; }
+
+/* ---- K2: payload container — never steals clicks from the edge hit area ---- */
+.ds-animated-payload, .edge-flow-icon { pointer-events: none; }
+
+/* ---- K3: CSS-only re-layout transition ------------------------------
+   Present only while a PROGRAMMATIC layout move is in flight (the class is
+   removed 400ms after it is added, i.e. after the .35s transition), so a
+   user drag is never eased. */
+.ds-animating-layout .react-flow__node {
+  transition: transform .35s cubic-bezier(.4, 0, .2, 1);
+}
+/* ---- K3: animation gating (persisted toggle; auto-off above 30 nodes) ---- */
+.ds-no-anim .ds-animated-payload { visibility: hidden; }
+.ds-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 8px 10px; cursor: pointer;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  transition: all .15s;
+}
+.ds-toggle:hover { border-color: var(--sel); }
+.ds-toggle.on { background: var(--sel-soft); color: var(--sel); border-color: var(--sel); }
+.ds-toggle b { color: var(--sel); font-weight: 700; }
+.ds-hint {
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  line-height: 1.6; padding: 6px 2px 0;
+}
+.ds-hint.warn { color: var(--acc); }
+
+/* reduced-motion: freeze the new choreography as well */
+@media (prefers-reduced-motion: reduce) {
+  .ds-electric .react-flow__edge-path { animation: none; }
+}
+
+/* F: the decorative disc beside each left/right midpoint is GONE — it was 16px
+   against the handle's 12px and sat 8px off that handle's centre, so every
+   horizontal edge read as two overlapping circles. With eight connection
+   points the handle alone is the affordance. */
+
+/* ---- K5: post-it treatment for `actor` and `note` ONLY -------------- */
+.node.shape-actor { transform: rotate(-1deg); }
+.node.shape-actor > .node-body,
+.note-node {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--nc, var(--acc)) 15%, var(--elevated)) 0%,
+    color-mix(in srgb, var(--nc, var(--acc)) 4%, var(--surface)) 100%);
+  box-shadow: 1px 1px 3px color-mix(in srgb, var(--shadow) 60%, transparent), 3px 4px 8px color-mix(in srgb, var(--shadow) 40%, transparent);
+  border-radius: 12px;
+}
+.note-node {
+  position: relative;
+  transform: rotate(1deg);
+  border-left: none; padding: 10px 14px 12px;
+  box-shadow: 1px 1px 3px color-mix(in srgb, var(--shadow) 60%, transparent), 3px 4px 8px color-mix(in srgb, var(--shadow) 40%, transparent);
+}
+/* folded corner — a zero-size div with asymmetric border widths */
+.ds-postit-fold {
+  position: absolute; right: 0; bottom: 0; width: 0; height: 0;
+  border-width: 0 0 18px 18px; border-style: solid;
+  border-color: transparent transparent
+    color-mix(in srgb, var(--nc, var(--acc)) 50%, transparent) transparent;
+  pointer-events: none; z-index: 2;
+}
+/* faint icon watermark in the corner */
+.ds-postit-mark {
+  position: absolute; right: 8px; top: 6px; width: 30px; height: 30px;
+  display: grid; place-items: center; opacity: .2;
+  transform: rotate(12deg); pointer-events: none; z-index: 1;
+  color: var(--nc, var(--acc));
+}
+.ds-postit-mark svg { width: 30px; height: 30px; }
+.ds-postit-mark .glyph { font-size: 26px; }
+
+/* ---- K5: group header banner + overlapping circular icon badge ------ */
+.group-head {
+  position: absolute; left: 0; right: 0; top: 0; height: 44px;
+  border-bottom: 1px solid color-mix(in srgb, var(--nc, var(--border-strong)) 30%, transparent);
+  border-radius: 14px 14px 0 0; pointer-events: none;
+  background: color-mix(in srgb, var(--nc, var(--border-strong)) 8%, transparent);
+}
+.group-badge {
+  position: absolute; left: 12px; top: -14px; width: 32px; height: 32px;
+  border-radius: 50%; z-index: 3; pointer-events: none;
+  display: grid; place-items: center;
+  background: var(--elevated);
+  border: 2px solid color-mix(in srgb, var(--nc, var(--border-strong)) 55%, var(--border-strong));
+  color: var(--nc, var(--fg));
+  box-shadow: var(--shadow-sm);
+}
+.group-badge svg { width: 16px; height: 16px; }
+.group-node.has-badge .group-label { padding-left: 54px; }
+/* the title sits inside the 44px banner, clearing the badge */
+.group-node .group-label {
+  top: 0; left: 0; right: 0; bottom: auto;
+  height: 44px; max-width: none; padding: 0 12px 0 14px;
+  border: none; border-radius: 14px 14px 0 0;
+  background: transparent; font-size: 11.5px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* =====================================================================
+   PACKAGE-L — presets, themes, flowchart / C4 / ERD
+   ===================================================================== */
+
+/* 2026-09-17 — the diagram-type PICKER is gone from the UI. The stored preset
+   string survives as DATA (it still drives edge defaults, auto-layout and the
+   category open-state); the bar, its label and the chip rules that lived here
+   were removed with the picker. The L1 theme strip had already been removed by
+   PACKAGE-M — the theme is now one card grid inside the Settings modal (see
+   the PACKAGE-M section at the end of this file). */
+
+.badge.preset { border-color: var(--acc); color: var(--acc); }
+.boards-item .boards-item-preset {
+  font-family: var(--mono); font-size: 9.5px; color: var(--acc);
+  border: 1px solid var(--acc); border-radius: 999px; padding: 0 5px; margin-left: 6px;
+}
+.preset-warn {
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
+  color: var(--dim); padding: 4px 10px 8px;
+}
+
+/* ---- L3a: label-only flowchart node body (one centered sentence) ---- */
+.node.label-only { border-radius: 0; background: transparent; }
+.node.label-only .lo-body, .node .lo-body {
+  position: relative; padding: 14px 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100%; text-align: center; gap: 3px;
+}
+.node .lo-title {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  color: var(--fg); line-height: 1.25;
+}
+.node .lo-sub {
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+}
+/* keep label-only text inside the diamond / parallelogram silhouette */
+.node.shape-decision .lo-body { padding: 26px 34px; }
+.node.shape-io .lo-body { padding: 14px 34px; }
+.node.shape-manual .lo-body { padding: 14px 30px 20px; }
+.node.shape-delay .lo-body { padding: 14px 30px 14px 12px; }
+.node.shape-connector .lo-body { padding: 8px; }
+.node.shape-connector .lo-title { font-size: 12px; }
+.node.shape-terminator .lo-body { padding: 14px 30px; }
+.node.shape-document .lo-body { padding: 12px 18px 22px; }
+.node.shape-subprocess .lo-body { padding: 14px 34px; }
+.node.shape-preparation .lo-body { padding: 14px 34px; }
+
+/* ---- L3c: crow's-foot markers + ERD relationship label ---- */
+.ds-crowdefs { position: absolute; width: 0; height: 0; }
+.edge-label .edge-techn {
+  display: block; font-size: 9.5px; color: var(--dim); font-weight: 400;
+}
+/* ERD edges: no arrowheads, crow's feet instead — the line is quieter */
+.react-flow__edge-path { stroke-linejoin: round; }
+
+/* ---- L3c: the `table` node ---- */
+.tnode {
+  width: 100%; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; overflow: hidden;
+  font-family: var(--sans); font-size: 11.5px;
+  box-shadow: var(--shadow-sm);
+}
+.tnode.selected { border-color: var(--sel); box-shadow: 0 0 0 2px var(--sel); }
+.tnode-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 9px; background: var(--elevated);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--nc, var(--border-strong));
+}
+.tnode-ico { color: var(--nc, var(--dim)); flex: none; }
+.tnode-name {
+  flex: 1; font-weight: 650; font-size: 12px; color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tnode-name small { color: var(--dim); font-weight: 400; }
+.tnode-mode {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--acc);
+  border: 1px solid var(--acc); border-radius: 999px; padding: 0 5px;
+}
+.tnode-toggle {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 5px;
+  background: transparent; border: none; color: var(--dim); cursor: pointer;
+}
+.tnode-toggle:hover { color: var(--fg); background: var(--surface); }
+.tnode-col {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 9px; border-bottom: 1px solid var(--border);
+  position: relative; cursor: default;
+}
+.tnode-col:last-child { border-bottom: 0; }
+.tnode-col:hover { background: color-mix(in srgb, var(--sel) 8%, transparent); }
+.tnode-col.is-fk .tnode-cname { color: var(--sel); }
+.tnode-flags { display: flex; align-items: center; gap: 3px; flex: none; width: 30px; }
+.tnode-pk { color: var(--acc); }
+.tnode-fkico { color: var(--sel); }
+.tnode-cname {
+  flex: 1; font-family: var(--mono); font-size: 11px; color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tnode-u {
+  font-family: var(--mono); font-size: 9px; color: var(--acc);
+  border: 1px solid var(--acc); border-radius: 3px; padding: 0 3px;
+}
+.tnode-nn {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  border: 1.5px solid var(--dim2); background: transparent;
+}
+.tnode-nn.on { border-color: var(--nc, var(--fg)); background: var(--nc, var(--fg)); }
+.tnode-ctype {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  text-align: right; flex: none; max-width: 96px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: .65; transition: opacity .15s;
+}
+.tnode-col:hover .tnode-ctype { opacity: 1; }
+.tnode-more {
+  padding: 4px 9px; font-family: var(--mono); font-size: 10px;
+  color: var(--dim); border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 5px; cursor: pointer;
+}
+.tnode.collapsed .tnode-more { border-top: 0; }
+/* per-column handles: invisible at rest, appear on node hover / selection */
+.tnode .react-flow__handle.tnode-h {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid var(--nc, var(--sel)); background: var(--surface);
+  opacity: 0; transition: opacity .15s;
+}
+/* M3/S3.6 — the per-column reveal is hover-only; gate it so the mouse keeps
+   today's behaviour and touch falls back to the selection reveal below. */
+@media (hover: hover) {
+  .tnode:hover .react-flow__handle.tnode-h { opacity: 1; }
+  .tnode:hover .tnode-h-head { opacity: 0; }
+}
+/* not hover-derived — must stay live on a coarse pointer */
+.tnode.selected .react-flow__handle.tnode-h,
+.tnode .react-flow__handle.tnode-h.connecting,
+.tnode .react-flow__handle.tnode-h.valid { opacity: 1; }
+.react-flow__handle.tnode-h.tnode-h-head { opacity: 0; }
+
+/* =====================================================================
+   L3a — ISO 5807 shapes: vertical handles + per-shape body padding
+   ===================================================================== */
+/* H — the old `top: -6px` / `bottom: -6px` nudges lived here (same
+   outboard scheme the horizontal pair carried at the midpoint block above);
+   both are gone so the tb-mode wire also starts flush on the border. */
+.node.shape-terminator .node-body { padding: 16px 30px; }
+.node.shape-process .node-body { padding: 20px 18px; }
+.node.shape-decision .node-body { padding: 30px 38px; }
+.node.shape-io .node-body { padding: 18px 38px; }
+.node.shape-document .node-body { padding: 16px 20px 26px; }
+.node.shape-subprocess .node-body { padding: 18px 38px; }
+.node.shape-preparation .node-body { padding: 18px 38px; }
+.node.shape-manual .node-body { padding: 18px 34px 24px; }
+.node.shape-delay .node-body { padding: 18px 34px 18px 14px; }
+.node.shape-connector .node-body { padding: 6px; }
+.node.shape-connector {
+  display: grid; place-items: center;
+}
+.node.shape-connector .node-title { font-size: 12px; justify-content: center; }
+.node.shape-connector .node-kicker,
+.node.shape-connector .node-sub,
+.node.shape-connector .node-metric { display: none; }
+/* F: the decorative disc beside each left/right midpoint is GONE. It was 16px
+   against the handle's 14px and sat 8px off its centre, so every horizontal
+   edge read as two overlapping circles. With eight connection points the
+   handle alone is the affordance. */
+
+/* =====================================================================
+   PACKAGE-M — Settings dialog (the theme became ONE setting in here)
+   Tokens only: no literal hex, no literal rgba. z-index 70 sits above
+   every canvas surface (toolbar 5, sel-bar 6, pop 30, sp-overlay 40,
+   ctx-menu 60) and below the tooltip layer (9999) + the Tour (10000), so a
+   tooltip fired from inside the modal still shows and the tour is never
+   hidden behind the dialog.
+   ===================================================================== */
+
+.settings-overlay {
+  position: absolute; inset: 0; z-index: 70;
+  display: grid; place-items: center;
+  background: var(--scrim);
+}
+.settings-modal {
+  position: relative;
+  width: 720px; max-width: calc(100% - 48px);
+  height: 460px; max-height: calc(100% - 48px);
+  display: flex; overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-pop);
+}
+
+/* ---- left nav ---- */
+.settings-nav {
+  width: 190px; flex: none; min-height: 0;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--elevated);
+  padding: 12px 8px;
+}
+.settings-search {
+  width: 100%; box-sizing: border-box;
+  margin: 0 0 8px;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-family: var(--sans); font-size: 12px;
+  outline: none; transition: border-color .15s;
+}
+.settings-search::placeholder { color: var(--dim); }
+.settings-search:focus { border-color: var(--sel); }
+.settings-nav-list { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+.settings-nav-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: transparent; color: var(--dim); text-align: left;
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 8px 11px; cursor: pointer;
+  font-family: var(--sans); font-size: 12.5px; transition: all .12s;
+}
+.settings-nav-item:hover { background: var(--surface); color: var(--fg); }
+.settings-nav-item.on {
+  background: var(--acc-soft); color: var(--acc); font-weight: 700;
+}
+.settings-nav-item svg { flex: none; }
+.settings-nav-note {
+  margin-top: auto; padding: 10px 11px 2px;
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+}
+.settings-empty {
+  color: var(--dim); font-family: var(--mono); font-size: 11.5px;
+  padding: 14px 11px; line-height: 1.5;
+}
+
+/* ---- right pane ---- */
+.settings-main {
+  flex: 1; min-width: 0; padding: 18px 22px; overflow-y: auto;
+  background: var(--surface);
+}
+.settings-h {
+  margin: 0 0 4px; font-family: var(--mono); font-size: 14px;
+  letter-spacing: .02em; color: var(--fg);
+}
+.settings-sub {
+  color: var(--dim); font-size: 11.5px; font-family: var(--mono);
+  margin: 0 0 18px;
+}
+.settings-close {
+  position: absolute; top: 10px; right: 10px;
+  width: 26px; height: 26px; display: grid; place-items: center;
+  background: transparent; color: var(--dim);
+  border: 1px solid transparent; border-radius: 7px;
+  cursor: pointer; transition: all .12s;
+}
+.settings-close:hover { color: var(--fg); border-color: var(--border-strong); }
+
+/* ---- read-only status rows (canvas / connections / editor / export) ---- */
+.settings-rows { display: flex; flex-direction: column; }
+.settings-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 2px; border-bottom: 1px solid var(--border);
+  font-size: 12.5px; color: var(--fg);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row-label { flex: 1; min-width: 0; }
+.settings-row-hint {
+  display: block; color: var(--dim); font-size: 10.5px;
+  font-family: var(--mono); margin-top: 2px;
+}
+.settings-row-val {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
+/* Settings → Keyboard: the chip row must not squeeze — align chips on their centres and let a long
+   row wrap rather than compress. */
+.settings-row .help-keys { gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* Settings → Keyboard: the heading that splits real key combos from pointer
+   gestures. Deliberately NOT row-shaped (no value column, no bottom border) —
+   mono, small, wide-tracked and dim, with a top margin that reads as a section
+   break, so it can never be mistaken for another row. */
+.settings-group {
+  margin: 16px 2px 4px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+}
+/* the first group sits right under the pane subtitle — no double gap */
+.settings-group:first-child { margin-top: 2px; }
+/* Settings → Keyboard: pointer gestures. Plain text tokens, NOT chips — no
+   border, no background, no box — and a dim colour, so a `kbd` chip and a
+   gesture can never be confused for one another. The `·` separators are text
+   BETWEEN tokens, never a token of their own. */
+.gesture {
+  display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+  justify-content: flex-end;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
+.gesture-token { border: none; background: none; padding: 0; }
+.settings-state { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.settings-state.on { color: var(--green); }
+.settings-state.off { color: var(--dim2); }
+/* M2 — the Editor pane's Board preset is a REAL control (everything else in the
+   dialog is still a readout). Same look as the nav search field, so the one
+   honest control reads as a control. */
+.settings-select {
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 22px 5px 9px;
+  font-family: var(--sans); font-size: 12px;
+  cursor: pointer; outline: none; transition: border-color .15s;
+}
+.settings-select:focus { border-color: var(--sel); }
+/* M4 — Canvas → Grid size: the pitch is a REAL number control. Same token
+   palette and shape as the preset select, but sized for a 2-digit value so the
+   label + control still read as one row. */
+.settings-input {
+  width: 72px; box-sizing: border-box;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 9px;
+  font-family: var(--mono); font-size: 12px;
+  outline: none; transition: border-color .15s;
+}
+.settings-input:focus { border-color: var(--sel); }
+.settings-input::-webkit-outer-spin-button,
+.settings-input::-webkit-inner-spin-button { opacity: .45; }
+/* M3 — the connection rules are REAL controls now: a switch, painted from the
+   token system so it reads in every theme (ON = --acc / --acc-soft,
+   OFF = --elevated / --border). No hardcoded colour. */
+.settings-toggle {
+  position: relative; flex: none;
+  width: 40px; height: 22px; padding: 0;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.settings-toggle:hover { border-color: var(--border-strong); }
+.settings-toggle:focus-visible {
+  outline: none; border-color: var(--sel);
+  box-shadow: 0 0 0 2px var(--sel-soft);
+}
+.settings-toggle.on { background: var(--acc-soft); border-color: var(--acc); }
+.settings-toggle-knob {
+  position: absolute; top: 50%; left: 3px;
+  width: 14px; height: 14px; border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--dim);
+  transition: left .15s, background .15s;
+}
+.settings-toggle.on .settings-toggle-knob { left: 21px; background: var(--acc); }
+.settings-chip {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--dim);
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 1px 5px; white-space: nowrap;
+}
+.settings-note {
+  margin-top: 16px; padding: 9px 11px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--elevated);
+  color: var(--dim); font-family: var(--mono); font-size: 10.5px; line-height: 1.55;
+}
+.settings-kv { font-family: var(--mono); font-size: 11.5px; color: var(--dim); line-height: 1.9; }
+
+/* ---- theme card grid (Appearance pane) ---- */
+.settings-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+}
+.settings-card {
+  display: block; width: 100%; text-align: left;
+  border: 1.5px solid var(--border); border-radius: 11px;
+  padding: 10px; cursor: pointer;
+  background: var(--surface); color: var(--fg);
+  transition: border-color .12s;
+}
+.settings-card:hover { border-color: var(--border-strong); }
+.settings-card.on { border-color: var(--acc); background: var(--acc-soft); }
+.settings-card-mini {
+  height: 76px; border-radius: 7px; border: 1px solid var(--border);
+  position: relative; overflow: hidden; margin-bottom: 8px;
+}
+.settings-card-mini .settings-mini-dots {
+  position: absolute; inset: 0;
+  /* the dots belong to the CANVAS side — the panel strip paints over them */
+  left: calc(25% + 1px);
+  background-image: radial-gradient(var(--mini-dot) 1.2px, transparent 1.2px);
+  background-size: 14px 14px; opacity: .9;
+}
+.settings-mini-box {
+  position: absolute; border-radius: 4px;
+  border: 1.5px solid var(--mini-nc);
+  background: color-mix(in srgb, var(--mini-nc) 12%, transparent);
+}
+/* M — the mini's PANEL strip. It shows the theme's `--surface` next to the
+   canvas `--bg`, so the surface-vs-canvas contrast is visible per card (the
+   three boxes alone never showed it). Painted from the per-card inline
+   variables on `.settings-card-mini` (like --mini-nc / --mini-dot), never from
+   a theme class: one theme's tokens are being painted inside another theme's
+   card. The rows are abstract bars — no text, no icons, nothing nameable. */
+.settings-mini-side {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 25%;
+  background: var(--mini-surface);
+  border-right: 1px solid var(--mini-border);
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding: 0 5px;
+}
+.settings-mini-side i {
+  display: block; height: 3px; border-radius: 999px;
+  background: var(--mini-fg); opacity: .22;
+}
+.settings-card-cap { display: flex; align-items: center; gap: 7px; }
+.settings-card-name { font-size: 12px; font-weight: 600; }
+.settings-card-mode {
+  font-family: var(--mono); font-size: 9.5px; color: var(--dim);
+}
+.settings-card-check {
+  margin-left: auto; display: flex; color: var(--acc);
+}
+/* the hidden probe (§5) — invisible, unfocusable, inert: `display:none` gives
+   zero client rects while `getComputedStyle` still resolves every custom
+   property, which is all the card previews need. */
+.settings-probe {
+  display: none;
+}
+
+/* the toolbar entry point; .tbtn-dd does the visuals, this adds the open state */
+.settings-btn[aria-expanded="true"] {
+  border-color: var(--acc); color: var(--acc); background: var(--acc-soft);
+}
+
+/* =====================================================================
+   PACKAGE-M / responsive ladder — ONE layout per tier for the Settings
+   dialog. Scoped to the [data-form-factor] / [data-orientation] attributes
+   `.app` already carries (written by src/useEditorInterface.ts), so this
+   adds NO props, NO state and NO second breakpoint number. The dialog is
+   rendered INSIDE `.canvas-wrap`, which is why these descendant selectors
+   reach it.
+
+   WHY `display: block` + container padding instead of the grid centring —
+   that centring IS the defect. `.settings-overlay` is `display: grid;
+   place-items: center` with an IMPLICIT auto column track; the modal's
+   fixed `width: 720px` sizes that track, and the modal's own
+   `max-width: calc(100% - 48px)` then resolves against the CYCLIC 720px
+   track instead of against the overlay. Measured at a 360px viewport:
+   modal 672px wide (720 − 48) = 336px = 50 % off-screen, with no scroll
+   container able to reveal it. Padding on the container plus a 100 % child
+   removes the percentage-against-track dependency entirely. Do NOT try to
+   fix this with `grid-template-columns: minmax(0, 1fr)` alone — the tier
+   layouts below are the fix.
+   ===================================================================== */
+
+/* ---- tablet PORTRAIT — the nav becomes a tab strip across the top ---- */
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-overlay {
+  display: block; padding: 24px;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-modal {
+  /* the base modal is row-flex around a 190px nav column; a bar across the
+     TOP needs the column axis. `width/height: 100%` is deterministic here
+     because the overlay is a padded block box, not an auto grid track. */
+  flex-direction: column;
+  width: 100%; height: 100%; max-width: none; max-height: none;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-nav {
+  width: auto; flex-direction: row; align-items: center; gap: 8px;
+  border-right: none; border-bottom: 1px solid var(--border);
+}
+/* the search is DOM-FIRST but must paint at the RIGHT end of the bar, hence
+   `order`. Measured tab run at this size is 607px against a ~530px strip, so
+   the list must be the shrinking, scrolling half (`flex: 1; min-width: 0`) or
+   the strip overflows the modal instead of scrolling inside it. */
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-nav-list {
+  flex-direction: row; gap: 4px; overflow-x: auto;
+  order: 1; flex: 1; min-width: 0;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-nav-item {
+  width: auto; white-space: nowrap;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-search {
+  width: 190px; flex: none; order: 2;
+}
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-nav-note { display: none; }
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-main { padding: 20px 24px; }
+
+/* ---- phone (either orientation) — a full-bleed sheet ---- */
+.app[data-form-factor="phone"] .settings-overlay {
+  display: block; padding: 0;
+}
+.app[data-form-factor="phone"] .settings-modal {
+  flex-direction: column;
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  border-radius: 0; border: none;
+}
+.app[data-form-factor="phone"] .settings-nav {
+  width: auto; flex-direction: column; gap: 8px;
+  border-right: none; border-bottom: 1px solid var(--border);
+  padding: 10px 10px 0;
+}
+/* the 5 tabs are 607px wide inside a 358px track here, so the strip MUST
+   drag sideways. The scrollbar is hidden: on a phone the strip has to read
+   as a tab row, not as a scroll region. */
+.app[data-form-factor="phone"] .settings-nav-list {
+  flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 10px;
+  scrollbar-width: none;
+}
+.app[data-form-factor="phone"] .settings-nav-list::-webkit-scrollbar { display: none; }
+.app[data-form-factor="phone"] .settings-nav-item {
+  width: auto; white-space: nowrap; flex: none;
+}
+.app[data-form-factor="phone"] .settings-nav-note { display: none; }
+.app[data-form-factor="phone"] .settings-main { padding: 16px 14px 22px; }
+/* 360px cannot hold a label and its control side by side — the label wrapped
+   to three lines and the control slid under the close button. Stack the row. */
+.app[data-form-factor="phone"] .settings-row {
+  flex-direction: column; align-items: flex-start; gap: 7px;
+}
+.app[data-form-factor="phone"] .settings-row-val { width: 100%; }
+/* 3 theme cards across 332px of pane leave ~99px per card — the mini preview
+   stops reading as a preview. Two columns at this tier. */
+.app[data-form-factor="phone"] .settings-grid { grid-template-columns: 1fr 1fr; }
+.app[data-form-factor="phone"] .settings-close { top: 8px; right: 8px; }
+/* The close button is a child of `.settings-main` (now the full modal width),
+   so at these tiers it lands ON TOP of the full-width search field — measured
+   24x24 px of overlap (576 px²) at 360, and 585 px² at 768. It still wins
+   hit-testing, but the field it sits on reads as broken. Reserve the button's
+   own width (26px + gap) out of the search instead of moving the control. */
+.app[data-form-factor="phone"] .settings-search { width: calc(100% - 34px); }
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-search { margin-right: 34px; }
+.app[data-form-factor="phone"] .settings-h { font-size: 15px; }
+
+/* =====================================================================
+   CONTROL KIT — one consistent chrome for every native control.
+
+   WHY: every select / input below used to be a browser-native control —
+   the OS drew the dropdown arrow, the focus ring and the padding, so the
+   look differed per browser (Safari vs Chrome vs Windows) and none of it
+   followed our five themes. This section paints them from the token
+   system instead, so a select in Settings and a select in the inspector
+   are the same object, in every theme.
+
+   HOW: ONE section that targets the EXISTING class names (no call-site
+   renames). It is placed LAST so that, at equal specificity, these rules
+   win over the earlier partial rules (.field select, .settings-search,
+   .sp-input, …). Colours come from tokens only.
+   ===================================================================== */
+
+/* ---- 1. SELECT — appearance:none + a chevron we draw -------------------
+   The chevron is an inline SVG background. Its stroke colour is the one
+   literal the kit cannot tokenise (a data-URI cannot read a CSS variable);
+   the value is the one Harvey approved in the mockup. */
+.ui-select,
+.field select,
+.settings-select,
+.tnode-mode-sel {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 32px 8px 11px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238a8a92' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.ui-select:hover,
+.field select:hover,
+.settings-select:hover,
+.tnode-mode-sel:hover { border-color: var(--border-strong); }
+.ui-select:focus,
+.field select:focus,
+.settings-select:focus,
+.tnode-mode-sel:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-soft);
+  outline: none;
+}
+/* the legend's table-mode select rides in a compact legend row — same kit
+   chrome, smaller box so the legend keeps its size (see report). */
+.tnode-mode-sel {
+  padding: 4px 26px 4px 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background-position: right 7px center;
+}
+
+/* ---- 2. TEXT INPUT / TEXTAREA ----------------------------------------- */
+.ui-input,
+.field input,
+.field textarea,
+.settings-search,
+.settings-input,
+.sp-input,
+.icon-search,
+.icon-raw,
+.tcol-name,
+.tcol-type,
+.edge-label-input {
+  background-color: var(--elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 11px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ui-input::placeholder,
+.field input::placeholder,
+.field textarea::placeholder,
+.settings-search::placeholder,
+.settings-input::placeholder,
+.sp-input::placeholder,
+.icon-search::placeholder,
+.icon-raw::placeholder,
+.tcol-name::placeholder,
+.tcol-type::placeholder { color: var(--dim2); }
+.ui-input:hover,
+.field input:hover,
+.field textarea:hover,
+.settings-search:hover,
+.settings-input:hover,
+.sp-input:hover,
+.icon-search:hover,
+.icon-raw:hover,
+.tcol-name:hover,
+.tcol-type:hover,
+.edge-label-input:hover { border-color: var(--border-strong); }
+.ui-input:focus,
+.field input:focus,
+.field textarea:focus,
+.settings-search:focus,
+.settings-input:focus,
+.sp-input:focus,
+.icon-search:focus,
+.icon-raw:focus,
+.tcol-name:focus,
+.tcol-type:focus,
+.edge-label-input:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-soft);
+}
+/* the canvas edge-label editor is a ~20px inline chip, not a panel row:
+   kit colour/border/radius/focus, but compact geometry so the label it
+   replaces does not grow (see report). */
+.edge-label-input { padding: 1px 6px; }
+
+/* ---- 3. SWITCH — already matches the kit; hover + focus-visible ring
+   exist on .settings-toggle above, so nothing is restyled here. -------- */
+
+/* ---- 4. SEGMENTED (Settings → Canvas → Grid size) ---------------------- */
+.settings-seg {
+  display: inline-flex;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+.settings-seg-btn {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  background: transparent;
+  color: var(--dim);
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: color .12s, background .12s;
+}
+.settings-seg-btn:hover { color: var(--fg); }
+.settings-seg-btn.on {
+  background: var(--acc-soft);
+  color: var(--acc);
+  font-weight: 700;
+}
+
+/* =====================================================================
+   PACKAGE-M3 / Step 3 — COARSE POINTER (touch) hardening.
+   Every rule here is additive and lives behind `(pointer: coarse)` or
+   `(hover: none)`, so a mouse/trackpad renders byte-for-byte what it did
+   before this step. Nothing here sets `touch-action` on `.app-host` or
+   `.canvas-wrap`: `touch-action` intersects up the ancestor chain, and any
+   value stricter than `.react-flow__pane`'s own `touch-action: none` would
+   kill canvas panning outright.
+   ===================================================================== */
+
+/* S3.5 — handle hit target.
+   14px is a mouse-sized dot; a fingertip needs materially more. React Flow's
+   own touch example renders handles at 20px, so take 20. NO per-side offset
+   here either (H): RF's `right: 0` / `transform: translate(50%, -50%)` already
+   centres the painted dot on the border at ANY diameter, so the 20px touch dot
+   needs no offset. The old `-10px !important` pair added a full radius on top of
+   that centring, which cost the wire a whole diameter per end —
+   `getHandlePosition` adds the entire measured width (see the FIX 2 note at the
+   midpoint block). With the pair gone the coarse path gap is 10px (half a 20px
+   dot) instead of 20px: the same one-radius floor as the mouse case. The
+   `::after` ring below grows the tap target without moving the centre. */
+@media (pointer: coarse) {
+  .react-flow__handle {
+    width: 20px; height: 20px;
+  }
+  /* G — the four corner sites are gone, so the top/bottom nudges that existed
+     only to pull them clear of the node's extreme corners (and therefore off
+     the resize grips) are gone with them. H removed the remaining `-10px`
+     midpoint nudges as well, so no handle offset is written in this block: the
+     four midpoints rely on React Flow's own centring translation. */
+  /* A transparent 5px ring painted with `::after` takes the tap target to
+     30x30 CSS px without changing the painted size or the node's layout —
+     WCAG 2.2 SC 2.5.8 asks for 24x24 minimum. Keep in sync with
+     `HANDLE_HIT_MARGIN_PX` in `src/touch.ts`. */
+  .react-flow__handle::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+  }
+}
+
+/* S3.6 — the touch ALTERNATIVE reveal. With `(hover: none)` there is no hover,
+   so the gated `:hover` rules above are inert and nothing would ever show a
+   handle. React Flow already marks the selection with `.selected`, so the
+   alt reveal costs no state: a SELECTED node always shows its handles, on
+   every pointer type. Tap a node → its handles appear → tap a handle
+   to connect (S3.4). */
+@media (hover: none) {
+  .react-flow__node.selected .react-flow__handle,
+  .react-flow__handle.valid,
+  .react-flow__handle.connecting { opacity: 1; }
+  .react-flow__handle.valid { border-color: var(--sel); }
+  .tnode.selected .react-flow__handle.tnode-h,
+  .tnode .react-flow__handle.tnode-h.connecting,
+  .tnode .react-flow__handle.tnode-h.valid { opacity: 1; }
+}
+
+/* S3.5 — primary touch controls below the 24px floor.
+   Measured (getBoundingClientRect, DevTools emulation) before this block:
+     .tbtn-icon      28x28  → 44x44  (undo/redo/fit/snap/duplicate/auto-layout/
+                                      align/distribute — the toolbar's primary row)
+     .panel-toggle   20x44  → 44x44  (the ONLY affordance that expands a
+                                      collapsed panel when a mouse cannot be
+                                      used to `resize`/hover it)
+   `.toolbar` grows in height so the 44px buttons are not clipped by its 40px
+   desktop cap. Context-menu rows (`.ctx-item`) have no mouse-only path to
+   them on touch: the long press in S3.1 opens that menu, so they are left at
+   their desktop metrics and measured in the report. */
+@media (pointer: coarse) {
+  .toolbar { height: auto; min-height: 44px; padding: 7px; }
+  .tbtn-icon { width: 44px; height: 44px; }
+  .panel-toggle { width: 44px; height: 44px; }
+  .panel-toggle[data-panel-toggle="left"] { left: max(4px, calc(var(--left-w, 232px) - 22px)); }
+  .panel-toggle[data-panel-toggle="right"] { right: max(4px, calc(var(--right-w, 288px) - 22px)); }
+}
+
+/* ---- 5. BUTTONS — nothing to add. The F5 node-toolbar icon buttons that used
+   to be called out here are GONE (ITEM 2b, 2026-09-18): the strip no longer
+   renders in any node kind, and its rules were removed with it. -------- */
+
+/* ---- 6. SWATCHES — .swatches / .swatch already carry their rules. ----- */
