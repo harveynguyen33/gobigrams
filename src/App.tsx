@@ -1820,7 +1820,7 @@ export default function App() {
   const setEdgeColor = useCallback((key: ColorKey) => {
     const e = edgesRef.current.find(x => x.id === selEdgeId);
     if (!e) return;
-    updateEdge(edgeColorPatch(key, {markerEnd: e.markerEnd, markerStart: e.markerStart}), true);
+    updateEdge(edgeColorPatch(key, {markerEnd: e.markerEnd, markerStart: e.markerStart}));
   }, [selEdgeId, updateEdge]);
 
   const onCommitLabel = useCallback((id: string, label: string) => {
@@ -4098,7 +4098,7 @@ export default function App() {
                 <label>label position</label>
                 <select
                   value={eOffset}
-                  onChange={e => updateEdge({data: {offset: e.target.value as 'center' | 'start' | 'end'}}, true)}
+                  onChange={e => updateEdge({data: {offset: e.target.value as 'center' | 'start' | 'end'}})}
                 >
                   <option value="center">center</option>
                   <option value="start">start</option>
