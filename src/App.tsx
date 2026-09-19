@@ -3415,9 +3415,6 @@ export default function App() {
       <div className="field">
         <label>text colour</label>
         {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k}))}
-        <div className="hint" style={{paddingTop: 4}}>
-          Text only — the node outline keeps its own colour.
-        </div>
       </div>
       <div className="field">
         <label>align</label>
@@ -3427,10 +3424,6 @@ export default function App() {
           options={ALIGN_OPTS}
           title="Text align"
         />
-      </div>
-      <div className="hint">
-        Size scales the whole text block — title, kicker, sub and metric move
-        together, keeping their hierarchy. Default (M) is not stored on the node.
       </div>
     </>
   );
@@ -4534,8 +4527,15 @@ export default function App() {
         <div className="panel-body">
           {edgeMode ? (
             <>
-              <span className="badge">edge</span>
-              <div style={{height: 12}} />
+              {/* ROUND Y, ITEM 3 — THE `edge` BADGE IS GONE. It stated the KIND
+                  of the selection, and the sections underneath now state it
+                  better: Label / Line / Markers (+ Cardinality on an ERD, then
+                  Flow) is a vocabulary NO node target renders (a goblin gets
+                  Content / Text / Style, a table Table / Columns / Show mode).
+                  A badge that repeats what the body below it already proves is
+                  a row of the panel spent on nothing, so the badge AND its
+                  trailing 12px spacer are both deleted — the spacer's only
+                  tenant was the badge. */}
               {(() => { secBody('label', <>
                 <div className="field">
                   <label>label</label>
@@ -4844,8 +4844,10 @@ export default function App() {
             </>
           ) : selected?.type === 'table' ? (
             <>
-              <span className="badge">table</span>
-              <div style={{height: 12}} />
+              {/* ROUND Y, ITEM 3 — THE `table` BADGE IS GONE, same reason as the
+                  edge's: Table / Columns / Show mode is the ERD vocabulary and
+                  no other target renders it. The badge restated the target kind
+                  the sections already name, so it went with its 12px spacer. */}
               {(() => { secBody('table', <>
               <div className="field">
                 <label>name</label>
@@ -4949,8 +4951,12 @@ export default function App() {
             </div>
           ) : selected.type === 'label' ? (
             <>
-              <span className="badge">label</span>
-              <div style={{height: 12}} />
+              {/* ROUND Y, ITEM 3 — THE `label` BADGE IS GONE, and this is the one
+                  Harvey pointed at ("cái label ở top có cần ko?"). A label target
+                  holds exactly ONE section, `text`, so the badge read `label`
+                  directly above a header that reads `Text` — it told the user
+                  nothing they could not see, and it pushed the section down.
+                  Badge and spacer both deleted. */}
               {/* PACKAGE-P §E.3(a) — THE PANEL'S SECOND TEXT WRITER IS GONE.
                   This branch used to register a 4-row <textarea> as its `text`
                   section, i.e. a SECOND writer for the same `text` the in-place
@@ -4969,13 +4975,30 @@ export default function App() {
             </>
           ) : (
             <>
-              <span className="badge">{asShape((selected.data as any).shape)}</span>
+              {/* ROUND Y, ITEM 3 — THE GOBLIN SHAPE BADGE IS GONE. It printed the
+                  SHAPE's machine name (`service`, `queue`, `note`…) above the
+                  panel, and the Style section's own shape picker already names
+                  that same shape in the same panel — the trigger reads out
+                  `current.label` (InspectorPicker' `icon-trigger-name`), so the
+                  badge was a second, less readable copy of the control's own
+                  readout. Nothing is disambiguated by it: a goblin's sections
+                  (Content / Text / Style) name the target kind the same way they
+                  do for every other kind. Deleted with its 12px spacer.
+
+                  THE C4 CHIP STAYS AND IS THE ONE SURVIVOR — it is not a kind
+                  label. `{C4[...].kicker}` states the node's C4 ROLE (`Person`,
+                  `Container`, `System`…) which NOTHING else in this panel or on
+                  the node's own card prints. The spacer became PART of that
+                  conditional, because with the shape badge gone the chip is now
+                  the only reason the spacer has to exist. */}
               {preset.id === 'c4' && isC4Type((selected.data as any).c4Type) && (
-                <span className="badge preset" style={{marginLeft: 6}}>
-                  {C4[(selected.data as any).c4Type as keyof typeof C4].kicker}
-                </span>
+                <>
+                  <span className="badge preset">
+                    {C4[(selected.data as any).c4Type as keyof typeof C4].kicker}
+                  </span>
+                  <div style={{height: 12}} />
+                </>
               )}
-              <div style={{height: 12}} />
               {preset.note && <div className="preset-warn" style={{padding: '0 0 10px'}}>{preset.note}</div>}
               {(() => { secBody('content', <>
                 {hasKicker(inspTarget) && (
