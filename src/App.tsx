@@ -65,6 +65,10 @@ import {
   type PresetId, type DiagramPreset, type PathId,
 } from './presets';
 import {type PaletteItem} from './palette';
+/* ROUND AD, ITEM 5(a) — the colour key's label and its persisted dismissal
+   (Option B's condition: the key must be labelled where the user looks, and the
+   label must be dismissible so it does not become permanent furniture). */
+import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
 import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
@@ -566,6 +570,17 @@ export default function App() {
    *  ONE new persisted key, and this one control is a click away in a section
    *  the user already has open. */
   const [bodyModeOpen, setBodyModeOpen] = useState(false);
+
+  /* ROUND AD, ITEM 5(a) — OPTION B'S CONDITION, IN STATE. `keyNoteShown` starts
+     from the persisted value (absent → SHOW), and dismissing writes it through
+     the ONE convention every other panel preference uses. Global to the panel,
+     not per node — the note is a statement about the colour control, so it does
+     not reappear on every selection change. */
+  const [keyNoteShown, setKeyNoteShown] = useState(loadKeyNote);
+  const dismissKeyNote = useCallback(() => {
+    setKeyNoteShown(false);
+    saveKeyNote(false);
+  }, []);
 
   const nodesRef = useRef<Node[]>(nodes);
   nodesRef.current = nodes;
@@ -2255,21 +2270,26 @@ export default function App() {
   }, [mutateFavourites]);
 
   /** ROUND AB, ITEM 2 — remove ONE favourite from the strip.
+   *  ROUND AE — RE-KEYED ON THE ID, AND EVERY TILE NOW CARRIES IT.
    *
-   *  The tile's `×` control calls exactly this, and this calls exactly the
-   *  function the palette star's own remove path ends in (`removeFavouriteItem`,
-   *  which `toggleFavouriteItem` above delegates to), through the same
-   *  `mutateFavourites` writer — so the strip and the star cannot drift and the
-   *  write keeps the ref-synchronous + deferred-persist contract.
+   *  The tile calls exactly this, through the same `mutateFavourites` writer the
+   *  palette star uses, so the strip and the star cannot drift and the write
+   *  keeps the ref-synchronous + deferred-persist contract.
    *
-   *  IDENTITY IS THE LABEL, per `library.ts`: a favourite starred from a palette
-   *  item carries that item's `__label`; a "save selection" favourite has no
-   *  label at all. So the tile renders the control only where the label exists —
-   *  a label-less favourite would make this removal match EVERY label-less
-   *  favourite at once, and the existing path has nothing finer to reuse (the
-   *  gap is called out in the round report rather than papered over). */
-  const removeFavourite = useCallback((label: string) => {
-    mutateFavourites(prev => library.removeFavouriteItem(prev, label));
+   *  WHY IT IS NO LONGER THE LABEL. A favourite saved from a SELECTION has no
+   *  `__label`, so `favouriteLabel` returns `undefined` for it — and matching on
+   *  that would remove EVERY unnamed favourite in one call. Round AB therefore
+   *  rendered the control only where a label existed, which left a
+   *  selection-saved favourite with NO removal path at all. `f.id` is the one
+   *  field that is always present and unique (the tile already keys on it and
+   *  the drag payload already carries it), so it is the honest identity.
+   *
+   *  The label-based `library.removeFavouriteItem` is NOT dead: it is still the
+   *  arm of `toggleFavouriteItem`, i.e. what the palette star removes through.
+   *  This function reaches `removeFavouriteById` instead, so there are two
+   *  library helpers and ONE app-level removal, not a third mechanism. */
+  const removeFavourite = useCallback((id: string) => {
+    mutateFavourites(prev => library.removeFavouriteById(prev, id));
   }, [mutateFavourites]);
 
   const isStarred = useCallback(
@@ -3897,11 +3917,20 @@ export default function App() {
                     <span className="fav-glyph" aria-hidden="true">{favouritePreview(f)}</span>
                     <span className="fav-name">{library.favouriteName(f)}</span>
                     {/* ROUND AB, ITEM 2 — REMOVE FROM THE STRIP.
+                        ROUND AE — EVERY TILE NOW CARRIES IT, AND IT REMOVES BY ID.
                         Harvey: "tôi muốn shape trong favorite cũng có thể có
-                        icon để click remove khỏi favorite". Until now the only
-                        way out of Favourites was the star on the palette row,
-                        which means scrolling the library back to the item you
-                        just removed from your shortlist.
+                        icon để click remove khỏi favorite". Until ROUND AB the
+                        only way out of Favourites was the star on the palette
+                        row, which means scrolling the library back to the item
+                        you just removed from your shortlist.
+
+                        ROUND AB RENDERED THIS ONLY WHERE A LABEL EXISTED, because
+                        the removal matched by label and a selection-saved
+                        favourite has none — so the control was absent on exactly
+                        the tiles that had no other way out. ROUND AE keys the
+                        removal on `f.id` (see `removeFavourite` above), so the
+                        condition is gone: every tile has a `×`, including the
+                        ones saved from a selection.
 
                         WHAT IT STOPS, and nothing else. The tile inserts on
                         `click` (and double-click, and drag), so this control
@@ -3931,31 +3960,29 @@ export default function App() {
 
                         THE REMOVAL ITSELF IS NOT REIMPLEMENTED: it calls
                         `removeFavourite` → the SAME `mutateFavourites` write
-                        path, ending in the SAME `library.removeFavouriteItem`
-                        the palette star's remove already ends in. */}
-                    {library.favouriteLabel(f) && (
-                      <span
-                        className="fav-remove"
-                        role="button"
-                        tabIndex={0}
-                        data-fav-remove={f.id}
-                        aria-label={`Remove ${library.favouriteName(f)} from Favourites`}
-                        title={`Remove ${library.favouriteName(f)} from Favourites`}
-                        onClick={e => {
+                        path the palette star uses, now ending in
+                        `library.removeFavouriteById`. */}
+                    <span
+                      className="fav-remove"
+                      role="button"
+                      tabIndex={0}
+                      data-fav-remove={f.id}
+                      aria-label={`Remove ${library.favouriteName(f)} from Favourites`}
+                      title={`Remove ${library.favouriteName(f)} from Favourites`}
+                      onClick={e => {
+                        e.stopPropagation();
+                        removeFavourite(f.id);
+                      }}
+                      onDoubleClick={e => e.stopPropagation()}
+                      onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
                           e.stopPropagation();
-                          removeFavourite(library.favouriteLabel(f)!);
-                        }}
-                        onDoubleClick={e => e.stopPropagation()}
-                        onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeFavourite(library.favouriteLabel(f)!);
-                          }
-                        }}
-                      >×</span>
-                    )}
+                          removeFavourite(f.id);
+                        }
+                      }}
+                    >×</span>
                   </button>
                 ))}
               </div>
@@ -5257,9 +5284,45 @@ export default function App() {
                   <label>color</label>
                   {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
                 </div>
-                <div className="hint">
-                  Color drives the shape outline, icon, metric and glow.
-                </div>
+                {/* ROUND AD, ITEM 5(a) — OPTION B'S LABEL. Harvey kept the
+                    editor's semantic colour grouping, on the condition that the
+                    panel SAYS it is this editor's grouping and not an ISO
+                    convention — and that the colour stays overridable per node
+                    (the swatch row directly above: the key only supplies the
+                    default). Three properties this row is built to hold:
+
+                    · VISIBLE WITHOUT HOVER. It is markup, not a `title`
+                      attribute. A hover-only label is invisible on a tablet,
+                      and this project ships to touch.
+                    · DISMISSIBLE, AND THE DISMISSAL PERSISTS. The × writes
+                      `diagram-studio:colour-key-note` through the established
+                      convention (`src/colorKeyNote.ts`, the same shape as
+                      MARQUEE_KEY / ANIMATE_KEY / SECTIONS_KEY), so it is gone
+                      for good rather than back on the next selection.
+                    · ONE SHORT LINE, AND IT DOES NOT STEAL FOCUS. A plain
+                      `<span>` with `role="button" tabIndex={0}`, exactly like
+                      `.fav-remove` and `.cust-remove`; nothing autofocuses it,
+                      and the string is measured to fit one line at the panel's
+                      width (see the note in `src/colorKeyNote.ts`). */}
+                {keyNoteShown && (
+                  <div className="key-note" data-key-note="true">
+                    <span className="key-note-text">{KEY_NOTE_TEXT}</span>
+                    <span
+                      className="key-note-x"
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Dismiss the colour-key note"
+                      title="Dismiss the colour-key note"
+                      onClick={dismissKeyNote}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          dismissKeyNote();
+                        }
+                      }}
+                    >×</span>
+                  </div>
+                )}
               </>); return null; })()}
               {renderSections()}
             </>

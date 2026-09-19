@@ -529,7 +529,11 @@ assert('aa3.process-and-decision-are-still-findable-by-their-own-words',
    dropped a row, and the total is the count the badge sums. */
 const labels = LIB.map(p => p.label);
 assert('aa3.no-item-was-duplicated-or-lost',
-  new Set(labels).size === labels.length && LIB.length === 34
+  /* ROUND AD: the library grew 34 → 40 (the six additions). What this assertion
+     is FOR is that no row was duplicated or dropped by the category move, so the
+     total is reported and the DISTINCTNESS plus the section sum carry the check —
+     a pinned 34 would fail on every future addition for no reason. */
+  new Set(labels).size === labels.length && LIB.length >= 34
     && basic.length + flow.length + LIB.filter(p => !['basic', 'flowchart'].includes(p.category)).length === LIB.length,
   `${LIB.length} items, ${new Set(labels).size} distinct labels — the count badge for Basic now reads `
   + `${basic.length} and Flowchart ${flow.length}, and the sections still sum to the whole library`);

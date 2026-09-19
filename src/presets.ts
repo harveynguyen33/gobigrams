@@ -1,7 +1,7 @@
 import {MarkerType, type Edge, type Node} from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from './colors';
 import {PALETTE, type DiagramType, type PaletteCategory, type PaletteItem} from './palette';
-import {type Shape} from './shapes';
+import {type Shape, FLOWCHART_EXTRA_SHAPES} from './shapes';
 import {gridLayout, layoutDiagram, type LayoutDirection, type LayoutSpacing} from './layout';
 import {type CrowFoot} from './crowfoot';
 import {type ThemeName} from './theme';
@@ -391,16 +391,30 @@ const FLOW: DiagramType[] = ['flowchart'];
 const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteItem;
 
 const FLOWCHART_PALETTE: PaletteItem[] = [
-  fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium'),
-  fc('Process', 'rect · task', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
+  fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium', {width: 270, height: 180}),
+  fc('Process', 'rect · action step', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
   fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'flowchart', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', {width: 150, height: 96}),
-  fc('Input / Output', 'parallelogram', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
-  fc('Document', 'wavy base · output', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base'),
+  fc('Input / Output', 'parallelogram · data', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
+  fc('Document', 'wavy base · in or out', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base'),
   fc('Predefined process', 'double-bar rect', 'subprocess', 'cyan', 'Subprocess', 'flowchart', FLOW, ['subprocess', 'subproc', 'subroutine', 'fr-rect', 'predefined'], 'double-bar rect'),
   fc('Preparation', 'hexagon · setup', 'preparation', 'cyan', 'Initialise', 'flowchart', FLOW, ['initialization', 'initialisation', 'setup', 'init', 'hex'], 'hexagon'),
   fc('Manual operation', 'trapezoid · by hand', 'manual', 'green', 'Manual step', 'flowchart', FLOW, ['manual step', 'manual', 'person'], 'trapezoid'),
   fc('Delay', 'D-shape · wait', 'delay', 'amber', 'Wait', 'flowchart', FLOW, ['wait', 'pause'], 'D-shape'),
   fc('On-page connector', 'circle · jump', 'connector', 'slate', 'A', 'flowchart', FLOW, ['connector', 'circle', 'reference', 'jump', 'on-page'], 'circle', {width: 84, height: 84}),
+  /* ROUND AD, ITEM 2 — the six additions. Colour keys follow the SAME semantic
+     grouping as the ten above (Option B), so the key stays one idea:
+       offpage          slate  — a routing marker, like On-page connector
+       manualinput      green  — entry / exit-ish: data arriving from outside
+       display          violet — I/O, beside Input / Output and Document
+       storeddata       violet — a store read/written, beside Document's violet
+       looplimit        amber  — control (loop start), beside Decision / Delay
+       internalstorage  violet — I/O-adjacent, a store; the cylinder's sibling */
+  fc('Off-page connector', 'home plate · another page', 'offpage', 'slate', 'Off page', 'flowchart', FLOW, ['off page', 'off-page', 'offpage', 'home plate', 'another page', 'next page'], 'home plate'),
+  fc('Manual input', 'sloped top · by keyboard', 'manualinput', 'green', 'Manual input', 'flowchart', FLOW, ['manual input', 'keyboard', 'typed', 'form', 'sloped top'], 'sloped top'),
+  fc('Display', 'curved trapezoid · show data', 'display', 'violet', 'Show result', 'flowchart', FLOW, ['display', 'screen', 'show', 'report', 'output device'], 'curved trapezoid'),
+  fc('Stored data', 'cylinder · read / write', 'storeddata', 'violet', 'Stored data', 'flowchart', FLOW, ['stored data', 'store', 'database', 'db', 'read write', 'cylinder'], 'cylinder'),
+  fc('Loop limit', 'notched top · loop start', 'looplimit', 'amber', 'Loop', 'flowchart', FLOW, ['loop limit', 'loop', 'loop start', 'notched top', 'iteration'], 'notched top'),
+  fc('Internal storage', 'pane rect · in-memory', 'internalstorage', 'violet', 'In memory', 'flowchart', FLOW, ['internal storage', 'in memory', 'memory', 'pane rect', 'ram'], 'pane rect'),
   {
     label: 'Lane', hint: 'container · role', shape: 'group', colorKey: 'slate', kind: 'goblin',
     category: 'groups', types: FLOW, aliases: ['swimlane', 'pool', 'role', 'container', 'system'], geometry: 'dashed boundary band',
@@ -437,14 +451,14 @@ const flowchartApprovalTemplate: TemplateSpec = {
     lane('laneReq', 'Requester', 'lane · role', 30, 70, 940, 230),
     lane('laneFin', 'Finance', 'lane · role', 30, 320, 940, 230),
 
-    flowNode('a1', 'terminator', 'Start', 'green', 200, 130),
+    flowNode('a1', 'terminator', 'Start', 'green', 200, 130, {width: 270, height: 180}),
     flowNode('a2', 'process', 'Submit purchase request', 'cyan', 180, 220),
     flowNode('a3', 'io', 'Attach quote', 'violet', 430, 220),
     flowNode('a4', 'decision', 'Amount > 1,000?', 'amber', 660, 200, {width: 150, height: 96}),
     flowNode('a5', 'manual', 'Finance review', 'green', 660, 380),
     flowNode('a6', 'decision', 'Approved?', 'amber', 420, 360, {width: 150, height: 96}),
     flowNode('a7', 'document', 'Issue purchase order', 'violet', 180, 470),
-    flowNode('a8', 'terminator', 'End — approved', 'green', 430, 480),
+    flowNode('a8', 'terminator', 'End — approved', 'green', 430, 480, {width: 270, height: 180}),
     flowNode('a9', 'connector', 'A', 'slate', 300, 380, {width: 84, height: 84}),
     flowNode('a10', 'connector', 'A', 'slate', 300, 175, {width: 84, height: 84}),
     {id: 'a11', type: 'label', position: {x: 120, y: 590}, data: {text: 'Rejections must state a reason.'}},
@@ -660,7 +674,13 @@ export const FLOWCHART_PRESET: DiagramPreset = {
   label: 'Flowchart',
   hint: 'steps · decisions · lanes',
   palette: libraryFor('flowchart'),
-  extraShapes: ['terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'manual', 'delay', 'connector', 'preparation'],
+  /* ROUND AD — ONE SHAPE LIST. These two arrays used to repeat the ten ids
+     literally in this file AND in `FLOWCHART_EXTRA_SHAPES` in `src/shapes.tsx`,
+     so adding a shape meant editing three lists and a miss was silent (the
+     round-AD additions landed in `shapes.tsx` first and left both copies at
+     ten). They now REFERENCE the one array, so a shape added for the flowchart
+     set cannot be missing here. */
+  extraShapes: FLOWCHART_EXTRA_SHAPES,
   edges: FLOWCHART_EDGES,
   layout: {engine: 'layered-tb', direction: 'TB', spacing: {x: 90, y: 70}, bandGroups: true},
   theme: {suggested: 'dark', canvas: 'plain', showLegend: false},
@@ -738,7 +758,10 @@ export const CUSTOM_PRESET: DiagramPreset = {
   label: 'Mixed',
   hint: 'everything — mix freely',
   palette: libraryFor('custom'),
-  extraShapes: ['terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'manual', 'delay', 'connector', 'preparation'],
+  /* ROUND AD — the SAME one array the flowchart preset references (see the note
+     there): a Mixed board offers the whole shape vocabulary, so the two lists
+     were always meant to be identical and now cannot differ. */
+  extraShapes: FLOWCHART_EXTRA_SHAPES,
   edges: {
     path: 'bezier',
     strokeKey: 'slate',

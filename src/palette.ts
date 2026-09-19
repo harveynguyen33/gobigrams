@@ -67,12 +67,12 @@ export const PALETTE: PaletteItem[] = [
     make: () => node('service', 'Service', 'service', 'stateless', 'cyan', 'server'),
   },
   {
-    label: 'Database', hint: 'cylinder', shape: 'database', colorKey: 'violet', kind: 'goblin',
+    label: 'Database', hint: 'cylinder · datastore', shape: 'database', colorKey: 'violet', kind: 'goblin',
     category: 'data-storage', types: ['architecture'], aliases: ['cyl', 'db', 'store', 'datastore'], geometry: 'cylinder',
     make: () => node('database', 'Database', 'database', 'primary', 'violet', 'database'),
   },
   {
-    label: 'Queue', hint: 'rows + items', shape: 'queue', colorKey: 'amber', kind: 'goblin',
+    label: 'Queue', hint: 'rows + items · bus', shape: 'queue', colorKey: 'amber', kind: 'goblin',
     category: 'architecture', types: ['architecture'], aliases: ['bus', 'topic', 'stream'], geometry: 'rows',
     make: () => node('queue', 'Queue', 'stream', 'message bus', 'amber', 'layers'),
   },
@@ -82,12 +82,12 @@ export const PALETTE: PaletteItem[] = [
     make: () => node('external', 'External System', 'external', 'third party', 'accent', 'cloud'),
   },
   {
-    label: 'Actor', hint: 'rect + person', shape: 'actor', colorKey: 'green', kind: 'goblin',
+    label: 'Actor', hint: 'rect + person · user', shape: 'actor', colorKey: 'green', kind: 'goblin',
     category: 'architecture', types: ['architecture'], aliases: ['person', 'user'], geometry: 'rect + person',
     make: () => node('actor', 'User', 'actor', 'person', 'green', 'user'),
   },
   {
-    label: 'Storage', hint: 'bucket', shape: 'storage', colorKey: 'amber', kind: 'goblin',
+    label: 'Storage', hint: 'bucket · objects', shape: 'storage', colorKey: 'amber', kind: 'goblin',
     category: 'data-storage', types: ['architecture'], aliases: ['bucket', 'object', 'objects'], geometry: 'bucket',
     make: () => node('storage', 'Storage', 'object store', 'bucket', 'amber', 'package'),
   },

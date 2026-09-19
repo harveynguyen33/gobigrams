@@ -152,9 +152,32 @@ export function favouriteFromItem(item: PaletteItem): Favourite {
 export const isFavouriteItem = (list: Favourite[], label: string): boolean =>
   list.some(f => favouriteLabel(f) === label);
 
-/** Un-star. Removes the item's favourite; identity by label, not by position. */
+/** Un-star. Removes the item's favourite; identity by label, not by position.
+ *
+ *  ROUND AE — KEPT, AND NOW ONE OF TWO. It is the star control's removal arm
+ *  (`toggleFavouriteItem` delegates to it) and it is still the honest answer to
+ *  "remove the favourite that WAS this palette item". It is NOT safe for a
+ *  favourite saved from a SELECTION: such a favourite has no `__label`, so
+ *  `favouriteLabel` returns `undefined`, and a label-based removal would match
+ *  EVERY unnamed favourite at once. That is why `removeFavouriteById` exists and
+ *  is the path the tile control uses. */
 export const removeFavouriteItem = (list: Favourite[], label: string): Favourite[] =>
   list.filter(f => favouriteLabel(f) !== label);
+
+/** ROUND AE — remove ONE favourite by its stable `id` (`fav_<random>`).
+ *
+ *  WHY THIS EXISTS AT ALL. `Favourite.id` is the identity the tile already keys
+ *  on (`key={f.id}`, `data-fav-id={f.id}`) and the value the drag payload
+ *  carries for insertion (`dataTransfer.setData('favourite', f.id)`), so it is
+ *  the one field that is guaranteed present and unique — including on a
+ *  selection-saved favourite, which has no `name` and no label. Matching on the
+ *  label instead would take every unnamed favourite in one call.
+ *
+ *  Exactly one element is removed: the filter is an equality against a unique
+ *  id, so two favourites sharing a label (or sharing its ABSENCE) survive each
+ *  other's removal — asserted in `checks/round-ae-favourite-id.mjs`. */
+export const removeFavouriteById = (list: Favourite[], id: string): Favourite[] =>
+  list.filter(f => f.id !== id);
 
 /** The one toggle the star control needs, as data. */
 export function toggleFavouriteItem(list: Favourite[], item: PaletteItem): Favourite[] {

@@ -11,6 +11,8 @@ import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './text
 export const RESIZABLE = new Set<NodeShape>([
   'service', 'database', 'queue', 'external', 'actor', 'storage', 'gateway', 'group', 'note',
   'terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'preparation', 'manual', 'delay', 'connector',
+  /* ROUND AD — the six additions, so each can be resized like every other shape. */
+  'offpage', 'manualinput', 'display', 'storeddata', 'looplimit', 'internalstorage',
 ]);
 
 /** K5: only these shapes get the "post-it" surface (rotation, gradient,

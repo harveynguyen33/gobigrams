@@ -230,17 +230,23 @@ assert('ab2.the-remove-control-stops-every-event-the-tile-inserts-on',
   'that activates the × cannot also reach a handler behind it). `onClick` alone would have been the bug the brief ' +
   'warns about.');
 
-/* ONE REMOVAL PATH — the existing one. */
+/* ONE REMOVAL PATH — the existing one, UNTIL ROUND AE RE-KEYED IT ON THE ID.
+   ROUND AE: the argument is `f.id` and the library helper is
+   `removeFavouriteById`, because a selection-saved favourite has no label and a
+   label-based removal would take every unnamed favourite at once. The invariant
+   this assertion exists for is unchanged — the tile must not grow a SECOND app
+   level removal — so it now asserts THAT, against the id-keyed helper. */
 assert('ab2.the-removal-reuses-the-single-existing-path-and-adds-no-second-one',
-  countOf(APP, 'library.removeFavouriteItem') === 1
-    && /const removeFavourite = useCallback\(\(label: string\) => \{\s*\n\s*mutateFavourites\(prev => library\.removeFavouriteItem\(prev, label\)\)/.test(APP)
-    && /onClick=\{e => \{\s*\n\s*e\.stopPropagation\(\);\s*\n\s*removeFavourite\(library\.favouriteLabel\(f\)!\)/.test(REMOVE_BLOCK)
+  countOf(APP, 'library.removeFavouriteById') === 1
+    && /const removeFavourite = useCallback\(\(id: string\) => \{\s*\n\s*mutateFavourites\(prev => library\.removeFavouriteById\(prev, id\)\)/.test(APP)
+    && /onClick=\{e => \{\s*\n\s*e\.stopPropagation\(\);\s*\n\s*removeFavourite\(f\.id\)/.test(REMOVE_BLOCK)
     && countOf(APP, 'const removeFavourite = useCallback') === 1
     && countOf(REMOVE_BLOCK, 'removeFavourite(') === 2,
-  `${countOf(APP, 'library.removeFavouriteItem')} call to \`library.removeFavouriteItem\` in the whole app, reached ` +
+  `${countOf(APP, 'library.removeFavouriteById')} call to \`library.removeFavouriteById\` in the whole app, reached ` +
   'from the tile through `removeFavourite` → `mutateFavourites` — the SAME writer `toggleFavourite` (the palette ' +
-  'star) uses, so the strip and the star share one code path, one ref-synchronous update and one deferred ' +
-  'persist. The tile calls it from its `onClick` and its `onKeyDown`; no second removal function was written.');
+  'star) uses, so the strip and the star share one ref-synchronous update and one deferred persist. The tile calls ' +
+  'it from its `onClick` and its `onKeyDown`; no second removal function was written. (ROUND AE re-keyed the ' +
+  'argument from the label to the id; the ONE-path invariant is what this assertion holds.)');
 
 /* ALWAYS VISIBLE, AND REACHABLE FROM THE KEYBOARD. */
 const REMOVE_CSS = ruleText('.fav-remove');

@@ -15,7 +15,9 @@ export type Shape =
   | 'service' | 'database' | 'queue' | 'external' | 'actor' | 'storage' | 'gateway' | 'group' | 'note'
   /* L3a — ISO 5807 flowchart */
   | 'terminator' | 'process' | 'decision' | 'io' | 'document' | 'subprocess'
-  | 'manual' | 'delay' | 'connector' | 'preparation';
+  | 'manual' | 'delay' | 'connector' | 'preparation'
+  /* ROUND AD — the six "every tool ships this" additions Harvey approved. */
+  | 'offpage' | 'manualinput' | 'display' | 'storeddata' | 'looplimit' | 'internalstorage';
 
 /* ITEM 4 (2026-09-17) — EVERY `hint` IS A GLANCEABLE SECONDARY LINE.
 
@@ -59,20 +61,29 @@ export const SHAPES: {id: Shape; label: string; hint: string}[] = [
   {id: 'process', label: 'Process', hint: 'rect · action step'},
   {id: 'decision', label: 'Decision', hint: 'diamond · yes / no'},
   {id: 'io', label: 'Input / Output', hint: 'parallelogram · data'},
-  {id: 'document', label: 'Document', hint: 'wavy base · output'},
+  {id: 'document', label: 'Document', hint: 'wavy base · in or out'},
   {id: 'subprocess', label: 'Predefined process', hint: 'double-bar rect'},
   {id: 'preparation', label: 'Preparation', hint: 'hexagon · setup'},
   {id: 'manual', label: 'Manual operation', hint: 'trapezoid · by hand'},
   {id: 'delay', label: 'Delay', hint: 'D-shape · wait'},
   {id: 'connector', label: 'On-page connector', hint: 'circle · jump'},
+  /* ROUND AD — draw.io's own template labels, verbatim, for the six additions. */
+  {id: 'offpage', label: 'Off-page connector', hint: 'home plate · another page'},
+  {id: 'manualinput', label: 'Manual input', hint: 'sloped top · by keyboard'},
+  {id: 'display', label: 'Display', hint: 'curved trapezoid · show data'},
+  {id: 'storeddata', label: 'Stored data', hint: 'cylinder · read / write'},
+  {id: 'looplimit', label: 'Loop limit', hint: 'notched top · loop start'},
+  {id: 'internalstorage', label: 'Internal storage', hint: 'pane rect · in-memory'},
 ];
 
 export const SHAPE_IDS: Shape[] = SHAPES.map(s => s.id);
 
 /** Shapes a flowchart preset offers as its own vocabulary (the 9 ISO additions
- *  plus `preparation`, which adapts the existing `gateway` hexagon geometry). */
+ *  plus `preparation`, which adapts the existing `gateway` hexagon geometry),
+ *  plus ROUND AD's six "every tool ships this" additions. */
 export const FLOWCHART_EXTRA_SHAPES: Shape[] =
-  ['terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'manual', 'delay', 'connector', 'preparation'];
+  ['terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'manual', 'delay', 'connector', 'preparation',
+   'offpage', 'manualinput', 'display', 'storeddata', 'looplimit', 'internalstorage'];
 
 export function asShape(v: unknown): Shape {
   return typeof v === 'string' && (SHAPE_IDS as string[]).includes(v) ? (v as Shape) : 'service';
@@ -101,20 +112,25 @@ export function ShapeFrame({shape}: {shape: Shape}) {
       {children}
     </svg>
   );
+  /* ROUND AD — THE CYLINDER IS ONE DRAWING. `database` and the new `storeddata`
+     are the same conventional cylinder (AWS / ArchiMate style: a rounder top
+     and two inner bands, so it reads as a store rather than a flat pancake), so
+     the markup lives HERE and both cases call it. Redrawing it under the new id
+     would have been a second copy free to drift — the brief's "REUSE the path,
+     do not redraw". Only the wrapper class differs. */
+  const cylinder = (cls: string) => wrap(<>
+    <ellipse cx="100" cy="20" rx="96" ry="15" {...p} />
+    <path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" {...p} />
+    <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />
+    <path d="M4 60 A 96 15 0 0 0 196 60" {...line} opacity={0.3} />
+  </>, cls);
   switch (shape) {
     case 'service':
       return wrap(<rect x="1" y="1" width="198" height="98" rx="14" {...p} />, 'service');
     case 'external':
       return wrap(<rect x="1" y="1" width="198" height="98" rx="14" strokeDasharray="8 5" {...p} />, 'external');
     case 'database':
-      // Classic 3-ring cylinder (AWS/ArchiMate style) — rounder top, two inner bands
-      // so the shape reads as a database instead of a flat pancake.
-      return wrap(<>
-        <ellipse cx="100" cy="20" rx="96" ry="15" {...p} />
-        <path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" {...p} />
-        <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />
-        <path d="M4 60 A 96 15 0 0 0 196 60" {...line} opacity={0.3} />
-      </>, 'database');
+      return cylinder('database');
     case 'queue':
       // Message queue: a container with an item gutter on the left (dots + short
       // rows) and a divider, leaving the centre free for the title text.
@@ -185,6 +201,41 @@ export function ShapeFrame({shape}: {shape: Shape}) {
     case 'connector':
       // Small circle — an on-page jump (label it A / B / 1 / 2).
       return wrap(<circle cx="100" cy="50" r="48" {...p} />, 'connector');
+
+    /* ------------- ROUND AD: the six approved additions -------------
+       Geometry from draw.io / Lucidchart's own shapes, drawn in THIS frame's
+       normalised 200x100 box so they stretch with the node exactly as the rest
+       of the set does. */
+    case 'offpage':
+      // Home plate pointing DOWN — continue on another page / sheet. The
+      // deliberate partner of the round `connector` above (an on-page jump).
+      return wrap(<path d="M2 2 H198 V66 L100 98 L2 66 Z" {...p} />, 'offpage');
+    case 'manualinput':
+      // A quadrilateral with a SLOPED TOP edge — data entered by hand. The
+      // slope is what tells it apart from `manual` (a trapezoid, sloped on the
+      // sides) and from `process` (a plain rect).
+      return wrap(<path d="M2 30 L198 2 V98 H2 Z" {...p} />, 'manualinput');
+    case 'display':
+      // Trapezoid on the left, a curved right edge — show data to a person.
+      // The arc is drawn to the frame's own centre line so the curve reads as
+      // the shape's end cap rather than a stray bulge.
+      return wrap(<path d="M2 2 H120 A 78 48 0 0 1 120 98 H2 Z" {...p} />, 'display');
+    case 'storeddata':
+      // Read / write store. SAME cylinder as `database` — see `cylinder()` above.
+      return cylinder('storeddata');
+    case 'looplimit':
+      // Rectangle with the top corners CUT — the start of a loop. The cut is
+      // what distinguishes it from `process`, and the flat top edge stays wide
+      // enough for a label on a node at the resizer floor.
+      return wrap(<path d="M36 2 H164 L198 24 V98 H2 V24 Z" {...p} />, 'looplimit');
+    case 'internalstorage':
+      // Rectangle with a vertical + horizontal pane line — in-memory storage.
+      // The two lines divide off a corner pane, the way the notation does.
+      return wrap(<>
+        <rect x="1" y="1" width="198" height="98" rx="2" {...p} />
+        <path d="M26 2 V98" {...line} />
+        <path d="M2 26 H26" {...line} />
+      </>, 'internalstorage');
 
     default:
       return null;
@@ -261,5 +312,26 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
       return wrap(<path d="M1 3 H13 A 6 6 0 0 1 13 15 H1 Z" {...s} />, 'delay');
     case 'connector':
       return wrap(<circle cx="13" cy="9" r="5.6" {...s} />, 'connector');
+
+    /* ---------------- ROUND AD previews (26x18) ---------------- */
+    case 'offpage':
+      return wrap(<path d="M1 2 H25 V11 L13 16.5 L1 11 Z" {...s} />, 'offpage');
+    case 'manualinput':
+      return wrap(<path d="M1 6 L25 1.5 V15 H1 Z" {...s} />, 'manualinput');
+    case 'display':
+      return wrap(<path d="M1 2 H15 A 9 6.5 0 0 1 15 16 H1 Z" {...s} />, 'display');
+    case 'storeddata':
+      return wrap(<>
+        <ellipse cx="13" cy="4.6" rx="11.5" ry="3.4" {...s} />
+        <path d="M1.5 4.6 V13.4 A 11.5 3.4 0 0 0 24.5 13.4 V4.6" {...s} />
+        {line('M1.5 9 A 11.5 3.4 0 0 0 24.5 9', 1, 0.55)}
+      </>, 'storeddata');
+    case 'looplimit':
+      return wrap(<path d="M5 2 H21 L25 4.5 V15 H1 V4.5 Z" {...s} />, 'looplimit');
+    case 'internalstorage':
+      return wrap(<>
+        <rect x="1" y="3" width="24" height="12" rx="1" {...s} />
+        {line('M5 3 V15 M1 6.5 H5')}
+      </>, 'internalstorage');
   }
 }

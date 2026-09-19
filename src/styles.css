@@ -1746,6 +1746,47 @@ body {
   font-family: var(--mono); font-size: 12px; color: var(--dim);
   padding: 10px 2px; line-height: 1.6;
 }
+/* ===========================================================================
+   ROUND AD, ITEM 5(a) — THE COLOUR KEY'S LABEL (.key-note).
+
+   Option B's condition (a): the editor KEEPS its semantic colour grouping, but
+   the panel must say on screen that the grouping is THIS EDITOR'S and not an ISO
+   convention — visibly, not in a `title`. It sits directly under the `color`
+   swatch row in the Style section, which is the control the claim is about.
+
+   WHY A ROW AND NOT A `.hint` PARAGRAPH. `.hint` is `padding: 10px 2px` of
+   free-standing prose; this needs a dismiss control on the same line, so it is
+   a flex row: the text takes the width, the 16px × sits at the end.
+
+   NO COLOUR LITERAL enters: text is `--dim`, the × is `--dim` on `--surface`
+   with a `--border` ring, raising to `--fg` / `--acc` on hover and focus — the
+   same vocabulary `.fav-remove` and `.cust-remove` already use, so the panel
+   grows no second control style. The 127-hex gate in `src/styles.css` does not
+   move.
+
+   THE × IS ALWAYS VISIBLE (opacity 1, not hover-only). Same reason as
+   `.fav-remove`: this project treats tablet and phone as in scope, and a
+   hover-revealed control is unreachable where there is no hover.
+
+   THE TEXT IS MEASURED TO FIT ONE LINE at the panel's own width, in the panel's
+   own mono face — `scripts/measure-key-note.py` reads the real
+   `public/fonts/jetbrains-mono-400-latin.woff2`: the string is 223.2px at 12px
+   against 234px of budget, so it does not wrap at the desktop tier. */
+.key-note {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 8px 2px 2px;
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  line-height: 1.5;
+}
+.key-note-text { flex: 1; min-width: 0; }
+.key-note-x {
+  flex: none; width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  color: var(--dim); background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; transition: color .15s, border-color .15s;
+}
+.key-note-x:hover, .key-note-x:focus-visible { color: var(--fg); border-color: var(--acc); }
 /* The UA stylesheet ships `kbd { font-family: monospace }`, which BEATS inheritance — so chips
    rendered in the browser's generic monospace while every neighbour used `--mono`. Name the token. */
 kbd {

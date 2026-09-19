@@ -576,9 +576,13 @@ console.log(`  goblin × 19 shapes × 2 bodies: ${goblinAll.length - goblinBad.l
   + `return ${GOBLIN_WANT}`);
 for (const x of goblinBad.slice(0, 3)) console.log(`  ! ${x.s}/${x.b} → ${x.got}`);
 assert('f.every-goblin-lists-content-text-style-in-that-order',
-  SHAPE_IDS.length === 19 && goblinBad.length === 0,
+  /* ROUND AD: the count is 25 (the six `every tool ships this` additions joined
+     the union). The assertion it guards is that the LIST DOES NOT DEPEND ON THE
+     SHAPE, so it is asserted over every id the file declares and the count is
+     reported, not pinned to a round's number. */
+  SHAPE_IDS.length >= 25 && goblinBad.length === 0,
   `${SHAPE_IDS.length} shapes × ${GOBLIN_BODIES.length} body values, all ${GOBLIN_WANT} — \`text\` is `
-  + 'between `content` and `style`, which is exactly what the pass-1 omission note promised');
+  + 'between `content` and `style`, for EVERY shape in the union, which is exactly what the pass-1 omission note promised');
 /* `text` must be in the MIDDLE, not merely present: a list that appended it
    would satisfy a `.includes` check and paint the section in the wrong place. */
 assert('f.text-sits-before-style-not-after-it',
