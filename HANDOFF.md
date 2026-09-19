@@ -1,7 +1,34 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P complete + ROUND W + **ROUND X** shipped.
-**Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P + ROUND W + ROUND X + **ROUND Y** shipped.
+**Next: the font LIST + vertical align (research in flight), then Harvey's Mac test, then PACKAGE-N.**
+
+> ## ✅ ROUND Y (2026-09-19) — the teaching hints out, the target badges out
+>
+> Harvey: *"Tiếp tục hint chỗ Text color và align tôi nghĩ k cần thiết lắm"* + *"cái label ở top có cần ko?"*
+>
+> **The Text section now carries ZERO `.hint`** — `SIZE · WEIGHT · FONT · TEXT COLOUR · ALIGN` and nothing else.
+> Verified live: a label target reads exactly that with `hints: 0`.
+>
+> **ALL FOUR target-kind badges are gone.** The reasoning, per badge: a `label` target's panel holds one section
+> so `label` said nothing; `edge`/`table` were already evident from their section names; the goblin's
+> `{asShape(…)}` printed the SHAPE's machine name (`service`) while the Style section's own picker prints the
+> human label — the badge was the less readable of two copies. Each badge's `<div style={{height:12}} />` spacer
+> went with it (the 4th was kept but moved INSIDE the C4 conditional, because an unconditional spacer would
+> leave a 12px hole on every plain goblin).
+>
+> **KEPT: the C4 chip.** It is the one surviving badge and it is NOT a kind label — it states the node's C4
+> ROLE (`[Container: application]`), which nothing else in the panel and nothing on the node card prints.
+> Its now-meaningless `marginLeft: 6` (which separated it from the deleted shape badge) was removed.
+> Verified live: label → no badge / 1 section; plain goblin → no badge / 3 sections; C4 container →
+> `[Container: application]` / 3 sections. `package-o-metrics` item 5 asserts `.badge.preset` has ≥1 consumer —
+> still true (the C4 chip), so it stayed green unmodified.
+>
+> New harness `checks/round-y-hints-and-badge.mjs` (12/12). Gates: tsc=0, build=0, hex=127 (no CSS touched).
+> **Process note worth keeping:** the coder's first slice anchor was `<div className="panel-body">`, which is
+> NOT unique (the palette renders one first) — the slice was the palette's and four assertions were passing
+> **vacuously**. Re-anchored on `<aside className="panel right">` with a liveness floor. Same failure family as
+> the empty-slice bug; see the diagram-studio skill's reference.
 
 > ## ✅ ROUND X (2026-09-19) — Harvey's UI feedback on the Text section
 >
