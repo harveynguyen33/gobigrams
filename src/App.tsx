@@ -86,6 +86,7 @@ import {
   COARSE_NODE_CLICK_DISTANCE_PX,
 } from './touch';
 import {usePanelCollapse, isPanelHidden} from './panelCollapse';
+import {useInspectorSections} from './inspectorState';
 import {searchLibrary, groupByCategory} from './paletteSearch';
 import {
   useCategoryCollapse, CATEGORY_ORDER, CATEGORY_LABEL, defaultOpenCategory,
@@ -544,6 +545,19 @@ export default function App() {
   // it served, and the reviewer's flag removed the two never-consumed methods
   // (`setPanelCollapsed`, `resetPanels`) — one flag per side is the whole state.
   const {state: panelState, togglePanel, setPanelsVisible} = usePanelCollapse();
+
+  /* ---- PACKAGE-P PASS 3 §C: ONE fold state for the whole panel ----------
+     Loaded once from `diagram-studio:inspector-sections`, saved on every change.
+     The state is keyed by SECTION ID and is global to the panel — not per node:
+     a fold is a statement about how the user reads the panel, and re-folding
+     Cardinality on every edge click would make the persisted value meaningless.
+     Selection changes therefore do NOT reset it; only a toggle does. */
+  const {toggleSection, isCollapsed} = useInspectorSections();
+  /** The goblin `body` switch (§C) — a SECOND-LEVEL disclosure inside the Style
+   *  section, which §A.3 keeps OPEN. Session-scoped on purpose: §C names exactly
+   *  ONE new persisted key, and this one control is a click away in a section
+   *  the user already has open. */
+  const [bodyModeOpen, setBodyModeOpen] = useState(false);
 
   const nodesRef = useRef<Node[]>(nodes);
   nodesRef.current = nodes;
@@ -3188,6 +3202,37 @@ export default function App() {
      table-only; on a fresh board the fallback target is `{kind:'label'}`, whose
      `text` body the label branch registers. A section with no body would be an
      empty shell with a title, so it is skipped rather than rendered blank. */
+  /* PASS 3 §C — THE FOLDED ROW'S CURRENT VALUE. A fold that hid the thing it
+     controls would be a lie; both readouts read the SAME node/edge data the
+     expanded controls bind to, so there is no second source to drift. `label`
+     names the value for assistive tech without turning it into the button's
+     accessible name, which stays the section title. */
+  const CROW_WORD: Record<string, string> = {
+    one: 'one', zeroOrOne: 'zero or one', many: 'many', zeroOrMany: 'zero or many',
+  };
+  const crowWord = (end: unknown): string => {
+    const k = typeof end === 'string' ? end : '';
+    if (!k) return 'none';
+    return CROW_WORD[k] ?? (k === MarkerType.ArrowClosed ? 'arrow' : k);
+  };
+  /* `count` is a field of exactly three flows (the stepper renders for
+     dots/icon/event, App.tsx:4570), so the readout reports a number only where
+     the expanded body would show one. */
+  const flowReadout = () =>
+    eFlow === 'none' ? 'off'
+      : (eFlow === 'dots' || eFlow === 'icon' || eFlow === 'event') ? `on · ${eFlowCount}`
+      : 'on';
+  const FOLDED_READOUT: Partial<Record<SectionId, {node: React.ReactNode; label: string}>> = {
+    cardinality: {
+      node: <>
+        {crowWord((selectedEdge?.markerStart as any)?.type)}
+        {' → '}
+        {crowWord((selectedEdge?.markerEnd as any)?.type)}
+      </>,
+      label: 'ends',
+    },
+    flow: {node: flowReadout(), label: 'flow'},
+  };
   const renderSections = () => inspSections
     .filter(s => sectionBody[s.id] != null)
     .map(s => (
@@ -3196,6 +3241,10 @@ export default function App() {
         id={s.id}
         title={SECTION_TITLES[s.id]}
         collapsedDefault={s.collapsedDefault}
+        collapsed={isCollapsed(s.id)}
+        onToggle={toggleSection}
+        readout={FOLDED_READOUT[s.id]?.node}
+        readoutLabel={FOLDED_READOUT[s.id]?.label}
       >
         {sectionBody[s.id]}
       </Section>
@@ -4908,17 +4957,42 @@ export default function App() {
                     color={resolveColor(selected.data as any)}
                   />
                 </div>
-                {/* §C: the `body` switch is a rarely-changed 2-way toggle, so it
-                    lives INSIDE the Style section rather than getting a section
-                    of its own. Pass 1 renders it as a plain field (no fold). */}
+                {/* §C READ LITERALLY. The two halves of the sentence are
+                    "the `body` toggle sits behind the Style section's trigger
+                    rather than occupying a full row" AND "One control folds, not
+                    a section". The second half forbids folding Style itself —
+                    which §A.3 already forbids (its collapsed-default is
+                    `false`) and §F.4 confirms by listing Style among the OPEN
+                    sections. So the fold is a SECOND-LEVEL disclosure INSIDE
+                    Style: a `▸ body: card` trigger row that reveals the 2-way
+                    toggle. Nothing is reordered; the shape picker, icon and
+                    colour stay exactly where they were. The row's readout is the
+                    CURRENT value, so the collapsed state still says what it
+                    controls. Session-scoped open state: §C names ONE new
+                    persisted key. */}
                 <div className="field">
-                  <label>body</label>
-                  <ToggleRow
-                    value={(((selected.data as any).body ?? 'card') as string)}
-                    onChange={v => update({body: v as 'card' | 'label-only'} as any)}
-                    options={BODY_OPTS}
-                    title="Body"
-                  />
+                  <button
+                    type="button"
+                    className="field-toggle-trigger"
+                    aria-expanded={bodyModeOpen}
+                    aria-controls="insp-body-toggle"
+                    onClick={() => setBodyModeOpen(o => !o)}
+                  >
+                    <span className="insp-sec-caret" aria-hidden="true">{bodyModeOpen ? '▾' : '▸'}</span>
+                    <span className="field-toggle-label">
+                      body: {(((selected.data as any).body ?? 'card') as string)}
+                    </span>
+                  </button>
+                  {bodyModeOpen && (
+                    <div id="insp-body-toggle">
+                      <ToggleRow
+                        value={(((selected.data as any).body ?? 'card') as string)}
+                        onChange={v => update({body: v as 'card' | 'label-only'} as any)}
+                        options={BODY_OPTS}
+                        title="Body"
+                      />
+                    </div>
+                  )}
                 </div>
                 {/* §A.2: `note` draws no IconGlyph, so the field is absent —
                     not disabled — for exactly that shape. */}

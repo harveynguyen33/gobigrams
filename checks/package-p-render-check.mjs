@@ -15,8 +15,8 @@ import {
   ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtWidth,
 } from './src/InspectorPickers';
 import {getInspectorSections} from './src/inspector';
+import {defaultSectionState} from './src/inspectorState';
 import {textStyleVars, readTextStyle, mergeTextStyle, TEXT_SCALE} from './src/textStyle';
-
 const W: any[] = [1, 1.5, 1.8, 2, 3].map(w => ({v: String(w), label: String(w), art: <ArtWidth w={w} />}));
 const D: any[] = ['solid','dashed','dotted'].map((d:any) => ({v: d, label: d, art: <ArtDash kind={d} />}));
 const C: any[] = ['bezier','smoothstep','step','straight'].map((c:any) => ({v: c, label: c, art: <ArtCurve kind={c} />}));
@@ -36,10 +36,20 @@ const AL: any[] = [{v:'left',label:'Left',art:null},{v:'center',label:'Center',a
 const SW: any[] = ['accent','green','cyan','violet','amber','slate'];
 
 const TITLES: any = {content:'Content',text:'Text',style:'Style',table:'Table',columns:'Columns',showMode:'Show mode',label:'Label',line:'Line',markers:'Markers',cardinality:"Cardinality",flow:'Flow animation'};
+/* PASS 3 §C — a folded row still shows its current value. Supplied here the way
+   App.tsx supplies it, so the SSR path of the readout is really exercised (the
+   bodies above and the readouts below are the same values, as in the panel). */
+const READOUT: any = {
+  cardinality: {node: 'one → many', label: 'ends'},
+  flow: {node: 'off', label: 'flow'},
+};
 
-export function renderTarget(t: any, bodies: any) {
+export function renderTarget(t: any, bodies: any, fold?: any) {
+  const f = fold ?? {state: defaultSectionState(), toggleSection: () => {}};
   return getInspectorSections(t).map((s: any) => (
-    <Section key={s.id} id={s.id} title={TITLES[s.id]} collapsedDefault={s.collapsedDefault}>{bodies[s.id]}</Section>
+    <Section key={s.id} id={s.id} title={TITLES[s.id]} collapsedDefault={s.collapsedDefault}
+      collapsed={f.state[s.id]} onToggle={f.toggleSection}
+      readout={READOUT[s.id]?.node} readoutLabel={READOUT[s.id]?.label}>{bodies[s.id]}</Section>
   ));
 }
 
@@ -83,6 +93,15 @@ export function All() {
   g.__stored = {size:'xl', weight:'bold', colorKey:'amber', align:'right'};
   return <div>
     <div id="edge">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies)}</div>
+    {/* PASS 3 §F.5 — the same target with Cardinality EXPANDED, to prove an open
+        fold mounts its body INLINE (not a popover) and flips aria-expanded. */}
+    <div id="edge-expanded">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies,
+      {state: {...defaultSectionState(), cardinality: false}, toggleSection: () => {}})}</div>
+    {/* …and with FLOW expanded instead, which is where the §B #7 stepper lives —
+        pass 1/2 asserted the stepper against markup that is now legitimately
+        folded away, so it is asserted against the state that paints it. */}
+    <div id="edge-flow-open">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies,
+      {state: {...defaultSectionState(), flow: false}, toggleSection: () => {}})}</div>
     <div id="edge-nonerd">{renderTarget({kind:'edge'}, edgeBodies)}</div>
     <div id="goblin">{renderTarget(g, {content: <input />, text: tsBody(g), style: <>
       <ShapesPicker value="database" onChange={()=>{}} color="var(--nc, orange)" />
@@ -215,10 +234,55 @@ check('CONTROL — the stored read differs from the default read',
   storedOn.join() !== defaultOn.join() && onSwatchOf(gText).length !== onSwatchOf(textSectionOf('goblin-default')).length,
   'the section is really driven by the node data, not by constants');
 
-check('pass 1 renders everything OPEN', edge.every(s => s.collapsed === 'false'), JSON.stringify(edge.map(s=>s.collapsed)));
+/* PASS 3 §C/§F.4 — the fold is now REAL, and on a fresh profile it is §A.3's
+   truth table: Cardinality and Flow folded, everything else open. The readout
+   values here are the ones the panel would show for the harness's own bodies. */
+check('PASS 3 — nothing folded except cardinality + flow (the §A.3 default)',
+  edge.filter(s => s.collapsed === 'true').map(s => s.id).join() === 'cardinality,flow'
+    && edge.filter(s => s.collapsed === 'false').map(s => s.id).join() === 'label,line,markers',
+  edge.map(s => `${s.id}=${s.collapsed}`).join(' '));
 check('collapsedDefault true exactly for cardinality + flow',
   edge.filter(s=>s.def==='true').map(s=>s.id).join() === 'cardinality,flow',
   edge.map(s=>`${s.id}=${s.def}`).join(' '));
+/* §F.4 — the folded sections' BODIES are absent from the DOM, their TRIGGER rows
+   are present, and an open section's body is present. Asserted by MARKUP, since
+   this is the SSR of the real component. */
+const flowBodyAbsent = !segOf('edge').includes('title="Flow count"')
+  && !segOf('edge').includes('title="Flow speed"');
+const cardBodyAbsent = !segOf('edge').includes('title="Cardinality: source end"');
+/* PASS 3 — SECTION triggers only. The icon-picker triggers carry their own
+   `aria-expanded` for their popovers, so a bare count of the attribute mixes the
+   two vocabularies; the class is what tells a SECTION fold from a popover. */
+const sectionFolds = seg => {
+  const m = [...seg.matchAll(/class="insp-sec-trigger" aria-expanded="(true|false)"/g)].map(x => x[1]);
+  return {open: m.filter(v => v === 'true').length, folded: m.filter(v => v === 'false').length, total: m.length};
+};
+const edgeFolds = sectionFolds(segOf('edge'));
+check('§F.4 — folded Cardinality/Flow bodies are ABSENT, their triggers PRESENT',
+  cardBodyAbsent && flowBodyAbsent
+    && edgeFolds.total === 5 && edgeFolds.open === 3 && edgeFolds.folded === 2,
+  `${edgeFolds.open} open section triggers + ${edgeFolds.folded} folded (of ${edgeFolds.total}); `
+  + `cardinality body ${cardBodyAbsent ? 'absent' : 'PRESENT'}, flow body ${flowBodyAbsent ? 'absent' : 'PRESENT'}`);
+check('§F.4 — an OPEN section\'s body is in the DOM (negative control)',
+  segOf('edge').includes('title="Stroke width"') && segOf('edge').includes('title="Arrow head"'),
+  'the Line/Markers bodies are present with the SAME renderTarget call, so "absent" is the fold and not a broken painter');
+check('§C — a folded row shows its current value',
+  segOf('edge').includes('insp-sec-readout') && segOf('edge').includes('ends') && segOf('edge').includes('flow'),
+  'the Cardinality trigger carries its `ends` readout and the Flow trigger its `flow` readout');
+check('§F.5 SSR — every section is keyboard-operable and labelled',
+  (segOf('edge').match(/aria-controls="insp-sec-/g) ?? []).length === 5
+    && (segOf('edge').match(/<button[^>]*class="insp-sec-trigger"/g) ?? []).length === 5,
+  'one aria-controls + one native <button> per section, so Enter/Space work without any key handler');
+/* §F.5's UI HALF, in markup: expanding a section reveals its body INLINE in the
+   same section element (not a popover, not a portal) and flips aria-expanded. */
+const expandedEdge = segOf('edge-expanded');
+const expandedFolds = sectionFolds(expandedEdge);
+check('§F.5 SSR — expanding a section reveals its body inline in place',
+  expandedEdge.includes('title="Cardinality: source end"')
+    && !expandedEdge.includes('title="Flow count"')
+    && expandedFolds.open === 4 && expandedFolds.folded === 1 && expandedFolds.total === 5,
+  `cardinality expanded: its body is back (${expandedEdge.includes('title="Cardinality: source end"')}), `
+  + `flow still folded, ${expandedFolds.open} open section triggers — one fold state, two sections, independent values`);
 
 /* ===========================================================================
    §E.2 — THE STORED VALUES, executed. `Model()` ran the real `mergeTextStyle`
@@ -268,8 +332,20 @@ const options = (html.match(/<option[\s>]/g) ?? []).length;
 check('ZERO <select> in the rendered markup', selects === 0, `${selects} <select>, ${options} <option>`);
 check('triggers are <button> with a caret', (html.match(/icon-trigger-caret/g) ?? []).length >= 5,
   `${(html.match(/icon-trigger-caret/g) ?? []).length} carets, ${(html.match(/aria-haspopup="listbox"/g) ?? []).length} aria-haspopup`);
-check('stepper renders − / value / +', html.includes('insp-step-val') && html.includes('data-value="3"'),
-  html.slice(html.indexOf('insp-stepper'), html.indexOf('insp-stepper') + 200).replace(/\n/g, ''));
+/* PASS 3 MOVED THIS ASSERTION, IT DID NOT WEAKEN IT. The stepper is the §B #7
+   control inside Flow animation, which §A.3 folds by default — so the fresh
+   markup legitimately no longer carries it. It is asserted against the state
+   that paints it (Flow expanded) AND its absence is asserted against the state
+   that folds it, which is a STRONGER pair of claims than the single presence
+   check it replaces. */
+const flowOpen = segOf('edge-flow-open');
+check('stepper renders − / value / +',
+  flowOpen.includes('insp-step-val') && flowOpen.includes('data-value="3"'),
+  flowOpen.slice(flowOpen.indexOf('insp-stepper'), flowOpen.indexOf('insp-stepper') + 200).replace(/\n/g, ''));
+check('PASS 3 — the stepper is absent while Flow is folded (the fold, not a lost control)',
+  sectionFolds(flowOpen).folded === 1 && sectionFolds(flowOpen).open === 4
+    && !segOf('edge').includes('data-value="3"'),
+  'folded: 0 steppers in the fresh markup; flow expanded: the stepper and its value are back');
 check('segmented rows render as buttons with aria-pressed',
   (html.match(/insp-seg-btn/g) ?? []).length >= 3 && html.includes('aria-pressed="true"'),
   `${(html.match(/insp-seg-btn/g) ?? []).length} segmented buttons`);

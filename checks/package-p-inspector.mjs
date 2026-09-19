@@ -29,6 +29,10 @@ const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
    whose blur-commit behaviour (e) and (i) are about. */
 const TS_RAW = readFileSync(`${ROOT}/src/textStyle.ts`, 'utf8');
 const LABEL_RAW = readFileSync(`${ROOT}/src/LabelNode.tsx`, 'utf8');
+/* PACKAGE-P PASS 3 (§C) — the fold state and its persistence. Read as text for
+   the shape/copy assertions and BUNDLED below (after `stripTs` exists) for the
+   executed ones. */
+const IST_SRC = readFileSync(`${ROOT}/src/inspectorState.ts`, 'utf8');
 
 /** Strip block + line comments. The `[^:]` before `//` keeps `https://`. */
 const stripTs = s => s
@@ -38,6 +42,7 @@ const APP = stripTs(APP_RAW);
 const PICKS = stripTs(PICKS_RAW);
 const INSP = stripTs(INSP_RAW);
 const TS = stripTs(TS_RAW);
+const IST = stripTs(IST_SRC);
 /* The label editor is stripped with the SAME rule, so a docblock that merely
    QUOTES the hold's mechanism cannot satisfy the "does the hold exist" probe.
    The comment strip is what makes (i) an assertion about code. */
@@ -354,25 +359,36 @@ assert('d.goblin-collapses-nothing',
 assert('d.the-flag-is-carried-as-data-not-as-UI',
   PICKS.includes('data-collapsed-default') && PICKS.includes("{String(collapsedDefault)}"),
   'Section emits data-collapsed-default so pass 3 reads the truth table instead of re-deriving it');
-assert('d.pass-1-renders-everything-open',
-  PICKS.includes('data-collapsed="false"'),
-  'the only data-collapsed value in the tree is the literal false — no fold state exists yet');
-assert('d.no-collapse-UI-and-no-persistence-key-yet',
-  !INSP.includes('localStorage') && !PICKS.includes('localStorage')
-    && !APP.includes('inspector-sections') && !INSP.includes('inspector-sections'),
-  'no localStorage read/write and no diagram-studio:inspector-sections key in CODE — the string '
-  + 'survives only in the PASS 3 notes, which the comment strip removes before this count');
-assert('d.section-wrapper-has-no-click-handler-yet',
+/* PASS 3 INVALIDATED THIS ASSERTION AND IT WAS REPLACED, NOT DELETED. It used
+   to read `PICKS.includes('data-collapsed="false"')` — "nothing is folded yet".
+   The invariant it stood for is still the important one ("the fold state is real
+   and one source of it"), so it is now stated against the fold's OWN module and
+   the render, below. */
+assert('d.fold-state-exists-and-is-defaulted-from-the-truth-table',
+  PICKS.includes('collapsed={') && PICKS.includes('data-collapsed={String(collapsed)}')
+    && IST.includes('COLLAPSED_DEFAULT')
+    && APP.includes('collapsed={isCollapsed(s.id)}'),
+  'data-collapsed is the live boolean, and the default comes from COLLAPSED_DEFAULT '
+  + '(inspector.ts) read through useInspectorSections — not from a literal');
+assert('d.section-wrapper-is-the-trigger-row',
   (() => {
+    /* PASS 1's SLICE WAS SILENTLY TRUNCATED. It cut the wrapper at the first
+       `\n}` — which in a multi-line props type is the `}) {` line, so `body` was
+       the props type alone and the old `!onClick && !aria-expanded` assertion
+       passed on an EMPTY slice, i.e. on anything. The slice now runs to the next
+       `export function`, and its length is asserted, so it cannot go vacuous
+       again. */
     const wrap = PICKS_RAW.slice(PICKS_RAW.indexOf('export function Section('));
-    const body = stripTs(wrap.slice(0, wrap.indexOf('\n}')));
-    console.log(`  <Section> body contains onClick: ${/onClick/.test(body)}  aria-expanded: ${/aria-expanded/.test(body)}`);
-    return !/onClick/.test(body) && !/aria-expanded/.test(body);
+    const body = stripTs(wrap.slice(0, wrap.indexOf('\nexport function CardReadout'))).replace(/\s/g, '');
+    console.log(`  <Section> body: ${body.length} chars, onClick present ${/onClick/.test(body)}, `
+      + `aria-expanded present ${/aria-expanded/.test(body)}  (PASS 3: both required)`);
+    return body.length > 400 && /onClick/.test(body) && /aria-expanded/.test(body)
+      && /type="button"/.test(body) && /aria-controls/.test(body);
   })(),
-  'the Section wrapper is a pure render — §C\'s expanding trigger row is PASS 3');
+  'the Section wrapper is §C\'s trigger row: a native button with onClick + aria-expanded + aria-controls');
 assert('d.no-localStorage-in-the-new-files',
   !/\blocalStorage\b/.test(INSP_RAW) && !/\blocalStorage\b/.test(PICKS_RAW),
-  'neither new file touches storage');
+  'neither file touches storage — the persistence lives in src/inspectorState.ts alone');
 assert('d.curvature-picker-writes-type-and-remembers-path',
   APP.includes('updateEdge({type: PATH_TYPES[id]})') && APP.includes('rememberEdgePath(id)')
     && countOf(APP, 'rememberEdgePath(id)') === 1,
@@ -1314,6 +1330,172 @@ assert('l.control-the-subject-test-does-not-cross-rows',
   otherRowSweep.violations.length === 0,
   'a more specific earlier rule on a DIFFERENT subject (the title row) is not counted against the body row — ' +
   'without the subject test every node rule would look like a rival of every other');
+
+/* ===========================================================================
+   (m)/(n)/(o) — PACKAGE-P PASS 3, THE FOLD AND ITS PERSISTENCE.
+   ===========================================================================
+   WHY `inspectorState.ts` IS BUNDLED AND NOT IMPORTED. It imports './inspector'
+   — a bare extensionless specifier that Node's ESM resolver refuses on a `.ts`
+   file (`ERR_MODULE_NOT_FOUND`), the exact problem (k) documents for
+   `textStyle.ts` — and unlike `inspector.ts` it also imports React, so Node's
+   type-strip cannot run it either. It is therefore bundled with the SAME
+   technique (k) uses, and its artefact is removed on the way out. `localStorage`
+   is stubbed before the import, so the storage path is really EXECUTED rather
+   than described.
+   =========================================================================== */
+const IST_ENTRY = `${ROOT}/.p-inspector-state.ts`;
+const IST_OUT = `${ROOT}/.p-inspector-state.mjs`;
+const {writeFileSync: writeState, rmSync: rmState} = await import('node:fs');
+writeState(IST_ENTRY, "export * from './src/inspectorState';\n");
+await (await import('esbuild')).build({
+  entryPoints: [IST_ENTRY], bundle: true, format: 'esm', platform: 'node',
+  outfile: IST_OUT, logLevel: 'error',
+});
+
+/* A MINIMAL localStorage, backed by a Map. `getItem` returns null for an absent
+   key, exactly like the browser — which is the "fresh profile" the default rule
+   is about, so this stub cannot make the default test pass by accident. */
+const STORE = new Map();
+globalThis.localStorage = {
+  getItem: k => (STORE.has(k) ? STORE.get(k) : null),
+  setItem: (k, v) => { STORE.set(k, String(v)); },
+  removeItem: k => { STORE.delete(k); },
+  clear: () => STORE.clear(),
+};
+const istMod = await import(`${IST_OUT}?t=${Date.now()}`);
+for (const f of [IST_ENTRY, IST_OUT]) { try { rmState(f, {force: true}); } catch { /* gone */ } }
+const {SECTIONS_KEY, defaultSectionState, parseSectionState, loadSectionState,
+  saveSectionState, toggleSectionState} = istMod;
+
+console.log('\n' + '='.repeat(78));
+console.log('(m) §F.4 — THE COLLAPSED-BY-DEFAULT TRUTH TABLE, from the fold module');
+console.log('='.repeat(78));
+/* The DEFAULT and the truth table must be the same object's values — the whole
+   (§A.3) point of §C. Asserted per section id, not by count. */
+const DEFAULTS = defaultSectionState();
+const perId = {};
+for (const id of Object.keys(DEFAULTS).sort()) {
+  perId[id] = {defaultCollapsed: DEFAULTS[id], table: insp.COLLAPSED_DEFAULT[id],
+    forErdEdge: getInspectorSections({kind: 'edge', presetId: 'erd'}).find(s => s.id === id)?.collapsedDefault};
+}
+console.log('  section id        default  COLLAPSED_DEFAULT  on an ERD edge');
+for (const [id, r] of Object.entries(perId)) {
+  console.log(`    ${id.padEnd(14)}  ${String(r.defaultCollapsed).padEnd(7)}  `
+    + `${String(r.table).padEnd(17)}  ${r.forErdEdge === undefined ? '(not listed)' : r.forErdEdge}`);
+}
+const FOLDED_IDS = Object.keys(DEFAULTS).filter(id => DEFAULTS[id]).sort();
+const OPEN_IDS = Object.keys(DEFAULTS).filter(id => !DEFAULTS[id]).sort();
+assert('m.the-default-fold-state-is-exactly-cardinality-and-flow',
+  FOLDED_IDS.join() === 'cardinality,flow'
+    && getInspectorSections({kind: 'edge', presetId: 'erd'})
+      .filter(s => s.collapsedDefault).map(s => s.id).join() === 'cardinality,flow',
+  `folded by default, per section id: [${FOLDED_IDS.join(', ')}] — and the same list is what an `
+  + 'ERD edge is told, so the panel and the truth table cannot disagree');
+assert('m.every-other-section-is-open-by-default',
+  OPEN_IDS.join() === 'columns,content,label,line,markers,showMode,style,table,text'
+    && OPEN_IDS.length === 9,
+  `open by default, per section id: [${OPEN_IDS.join(', ')}] — includes Style, which §C's `
+  + '"one control folds, not a section" forbids folding');
+assert('m.the-render-reads-the-default-and-not-a-literal',
+  PICKS.includes('data-collapsed={String(collapsed)}')
+    && !/data-collapsed="(true|false)"/.test(PICKS)
+    && APP.includes("collapsed={isCollapsed(s.id)}"),
+  'the attribute is the live boolean; no literal true/false survives in the wrapper');
+
+console.log('\n' + '='.repeat(78));
+console.log('(n) §F.5 — PERSISTENCE, EXECUTED (load / toggle / save / tolerate)');
+console.log('='.repeat(78));
+/* FRESH PROFILE: no key at all → §A.3's default. */
+STORE.clear();
+const fresh = loadSectionState();
+console.log(`  fresh profile (no key)        → ${JSON.stringify(fresh)}`);
+assert('n.a-fresh-profile-loads-the-collapsed-default',
+  fresh.cardinality === true && fresh.flow === true && fresh.label === false
+    && fresh.line === false && fresh.markers === false,
+  'absent key ⇒ COLLAPSED_DEFAULT: Cardinality + Flow folded, Label/Line/Markers open');
+
+/* THE ROUND TRIP. `true` means COLLAPSED, so EXPANDING Cardinality stores
+   `{"cardinality":false}` — the negative of the default, stated explicitly so
+   the convention is unambiguous to a reader of the stored value. */
+const expanded = toggleSectionState(loadSectionState(), 'cardinality');
+saveSectionState(expanded);
+const RAW = STORE.get(SECTIONS_KEY);
+console.log(`  after expanding Cardinality   → ${SECTIONS_KEY} = ${RAW}`);
+assert('n.expanding-stores-the-section-under-the-exact-key',
+  SECTIONS_KEY === 'diagram-studio:inspector-sections'
+    && JSON.parse(RAW).cardinality === false,
+  `the exact key holds ${RAW} — \`true\` means COLLAPSED, so an EXPANDED section is stored \`false\``);
+assert('n.a-reload-reproduces-the-expanded-state',
+  parseSectionState(RAW).cardinality === false && parseSectionState(RAW).flow === true,
+  'parse(JSON.stringify(state)) === state: the expanded Cardinality SURVIVES a reload while Flow, '
+  + 'never toggled, stays at its default');
+assert('n.a-later-default-and-a-save-is-idempotent',
+  (() => {
+    /* Save twice, reload, and ask again — the state must not drift. */
+    saveSectionState(parseSectionState(RAW));
+    const again = loadSectionState();
+    return again.cardinality === false && JSON.stringify(again) === JSON.stringify(expanded);
+  })(),
+  'save(parse(save(x))) === x — a second load/save cycle is a no-op, not a slow drift');
+
+/* TOLERANT PARSE — the three shapes the brief names, each asserted to fall back
+   to the DEFAULTS without throwing. */
+console.log('\n  tolerant parse:');
+const TOLERANT = [
+  {why: 'a hand-edited, half-written value', raw: '{"cardinality":'},
+  {why: 'garbage that is not JSON at all', raw: 'not json -- {{'},
+  {why: 'a non-boolean field ("false" is TRUTHY in JS, so this one matters)',
+   raw: '{"cardinality":"false","flow":0,"label":null}', want: 'defaults'},
+  {why: 'an unknown section id (written by another build)', raw: '{"nope":false}'},
+  {why: 'the wrong container entirely (an array)', raw: '[true,false]'},
+  {why: 'an empty string', raw: ''},
+];
+for (const t of TOLERANT) {
+  let got; let threw = null;
+  try { got = parseSectionState(t.raw); } catch (e) { threw = e; }
+  const isDefaults = got && JSON.stringify(got) === JSON.stringify(defaultSectionState());
+  console.log(`    ${threw ? 'THREW' : isDefaults ? 'defaults' : 'MUTATED'}  ${JSON.stringify(t.raw).padEnd(46)} ${t.why}`);
+  assert(`n.tolerates-${t.raw === '' ? 'empty-string' : JSON.stringify(t.raw).slice(0, 28)}`,
+    threw === null && isDefaults,
+    'no throw, and every id falls back to the default');
+}
+/* NEGATIVE CONTROL: the tolerant path must still KEEP a real boolean, or the
+   "falls back to defaults" checks above would pass on a parser that ignores the
+   input entirely. */
+assert('n.control-a-real-boolean-is-kept',
+  parseSectionState('{"cardinality":false}').cardinality === false
+    && parseSectionState('{"flow":false}').flow === false
+    && parseSectionState('{"nope":false}').nope === undefined,
+  'a boolean for a KNOWN id is honoured; a boolean for an UNKNOWN id is dropped, not carried into '
+  + 'the next save');
+assert('n.control-a-missing-id-falls-back-and-a-present-one-is-kept',
+  (() => {
+    const p = parseSectionState('{"flow":false}');
+    return p.flow === false && p.cardinality === true;   // written | defaulted
+  })(),
+  'a partial stored value is repaired per id: the written one is kept, the missing one restores its default');
+
+console.log('\n' + '='.repeat(78));
+console.log('(o) THE TRUTH TABLE HAS ONE HOME');
+console.log('='.repeat(78));
+/* The bug class this pass must not introduce: a SECOND copy of the folded pair.
+   Counted in CODE (comments stripped), so the prose above cannot satisfy it. */
+const istIdLists = ['cardinality', 'flow'].map(id => countOf(IST, `'${id}'`));
+console.log(`  inspectorState.ts (code) — 'cardinality' ×${istIdLists[0]}, 'flow' ×${istIdLists[1]}`);
+console.log(`  inspectorState.ts imports COLLAPSED_DEFAULT: ${IST.includes('COLLAPSED_DEFAULT')}`);
+assert('o.inspectorState-imports-the-truth-table-instead-of-re-listing-it',
+  IST.includes("import {COLLAPSED_DEFAULT")
+    && IST.includes('Object.keys(COLLAPSED_DEFAULT)')
+    && istIdLists[0] === 0 && istIdLists[1] === 0,
+  'zero occurrences of either section id in the module\'s code: the folded pair is enumerated by '
+  + '`Object.keys(COLLAPSED_DEFAULT)`, so a section added to §A.3 is parsed here with no edit to this file');
+assert('o.CollapsedDefault-is-not-mutated-by-the-fold-module',
+  IST.includes('{...COLLAPSED_DEFAULT}')
+    && !/COLLAPSED_DEFAULT\[[^\]]+\]\s*=/.test(IST)
+    && !Object.isFrozen(insp.COLLAPSED_DEFAULT)
+    && insp.COLLAPSED_DEFAULT.cardinality === true && insp.COLLAPSED_DEFAULT.flow === true,
+  'the default is COPIED before use, so a toggle in one session cannot rewrite §A.3 for the next — '
+  + 'inspector.ts still reads cardinality=true, flow=true after every write above');
 
 /* ===========================================================================
    SUMMARY
