@@ -1382,10 +1382,21 @@ const TS_FONT_ROWS = [
   ['.label-node', 'var(--mono)'],
 ];
 const FAMILY_BASE = new Map(TS_FONT_ROWS);
+/* ROUND W FIX 2 — the NINTH consumer, and why it is not a ninth row.
+   `.label-node` is the one row with a SECOND render site: its in-place
+   `<textarea>` (`.node-label-input`). A textarea does not inherit
+   `font-family`, so the row's contract has to be declared on the editor too
+   (exactly as `--ts-scale` / `--ts-weight` / `--ts-color` / `--ts-align`
+   already are). The sweep still sees EIGHT subjects; one of them — the label —
+   is read twice, once per render site, from the SAME base stack. So the
+   editor's subject key is folded back onto the row it belongs to here, and
+   (l2.a) asserts the 8-subject / 9-consumer shape rather than a bare count. */
+const EDITOR_OF = new Map([['.node-label-input', '.label-node']]);
+const rowKey = c => EDITOR_OF.get(subjectKey(c.selectors[0])) ?? subjectKey(c.selectors[0]);
 const TS_FONT = sweepSheet(STYLES_RAW, '--ts-font');
 console.log(`  rules parsed: ${TS_FONT.rules.length}   var(--ts-font, …) consumers: ${TS_FONT.consumers.length}`);
 for (const c of TS_FONT.consumers) {
-  const subj = subjectKey(c.selectors[0]);
+  const subj = rowKey(c);
   const want = FAMILY_BASE.get(subj);
   const lose = TS_FONT.violations.filter(v => v.c === c);
   console.log(`    line ${String(c.line).padStart(4)}  ${c.prop.padEnd(12)} ${c.sel}`);
@@ -1396,16 +1407,17 @@ for (const c of TS_FONT.consumers) {
     (want === undefined ? '  !! NOT ONE OF THE EIGHT ROWS' : ''));
 }
 
-const fontSubjects = TS_FONT.consumers.map(c => subjectKey(c.selectors[0]));
+const fontSubjects = TS_FONT.consumers.map(rowKey);
 const fontDupes = fontSubjects.filter((s, i) => fontSubjects.indexOf(s) !== i);
 console.log(`  subjects: ${TS_FONT.consumers.length} consumers, ${new Set(fontSubjects).size} distinct, dupes: [${[...new Set(fontDupes)].join(', ')}]`);
 console.log(`  LOSING: ${TS_FONT.violations.length}   fallback-vs-base mismatches: ${TS_FONT.fallbackBad.length}`);
 
 assert('l2.a-ts-font-has-exactly-one-consumer-per-node-text-row',
-  TS_FONT.consumers.length === 8 && fontDupes.length === 0
+  TS_FONT.consumers.length === 9 && fontDupes.join('|') === '.label-node'
     && [...new Set(fontSubjects)].sort().join('|') === TS_FONT_ROWS.map(r => r[0]).sort().join('|'),
-  `the eight rows (${TS_FONT_ROWS.map(r => r[0]).join(', ')}) each read \`--ts-font\` exactly once — ` +
-  'one write sets the whole node, and no row reads it twice');
+  `the eight rows (${TS_FONT_ROWS.map(r => r[0]).join(', ')}) — NINE consumers, because \`.label-node\` is ` +
+  'the one row with a second render site and reads `--ts-font` twice (root + `.node-label-input`, the ' +
+  'in-place editor); every other row reads it exactly once, so one write still sets the whole node');
 assert('l2.b-no-earlier-rule-outranks-a-ts-font-consumer',
   TS_FONT.violations.length === 0,
   TS_FONT.violations.length === 0
@@ -1415,9 +1427,9 @@ assert('l2.b-no-earlier-rule-outranks-a-ts-font-consumer',
       'picker would silently do nothing there');
 assert('l2.c-every-ts-font-fallback-is-the-stack-its-base-declares',
   TS_FONT.fallbackBad.length === 0
-    && TS_FONT.consumers.every(c => c.fallback === FAMILY_BASE.get(subjectKey(c.selectors[0]))),
-  '8/8 fallbacks equal their row\'s own pre-ITEM-2 stack (`' +
-  TS_FONT_ROWS.map(r => `${r[0]}→${r[1]}`).join('`, `') +
+    && TS_FONT.consumers.every(c => c.fallback === FAMILY_BASE.get(rowKey(c))),
+  '9/9 fallbacks (8 rows, the label read on BOTH of its render sites) equal that row\'s own pre-ITEM-2 ' +
+  'stack (`' + TS_FONT_ROWS.map(r => `${r[0]}→${r[1]}`).join('`, `') +
   '`), so a node carrying no `--ts-font` paints exactly what it painted before');
 
 /* --- THE CONTROLS — the extended sweep must FAIL on the shape it hunts ---- */
@@ -1833,6 +1845,89 @@ assert('p.the-custom-input-is-a-real-input-and-clamped-on-commit',
 assert('p.control-the-clamp-detects-an-out-of-range-value',
   M.clampTextScale(0.1) !== 0.1 && M.clampTextScale(9) !== 9,
   'the bounds are enforced, not merely documented in a hint');
+
+/* ===========================================================================
+   (p5) ROUND W FIX 2 — A `--ts-*` ON `.label-node` NEEDS ITS EDITOR TWIN.
+   ---------------------------------------------------------------------------
+   The label is the ONE node kind whose text has a SECOND render site: the
+   in-place `<textarea>` (`.node-label-input`). A `<textarea>` is a REPLACED
+   form control — it does not inherit `font-family` from `.label-node` — so a
+   text property declared on the root alone paints the label at rest and is
+   silently dropped the moment editing starts. `--ts-font` shipped with ONLY
+   the root consumer for that reason; three earlier passes fixed the same
+   omission one property at a time for `--ts-scale`, `--ts-weight`,
+   `--ts-color` and `--ts-align`. THIS RULE IS THE STOP: it is general over
+   EVERY `--ts-*` property, not a line about font, so a fifth one added
+   tomorrow fails here instead of reaching a browser.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(p5) every --ts-* on .label-node ALSO on its in-place editor');
+console.log('='.repeat(78));
+/* Comment-stripped FIRST, so a docblock that merely QUOTES a property cannot
+   satisfy the rule — the same reason LABEL is stripped above. One entry per
+   selector in a comma list; a rule nested in an at-rule still yields its own
+   selector, since `[^{}]*` cannot span the inner brace. */
+const CSS_SHEET = stripTs(STYLES_RAW);
+const CSS_BLOCKS = [];
+for (const m of CSS_SHEET.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const sel of m[1].split(',')) CSS_BLOCKS.push({sel: sel.trim().replace(/\s+/g, ' '), body: m[2]});
+}
+const tsPropsIn = pred => {
+  const out = new Set();
+  for (const b of CSS_BLOCKS) {
+    if (!pred(b.sel)) continue;
+    for (const p of b.body.matchAll(/--ts-[a-z-]+/g)) out.add(p[0]);
+  }
+  return out;
+};
+const LABEL_PROPS = tsPropsIn(sel => sel === '.label-node');
+const EDITOR_PROPS = tsPropsIn(sel => /\.label-node\b/.test(sel) && /\.node-label-input\b/.test(sel));
+/* The four the sheet is already known to pair. Required as a LIVENESS FLOOR:
+   without them this rule would pass on a parse that found nothing at all. */
+const PAIRED = ['--ts-scale', '--ts-weight', '--ts-color', '--ts-align'];
+const UNPAIRED = [...LABEL_PROPS].filter(p => !EDITOR_PROPS.has(p)).sort();
+console.log(`  .label-node consumers:          ${[...LABEL_PROPS].sort().join(' ')}`);
+console.log(`  .label-node .node-label-input:  ${[...EDITOR_PROPS].sort().join(' ')}`);
+assert('p.every-ts-property-on-the-label-has-its-editor-twin',
+  UNPAIRED.length === 0 && PAIRED.every(p => LABEL_PROPS.has(p)),
+  UNPAIRED.length
+    ? `UNPAIRED on .node-label-input: ${UNPAIRED.join(', ')} — a textarea does not inherit `
+      + 'font-family, so this value paints at rest and is dropped mid-edit'
+    : `${LABEL_PROPS.size} properties on .label-node, all of them also on its editor; the four known `
+      + `pairs (${PAIRED.join(' ')}) are all present, so the rule is not passing on an empty parse`);
+
+/* NEGATIVE CONTROLS — the rule must FIRE on the defect it was written for.
+   This is the same analysis re-run on a MUTATED copy of the sheet: the editor
+   twin deleted. A parse that silently found nothing would report an EMPTY
+   unpaired set for both and pass, so each control also pins the detection. */
+const analyse = sheet => {
+  const props = {};
+  for (const m of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const sel of m[1].split(',')) {
+      const s = sel.trim().replace(/\s+/g, ' ');
+      props[s] ??= new Set();
+      for (const p of m[2].matchAll(/--ts-[a-z-]+/g)) props[s].add(p[0]);
+    }
+  }
+  const root = props['.label-node'] ?? new Set();
+  const ed = new Set();
+  for (const [s, v] of Object.entries(props)) {
+    if (/\.label-node\b/.test(s) && /\.node-label-input\b/.test(s)) for (const p of v) ed.add(p);
+  }
+  return [...root].filter(p => !ed.has(p)).sort();
+};
+const noFontTwin = analyse(CSS_SHEET.replace(
+  /\.label-node \.node-label-input \{ font-family: var\(--ts-font[^}]*\}\n/, ''));
+const noWeights = analyse(CSS_SHEET.replace(
+  /\.label-node \.node-label-input \{ font-weight: var\(--ts-weight[^}]*\}\n/, ''));
+assert('p.control-the-pair-rule-detects-the-font-defect-in-place',
+  noFontTwin.length === 1 && noFontTwin[0] === '--ts-font',
+  `with the font-family editor rule deleted the mutated sheet reports ${JSON.stringify(noFontTwin)} `
+  + '— exactly the bug measured live (label at rest "Be Vietnam Pro", editor ui-monospace)');
+assert('p.control-the-pair-rule-is-not-keyed-to-font',
+  noWeights.length === 1 && noWeights[0] === '--ts-weight',
+  `with the font-WEIGHT editor rule deleted instead it reports ${JSON.stringify(noWeights)} — the rule `
+  + 'is general over the property, not a special case for the one that shipped broken');
 
 /* ===========================================================================
    SUMMARY

@@ -3663,3 +3663,11 @@ kbd {
 .node .lo-sub { font-family: var(--ts-font, var(--mono)); }
 .note-node { font-family: var(--ts-font, var(--mono)); }
 .label-node { font-family: var(--ts-font, var(--mono)); }
+/* ROUND W FIX 2 — the editor's half of the pair. `--ts-scale`, `--ts-weight`,
+   `--ts-color` and `--ts-align` each declare TWO consumers for a label (the node
+   at rest AND `.node-label-input`) because the `<textarea>` is a REPLACED element
+   whose font is NOT inherited from `.label-node` — a `font-family` declared only
+   on the root is silently dropped the moment editing starts. `.node-label-input`
+   carries no family of its own (see its own block above), so without this line it
+   falls back to the UA default and the text changes typeface mid-edit. */
+.label-node .node-label-input { font-family: var(--ts-font, var(--mono)); }
