@@ -696,6 +696,31 @@ body {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono); font-size: 9.5px;
 }
+/* ROUND AB, ITEM 2 — THE REMOVE CONTROL ON A FAVOURITE TILE, drawn with the
+   exact geometry of `.cust-remove` (16px circle on the tile's top-right corner,
+   `--surface` on the `--dim` glyph). It reuses that vocabulary rather than
+   inventing a second one, and `position: relative` on the tile is what makes
+   the corner the TILE's corner and not the grid cell's — same as `.cust-tile`
+   above it. Tokens only; no new literal.
+
+   ITS DEFAULTS ARE DELIBERATE: present at `.6` opacity, so it is visible (and
+   tappable) with no hover at all — the phone/tablet tier has no hover to
+   reveal anything with — and raised to full on the tile's hover AND on
+   `:focus-within`, so a keyboard user tabbing into the tile sees it as clearly
+   as a mouse user does. The 16px circle sits INSIDE the tile even at the
+   narrowest column `.fav-grid` can produce (72px), leaving 54px of tile to
+   press for the insert, so the tile's own hit area is not reduced. */
+.fav-tile { position: relative; }
+.fav-remove {
+  position: absolute; top: 2px; right: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  color: var(--dim); background: var(--surface); border: 1px solid var(--border);
+  opacity: .6; transition: opacity .15s, color .15s, border-color .15s;
+}
+.fav-remove:hover, .fav-remove:focus-visible { opacity: 1; color: var(--fg); border-color: var(--acc); }
+.fav-tile:hover > .fav-remove, .fav-tile:focus-within > .fav-remove { opacity: .9; }
 /* §6.4 — the pending `+`: visibly a call to action, not a stored item. The
    pulse is a box-shadow ring in the accent token (no literal rgba), so it
    themes with everything else; reduced-motion switches it off below. */
@@ -1256,18 +1281,99 @@ body {
 .icon-trigger-caret { color: var(--dim); font-size: 10px; }
 .icon-pop {
   position: absolute; z-index: 20; top: calc(100% + 6px);
-  left: auto; right: 12px; width: 264px;
+  left: auto; right: 12px; width: min(264px, calc(100% - 12px));
   background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: 10px; padding: 8px;
   box-shadow: var(--shadow-strong);
 }
+/* ROUND AB, ITEM 3 — THE INSPECTOR POPOVER CANNOT OVERHANG ITS PANEL.
+ *
+ *  MEASURED: the popover painted `left: 958` against a panel at `left: 992` —
+ *  34px of popover out over the canvas, which is what Harvey saw as "bị lệch và
+ *  bị sidebar che": the overhanging strip is what the panel's own edge cuts off,
+ *  so the popover read as offset AND truncated.
+ *
+ *  THE CAUSE IS THE WIDTH, not the anchoring. `width: 288px` is fixed, and the
+ *  containing block (`.icon-field {position: relative}`) is the TRIGGER's own
+ *  width — 264px in the default 288px panel (panel-body's 12px padding either
+ *  side). An absolutely-positioned box WIDER than its containing block overflows
+ *  to the right of it and the `right: 12px` anchor cannot help: an
+ *  over-constrained absolutely-positioned box drops `right`, so the popover
+ *  painted 34px past the panel's inner edge and over the canvas.
+ *
+ *  `width: min(288px, calc(100% - 12px))` is the clamp, and both halves are
+ *  load-bearing:
+ *
+ *    `100% - 12px` is the width that keeps the EXISTING `right: 12px` inset
+ *    inside the trigger's box. At the widest field the clamp allows, the
+ *    popover's right edge is 12px inside the field's right edge and its LEFT
+ *    edge is exactly the field's left edge — so the box can never leave the
+ *    trigger it belongs to, at any panel width the resizer produces (253px at
+ *    the floor, 300px+ with the panel dragged wide);
+ *
+ *    `288px` is the ceiling: at a wide panel the popover stays the width the
+ *    two-line shape rows were measured at instead of stretching with the panel.
+ *
+ *  The horizontal ANCHOR is untouched — the popover is still right-aligned to
+ *  its trigger, never centred on it — and `min()` is the expression `.help-pop`
+ *  already uses for its own bound. What the shape picker was missing is exactly
+ *  this: the icon picker's popover (`.insp-pop`, same rule) had it, and this
+ *  restores it for both. */
+/* ROUND AB, ITEM 3 — THE POPOVER IS MEASURED AND LIFTED INTO THE VIEWPORT.
+ *
+ *  The second measured fault: the shape popover's `bottom` was 601 in a 577px
+ *  viewport, so 24px of it — the last rows — was clipped and unclickable. The
+ *  `margin-top` that lifts it is set from a real `getBoundingClientRect()` in
+ *  `src/InspectorPickers.tsx` (`clampPopover`), the same technique
+ *  `src/ContextMenu.tsx:62-69` already uses for the right-click menu: measure
+ *  once after mount, then shift by exactly the overflow, clamped at 0 so a
+ *  popover with room below is never moved. It is a negative `margin-top` rather
+ *  than a new `top`, because `top: calc(100% + 6px)` is the anchor that keeps
+ *  the popover attached to its trigger — this rule is only the guard that stops
+ *  a `dvh`-shorter viewport from turning that into an off-screen box. */
+/* ROUND AB, ITEM 3 — THE SEARCH BOX IS AN ORDINARY INPUT AGAIN.
+ *
+ *  Measured live before this round, the shape popover's search input computed
+ *  `border-color: rgb(245, 78, 0)` — which is `--acc`, this theme's accent, the
+ *  SAME token the control kit paints on a FOCUSED input (see the
+ *  `.icon-search:focus` rule 6 lines below and the CONTROL KIT block at the end
+ *  of this file). So at rest the box already read as an error / focus state:
+ *  Harvey's screenshot shows exactly that orange outline with nothing wrong.
+ *
+ *  It was an accident of the cascade, not a choice: `.icon-search` is listed in
+ *  the kit's text-input GROUP (see the CONTROL KIT block), and this local rule
+ *  is what stated the `--border-strong` that overrode it. Stating the kit's
+ *  RESTING border here — `--border`, the value every other input in the app
+ *  rests at — makes the box ordinary, while `:focus` still lifts it to `--sel`
+ *  and therefore still reads as focus. */
 .icon-search {
   width: 100%; background: var(--elevated); color: var(--fg);
-  border: 1px solid var(--border-strong); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: 6px;
   padding: 7px 9px; font-family: var(--mono); font-size: 12px; outline: none;
   margin-bottom: 7px;
 }
-.icon-search:focus { border-color: var(--sel); }
+/* ROUND AB, ITEM 3 — AND ITS FOCUS STATE IS NOT THE ACCENT EITHER.
+ *
+ *  The search box AUTOFOCUSES when the popover opens (`searchRef.current.focus()`
+ *  in `ShapesPicker`), so the state the user actually SEES on open is the FOCUS
+ *  state — which is why the live measurement read `rgb(245, 78, 0)` even though
+ *  the resting rule says `--border-strong`: the CONTROL KIT's text-input group
+ *  (`.ui-input, …, .icon-search, …` at the end of this sheet) paints a focused
+ *  input with `border-color: var(--acc)` plus an `--acc-soft` halo, and being
+ *  later in the sheet it wins the tie. Fixing only the resting border would have
+ *  left the exact orange box Harvey photographed on screen every time the
+ *  popover opened.
+ *
+ *  This rule therefore states the popover's own focus treatment as a
+ *  THREE-part selector, which beats the kit's two-part one on specificity
+ *  rather than on source order: the border lifts to `--sel` — the blue this
+ *  popover's own selected row and selected cell already use (`.insp-opt.on`,
+ *  `.icon-cell.on`), so the popover has ONE selection colour instead of two —
+ *  and the accent halo is dropped, because the halo is what made an ordinary
+ *  search box read as an error ring on the dark theme. Focus is still plainly
+ *  indicated: the border changes from grey (`--border`) to blue (`--sel`), which
+ *  is exactly how the rest of this panel signals selection. */
+.icon-pop .icon-search:focus { border-color: var(--sel); box-shadow: none; }
 .icon-grid {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
   max-height: 232px; overflow-y: auto; padding-right: 2px;
@@ -1301,8 +1407,8 @@ body {
    `.insp-trigger-glyph` so the node-icon picker (`IconPicker.tsx`) keeps its
    18x18 cell untouched. */
 .insp-trigger-glyph { width: 26px; height: 18px; }
-.insp-pop { width: 288px; }
-.insp-opt-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+.insp-pop { width: min(288px, calc(100% - 12px)); }
+.insp-opt-list { display: flex; flex-direction: column; gap: 3px; max-height: min(60dvh, 260px); overflow-y: auto; }
 .insp-opt {
   display: flex; align-items: center; gap: 9px; width: 100%;
   background: var(--elevated); color: var(--fg);
@@ -1325,7 +1431,7 @@ body {
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list
    rather than `.insp-opt-list`'s single-line rows. */
-.insp-shape-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+.insp-shape-list { display: flex; flex-direction: column; gap: 3px; max-height: min(60dvh, 260px); overflow-y: auto; }
 .insp-shape-item {
   display: flex; align-items: center; gap: 9px; width: 100%;
   background: var(--elevated); color: var(--fg);
@@ -1431,6 +1537,24 @@ body {
  *  `Regular` 46.4 / `Bold` 26.5 / `XL` 13.7 are all inside their shares. */
 .insp-seg.half { gap: 5px; }
 .insp-seg.half .insp-seg-btn { flex: 1 1 calc((100% - 5px) / 2); min-width: 0; padding: 6px 7px; }
+/* ROUND AB, ITEM 1 — THE TWO ALIGN ROWS ARE SEPARATED.
+ *
+ *  Harvey: "2 hàng ở align nó đang hơi sát nhau. nên có khoảng cách như 6 fonts
+ *  vậy". The align field is the ONE field in the panel that holds TWO segmented
+ *  rows (horizontal `align` then vertical `vAlign`), and they were siblings with
+ *  nothing between them — 0px, so the two bordered rows touched. Every other
+ *  neighbouring pair in the Text section is 13px apart (`.field`'s own
+ *  `margin-bottom`, which is the panel's row rhythm — the label that sits inside
+ *  those 13px is what makes a size row and a weight row read as separate).
+ *
+ *  SO THE SECOND ROW GETS THAT SAME 13px, and it is written as an
+ *  adjacent-sibling rule rather than as a wrapper element: the two rows are
+ *  direct children of their `.field`, the selector matches exactly one place in
+ *  the whole panel (asserted in `checks/round-ab-align-favourite-popover.mjs`),
+ *  and no markup moves — so the `.field label` contract (one label, then its
+ *  controls) and the section's spacing are untouched. A later field that stacks
+ *  two segmented rows gets the same separation for free instead of touching. */
+.field > .swatches.insp-seg + .swatches.insp-seg { margin-top: 13px; }
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */

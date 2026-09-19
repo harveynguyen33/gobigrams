@@ -2254,6 +2254,24 @@ export default function App() {
     mutateFavourites(prev => library.toggleFavouriteItem(prev, item));
   }, [mutateFavourites]);
 
+  /** ROUND AB, ITEM 2 — remove ONE favourite from the strip.
+   *
+   *  The tile's `×` control calls exactly this, and this calls exactly the
+   *  function the palette star's own remove path ends in (`removeFavouriteItem`,
+   *  which `toggleFavouriteItem` above delegates to), through the same
+   *  `mutateFavourites` writer — so the strip and the star cannot drift and the
+   *  write keeps the ref-synchronous + deferred-persist contract.
+   *
+   *  IDENTITY IS THE LABEL, per `library.ts`: a favourite starred from a palette
+   *  item carries that item's `__label`; a "save selection" favourite has no
+   *  label at all. So the tile renders the control only where the label exists —
+   *  a label-less favourite would make this removal match EVERY label-less
+   *  favourite at once, and the existing path has nothing finer to reuse (the
+   *  gap is called out in the round report rather than papered over). */
+  const removeFavourite = useCallback((label: string) => {
+    mutateFavourites(prev => library.removeFavouriteItem(prev, label));
+  }, [mutateFavourites]);
+
   const isStarred = useCallback(
     (label: string) => library.isFavouriteItem(favourites, label),
     [favourites],
@@ -3878,6 +3896,66 @@ export default function App() {
                   >
                     <span className="fav-glyph" aria-hidden="true">{favouritePreview(f)}</span>
                     <span className="fav-name">{library.favouriteName(f)}</span>
+                    {/* ROUND AB, ITEM 2 — REMOVE FROM THE STRIP.
+                        Harvey: "tôi muốn shape trong favorite cũng có thể có
+                        icon để click remove khỏi favorite". Until now the only
+                        way out of Favourites was the star on the palette row,
+                        which means scrolling the library back to the item you
+                        just removed from your shortlist.
+
+                        WHAT IT STOPS, and nothing else. The tile inserts on
+                        `click` (and double-click, and drag), so this control
+                        stops: `click` (the whole point — a remove must never
+                        also insert), `dblclick` (a fast double-tap on the `×`
+                        would otherwise reach the tile's insert), and
+                        `dragstart` (mousedown on a child of a `draggable`
+                        button can begin the tile's drag, and the drag is what
+                        actually inserts on canvas drop). `keydown` stops its
+                        own Enter / Space so the key that activates the `×`
+                        cannot also reach a handler behind it.
+
+                        ALWAYS VISIBLE, at low emphasis (opacity .6) — not
+                        hover-only. This project treats tablet and phone as in
+                        scope, and there is no hover on a tablet: a
+                        hover-revealed control would be unreachable there. The
+                        `:focus-within` / `:hover` rules in `styles.css` only
+                        raise its emphasis, so touch users get the same target a
+                        mouse user does.
+
+                        A `<span role="button" tabIndex={0}>` rather than a
+                        nested `<button>`: identical to `.cust-remove` on the
+                        custom-shape tiles 40 lines below, so the two grids of
+                        tiles stay one control vocabulary — and a nested
+                        interactive element would be invalid inside the tile's
+                        own `<button>`.
+
+                        THE REMOVAL ITSELF IS NOT REIMPLEMENTED: it calls
+                        `removeFavourite` → the SAME `mutateFavourites` write
+                        path, ending in the SAME `library.removeFavouriteItem`
+                        the palette star's remove already ends in. */}
+                    {library.favouriteLabel(f) && (
+                      <span
+                        className="fav-remove"
+                        role="button"
+                        tabIndex={0}
+                        data-fav-remove={f.id}
+                        aria-label={`Remove ${library.favouriteName(f)} from Favourites`}
+                        title={`Remove ${library.favouriteName(f)} from Favourites`}
+                        onClick={e => {
+                          e.stopPropagation();
+                          removeFavourite(library.favouriteLabel(f)!);
+                        }}
+                        onDoubleClick={e => e.stopPropagation()}
+                        onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeFavourite(library.favouriteLabel(f)!);
+                          }
+                        }}
+                      >×</span>
+                    )}
                   </button>
                 ))}
               </div>
