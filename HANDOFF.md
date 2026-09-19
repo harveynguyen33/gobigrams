@@ -1,24 +1,31 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-18 (late night) · **Status:** edge-reshaping **ROUND T** shipped — the midpoint drag
-now works on BOTH axes, the bend slider is gone, and the big endpoint circle no longer paints. Pushed as
-**`65d1927`**. **awaiting Harvey's re-test.**
+**Last session:** 2026-09-19 (morning) · **Status:** ROUND V shipped (overflow). Pushed as **`8ee90b4`**.
+**Next: the inspector + text-styling work, spec'd from the Excalidraw research.**
 
-> **ROUND S's drag only moved LEFT/RIGHT. Root cause, measured:** `bendAxis` derived the dragged coordinate
-> from the SPLIT the generator happens to use — and that flips at **0.001px** of stagger, so on any
-> non-pixel-level edge only one axis was reachable. A 600-geometry sweep then proved the generator READS
-> exactly one of `centerX`/`centerY` and **never both (0/600)**, so "store both and let the generator draw
-> it" could not work.
+> **ROUND V — nothing may paint outside a node box.** Two MEASURED defects, both fixed at the CONTENT level:
+> a 43-char unbreakable word overflowed 259px RIGHT (`.node-title` is flex; the text span's `min-width:auto`
+> == the longest word), and a Text node's sentence overflowed 65px BELOW (`.label-node` had only
+> `min-height:100%`, a FILL rule). Fix = **`overflow-wrap: anywhere`** (the WRAP) + `overflow:hidden` as a belt.
+> **`overflow:hidden` alone is NOT the fix** — measured, `break-word` + `overflow:hidden` is still 165px out
+> because it clips MID-WORD and loses the text. The clip is INNER (`.label-text` / `.note-body` are new child
+> boxes) because `.shape-frame` and the 4 connect dots sit ON `.node`'s border; `.label-node` also carries the
+> 4 resize grips, so its root stays `overflow:visible` (negative-controlled). **`height:100%` on those inner
+> boxes is load-bearing** — a clip on an auto-height box clips nothing vertically.
+> Verified live: 0 overflow across 6 nodes, the long word wraps to 3 lines with `scrollWidth === clientWidth`
+> (no character lost), 4 connect dots still 0px from the border, the 420×300 node unchanged, the label editor
+> still opens focused and scrolls itself.
+> **Known, NOT fixed (pre-existing):** `.tnode { overflow:hidden }` clips TableNode's per-column handles
+> (8px, centred on the border → 4px sits outside). Table nodes are not resizable; recorded in the round's skill.
 >
-> **The rule that ships: no stored point → the generator (unchanged, parity 480/480). Stored point →
-> `freePath`, our own orthogonal staircase through BOTH coordinates.** The drag's axis comes from the
-> **pointer delta** (draw.io's real rule), locked once per gesture, with a `col-resize`/`row-resize` cursor.
->
-> **ROUND T also:** the bend-position slider is DELETED (with `coalesce` / `bendDragging` / `.range-row`);
-> `.react-flow__edgeupdater` (the 38px "hình tròn to", r=14, ROUND Q) **paints nothing** — `fill/stroke: none`,
-> `opacity: 0`, reveal rules deleted — while `edgesReconnectable` + `RECONNECT_RADIUS` keep the silent hit
-> area, so reconnect still works. Auto-remove: releasing on the generator's own point drops the waypoint.
-> **`data.bend` (the old fraction) is still READ** so an old board renders unchanged.
+> **RESEARCH DONE for the next work — `diagram-studio-research/excalidraw/`** (`SYNTHESIS.md` + `X1`/`X2`/`X3`
+> + `ORCH-FINDINGS-icons-and-collapse.md`), pinned at Excalidraw `c0ad61c`. **Three corrections that change
+> decisions:** (1) Excalidraw's panel is **TOP-LEFT**, not right — our right panel is OUR divergence, not a
+> copy; (2) **nothing is rendered near the text while editing** — the "buttons while typing" people remember are
+> the ordinary panel, kept live because *editing counts as a selection*; so "controls while typing" = keep the
+> panel mounted and target the editing node, **not new UI**; (3) font family has **3** buttons + a popover
+> trigger, not 4. Also: **zero `<select>` in the whole panel** (icon pickers everywhere), and **no accordion
+> exists** — the frequency-driven mechanism is `CompactShapeActions` ("collapsed, popover-driven layout").
 
 > ⚠️ **THIS FILE HAS GIT.** The project became a git repo on 2026-09-18 — private
 > `github.com/harveynguyen33/goblin-diagrams.git`, branch `main`. **`boards/` is gitignored**, so a
@@ -79,27 +86,40 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**Harvey re-tests the midpoint drag on Mac.** Click a step/smoothstep line → an orange dot appears → drag it
-**in any direction**: it now moves up/down AND left/right. Behaviour to expect:
-- The axis is chosen from the direction you pull first and **locks for that drag**, so the line stays square.
-  Pull it roughly sideways → it moves sideways; pull it roughly up/down → it moves up/down. The **cursor tells
-  you which** (`col-resize` / `row-resize`).
-- **Release it on the line's original path and the bend is dropped** (auto-remove, 10px) — the edge returns to
-  the clean routed look.
-- The handle shows **only on the selected edge**, and a click on empty canvas or Escape dismisses it.
-- The **label travels with the bend** (the handle is painted at the path's midpoint, which is what the label
-  anchors to).
-- On a `smoothstep` edge the label can sit up to ~12px off the line — that is the ROUNDED CORNER's arc centre,
-  exactly where the generator puts its own label. On `step` edges (the app's `consume` line) it is exact.
-- **The reconnect endpoint disc is gone deliberately** (~the big circle). Reconnecting still works — aim at the
-  endpoint itself; the hit area is still there, just unpainted.
+**ROUND V is shipped — nothing more queued on overflow.** Harvey's re-test: drag a shape's resize grips as
+small as they go, and put one very long word in a node's title; the text must wrap inside the box and nothing
+may escape it.
 
-**Vault debt:** edge reshaping — STEP 1/2 (ROUND S) AND ROUND T are NOT yet in ADR-031 / Change Log. Batch on
-the next go via pkm. `checks/round-s-edge-bend.mjs` covers a–j.
-**Stale harness:** `checks/package-q-reconnect-endpoints.mjs` now FAILS 13 (was 2): 11 of its assertions
-require the endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. It is left untouched as
-the record; do not "fix" it to hide the change — retire or rewrite it if reconnect paint ever returns.
+**NEXT WORK — the inspector rebuild + text styling. Spec FIRST, mockup for approval, then build in
+gated passes.** Decision already taken by Harvey: **text styling lives in the right panel (option B)**, and he
+wants it **"like Excalidraw"**, plus the panel **reorganised per shape type**, with **icon pickers instead of
+text dropdowns** and **rarely-used controls collapsed**.
 
+**The research this must be spec'd from** — `diagram-studio-research/excalidraw/`:
+`SYNTHESIS.md` (read this first) · `X1-text-editor.md` · `X2-right-panel.md` · `X3-panel-by-type.md` ·
+`ORCH-FINDINGS-icons-and-collapse.md`. Pinned at Excalidraw `c0ad61c`.
+
+**The four load-bearing facts** (all orchestrator-verified against upstream source):
+1. Excalidraw has **0 `<select>`** in its panel — icon/toggle buttons and `trigger + popover` throughout.
+2. **No accordion exists.** The frequency-driven mechanism is `CompactShapeActions` — *"the collapsed,
+   popover-driven layout"* — same actions, two densities. Copy that, not a home-made accordion.
+3. **Nothing renders next to the text while editing.** The panel stays live because *editing is a target*
+   (`showSelectedShapeActions`) — so copying it means our panel must target `editingNodeId ?? selectedNodeId`,
+   keep focus, and hide duplicate/delete while editing.
+4. The per-type decision is **one predicate function returning boolean flags** (`shapeActionPredicates.ts`),
+   consumed by every layout. That is the structure to copy — our inspector currently has no per-type branch.
+
+**BLOCKED ON HARVEY (one open question, asked, not yet answered):** in his Excalidraw screenshot he sees **4**
+font-family buttons; upstream ships **3** fonts + a 4th icon that OPENS the picker. Harmless either way, but do
+not guess which he means.
+
+**Vault debt:** edge reshaping — ROUND S, T and U are NOT yet in ADR-031 / Change Log. Batch via pkm.
+`checks/round-s-edge-bend.mjs` covers (a)–(o).
+**Stale harness:** `checks/package-q-reconnect-endpoints.mjs` FAILS 13 (was 2): 11 assertions require the
+endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. Left as the record — do not "fix".
+
+## ✅ ROUND V 2026-09-19 — nothing may paint outside a node box
+## ✅ ROUND U 2026-09-18 — midpoint drag on bezier + straight (free 2-D)
 ## ✅ ROUND T 2026-09-18 — 2-D midpoint drag, slider removed, endpoint circle unpainted
 ## ✅ ROUND S 2026-09-18 — draw.io-style draggable midpoint on the selected edge
 ## ✅ ROUND Q 2026-09-18 — edge endpoints draggable (reconnect)
