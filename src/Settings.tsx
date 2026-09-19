@@ -200,7 +200,9 @@ const SHORTCUTS_KEYS: {what: string; keys: string[]}[] = [
   {what: 'Fit view to diagram',      keys: ['⇧', '1']},
   {what: 'Toggle read-only review mode', keys: ['⇧', '2']},
   {what: 'Nudge selection',          keys: ['←↑↓→']},
-  {what: 'Collapse / expand panels', keys: ['⌘/Ctrl', '⇧', '\\']},
+  {what: 'Collapse / expand both panels', keys: ['⌘/Ctrl', '⌃', '⇧', '\\']},
+  {what: 'Toggle left panel',            keys: ['⌘/Ctrl', '⌃', '⇧', '[']},
+  {what: 'Toggle right panel',           keys: ['⌘/Ctrl', '⌃', '⇧', ']']},
 ];
 
 /** Pointer gestures — NOT keys. Rendered as plain tokens, never as kbd chips.

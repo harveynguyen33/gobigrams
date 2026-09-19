@@ -2,7 +2,10 @@ import {cloneElement, isValidElement, useCallback, useEffect, useRef, useState} 
 import {createPortal} from 'react-dom';
 
 type TooltipProps = {
-  label: string;
+  /** PACKAGE-Q: widened from `string` to `ReactNode` so a tooltip can carry the
+   *  shortcut as `kbd` chips (the panel-edge chevrons' tooltips do). A plain
+   *  string still satisfies this, so every existing call site is unchanged. */
+  label: React.ReactNode;
   /** Which side of the trigger the popover appears on. Default: bottom. */
   side?: 'top' | 'bottom' | 'left' | 'right';
   /** Delay before showing, in ms. Default: 350. */

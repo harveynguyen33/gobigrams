@@ -1408,6 +1408,18 @@ kbd {
   background: var(--elevated); border: 1px solid var(--border-strong);
   color: var(--fg);
 }
+/* PACKAGE-Q: the chip group inside a tooltip. `.tooltip` is deliberately
+   `nowrap` (a one-line label), so the group lays its chips out inline and the
+   popover measures as one line. Reuses the global `kbd` chip rule above and
+   tokens only — no new colour, no new hex. */
+.tt-keys {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 5px; vertical-align: middle;
+}
+.tt-keys kbd {
+  min-width: 0; padding: 1px 4px; font-size: 10px;
+  background: var(--surface); border-color: var(--border);
+}
 .badge {
   display: inline-block; font-family: var(--mono); font-size: 10.5px;
   padding: 2px 7px; border-radius: 999px;
@@ -1739,6 +1751,21 @@ kbd {
      wrap on Linux metrics; on macOS Menlo advances are within 0.1% so the same
      340px holds.
 
+     PACKAGE-Q WIDENED IT. The group row's chord gained a modifier chip (⌃), so
+     `Collapse / expand both panels` moved from 303px to 360px and became the
+     binding constraint again — at 340px exactly one row wrapped, which is the
+     ITEM 3 defect returning in slow motion. Measured now, same harness:
+
+      Collapse / expand both panels    360px   <- the binding constraint
+      Copy / paste / duplicate         289px
+      Rename connection                276px
+
+     `400px` is that 360px plus the same 24px + 2px of chrome — ~14px of slack,
+     which is what absorbs a wider fallback font. Three chips' worth of extra
+     box, and each row stays on one line. It still grows LEFTWARD from its
+     bottom-right anchor, so the extra 60px can never reach off-screen; the
+     phone tier below overrides `width: auto` outright and is unaffected.
+
      A FIXED WIDTH, not `max-content`. `max-content` would let the sheet grow
      with its longest string forever, and it was the fixed width that made the
      earlier overflow bug reproducible and testable in the first place. The
@@ -1748,7 +1775,7 @@ kbd {
      The `max-height` + vertical-scroll guard is kept verbatim — a tall sheet
      must still scroll rather than spill, and the phone tier below still
      overrides left/right/width entirely. */
-  width: 340px;
+  width: 400px;
   max-height: min(70dvh, 520px);
   overflow-y: auto; overflow-x: hidden;
   background: var(--surface); border: 1px solid var(--border-strong);

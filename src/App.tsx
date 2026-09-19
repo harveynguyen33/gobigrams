@@ -2757,29 +2757,61 @@ export default function App() {
       if (mod && k === 'c') { copySelection(); return; }
       if (mod && k === 'v') { e.preventDefault(); pasteClipboard(40); return; }
       if (mod && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
-      // ---- M3/S2c: panel chrome — the shortcut is ATOMIC and VISIBLE-driven --
-      // Shift+Mod+\ : hide BOTH docked panels if either one is on screen, else
-      //               show BOTH (Figma ships the same group toggle; a single
-      //               panel is reachable from its own edge chevron). A bare
-      //               Mod+\ is intentionally NOT a binding: it falls through to
-      //               the handlers below.
+      // ---- PACKAGE-Q: panel chrome — three chords, ONE writer each ----------
+      //   Cmd+Ctrl+Shift+backslash → hide BOTH docked panels if either one is on
+      //                              screen, else show BOTH (the Figma group
+      //                              toggle, unchanged; a single panel is still
+      //                              reachable from its own edge chevron)
+      //   Cmd+Ctrl+Shift+[         → toggle the LEFT panel only
+      //   Cmd+Ctrl+Shift+]         → toggle the RIGHT panel only
       //
-      // Root cause of the desync this replaces (that history also included a
-      // third, now-deleted visible state — the C4 auto-hide, retired in M3/S2d):
-      // after a chevron press the visible state and the raw `collapsed` flags
-      // disagreed. The old code derived `next` from `collapsed.left &&
-      // collapsed.right`, i.e. from the STATE, while the user was watching the
-      // SCREEN: a left-only collapse read as "not both collapsed" → next=true →
-      // it wrote right:true for a right panel that was already hidden, so the
-      // press changed nothing the eye could see. Reading the VISIBLE state and
-      // writing both sides in ONE setState (see `setPanelsVisible`) makes that
-      // failure unreachable — and with only ONE flag per side left, there is no
-      // residue (the retired `pinned`) that could hold a panel open either.
-      if (mod && e.shiftKey && k === '\\') {
+      // THE GROUP CHORD GAINED A MODIFIER. It used to be one modifier plus
+      // Shift; on macOS the user asked for Cmd AND Ctrl together. `mod` above is
+      // meta-OR-ctrl, so it cannot express a two-modifier chord — the real
+      // modifier PAIR is tested below instead, per platform.
+      //
+      // MATCHED ON `e.code`, NEVER on the `k` string read above. All three
+      // chords carry Shift, and Shift rewrites the character a key delivers, so
+      // a character match against the bracket glyph would never fire. This is
+      // the same trap Shift+1 / Shift+2 higher up avoid by matching the physical
+      // Digit1 / Digit2 keys.
+      //
+      // PLACEMENT IS LOAD-BEARING and unchanged from the binding this replaces:
+      // these branches sit BELOW the read-only early-return above (panel
+      // visibility is a persisted layout mutation, so review mode must swallow
+      // them exactly as it swallowed the chord before) and BELOW the overlay
+      // guard, so a stray chord cannot flip panels behind the tour, help, a
+      // board menu or the insert palette. They sit ABOVE the arrow-nudge, `?`
+      // and `/` branches, which they shadow.
+      //
+      // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
+      // desync unreachable: the old code derived `next` from the raw collapse
+      // flags, so a left-only collapse wrote both sides as hidden for a right
+      // panel that was already hidden and the press changed nothing the eye
+      // could see. ONE atomic `setPanelsVisible` write of both sides is the fix;
+      // do not reintroduce a second path.
+      //
+      // NON-MAC: there is no Cmd key, so the group chord keeps the form this app
+      // already shipped on Windows/Linux — Ctrl+Shift — and the two per-side
+      // chords mirror onto the bracket keys. Documented in Settings → Shortcuts
+      // and README so the documentation matches the code.
+      const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+      const panelChord = mac ? (e.metaKey && e.ctrlKey && e.shiftKey) : (e.ctrlKey && e.shiftKey);
+      if (panelChord && e.code === 'Backslash') {
         e.preventDefault();
         const {left, right} = hiddenRef.current;
         // any panel visible → hide both; none visible → show both
         setPanelsVisible(left && right);
+        return;
+      }
+      if (panelChord && e.code === 'BracketLeft') {
+        e.preventDefault();
+        togglePanel('left');
+        return;
+      }
+      if (panelChord && e.code === 'BracketRight') {
+        e.preventDefault();
+        togglePanel('right');
         return;
       }
       // arrow keys nudge the selection: 1px, Shift+arrow 10px
@@ -3273,28 +3305,46 @@ export default function App() {
   const panelToggle = (side: 'left' | 'right') => {
     const hidden = side === 'left' ? leftHidden : rightHidden;
     const label = side === 'left' ? 'left panel' : 'inspector';
-    const mod = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl';
-    const title = hidden ? `Expand ${label} — ${mod}⇧\\` : `Collapse ${label} — ${mod}⇧\\`;
+    // PACKAGE-Q. Two different spellings of the same physical key, deliberately:
+    //   * the DISPLAY chord is what the user reads on the chips below;
+    //   * `aria-keyshortcuts` takes the ARIA token spelling of the key the
+    //     handler matches on (`BracketLeft`/`BracketRight`), never a glyph and
+    //     never the shifted character.
+    // The chord itself mirrors the handler: Cmd+Ctrl+Shift on macOS, and the
+    // shipped Ctrl+Shift form elsewhere (no Cmd key exists there).
+    const macPlatform = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+    const sideKey = side === 'left' ? 'BracketLeft' : 'BracketRight';
+    const sideGlyph = side === 'left' ? '[' : ']';
+    const ariaChord = `${macPlatform ? 'Meta+Control' : 'Control'}+Shift+${sideKey}`;
     // M3/S4+S5: in a drawer/sheet layout this same control is the overlay
     // OPENER, not the collapse flag. The chevron keeps pointing the way it
     // always did and the Step 2 collapse flag is left completely alone, so a
     // tablet never rewrites the desktop layout the user configured.
     const isOverlay = overlayMode !== null;
     const ovOpen = overlay === side;
-    const shown = isOverlay ? overlayTitle(side, ovOpen, overlayMode ?? 'drawer') : title;
+    // The tooltip's ACTION text, which is also the accessible name. `aria-label`
+    // is NOT replaced by the tooltip: assistive tech gets the name here, and the
+    // chord through `aria-keyshortcuts`, whether or not a popover is visible.
+    const action = isOverlay
+      ? overlayTitle(side, ovOpen, overlayMode ?? 'drawer')
+      : `${hidden ? 'Expand' : 'Collapse'} ${label}`;
     // left: collapse points left (outward), expand points right (inward).
     // right: mirrored.
     const Icon = side === 'left'
       ? (hidden ? ChevronRight : ChevronLeft)
       : (hidden ? ChevronLeft : ChevronRight);
-    return (
+    const button = (
       <button
         type="button"
         className={`panel-toggle${hidden && !isOverlay ? ' hidden' : ''}`}
         data-panel-toggle={side}
         data-overlay-toggle={isOverlay ? overlayMode : undefined}
-        aria-label={shown}
+        aria-label={action}
         aria-expanded={isOverlay ? ovOpen : !hidden}
+        // No chord while this control opens an overlay: no keyboard shortcut
+        // opens a drawer or a bottom sheet, and advertising one here would be a
+        // promise the handler does not keep.
+        aria-keyshortcuts={isOverlay ? undefined : ariaChord}
         onClick={() => {
           if (isOverlay) { openOverlay(side); return; }
           togglePanel(side);
@@ -3302,6 +3352,24 @@ export default function App() {
       >
         <Icon size={14} />
       </button>
+    );
+    // Keys render as `kbd` chips, gestures as plain text — the app's rule. The
+    // overlay tier keeps its plain-text tooltip and carries NO chord.
+    if (isOverlay) return button;
+    return (
+      <Tooltip
+        label={
+          <>
+            {action} <span className="tt-keys">
+              <kbd>{macPlatform ? '⌘' : 'Ctrl'}</kbd>
+              {macPlatform && <kbd>⌃</kbd>}
+              <kbd>⇧</kbd><kbd>{sideGlyph}</kbd>
+            </span>
+          </>
+        }
+      >
+        {button}
+      </Tooltip>
     );
   };
 
@@ -3935,7 +4003,9 @@ export default function App() {
                 surfaces carry the same information (item 4), not just the same
                 labels */}
             <div className="help-row"><span>Nudge selection<span className="help-hint">1px per keypress, 10px with ⇧</span></span><span className="help-keys"><kbd>←↑↓→</kbd></span></div>
-            <div className="help-row"><span>Collapse / expand panels</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>{'\\'}</kbd></span></div>
+            <div className="help-row"><span>Collapse / expand both panels</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>{'\\'}</kbd></span></div>
+            <div className="help-row"><span>Toggle left panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>[</kbd></span></div>
+            <div className="help-row"><span>Toggle right panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>]</kbd></span></div>
             <div className="help-group">Mouse &amp; trackpad</div>
             <div className="help-row"><span>Insert node</span><span className="gesture"><span className="gesture-token">double-click canvas</span></span></div>
             <div className="help-row"><span>Connect nodes</span><span className="gesture"><span className="gesture-token">drag from a node edge</span></span></div>

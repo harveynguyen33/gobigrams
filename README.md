@@ -129,7 +129,9 @@ JSON document. There is no account and no backend.
 | Scroll / two-finger swipe | Pan (both axes) |
 | `Ctrl`/`Cmd` + scroll (trackpad pinch) | Zoom |
 | `Space` + drag / middle-drag | Pan |
-| `Cmd/Ctrl + Shift + \` | Collapse / expand both side panels |
+| `Cmd/Ctrl + Ctrl + Shift + \` (`Ctrl + Shift + \` on Windows/Linux) | Collapse / expand both side panels |
+| `Cmd/Ctrl + Ctrl + Shift + [` (`Ctrl + Shift + [` on Windows/Linux) | Toggle the left panel |
+| `Cmd/Ctrl + Ctrl + Shift + ]` (`Ctrl + Shift + ]` on Windows/Linux) | Toggle the right panel |
 
 The same list is available in-app behind the **?** button.
 
