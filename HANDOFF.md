@@ -1,8 +1,52 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (midday) · **Status:** PACKAGE-P **passes 1 and 2 shipped** (inspector: per-type
-sections + icon pickers; then the Text section) and PACKAGE-Q shipped (panel hotkeys).
-**Next: PACKAGE-P pass 3 — the collapse UI + `diagram-studio:inspector-sections` persistence.**
+**Last session:** 2026-09-19 (midday) · **Status:** ✅ **PACKAGE-P COMPLETE — all three passes shipped and
+orchestrator-verified** (per-type sections + icon pickers · the Text section · the fold UI + persistence).
+PACKAGE-Q (panel hotkeys) shipped the same session.
+**Next: Harvey's Mac test of PACKAGE-P + PACKAGE-Q, then PACKAGE-N (the palette redesign) — its spec is
+already written.**
+
+> ## ✅ PACKAGE-P COMPLETE (2026-09-19) — the inspector rebuild
+>
+> **What it delivers, per Harvey's three asks:** per-shape-type sections (19 goblin shapes used to share ONE
+> panel), icon pickers instead of text dropdowns (**the app now renders ZERO native `<select>`**), and the
+> rarely-changed controls folded with their current value on the trigger.
+>
+> **The three passes:**
+> 1. `src/inspector.ts` — ONE pure decision function, `getInspectorSections(target)`, mirroring upstream's
+>    `shapeActionPredicates.ts`. `src/InspectorPickers.tsx` — the picker kit; all 12 `<select>`s converted.
+> 2. `src/textStyle.ts` — the Text section (size / weight / colour / align). Option B, from the Excalidraw
+>    research. **`size` is a MULTIPLIER** (`--ts-scale`, ladder 0.85/1/1.15/1.3, `1` = Default = not written)
+>    because one node already paints FOUR sizes and the hierarchy IS the ladder.
+> 3. `src/inspectorState.ts` — the fold UI + `diagram-studio:inspector-sections`.
+>
+> **FOUR defects were found during verification, ALL invisible to the harness as it stood — three in pass 2:**
+> 1. **Double render.** `secBody` both registered a body AND returned it; all 11 call sites rendered the return
+>    value, so every section painted TWICE and Cardinality three times. `secBody` now registers only;
+>    `renderSections` is the ONE painter.
+> 2. **A stored align that was never painted.** `textStyleVars` hard-coded `left`, but align's default is
+>    **per-target** (`center` for `label-only`). Executed both pure functions together: `label-only + Left`
+>    stored `{"align":"left"}` and returned `vars={}` — saved and dropped.
+> 3. **The variable losing to a more specific rule.** `.node.label-only .lo-body` (specificity 0,3,0) beat
+>    `.node .lo-body` (0,2,0) and pinned `text-align: center` **plus** `align-items: center`.
+> 4. A **vacuous assertion** from pass 1 (a slice cut at the first `\n}`, so it asserted against an empty
+>    string and passed on anything) — found by the coder, fixed with a length floor.
+>
+> **Defects 2 and 3 are the SAME bug class: one rule with two copies, one right and one guessing.** The harness
+> missed them because it asserted *presence*, not *precedence*. It now carries a cross-check for every
+> `(align default, choice)` pair and a **specificity sweep** over every `--ts-*` consumer that fails on the
+> pre-fix tree. **Read `references/verifying-token-driven-styles.md` in the diagram-studio skill** before
+> touching any token-driven style feature — the three traps, the geometry measurement, and the probe hygiene
+> (`.tour-overlay` AND `.gsc` swallow clicks; CDP keys do not reach React) that also cost time here.
+>
+> **§C's ambiguity, resolved:** Style does NOT fold; the goblin `body` toggle moved behind a SECOND-LEVEL
+> disclosure inside Style (`▸ body: card`). The old `<label>body</label>` is gone.
+>
+> **Verified live:** text lands where the user chose (span offset 14/57/35 = left/right/centred in a 186px
+> block, and back to the default drops the stored key); size XL `1.3` → title 18.85px, S `0.85` → 12.325px;
+> the fold survives a reload; folded rows read `ends: one → zero or many` and `flow: on · 3`; 0 overflow
+> against the 288px panel; and with the in-place editor focused, clicking a Text control left the editor
+> **open** and the text **uncommitted** (§E.3(b)).
 
 > **PACKAGE-P pass 2 — the Text section (§E).** `src/textStyle.ts` (NEW, React-free). `text` enters the goblin
 > section list **BETWEEN `content` and `style`** — the omission pass 1 documented in its own header, now
@@ -142,22 +186,20 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**PACKAGE-P pass 2 — the Text section (size / weight / colour / align) + the §E.3 editing behaviours.**
-Then pass 3 (the collapse UI + `diagram-studio:inspector-sections` persistence). **Harvey reviews between
-passes.** The spec of record is `PACKAGE-P-SPEC.md` §E; pass 1 shipped §A/§B/§D (see the top of this file).
+**PACKAGE-P is COMPLETE.** Harvey's Mac test of PACKAGE-P + PACKAGE-Q, then **PACKAGE-N — the palette
+redesign** (`PACKAGE-N-SPEC.md` is already written; the Excalidraw/draw.io research in
+`diagram-studio-research/` is its basis). Keep the review-gated pass discipline: land one pass, verify it live,
+then the next — a mistake in pass 1 gets built on three times otherwise.
 
-**Pass 2 must also do the one thing pass 1 deliberately left OUT** (and said so in `src/inspector.ts`):
-`getInspectorSections` does **not** return a `text` section for a goblin yet, because the render layer cannot
-paint it — returning an id the panel cannot draw would make the decision function disagree with the panel.
-Pass 2 inserts `text` BETWEEN `content` and `style` in that one array, in the same pass that adds its body.
+**The pass-2 note that pass 3 resolved** (`getInspectorSections` not returning `text` for a goblin) is settled;
+`text` sits between `content` and `style` in that one array. The panel's label `<textarea>` is gone — the label
+target has exactly ONE text editor, the in-place one.
 
-**Pass 2's other load-bearing item:** the panel's label `<textarea>` (`App.tsx:~4523`) is a **second writer**
-for the same `text` the in-place `LabelNode` editor writes. The spec removes it — but ONLY in the same pass that
-adds its replacement (§E.3.1). Do not remove it alone.
-
-**Harvey re-tests:** click a node of each kind and confirm the panel differs per shape (`group` has no
-kicker/metric, `note` has no metric/icon); the 12 dropdowns are now icon pickers; the chevrons show
-`Cmd+Ctrl+Shift+[` / `]` on hover; and the three hotkeys toggle left / right / both.
+**Harvey re-tests:** click each shape kind and confirm the panel differs (`group` has no kicker/metric, `note`
+has no metric/icon); the 12 dropdowns are icon pickers; **expand/collapse Cardinality and Flow on an ERD edge,
+reload, and confirm the fold is remembered**; the chevrons show `Cmd+Ctrl+Shift+[` / `]`; and the three hotkeys
+toggle left / right / both. Also: **two onboarding layers swallow clicks** — `.tour-overlay` and the
+`Getting started` checklist (`.gsc`). If a click does nothing on a fresh profile, it is one of those, not a bug.
 
 **Known debt, unchanged:** `checks/package-q-reconnect-endpoints.mjs` reports **15** failures — 11 assert the
 endpoint disc the user asked to delete in ROUND T, 2 are its old fixture failures, and 2 more are its
