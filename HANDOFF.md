@@ -1,13 +1,35 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (night) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + **AB**
-(3 fixes verified live) + **AC** (flowchart mockup, awaiting Harvey's review).
-**Awaiting Harvey:** review `mockup-flowchart-symbols.html` → pick a colour direction
-(A one-colour / B keep-the-key-labelled / C minimal-principled), decide which missing
-symbols to add (Off-page connector, Manual input, Display, Stored data, Loop limit,
-Internal storage are "every tool ships this"), and pick the Terminal ratio (1.50 / 1.33).
-**Next: Harvey's Mac test, then the flowchart decisions build, then PACKAGE-N** (the
-palette redesign) — its spec is already written...
+**Last session:** 2026-09-19 (night) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
+**AD + AE** shipped (flowchart decisions + id-based favourite removal). All orchestrator-verified live.
+**Next: Harvey's Mac test, then PACKAGE-N** (the palette redesign) — its spec is already written.
+
+## ROUND AD + AE — Harvey's flowchart decisions, built
+
+Harvey reviewed `mockup-flowchart-symbols.html` (ROUND AC) and answered four questions:
+**1. Colour = OPTION B** — he keeps the editor's own semantic colour grouping
+("tôi muốn thiết kế theo ý tôi trước, đó là điểm khác biệt"). The honest caveat stands and he
+accepted it deliberately: the research PROVED no standard colour scheme exists (draw.io's
+flowchart stencil contains zero `fillColor`; Mermaid uses one `nodeBkg` for every node). Two
+conditions were attached and both are met: **(a)** the key is labelled where the user actually
+looks — `Colour = our grouping, not ISO.`, rendered as markup (survives touch), one line, at
+the colour control, dismissible with the dismissal persisted; **(b)** the colour stays
+**overridable per node** — proven live, green `rgb(74,222,128)` → violet `rgb(167,139,250)`.
+   - **2. Symbol set** — the six "every tool ships this" symbols added: Off-page connector,
+     Manual input, Display, Stored data, Loop limit, Internal storage. All six PAINT with six
+     distinct geometries and all six are searchable.
+   - **3. Terminal 1.69 → 1.50** (270×180), in both the palette entry and the template path.
+   - **4. Id-based favourite removal** — done; the collision case is PROVEN (two unnamed
+     favourites, remove one, the other survives).
+   - **`body: card` on flowchart — the orchestrator was WRONG and the coder was right.** I
+     concluded from `fc()`'s hard-coded `label-only` that the control was dead UI. Harvey's own
+     board disproves it: node `n118` is a `terminator` with `body: card` and a metric. The
+     insert paths merely never *default* to card; a user can and does use it. Nothing was
+     removed, correctly.
+   - Harness: `round-ad-flowchart` 19/19 (incl. a GENERIC hint-agreement sweep that failed on
+     the tree first — 6 drift pairs found), `round-ae-favourite-id` 10/10.
+   - **Still owed:** `body: card` needs no fix; **vault debt** — ROUNDS S…AE are not yet in
+     ADR-031 / the Change Log.
 
 > ## ✅ ROUND AA (2026-09-19) — equal-width rows, a marquee-mode SETTING, the palette typo
 >
