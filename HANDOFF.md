@@ -1,7 +1,13 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (evening) · **Status:** ✅ PACKAGE-P + ROUND W + X + Y + Z + **AA** shipped.
-**Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+**Last session:** 2026-09-19 (night) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + **AB**
+(3 fixes verified live) + **AC** (flowchart mockup, awaiting Harvey's review).
+**Awaiting Harvey:** review `mockup-flowchart-symbols.html` → pick a colour direction
+(A one-colour / B keep-the-key-labelled / C minimal-principled), decide which missing
+symbols to add (Off-page connector, Manual input, Display, Stored data, Loop limit,
+Internal storage are "every tool ships this"), and pick the Terminal ratio (1.50 / 1.33).
+**Next: Harvey's Mac test, then the flowchart decisions build, then PACKAGE-N** (the
+palette redesign) — its spec is already written...
 
 > ## ✅ ROUND AA (2026-09-19) — equal-width rows, a marquee-mode SETTING, the palette typo
 >
