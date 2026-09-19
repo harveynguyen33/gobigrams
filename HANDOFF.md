@@ -1,8 +1,38 @@
 # HANDOFF — Diagram Studio
 
 **Last session:** 2026-09-19 (night) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-**AD + AE** shipped (flowchart decisions + id-based favourite removal). All orchestrator-verified live.
+AD + AE + **AF** shipped. All orchestrator-verified live.
 **Next: Harvey's Mac test, then PACKAGE-N** (the palette redesign) — its spec is already written.
+
+## ROUND AF — flowchart default sizes (the "Terminal is too big" fix)
+
+Harvey: *"sao cái terminal nó to so với các hình khác trong flowchart vậy?"* Approved "hướng 1".
+
+**The real bug was worse than a Terminal that was too big.** Only THREE of sixteen flowchart
+entries declared a size; the other thirteen wrote no `style.width/height` and fell back to the CSS
+floor (`min-width:190px`, auto height) — measured live at **190 × 27–77px**, slivers, while the
+Terminal was ~7× their area.
+
+**The root cause, and it corrected our own earlier decision.** Every silhouette is drawn in ONE
+frame — `shapes.tsx:111`, `viewBox="0 0 200 100" preserveAspectRatio="none"` — so the geometry is
+**stretched to its box**, and **ratio 2.0 is the only ratio that does not distort**. PROVEN by
+rendering the `connector` (a circle in that frame) at four box ratios and measuring the painted
+result: **2.00 → 1.00 round; 1.67 → 0.83; 1.50 → 0.75; 1.00 → 0.63.** So Decision (1.56) and the
+on-page connector (1.00) had been distorted all along, and the Terminal's caps at 1.50 were
+elliptical.
+
+**FIX:** one exported `FLOWCHART_NODE_SIZE = {width: 290, height: 145}` for all sixteen entries
+plus the template seeds. Ratio exactly 2.000. **Terminal −13.5% area** (came down, not the rest up).
+Coder picked **145, not 140**: the floor is enforced only by the resizer, and a 140-tall node
+**ratchets** (140→139→137→133…) on the first horizontal resize, while 145 is inert. Floor
+constants unchanged.
+
+**`ROUND AD's Terminal 1.50 (270×180) is SUPERSEDED** — it was chosen before the roundness
+measurement existed. Flagged to Harvey, not silently changed.
+
+Verified live: connector roundness **1.000** (139.2×139.2, was 0.63); all sixteen render
+**290×145**, one distinct value; no label clipping at 145; resizer holds height, clamps at
+200×145, survives a zero-movement grip click. Harness `round-af-flowchart-sizes` **21/21**.
 
 ## ROUND AD + AE — Harvey's flowchart decisions, built
 
