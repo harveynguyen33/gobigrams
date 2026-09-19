@@ -1498,6 +1498,164 @@ assert('o.CollapsedDefault-is-not-mutated-by-the-fold-module',
   + 'inspector.ts still reads cardinality=true, flow=true after every write above');
 
 /* ===========================================================================
+   (p) ROUND W — THE FONT PICKER AND THE CUSTOM SIZE.
+
+   Both are §E.2 fields: a choice equal to the default stores ABSENCE. This
+   section proves that for `font` and for a typed `1`, and it proves the two
+   facts that only the FILE SYSTEM can answer: every `@font-face` carries a
+   `unicode-range`, and every file it names EXISTS under `public/fonts/`.
+
+   WHY THE FILE CHECK MATTERS. The sheet is the only thing that names the 24
+   woff2 files, and a declaration pointing at a missing file is a SILENT
+   failure: the page renders in the fallback stack and nothing throws. A test
+   that only reads the CSS would pass on a sheet whose fonts are all absent.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(p) ROUND W — the font picker (ITEM 2) and the custom size (ITEM 3)');
+console.log('='.repeat(78));
+const {existsSync} = await import('node:fs');
+
+/* --- (p1) THE OPTION TABLE, and that each pick carries its role ---------- */
+const FONT_ROLES = {mono: 'cod', ui: 'architect', read: 'read', viet: 'Vietnam'};
+console.log(`  TEXT_FONT_OPTS at src/textStyle.ts:${at(TS_RAW, 'export const TEXT_FONT_OPTS')}  `
+  + `TEXT_FONT_FAMILY at :${at(TS_RAW, 'export const TEXT_FONT_FAMILY')}`);
+assert('p.font-option-table-exists-with-all-four-picks',
+  TS.includes('TEXT_FONT_OPTS') && M.TEXT_FONT_OPTS.length === 4
+    && M.TEXT_FONT_OPTS.map(o => o.v).join() === 'mono,ui,read,viet'
+    && M.TEXT_FONT_OPTS.every(o => typeof o.hint === 'string' && o.hint.length > 0),
+  `the four picks are [${M.TEXT_FONT_OPTS.map(o => o.v).join(', ')}], each with the role that `
+  + 'justifies it: ' + M.TEXT_FONT_OPTS.map(o => `${o.label}=${o.hint}`).join('; '));
+assert('p.each-pick-carries-the-role-it-was-chosen-for',
+  Object.entries(FONT_ROLES).every(([k, needle]) =>
+    M.TEXT_FONT_OPTS.find(o => o.v === k)?.hint.toLowerCase().includes(needle.toLowerCase())),
+  'mono→coding, ui→architecture, read→read, viet→Vietnamese diacritics');
+assert('p.the-picker-is-the-existing-primitive-and-not-a-select',
+  APP.includes('const FONT_OPTS') && APP.includes('<IconPickerRow')
+    && countOf(APP, 'options={FONT_OPTS}') === 1 && countOf(APP, '<FONT_OPTS') === 0
+    && countOf(APP, '<select') === 0,
+  `FONT_OPTS drives one IconPickerRow (trigger + popover, the §B #2-#6 idiom); App.tsx still `
+  + `renders ${countOf(APP, '<select')} native dropdowns anywhere`);
+assert('p.every-option-previews-its-own-family',
+  APP.includes("className=\"insp-opt-label insp-font-sample\"")
+    && APP.includes('fontFamily: TEXT_FONT_FAMILY[o.v]')
+    && STYLES_RAW.includes('.insp-font-sample'),
+  'each option renders its own NAME in its own family — via the `{o.art}` cell the picker already '
+  + 'draws on both the trigger and the popover, so no new prop was needed on IconPickerRow');
+
+/* --- (p2) THE DECLARATIONS AND THE FILES --------------------------------- */
+const FACES = [...STYLES_RAW.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(m => m[1]);
+const faceFamily = f => /font-family:\s*'([^']+)'/.exec(f)?.[1] ?? null;
+const faceFile = f => /url\('\/fonts\/([^']+)'\)/.exec(f)?.[1] ?? null;
+const declared = new Set(FACES.map(faceFamily).filter(Boolean));
+const noRange = FACES.filter(f => !/unicode-range:/.test(f));
+const noFile = FACES.map(faceFile).filter(Boolean).filter(n => !existsSync(`${ROOT}/public/fonts/${n}`));
+const ranges = new Set(FACES.map(f => /unicode-range:\s*([^;]+);/.exec(f)?.[1].trim()));
+console.log(`  @font-face blocks in src/styles.css: ${FACES.length}  `
+  + `(weights × families × subsets); families declared: [${[...declared].join(', ')}]`);
+console.log(`  distinct unicode-ranges: ${ranges.size}  files referenced: ${FACES.length}  `
+  + `files missing on disk: ${noFile.length}`);
+assert('p.every-font-face-declares-a-unicode-range',
+  FACES.length === 24 && noRange.length === 0,
+  `${FACES.length} @font-face blocks, ${noRange.length} without a unicode-range — 4 families × `
+  + '2 weights × 3 subsets, so a page fetches only the subset it renders');
+assert('p.every-referenced-font-file-EXISTS-under-public-fonts',
+  noFile.length === 0 && FACES.every(f => faceFile(f) !== null),
+  noFile.length === 0
+    ? `${FACES.length} referenced woff2 files all present in public/fonts/ (a missing one renders `
+      + 'the fallback stack and throws nothing, which is why this is checked on disk)'
+    : `MISSING: [${noFile.join(', ')}]`);
+assert('p.the-three-ranges-are-the-three-subset-ranges',
+  ranges.size === 3,
+  `the three ranges are latin / latin-ext / vietnamese, identical across all four families because `
+  + 'Google defines the subsets once — copied verbatim, none invented');
+assert('p.the-four-families-in-the-model-are-the-four-declared',
+  [...declared].sort().join('|') === 'Be Vietnam Pro|Inter|JetBrains Mono|Lexend'
+    && M.TEXT_FONT_OPTS.every(o => {
+      const first = M.TEXT_FONT_FAMILY[o.v].match(/'([^']+)'/)?.[1]
+        ?? M.TEXT_FONT_FAMILY[o.v].match(/var\((--[\w-]+)\)/)?.[1];
+      return first != null;
+    }),
+  `declared: [${[...declared].sort().join(', ')}] — every pick's stack opens with a family the sheet `
+  + 'actually declares (or the `--mono` token whose declaration owns that family)');
+/* NEGATIVE CONTROL — the file check must SEE an absent file. */
+assert('p.control-the-font-file-check-detects-an-absent-file',
+  !existsSync(`${ROOT}/public/fonts/definitely-not-a-font.woff2`)
+    && existsSync(`${ROOT}/public/fonts/inter-400-latin.woff2`),
+  'the probe returns false for a name the brief never mentions and true for a real file');
+
+/* --- (p3) THE DEFAULT PICK WRITES NOTHING (§E.2) ------------------------- */
+const fontBad = [];
+for (const d of REAL_DEFAULTS) {
+  for (const pick of ['mono', 'ui', 'read', 'viet']) {
+    const stored = M.mergeTextStyle(undefined, {font: pick}, d.def);
+    const vars = M.textStyleVars(stored, d.def);
+    const want = pick === M.TEXT_DEFAULT_FONT;
+    const ok = want
+      ? (stored === undefined && !('--ts-font' in vars))
+      : (vars['--ts-font'] === M.TEXT_FONT_FAMILY[pick] && stored?.font === pick);
+    if (!ok) fontBad.push({d, pick, stored, vars});
+  }
+}
+console.log(`  font × ${REAL_DEFAULTS.length} target defaults × 4 picks: `
+  + `${REAL_DEFAULTS.length * 4 - fontBad.length}/${REAL_DEFAULTS.length * 4} as expected`);
+assert('p.a-pick-equal-to-the-default-writes-NOTHING',
+  fontBad.length === 0 && M.TEXT_DEFAULT_FONT === 'mono'
+    && M.mergeTextStyle(undefined, {font: 'mono'}, 'left') === undefined,
+  `${REAL_DEFAULTS.length * 4} cells — Mono stores nothing and paints nothing (a node the user `
+  + 'never touched keeps NO textStyle at all); the other three store the KEY and emit `--ts-font` '
+  + 'as the resolved stack');
+/* NEGATIVE CONTROL for the same rule: a NON-default pick must not be dropped,
+   or "the default writes nothing" would pass on a merge that writes nothing ever. */
+assert('p.control-a-non-default-pick-is-stored-and-painted',
+  (() => {
+    const s = M.mergeTextStyle(undefined, {font: 'viet'}, 'left');
+    const v = M.textStyleVars(s, 'left');
+    return JSON.stringify(s) === '{"font":"viet"}' && v['--ts-font'] === M.TEXT_FONT_FAMILY.viet;
+  })(),
+  'Viet → stored {"font":"viet"} and painted as the Be Vietnam Pro stack');
+
+/* --- (p4) THE CUSTOM SIZE ------------------------------------------------- */
+console.log(`  TEXT_SCALE_MIN=${M.TEXT_SCALE_MIN}  TEXT_SCALE_MAX=${M.TEXT_SCALE_MAX}`);
+assert('p.the-clamp-bounds-are-0.5-and-2.0',
+  M.TEXT_SCALE_MIN === 0.5 && M.TEXT_SCALE_MAX === 2
+    && M.clampTextScale(0.1) === 0.5 && M.clampTextScale(9) === 2
+    && M.clampTextScale(1.7) === 1.7 && M.clampTextScale(2) === 2
+    && M.clampTextScale(0.5) === 0.5,
+  `Harvey's range: 0.1 → ${M.clampTextScale(0.1)}, 9 → ${M.clampTextScale(9)}, `
+  + `1.7 → ${M.clampTextScale(1.7)} (inside the range is untouched)`);
+assert('p.a-literal-1-stores-ABSENCE',
+  M.clampTextScale(1) === null
+    && M.mergeTextStyle(undefined, {scale: M.clampTextScale(1)}, 'left') === undefined
+    && M.mergeTextStyle({scale: 1.7}, {scale: M.clampTextScale(1)}, 'left') === undefined
+    && Object.keys(M.textStyleVars(M.mergeTextStyle(undefined, {scale: null}, 'left'), 'left')).length === 0,
+  'typing 1 behaves exactly like picking M: the custom key is dropped and `--ts-scale` is not '
+  + 'emitted, so a typed 1 and the default are ONE representation and cannot drift');
+assert('p.a-custom-value-overrides-the-step-and-they-never-coexist',
+  (() => {
+    const custom = M.mergeTextStyle({size: 'lg'}, {scale: 1.7}, 'left');
+    const stepped = M.mergeTextStyle(custom, {size: 'xl'}, 'left');
+    const back = M.mergeTextStyle(stepped, {scale: 1.7}, 'left');
+    console.log(`  lg+1.7 → ${JSON.stringify(custom)}   then XL → ${JSON.stringify(stepped)}   `
+      + `then 1.7 again → ${JSON.stringify(back)}`);
+    return JSON.stringify(custom) === '{"scale":1.7}'
+      && JSON.stringify(stepped) === '{"size":"xl"}'
+      && JSON.stringify(back) === '{"scale":1.7}'
+      && M.textStyleVars(custom, 'left')['--ts-scale'] === '1.7';
+  })(),
+  'one property, one writer: picking a step clears the custom value and typing one clears the step');
+assert('p.the-custom-input-is-a-real-input-and-clamped-on-commit',
+  APP.includes('id="insp-text-scale"') && APP.includes('type="number"')
+    && APP.includes('min={TEXT_SCALE_MIN}') && APP.includes('max={TEXT_SCALE_MAX}')
+    && APP.includes('writeTextStyle({scale: clampTextScale(n)})')
+    && countOf(APP, 'clampTextScale(') === 1,
+  'a real `<input type="number">` — which is what keeps the canvas shortcuts inert, because '
+  + "App.tsx's keydown opens with `if (isEditable(e.target)) return;` and `isEditable` (App.tsx:367) "
+  + 'returns true for INPUT — and the only write goes through the clamp');
+assert('p.control-the-clamp-detects-an-out-of-range-value',
+  M.clampTextScale(0.1) !== 0.1 && M.clampTextScale(9) !== 9,
+  'the bounds are enforced, not merely documented in a hint');
+
+/* ===========================================================================
    SUMMARY
    =========================================================================== */
 const failed = results.filter(r => !r.pass);

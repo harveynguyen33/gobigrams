@@ -409,7 +409,19 @@ export function Section({id, title, collapsedDefault, collapsed, onToggle, reado
         aria-controls={bodyId}
         onClick={() => onToggle(id)}
       >
-        <span className="insp-sec-caret" aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+        <span className="insp-sec-caret" aria-hidden="true" data-open={!collapsed}>
+          {/* ROUND W, ITEM 1 — A DRAWN TRIANGLE, NOT A TEXT GLYPH. The row used
+              to print U+25B8 (`▸`) / U+25BE (`▾`) in `var(--mono)`. Those
+              glyphs exist in some monospace faces and not others, so the one
+              affordance the folded state had could render as a tofu box — and
+              at 10px it read as a smudge even when it did render. A path in
+              `currentColor` reads at this size in EVERY font, and it inherits
+              the row's hover colour for free. It rotates rather than swapping
+              `d`, so the two states cannot disagree about the shape. */}
+          <svg width="10" height="10" viewBox="0 0 10 10" focusable="false">
+            <path d="M3.4 1.6 L7.6 5 L3.4 8.4 Z" fill="currentColor" />
+          </svg>
+        </span>
         {/* `.insp-sec-title` stays on the LABEL so the section's title is still
             counted once per section by the render check, folded or not. */}
         <span className="sec-label insp-sec-title">{title}</span>

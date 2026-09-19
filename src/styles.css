@@ -1307,6 +1307,19 @@ body {
 .insp-opt:hover { border-color: var(--sel); color: var(--sel); }
 .insp-opt.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-opt-glyph { display: grid; place-items: center; width: 26px; height: 18px; flex: none; }
+/* ROUND W, ITEM 2 — the font picker's sample. The glyph cell is 26px wide in a
+   popover row and 18px in a trigger, and neither can hold a family NAME, so a
+   cell holding a sample is allowed to size to it and take the row's spare
+   width. Every OTHER row in this panel keeps its fixed cell and the `{o.art}`
+   path it always had.
+   THE TRIGGER'S NAME IS HIDDEN where a sample is present, because the sample
+   already IS the name: without this the button would read "Mono Mono". The text
+   is not lost — the sample span carries it, so the button's accessible name is
+   unchanged. */
+.insp-opt-glyph:has(.insp-font-sample) { width: auto; justify-content: start; }
+.icon-trigger-glyph:has(.insp-font-sample) { width: auto; }
+#insp-text-font:has(.insp-font-sample) .icon-trigger-name { display: none; }
+.insp-font-sample { flex: none; font-size: 13.5px; }
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list
    rather than `.insp-opt-list`'s single-line rows. */
@@ -1353,13 +1366,81 @@ body {
   color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   padding: 8px 0;
 }
+/* ROUND W, ITEM 3 — THE CUSTOM SIZE, beside the steps. It is a real `<input>`,
+   which is the whole reason it cannot fire the canvas shortcuts: App.tsx's
+   keydown handler opens with `if (isEditable(e.target)) return;` and
+   `isEditable` (App.tsx:367) returns true for `INPUT`. Bare `d`/`z`/`?` and the
+   arrow nudge are therefore inert while the caret is in this box.
+   `width: 62px` fits "2.0" with room for the `×` suffix; the box is the same
+   height as the segmented row beside it so the two sit on one line. */
+.insp-num {
+  width: 62px; flex: none; box-sizing: border-box;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 7px; font-family: var(--mono); font-size: 12px;
+  outline: none; transition: border-color .15s;
+}
+.insp-num:hover { border-color: var(--border-strong); }
+.insp-num:focus { border-color: var(--sel); }
+/* The unit is a LABEL, not part of the value: the input itself holds a bare
+   number, so `Number('2')` is all the handler has to parse and the `×` cannot
+   reach the parse. */
+.insp-num-row { display: flex; align-items: center; gap: 7px; }
+.insp-num-row .insp-num-unit {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
 /* The section wrapper. Sections stack with the same rule the old hand-written
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
    gap between neighbours, none before the first. */
 .insp-section + .insp-section {
   margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--border);
 }
-.insp-sec-title { margin: 0 0 10px 2px; }
+/* ===========================================================================
+   ROUND W, ITEM 1 — THE SECTION HEADER MUST READ AS A HEADER.
+
+   THE MEASURED DEFECT (live, on a selected node): this title was 11px /
+   var(--dim) / 0.1em tracking — BYTE-IDENTICAL to a `.field label` inside a
+   section — and a folded section was a 17px dim strip whose only affordance was
+   a 10px dim caret. No hierarchy, no visible affordance. Three changes, and
+   they are the whole fix:
+
+     HIERARCHY   13px / var(--fg) against the `.field label`'s 11px / var(--dim).
+                 The field label is NOT shrunk to open that gap: shrinking the
+                 label would only move the defect one level down. The title
+                 keeps the app's uppercase-mono treatment (`.sec-label`), which
+                 is what makes it read as THIS PANEL's header rather than as a
+                 new pattern, and the tracking drops to 0.06em because a larger
+                 size needs less air per glyph, not more.
+
+     AFFORDANCE  the caret is now a DRAWN triangle (InspectorPickers.tsx), not
+                 the U+25B8 / U+25BE text glyphs: those are missing from most
+                 monospace faces and rendered as a tofu box in some, which is
+                 exactly the "check, do not assume" the round called out. The
+                 trigger's vertical padding goes 2px -> 6px on each side, so the
+                 row is ~29px instead of 17px, and the row carries a hover
+                 surface: the whole strip is the hit area, not 10px of caret.
+
+     COHERENCE   ONE class serves both states. The trigger row is the only place
+                 a section title is ever rendered — folded (`caret + title +
+                 readout`) or open (`caret + title`, body below) — so the folded
+                 row and the open header cannot drift apart. The
+                 `.insp-section + .insp-section` hairline is untouched.
+
+   WHY NO !important. `.insp-sec-title` is (0,1,0) and sits BELOW `.sec-label`
+   (styles.css:566) in the sheet: equal specificity, later wins, so every value
+   here overrides the generic heading class outright.
+
+   THE LONGEST TITLE, RE-MEASURED. "Cardinality (crow's foot)" is 25 mono
+   glyphs. It measured 192px at 11px/0.1em, i.e. 192 - 24*1.1 = 165.6px of
+   glyph run = 0.602em per glyph in this sheet's `--mono`. At 13px/0.06em:
+   25*13*0.602 + 24*0.78 = 195.6 + 18.7 = ~214px, against 264 - 16 (caret) - 6
+   (row gap) = 242px of room in a 288px panel. It stays on ONE line with ~28px
+   to spare. The readout still wraps to its own line when folded — unchanged,
+   and for the reason its own comment gives. */
+.insp-sec-title {
+  margin: 0 0 10px 2px;
+  font-size: 13px; letter-spacing: 0.06em; color: var(--fg);
+}
 .insp-sec-body { display: block; margin-top: 10px; }
 
 /* ---------- the section fold (PACKAGE-P PASS 3, §C) ----------
@@ -1368,25 +1449,46 @@ body {
    only: no colour literal enters the sheet. */
 .insp-sec-trigger {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  width: 100%; min-width: 0; margin: 0; padding: 2px 2px 2px 0;
+  width: 100%; min-width: 0; margin: 0; padding: 6px 2px 6px 0;
   background: transparent; border: 0; cursor: pointer; text-align: left;
+  border-radius: 6px;
   font: inherit; color: var(--fg);
+  transition: background-color .12s;
 }
+/* ROUND W, ITEM 1 — the hover state the defect asked for. It has to be
+   MEASURABLE, so it is a surface (the elevated token) and not merely a colour
+   shift on a row that is already `--fg`: the row is now ~29px tall and ~264px
+   wide, i.e. the hit area is the whole strip, and hovering it says so. The
+   existing `.insp-sec-trigger:hover .insp-sec-title { color: var(--fg) }` below
+   is now a no-op (the title is `--fg` at rest) and is left alone rather than
+   deleted, because it is the rule that documents the hover contract. */
+.insp-sec-trigger:hover { background: var(--elevated); }
 .insp-sec-trigger:hover .insp-sec-title { color: var(--fg); }
 .insp-sec-trigger:focus-visible {
   outline: 2px solid var(--sel); outline-offset: 2px; border-radius: 4px;
 }
+/* ROUND W, ITEM 1 — the affordance column. 16px wide (was 12) so the 10px
+   triangle has real air around it, and `--fg` (was `--dim`) because a `--dim`
+   caret on a `--dim` title, in a 17px row, is the defect itself. The rotation
+   is the single source of the two states: `data-open` is the live
+   `!collapsed`, so the shape and the fold cannot disagree. */
 .insp-sec-caret {
-  flex: none; width: 12px; color: var(--dim); font-size: 10px; line-height: 1;
+  flex: none; display: grid; place-items: center;
+  width: 16px; color: var(--fg); line-height: 1;
 }
+.insp-sec-caret svg { display: block; transition: transform .15s; }
+.insp-sec-caret[data-open="true"] svg { transform: rotate(90deg); }
 /* The title carries a bottom margin for the standalone case; inside the flex
    row the row's own gap owns that space instead. It never wraps: the longest
-   title ("Cardinality (crow's foot)") is ~192px of the 264px a 288px panel
-   leaves after its padding, so it always fits on the first line. */
+   title ("Cardinality (crow's foot)") was ~192px at the old 11px and is ~214px
+   at the 13px ITEM 1 sets — see the measured derivation in the ITEM 1 header
+   above — against ~242px of room in the 288px panel, so it still always fits on
+   the first line. */
 .insp-sec-trigger .insp-sec-title { margin: 0; white-space: nowrap; }
 /* The folded row's current value, pushed to the far edge.
    WHY THIS WRAPS INSTEAD OF ELLIPSIZING. The longest real readout —
-   `zero or many → zero or many`, ~172px at this size — plus the ~192px title does
+   `zero or many → zero or many`, ~172px at this size — plus the ~214px title
+   ITEM 1 now paints does
    not fit the 264px row, and an ellipsis would turn the value into `zero or m…`,
    i.e. hide exactly what §C says the readout exists to show. `flex-wrap` moves
    the whole readout to its own line (flexbox wraps on the item's hypothetical
@@ -3379,3 +3481,170 @@ kbd {
 .label-node .node-label-input { text-align: var(--ts-align, left); }
 .node-title { justify-content: var(--ts-justify, flex-start); }
 .node .lo-title { justify-content: var(--ts-justify, center); }
+
+/* ===========================================================================
+   ROUND W, ITEM 2 — THE FOUR FAMILIES, DECLARED LOCALLY, AND THE ONE PROPERTY
+   THAT SELECTS THEM.
+
+   NO CDN, NO RUNTIME DOWNLOAD. All 24 files are already in `public/fonts/` and
+   are served by Vite's `publicDir` at `/fonts/<name>`; the app stays offline.
+   Four families × two weights × three subsets, and every `unicode-range` below
+   is copied VERBATIM from the family's own Google Fonts CSS block — none is
+   invented. The three ranges are identical across all four families because the
+   three subsets are defined once by Google's subset script, and a page fetches
+   ONLY the subset it renders: a node with no Vietnamese diacritic never pulls a
+   `-vietnamese.woff2`.
+   WHY THE VIETNAMESE SUBSET IS THE POINT: the user writes Vietnamese, and the
+   obvious "easy read" pick (Atkinson Hyperlegible) has NO vietnamese subset, so
+   it was rejected. Be Vietnam Pro is the family drawn FOR those diacritics.
+   `font-display: swap` keeps first paint unblocked — the woff2 files are local,
+   so the swap window is a frame or two.
+
+   ONLY `.node-kicker`'s FAMILY IS OVERRIDDEN HERE? No: all EIGHT rows that own
+   node text get a `--ts-font` consumer (below). The glyph and icon cells
+   (`.node .glyph`, `.node-ico`) are deliberately NOT among them — they draw a
+   symbol, not the user's text. `.group-label` and `.group-node` are also left
+   out, and that is a stated divergence, not an oversight: the group chip is
+   11px on the node's border and the same reasoning that keeps it out of the
+   weight choice (`--ts-weight` above) applies to its family.
+
+   WHAT THE DEFAULT PICK CHANGES. `mono` resolves to
+   `'JetBrains Mono', var(--mono)` — the sheet's existing stack with the web
+   font in front of it — so choosing Mono paints JetBrains Mono where it used to
+   paint the system mono. That is a deliberate glyph change for anyone who
+   explicitly picks it; a node with NO choice still paints `var(--mono)` exactly.
+   =========================================================================== */
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/jetbrains-mono-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/jetbrains-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/jetbrains-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/jetbrains-mono-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/jetbrains-mono-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/jetbrains-mono-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/inter-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/inter-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/inter-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/inter-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/inter-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/inter-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/lexend-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/lexend-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/lexend-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/lexend-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/lexend-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lexend'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/lexend-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Be Vietnam Pro'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/be-vietnam-pro-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ROUND W, ITEM 2 — THE SELECTOR. Every rule below keeps the EXACT stack its
+   base rule declares as the `var()` fallback, so a node carrying no `--ts-font`
+   resolves to what it paints today and nothing moves. Same discipline as
+   `--ts-scale`, same reason: ONE write sets the whole node, and absence is
+   indistinguishable from the pre-ITEM-2 sheet. */
+.node-kicker { font-family: var(--ts-font, var(--mono)); }
+.node-title { font-family: var(--ts-font, var(--sans)); }
+.node-sub { font-family: var(--ts-font, var(--mono)); }
+.node-metric { font-family: var(--ts-font, var(--mono)); }
+.node .lo-title { font-family: var(--ts-font, var(--sans)); }
+.node .lo-sub { font-family: var(--ts-font, var(--mono)); }
+.note-node { font-family: var(--ts-font, var(--mono)); }
+.label-node { font-family: var(--ts-font, var(--mono)); }

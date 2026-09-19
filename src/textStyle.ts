@@ -38,6 +38,8 @@ import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey} from './colors';
 export type TextSize = 'sm' | 'md' | 'lg' | 'xl';
 export type TextWeight = 'regular' | 'bold';
 export type TextAlign = 'left' | 'center' | 'right';
+/** ROUND W, ITEM 2 — WHICH FAMILY THE WHOLE NODE PAINTS IN. */
+export type TextFont = 'mono' | 'ui' | 'read' | 'viet';
 
 /** §E.2 — persisted verbatim on `node.data.textStyle`. Every field OPTIONAL and
  *  every field independently absent: a node with `{weight: 'bold'}` and nothing
@@ -49,6 +51,17 @@ export type TextStyle = {
    *  A hex here would be unthemable, which is the whole point of PACKAGE-L. */
   colorKey?: ColorKey;
   align?: TextAlign;
+  /** ROUND W, ITEM 2 — a family KEY, resolved through `TEXT_FONT_FAMILY` below.
+   *  Stored as a key and not as a stack for the same reason `colorKey` is: a
+   *  literal family list here would be a second copy of the sheet's stacks and
+   *  would pin a node to the theme's current fonts forever. */
+  font?: TextFont;
+  /** ROUND W, ITEM 3 — a CUSTOM multiplier beside the four steps, 0.5..2.0.
+   *  Mutually exclusive with `size` by construction: setting one clears the
+   *  other, because both land on the same `--ts-scale` property and two writers
+   *  for one property is a value that can contradict itself. A user who types
+   *  `1` stores neither (see `clampTextScale`). */
+  scale?: number;
 };
 
 /** The multiplier each step applies. `md` is 1 — the "no write" step. */
@@ -80,6 +93,56 @@ export const TEXT_WEIGHT_OPTS: {v: TextWeight; label: string}[] = [
 export const TEXT_ALIGN_OPTS: {v: TextAlign; label: string}[] = [
   {v: 'left', label: 'Left'}, {v: 'center', label: 'Center'}, {v: 'right', label: 'Right'},
 ];
+
+/* ===========================================================================
+   ROUND W, ITEM 2 — THE FONT PICKER'S DATA HALF.
+
+   WHY A TABLE AND NOT A CONTROL THAT WRITES A FAMILY. The renderers paint four
+   rows that ALREADY mix two stacks — `.node-title` and `.node .lo-title` are
+   `var(--sans)`, everything else is `var(--mono)` — and the picker's job is to
+   set ALL of them at once. It therefore emits ONE custom property on the node
+   root and each row falls back to the stack it declares today, which is the
+   same "one write, whole block, fallback is the base value" discipline
+   `--ts-scale` uses and the reason an untouched node cannot move.
+
+   `--ts-font` CANNOT SIMPLY BE A KEY. The sheet has no font per key, so the
+   `font-family: var(--ts-font, <own stack>)` fallback would be inert unless the
+   property resolves to a real family list. It is therefore emitted as the
+   resolved STACK (`TEXT_FONT_FAMILY[key]`), and the fallback is what makes the
+   no-write case work.
+   THE FAMILIES ARE LOCAL. `public/fonts/` holds 24 woff2 files, one per family ×
+   weight × subset, declared by the `@font-face` blocks in `src/styles.css`.
+   Nothing here mentions a CDN and nothing is downloaded at runtime — the app
+   stays offline. */
+export const TEXT_FONT_OPTS: {v: TextFont; label: string; hint: string}[] = [
+  {v: 'mono', label: 'Mono', hint: 'coding / technical'},
+  {v: 'ui', label: 'UI', hint: 'neutral UI text — architecture diagrams'},
+  {v: 'read', label: 'Read', hint: 'designed for reading ease'},
+  {v: 'viet', label: 'Viet', hint: 'for Vietnamese diacritics'},
+];
+
+/** ROUND W, ITEM 2 — the ONE place a family is chosen, and the reason it is
+ *  here rather than in the `.tsx`.
+ *
+ *  THE QUOTED NAME IS LOAD-BEARING. `TEXT_FONT_FAMILY[key][0]` is the family
+ *  `@font-face` declares in `src/styles.css`; the unquoted names after it are
+ *  the metric-compatible system fallbacks, so a board opened on a machine that
+ *  refused the woff2 still renders in a similar face rather than in Times. The
+ *  harness asserts the two halves agree — it reads the `font-family:` of every
+ *  `@font-face` in the sheet and requires it to appear here — so a family that
+ *  is declared but never chosen (or chosen but never declared) cannot ship.
+ *
+ *  `mono`'s stack is `--mono` WITH the web font in front, so the default is
+ *  today's exact stack plus the family as an alias — deliberately the only one
+ *  of the four that changes no glyph on an already-installed machine. */
+export const TEXT_FONT_FAMILY: Record<TextFont, string> = {
+  mono: "'JetBrains Mono', var(--mono)",
+  ui: "'Inter', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif",
+  read: "'Lexend', 'Lexend Fallback', ui-sans-serif, system-ui, sans-serif",
+  viet: "'Be Vietnam Pro', 'Be Vietnam Pro Fallback', ui-sans-serif, system-ui, sans-serif",
+};
+
+export const TEXT_DEFAULT_FONT: TextFont = 'mono';
 export {COLOR_KEYS, COLOR_VAR};
 
 /** `justify-content` for the two FLEX text rows. `text-align` cannot reach a
@@ -99,6 +162,10 @@ export function isTextDefault(
   if (key === 'size') return v === TEXT_DEFAULT_SIZE;
   if (key === 'weight') return v === TEXT_DEFAULT_WEIGHT;
   if (key === 'align') return v === alignDefault;
+  /* ROUND W, ITEM 2 — `mono` renders anyway, so picking Mono stores ABSENCE,
+   *  exactly like M and Regular. Target-independent, like size and weight: the
+   *  sheet's own stacks ARE the mono/sans mix every node already paints. */
+  if (key === 'font') return v === TEXT_DEFAULT_FONT;
   /* colorKey has NO default: the theme's text colour is not a swatch, so any
    * key the user picks is a real choice and is always stored. */
   return false;
@@ -124,23 +191,75 @@ export function mergeTextStyle(
   const next: TextStyle = {...(cur ?? {})};
   // Fixed key order, so a delete-then-re-add cannot reorder the object and make
   // a value-equality check below read as a change.
-  for (const k of ['size', 'weight', 'colorKey', 'align'] as (keyof TextStyle)[]) {
+  for (const k of ['size', 'weight', 'colorKey', 'align', 'font', 'scale'] as (keyof TextStyle)[]) {
     if (!(k in patch)) continue;
     const v = patch[k];
     if (v === undefined || isTextDefault(k, v, alignDefault)) delete next[k];
     else (next as Record<string, unknown>)[k] = v;
   }
+  /* ROUND W, ITEM 3 — THE MUTUAL EXCLUSION, and why it lives here rather than in
+     the panel. `size` and `scale` are two spellings of ONE property
+     (`--ts-scale`), so they can never both be stored: whichever the user just
+     chose clears the other. `patch.scale === null` is the panel's "this typed
+     value is the identity, drop the custom field" (a JSON board cannot hold
+     `undefined`, and `clampTextScale` already answers null for `1`). Putting
+     this in the merge — not in the click handler — is what keeps a node that
+     arrives from a board file with both fields from being re-emitted with both. */
+  if ('scale' in patch) {
+    if (patch.scale == null) delete next.scale;
+    if (patch.scale != null) delete next.size;
+  }
+  if ('size' in patch && patch.size !== undefined) delete next.scale;
   return Object.keys(next).length ? next : undefined;
 }
 
+/** ROUND W, ITEM 3 — THE CUSTOM SIZE'S BOUNDS AND ITS "STORE ABSENCE" TEST.
+ *
+ *  Harvey's range, verbatim: "0.5x – 2.0x". The scale is the multiplier
+ *  `--ts-scale` already is, so the control needs no new unit and no new
+ *  property — it needs a clamp and a definition of "the default".
+ *
+ *  WHY 1 IS NOT STORED. `TEXT_SCALE.md` is 1 and the sheet reads
+ *  `calc(<px> * var(--ts-scale, 1))`, so a stored `size:'md'` and a stored bare
+ *  `1` would be two representations of the SAME rendered value, and the two
+ *  would drift the moment either changed. Typing `1` therefore behaves exactly
+ *  like picking M: `mergeTextStyle` drops the key. A custom value has no
+ *  `TextSize` of its own — `size` stays the string union it always was — so the
+ *  value rides in its own optional field and `size` is CLEARED beside it, or the
+ *  two would fight over the same property. */
+export const TEXT_SCALE_MIN = 0.5;
+export const TEXT_SCALE_MAX = 2;
+
+/** NaN-safe, and clamps to the range Harvey chose. Returns null when there is
+ *  nothing to store: a blank field, a non-number, or the identity `1`. */
+export function clampTextScale(n: number): number | null {
+  if (!Number.isFinite(n)) return null;
+  const c = Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, n));
+  return c === 1 ? null : c;
+}
+
+/** The multiplier a stored style paints, for the PANEL to show. The custom
+ *  value wins when present, otherwise the step's own scale. */
+export function scaleOfTextStyle(ts: TextStyle | undefined): number {
+  if (ts?.scale !== undefined) return ts.scale;
+  return TEXT_SCALE[ts?.size ?? TEXT_DEFAULT_SIZE];
+}
 /** The values the panel SHOWS for a stored style: a missing field reads as the
- *  inherited default, never as a blank. */
+ *  inherited default, never as a blank.
+ *
+ *  ROUND W, ITEM 3 — `scale` is what `--ts-scale` actually paints, read through
+ *  `scaleOfTextStyle`, so the number in the box and the number on the node are
+ *  one value and not two. `size` stays whichever STEP is stored (or `md`), which
+ *  is what keeps the segmented control lit on M even while a custom 1.7 is in
+ *  the box beside it. */
 export function readTextStyle(ts: TextStyle | undefined, alignDefault: TextAlign) {
   return {
     size: ts?.size ?? TEXT_DEFAULT_SIZE,
     weight: ts?.weight ?? TEXT_DEFAULT_WEIGHT,
     colorKey: ts?.colorKey ?? null,
     align: ts?.align ?? alignDefault,
+    font: ts?.font ?? TEXT_DEFAULT_FONT,
+    scale: scaleOfTextStyle(ts),
   };
 }
 
@@ -170,9 +289,19 @@ export function textStyleVars(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (!ts) return out;
-  if (ts.size && TEXT_SCALE[ts.size] !== 1) out['--ts-scale'] = String(TEXT_SCALE[ts.size]);
+  /* ROUND W, ITEM 3 — THE ORDER OF THESE TWO MATTERS. `scale` is the CUSTOM
+     multiplier and `size` is the step; the merge guarantees they are never both
+     stored, but this reads the custom one FIRST so that a hand-edited board
+     carrying both paints the number the user typed rather than the step it
+     contradicts. `1` still emits nothing, because `1` IS the fallback. */
+  const scale = ts.scale ?? (ts.size ? TEXT_SCALE[ts.size] : undefined);
+  if (scale !== undefined && scale !== 1) out['--ts-scale'] = String(scale);
   if (ts.weight === 'bold') out['--ts-weight'] = '700';
   if (isColorKey(ts.colorKey)) out['--ts-color'] = COLOR_VAR[ts.colorKey];
+  /* ROUND W, ITEM 2 — ONE property, the WHOLE node. Each of the sheet's text
+     rules keeps its own stack as the fallback, so an untouched node emits
+     nothing here and is byte-identical to before this round. */
+  if (ts.font && ts.font !== TEXT_DEFAULT_FONT) out['--ts-font'] = TEXT_FONT_FAMILY[ts.font];
   if (ts.align && ts.align !== alignDefault) {
     out['--ts-align'] = ts.align;
     out['--ts-justify'] = JUSTIFY[ts.align];

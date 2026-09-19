@@ -50,9 +50,10 @@ import {
    the model is target-agnostic, and `alignForBody` supplies the only thing that
    differs between them (a label-only node is centred by design). */
 import {
-  TEXT_SIZE_OPTS, TEXT_WEIGHT_OPTS, TEXT_ALIGN_OPTS,
+  TEXT_SIZE_OPTS, TEXT_WEIGHT_OPTS, TEXT_ALIGN_OPTS, TEXT_FONT_OPTS, TEXT_FONT_FAMILY,
+  TEXT_SCALE_MIN, TEXT_SCALE_MAX, clampTextScale,
   alignForBody, mergeTextStyle, readTextStyle,
-  type TextStyle, type TextSize, type TextWeight, type TextAlign,
+  type TextStyle, type TextSize, type TextWeight, type TextAlign, type TextFont,
 } from './textStyle';
 import {
   PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch,
@@ -3132,6 +3133,30 @@ export default function App() {
   const SIZE_OPTS: PickerOption[] = TEXT_SIZE_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   const WEIGHT_OPTS: PickerOption[] = TEXT_WEIGHT_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   const ALIGN_OPTS: PickerOption[] = TEXT_ALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
+  /* ROUND W, ITEM 2 — the font table. It IS a picker (trigger + popover, the
+     `IconPickerRow` idiom) and NOT a `<select>`: the app renders zero native
+     dropdowns and `checks/package-p-inspector.mjs` asserts that. Each option's
+     art is its OWN family name rendered in that family, so the choice is
+     visible before it is taken — which is the whole reason a font picker is
+     worth having and the thing a `<select>` cannot do.
+
+     `family` here is the CSS stack for the OPTION'S PREVIEW only. The value
+     that reaches the node is the KEY, and the key is resolved to a stack by
+     `TEXT_FONT_FAMILY` in `src/textStyle.ts` — one place, not two. */
+  const FONT_OPTS: PickerOption[] = TEXT_FONT_OPTS.map(o => ({
+    v: o.v, label: o.label,
+    /* ROUND W, ITEM 2 — THE PREVIEW IS THE ART. Every option prints its own
+       family NAME in its own family, on the trigger and in the popover both,
+       so the choice is legible before it is taken. That is the one thing a
+       native `<select>` cannot do, and it is why this control is the existing
+       `IconPickerRow` idiom rather than a new one: the cell it renders art into
+       is exactly the cell a font sample belongs in. */
+    art: (
+      <span className="insp-opt-label insp-font-sample" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>
+        {o.label}
+      </span>
+    ),
+  }));
   /** Crow's-foot vocabulary (§B #9/#10) — IE / IDEF1X notation, drawn. */
   const CROW_FOOT: {v: string; label: string}[] = [
     {v: 'none', label: 'none'},
@@ -3323,12 +3348,46 @@ export default function App() {
     <>
       <div className="field">
         <label>size</label>
-        <ToggleRow
-          value={tsShown.size}
-          onChange={v => writeTextStyle({size: v as TextSize})}
-          options={SIZE_OPTS}
-          title="Text size"
-        />
+        {/* ROUND W, ITEM 3 — the steps AND a number, on one line. The segmented
+            control keeps its meaning (it is the four STEPS the spec named); the
+            input beside it is the escape hatch Harvey asked for. They write the
+            SAME property through the SAME merge, so they cannot fight: picking a
+            step clears the custom value and typing a value clears the step. */}
+        <div className="insp-num-row">
+          <ToggleRow
+            value={tsShown.size}
+            onChange={v => writeTextStyle({size: v as TextSize})}
+            options={SIZE_OPTS}
+            title="Text size"
+          />
+          <input
+            className="insp-num"
+            type="number"
+            id="insp-text-scale"
+            step="0.1"
+            min={TEXT_SCALE_MIN}
+            max={TEXT_SCALE_MAX}
+            aria-label={`Custom text size, ${TEXT_SCALE_MIN} to ${TEXT_SCALE_MAX} times`}
+            title={`Custom size, ${TEXT_SCALE_MIN}–${TEXT_SCALE_MAX}×`}
+            value={String(tsShown.scale)}
+            onChange={e => {
+              /* COMMIT ON A VALID NUMBER, not on every keystroke. Committing
+                 intermediate states would push a history entry per digit and
+                 would write `0.` on the way to `0.8`. An empty box is left
+                 alone so the value does not jump while the user retypes it. */
+              if (e.target.value.trim() === '') return;
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n)) return;
+              writeTextStyle({scale: clampTextScale(n)});
+            }}
+          />
+          <span className="insp-num-unit" aria-hidden="true">×</span>
+        </div>
+        <div className="hint" style={{paddingTop: 4}}>
+          Custom size is a multiplier, {TEXT_SCALE_MIN}–{TEXT_SCALE_MAX}×. A
+          custom value overrides the step; typing 1 is the default and is not
+          stored.
+        </div>
       </div>
       <div className="field">
         <label>weight</label>
@@ -3338,6 +3397,29 @@ export default function App() {
           options={WEIGHT_OPTS}
           title="Text weight"
         />
+      </div>
+      {/* ROUND W, ITEM 2 — THE FAMILY, FOR THE WHOLE NODE. Harvey's own choice:
+          "cả node trước" — the one choice sets title + kicker + sub + metric +
+          the label node's text. That FLATTENS the mix this section's header used
+          to call out ("one node already mixes `--mono` and `--sans`, so a single
+          family control would be a lie") and it is a decision, not an accident:
+          the picker is worth having only if it actually changes what you read.
+          The lie that note warned about is gone because the control now DOES set
+          every one of those rows — see the EIGHT `var(--ts-font, …)` consumers
+          in `src/styles.css`, one per row that owns node text. */}
+      <div className="field">
+        <label>font</label>
+        <IconPickerRow
+          id="insp-text-font"
+          value={tsShown.font}
+          onChange={v => writeTextStyle({font: v as TextFont})}
+          options={FONT_OPTS}
+          title="Text font for the whole node"
+        />
+        <div className="hint" style={{paddingTop: 4}}>
+          Applies to the whole node — title, kicker, sub and metric together.
+          Mono is the default and is not stored.
+        </div>
       </div>
       <div className="field">
         <label>text colour</label>
