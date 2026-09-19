@@ -1,7 +1,54 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P + ROUND W + ROUND X + **ROUND Y** shipped.
-**Next: the font LIST + vertical align (research in flight), then Harvey's Mac test, then PACKAGE-N.**
+**Last session:** 2026-09-19 (evening) · **Status:** ✅ PACKAGE-P + ROUND W + X + Y + **ROUND Z** shipped.
+**Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+
+> ## ✅ ROUND Z (2026-09-19) — six font names in a 3+3 grid + vertical align
+>
+> **1. SIX FAMILIES, REAL NAMES:** JetBrains / Inter / IBM Plex / Shantell / Lexend / Be Vietnam, 3+3 as
+> Harvey asked. **The short button labels are a MEASUREMENT, not taste** — a 3-column cell is 81px (content box
+> 65px), while "JetBrains Mono" is 84px and "Be Vietnam Pro" 75.2px at 10px. The full name rides the `title`.
+> `public/fonts/` now holds **36 woff2** (400+700 × latin/latin-ext/vietnamese); **offline, no CDN**.
+> **Every family was picked by MEASURING its vietnamese subset with fontTools.** Rejected for lacking one:
+> Atkinson Hyperlegible, Fira Code, Caveat, **Architects Daughter (draw.io's own sketch font)**.
+> **ROUND W's role keys still resolve** — a board storing `'viet'` renders Be Vietnam Pro (verified live).
+>
+> **2. VERTICAL ALIGN (top/middle/bottom)**, draw.io's model verified in mxGraph source: the padded
+> `.node-body` — which already carries the per-shape silhouette insets — is the text's **containing box**, so a
+> choice can never move text onto a cylinder cap or a diamond corner. The resizer floor stays
+> alignment-invariant.
+>
+> **⚑ THE THING TO KNOW BEFORE TOUCHING ANY `--ts-*` PROPERTY: three defects here, and they are the SAME family
+> as the earlier ones in this session. The harness missed all three.**
+> 1. **The emitted value was not a CSS keyword.** `--ts-valign: bottom` was fed to `justify-content`, where
+>    `bottom` is invalid → the declaration is DISCARDED, computed `normal`, control does nothing. The keyword
+>    mapping existed as `--ts-align-items` with **zero consumers**. **A `var()` cannot translate a semantic name
+>    into a keyword — the sheet must read the keyword directly.**
+> 2. **`middle` rendered as TOP:** it is the default so it stores absence, and the fallback was `flex-start`.
+>    The panel said Middle while every untouched node painted top.
+> 3. **A single global default was IMPOSSIBLE.** `.node-body` / `.note-body` / `.label-node` render from
+>    `padding-top` (= **top**), while `.node .lo-body` (label-only) centres BY DESIGN (= **middle**). The
+>    horizontal axis had already solved this shape — `alignForBody(body)` gives a **per-target** default and
+>    `textStyleVars` takes it as a PARAMETER. `vAlign` now does the same (`vAlignForBody`). **Whenever a
+>    no-write default differs by target, look for the `alignForBody` pattern rather than inventing a constant.**
+>
+> **Harness 132 → 153/153**, and the new assertions test that a value **REACHES** the property with a keyword
+> **valid for it** and that the **no-write state matches the declared per-target default** — not merely that a
+> property was emitted. **That is the fifth "emitted but never applied" defect in this project;** the reference
+> `references/verifying-token-driven-styles.md` now carries the rule and the per-target fix.
+>
+> **Verified live on distinct non-overlapping nodes:** card top → Top/flex-start/at top; middle →
+> Middle/center/centred (43/42); bottom → Bottom/flex-end/at bottom (74/10); no textStyle → Top/flex-start.
+> label-only no-textStyle → Middle/center; label-only bottom → Bottom/flex-end. note no-textStyle → Top.
+> label node bottom → inline `--ts-align-items: flex-end`, computed `flex-end`.
+>
+> **PROBE LESSONS (four of my own readings were wrong this round, all probe bugs not code bugs):**
+> (a) **nodes seeded at the same coordinates** make every click select the same one — always print and check
+> the rects; (b) reading a `.insp-seg` group must select the row by `aria-label`, not by index;
+> (c) a label node has **no `.node` class**, so `querySelector('.node, .label-node')` returns null for it — read
+> the element's own inline `style` instead; (d) **an SVG can sit over a node** so a centre click hits the SVG
+> (`elementFromPoint` shows `ownerNode: null`) — click the node's own text child, or read its inline vars
+> directly. The app was correct in all four cases.
 
 > ## ✅ ROUND Y (2026-09-19) — the teaching hints out, the target badges out
 >
