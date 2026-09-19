@@ -51,7 +51,6 @@ import {
    differs between them (a label-only node is centred by design). */
 import {
   TEXT_SIZE_OPTS, TEXT_WEIGHT_OPTS, TEXT_ALIGN_OPTS, TEXT_FONT_OPTS, TEXT_FONT_FAMILY,
-  TEXT_SCALE_MIN, TEXT_SCALE_MAX, clampTextScale,
   alignForBody, mergeTextStyle, readTextStyle,
   type TextStyle, type TextSize, type TextWeight, type TextAlign, type TextFont,
 } from './textStyle';
@@ -3133,26 +3132,27 @@ export default function App() {
   const SIZE_OPTS: PickerOption[] = TEXT_SIZE_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   const WEIGHT_OPTS: PickerOption[] = TEXT_WEIGHT_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   const ALIGN_OPTS: PickerOption[] = TEXT_ALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
-  /* ROUND W, ITEM 2 — the font table. It IS a picker (trigger + popover, the
-     `IconPickerRow` idiom) and NOT a `<select>`: the app renders zero native
-     dropdowns and `checks/package-p-inspector.mjs` asserts that. Each option's
-     art is its OWN family name rendered in that family, so the choice is
-     visible before it is taken — which is the whole reason a font picker is
-     worth having and the thing a `<select>` cannot do.
+  /* ROUND X, ITEM 3 — THE FONT TABLE, AS FOUR SELF-PREVIEWING BUTTONS. It is no
+     longer an `IconPickerRow` (trigger + popover): Harvey asked for "4 nút bấm
+     chọn cùng 1 hàng nếu đc luôn", so it is now the SAME segmented idiom Size
+     and Align use, one row, one control vocabulary in the panel. The app still
+     renders zero native `<select>` — `checks/package-p-inspector.mjs` asserts
+     that — and each button still previews its own family, which is the whole
+     reason a font control is worth having and the thing a `<select>` cannot do.
 
-     `family` here is the CSS stack for the OPTION'S PREVIEW only. The value
-     that reaches the node is the KEY, and the key is resolved to a stack by
+     `family` here is the CSS stack for the BUTTON'S PREVIEW only. The value that
+     reaches the node is the KEY, and the key is resolved to a stack by
      `TEXT_FONT_FAMILY` in `src/textStyle.ts` — one place, not two. */
   const FONT_OPTS: PickerOption[] = TEXT_FONT_OPTS.map(o => ({
     v: o.v, label: o.label,
-    /* ROUND W, ITEM 2 — THE PREVIEW IS THE ART. Every option prints its own
-       family NAME in its own family, on the trigger and in the popover both,
-       so the choice is legible before it is taken. That is the one thing a
-       native `<select>` cannot do, and it is why this control is the existing
-       `IconPickerRow` idiom rather than a new one: the cell it renders art into
-       is exactly the cell a font sample belongs in. */
+    /* ROUND X, ITEM 3 — THE PREVIEW IS THE BUTTON'S OWN CONTENT. Each option
+       prints its own family NAME in its own family. That is the one thing a
+       native `<select>` cannot do, and it is why this control survives the
+       change from a popover to a segmented row: the label and the sample are
+       the SAME span, so the row prints each name exactly ONCE — there is no
+       second cell to suppress and therefore nothing to hide. */
     art: (
-      <span className="insp-opt-label insp-font-sample" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>
+      <span className="insp-font-btn" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>
         {o.label}
       </span>
     ),
@@ -3348,46 +3348,29 @@ export default function App() {
     <>
       <div className="field">
         <label>size</label>
-        {/* ROUND W, ITEM 3 — the steps AND a number, on one line. The segmented
-            control keeps its meaning (it is the four STEPS the spec named); the
-            input beside it is the escape hatch Harvey asked for. They write the
-            SAME property through the SAME merge, so they cannot fight: picking a
-            step clears the custom value and typing a value clears the step. */}
-        <div className="insp-num-row">
-          <ToggleRow
-            value={tsShown.size}
-            onChange={v => writeTextStyle({size: v as TextSize})}
-            options={SIZE_OPTS}
-            title="Text size"
-          />
-          <input
-            className="insp-num"
-            type="number"
-            id="insp-text-scale"
-            step="0.1"
-            min={TEXT_SCALE_MIN}
-            max={TEXT_SCALE_MAX}
-            aria-label={`Custom text size, ${TEXT_SCALE_MIN} to ${TEXT_SCALE_MAX} times`}
-            title={`Custom size, ${TEXT_SCALE_MIN}–${TEXT_SCALE_MAX}×`}
-            value={String(tsShown.scale)}
-            onChange={e => {
-              /* COMMIT ON A VALID NUMBER, not on every keystroke. Committing
-                 intermediate states would push a history entry per digit and
-                 would write `0.` on the way to `0.8`. An empty box is left
-                 alone so the value does not jump while the user retypes it. */
-              if (e.target.value.trim() === '') return;
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n)) return;
-              writeTextStyle({scale: clampTextScale(n)});
-            }}
-          />
-          <span className="insp-num-unit" aria-hidden="true">×</span>
-        </div>
-        <div className="hint" style={{paddingTop: 4}}>
-          Custom size is a multiplier, {TEXT_SCALE_MIN}–{TEXT_SCALE_MAX}×. A
-          custom value overrides the step; typing 1 is the default and is not
-          stored.
-        </div>
+        {/* ROUND X, ITEM 1 — BACK TO THE BARE SEGMENTED ROW. ROUND W put a
+            custom-size `<input type="number">` beside these four buttons, inside
+            `.insp-num-row`, and that flex row squeezed the 4-column grid into a
+            31×121px COLUMN — the four steps stacked vertically at `left: 1005`,
+            identical for all of them (Harvey: "UI lệch, quá xấu"). The input is
+            GONE; the steps are the control again, full panel width, one row.
+
+            THE RULE STAYS (Harvey: "rule giữ khi cần"). `scale` on `TextStyle`,
+            `TEXT_SCALE_MIN/MAX`, `clampTextScale` and the `scale` read in
+            `textStyleVars` are all still in `src/textStyle.ts`, so a board that
+            already carries a custom multiplier still RENDERS it. What changed is
+            only how the panel REPORTS one: `readTextStyle` now derives `size`
+            from what actually paints (`stepForScale`), so a stored 1.7 lights NO
+            step here rather than claiming M while the node paints 1.7. */}
+        <ToggleRow
+          /* `null` is "matches no step" — a custom multiplier. `?? ''` matches no
+             option either, so nothing is marked and the node keeps painting its
+             stored scale. */
+          value={tsShown.size ?? ''}
+          onChange={v => writeTextStyle({size: v as TextSize})}
+          options={SIZE_OPTS}
+          title="Text size"
+        />
       </div>
       <div className="field">
         <label>weight</label>
@@ -3409,18 +3392,25 @@ export default function App() {
           in `src/styles.css`, one per row that owns node text. */}
       <div className="field">
         <label>font</label>
-        <IconPickerRow
-          id="insp-text-font"
-          rowClass="icon-field-font"
+        {/* ROUND X, ITEM 3 — four buttons, one row, each previewing its own
+            family. `wide` is a MODIFIER on the one segmented control, not a
+            fork of it: this row's labels are words (Mono / UI / Read / Viet)
+            where the S×4 and Align rows carry one or two glyphs, so it needs
+            wider buttons and the same `.insp-seg` grid otherwise.
+
+            THE HINT THAT USED TO SIT UNDER THIS CONTROL IS GONE — with four
+            self-previewing buttons the control states its own scope, which is
+            the same principle Harvey gave for the label branch (item 4). The
+            "applies to the whole node" fact is still true (one `--ts-font` on
+            the node root, eight consumers in the sheet); it just no longer
+            needs a sentence a user has to read. */}
+        <ToggleRow
           value={tsShown.font}
           onChange={v => writeTextStyle({font: v as TextFont})}
           options={FONT_OPTS}
           title="Text font for the whole node"
+          wide
         />
-        <div className="hint" style={{paddingTop: 4}}>
-          Applies to the whole node — title, kicker, sub and metric together.
-          Mono is the default and is not stored.
-        </div>
       </div>
       <div className="field">
         <label>text colour</label>
@@ -4975,7 +4965,6 @@ export default function App() {
                   are usable WHILE the editor is open (§E.3(b) holds the
                   blur-commit while the pointer is inside this panel). */}
               {(() => { secBody('text', tsBody); return null; })()}
-              <div className="hint">Free text annotation — no handles, no border. Double-click it on the canvas to edit the text.</div>
               {renderSections()}
             </>
           ) : (

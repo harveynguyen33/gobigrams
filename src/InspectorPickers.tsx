@@ -136,12 +136,14 @@ export function IconPickerRow({value, onChange, options, title, id, rowClass}: {
   title: string;
   id: string;
   /** ROUND W FIX — an OPTIONAL class for the `.icon-field` wrapper, so ONE
-   *  caller can scope sheet rules to its own rows. `.icon-field` wraps exactly
-   *  one picker and each picker gets its own element, so a class on this
-   *  wrapper reaches this picker's trigger AND its popover rows and cannot
-   *  reach any other picker's. It is a prop rather than a literal because the
-   *  font picker is the only caller that needs it (`src/App.tsx` passes
-   *  `icon-field-font`) — the other four pickers are untouched, byte for byte. */
+   *  caller can scope sheet rules to its own rows. ROUND X, ITEM 3 — NO CALLER
+   *  PASSES IT ANY MORE. Its one caller was the font picker, which needed a hook
+   *  to suppress a duplicate name in its option rows; the font control is now a
+   *  segmented row with no trigger, no popover and no duplicate, so the prop and
+   *  its `icon-field-font` call site are gone. Kept on the shared primitive
+   *  deliberately: it is optional and inert, the other four pickers are
+   *  byte-identical with or without it, and the next picker that needs a scoped
+   *  sheet rule should not have to re-add the same plumbing. */
   rowClass?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -306,14 +308,21 @@ export function ShapesPicker({value, onChange, color}: {
    `on` is painted with the panel's existing `.mbtn` vocabulary (`styles.css:1725`)
    so a selected button looks the same here as in the multi-select branch.
    =========================================================================== */
-export function ToggleRow({value, onChange, options, title}: {
+export function ToggleRow({value, onChange, options, title, wide}: {
   value: string;
   onChange: (v: string) => void;
   options: PickerOption[];
   title: string;
+  /** ROUND X, ITEM 3 — a MODIFIER, not a fork. The S×4 and Align rows carry one
+   *  or two glyphs per button; the font row carries a WORD (`Mono`, `Read`), so
+   *  its buttons need more than the default padding to keep the word off the
+   *  border. Same wrapper, same `.insp-seg-btn`, same `.on` treatment — only the
+   *  padding differs, applied with `.insp-seg.wide` so there is still exactly ONE
+   *  segmented control in the panel. */
+  wide?: boolean;
 }) {
   return (
-    <div className="swatches insp-seg" role="group" aria-label={title}>
+    <div className={`swatches insp-seg${wide ? ' wide' : ''}`} role="group" aria-label={title}>
       {options.map(o => (
         <button
           type="button"

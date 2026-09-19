@@ -1307,34 +1307,14 @@ body {
 .insp-opt:hover { border-color: var(--sel); color: var(--sel); }
 .insp-opt.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-opt-glyph { display: grid; place-items: center; width: 26px; height: 18px; flex: none; }
-/* ROUND W, ITEM 2 — the font picker's sample. The glyph cell is 26px wide in a
-   popover row and 18px in a trigger, and neither can hold a family NAME, so a
-   cell holding a sample is allowed to size to it and take the row's spare
-   width. Every OTHER row in this panel keeps its fixed cell and the `{o.art}`
-   path it always had.
-   THE TRIGGER'S NAME IS HIDDEN where a sample is present, because the sample
-   already IS the name: without this the button would read "Mono Mono". The text
-   is not lost — the sample span carries it, so the button's accessible name is
-   unchanged. */
-.insp-opt-glyph:has(.insp-font-sample) { width: auto; justify-content: start; }
-.icon-trigger-glyph:has(.insp-font-sample) { width: auto; }
-#insp-text-font:has(.insp-font-sample) .icon-trigger-name { display: none; }
-/* ROUND W FIX — THE SAME SUPPRESSION IN THE POPOVER, which the trigger rule
-   above cannot reach. Measured in the DOM: `.icon-pop` is the trigger
-   BUTTON's sibling inside `.icon-field`, so the option rows are never
-   descendants of the font field's id and no selector starting at that id
-   matches them. The row therefore carries a HOOK OF ITS OWN —
-   `icon-field-font`, added in `IconPickerRow` ONLY when its caller passes
-   `rowClass`, and passed by exactly one caller (`src/App.tsx`: the font
-   picker). `.icon-field` wraps ONE picker, so the hook reaches this picker's
-   option rows and cannot reach another picker's; a bare sibling rule would
-   have silently emptied every other picker in the panel.
-   THE SAMPLE IS NOT TOUCHED. `:not(.insp-font-sample)` is what states that:
-   the cell holding the preview is the informative half and stays visible, in
-   its own family, and remains the row's only label. The plain sibling beside
-   it is the duplicate, and it goes. */
-.icon-field-font .insp-opt .insp-opt-label:not(.insp-font-sample) { display: none; }
-.insp-font-sample { flex: none; font-size: 13.5px; }
+/* ROUND X, ITEM 3 — the font row's button label. The four font buttons are the
+   segmented control, so each button's content is ONE span: the family NAME
+   rendered in that family. It is the label and the sample at once, which is why
+   the row prints each name exactly once and needs no suppression rule at all.
+   `font-size` matches `.insp-opt`'s row size so the preview reads at the size
+   the popover used to give it; the measurement that proves the row fits is on
+   `.insp-seg.wide` above. */
+.insp-font-btn { flex: none; font-size: 12.5px; }
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list
    rather than `.insp-opt-list`'s single-line rows. */
@@ -1360,6 +1340,13 @@ body {
    segmented row both fill the field width. */
 .insp-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
 .insp-seg-btn { display: grid; place-items: center; padding: 7px 6px; gap: 4px; }
+/* ROUND X, ITEM 3 — the FONT row's modifier: its buttons carry a WORD, not a
+   one-glyph label, so they get more side padding and less vertical. Measured at
+   the sheet's 12.5px: the widest label (`Read`, Lexend 400) is 31.85px against a
+   45.5px content box, so the row fits the 253px field with 13.65px of slack and
+   no label is shrunk to make it. Everything else — the grid, the button, the
+   `.on` treatment — is the shared control, untouched. */
+.insp-seg.wide .insp-seg-btn { padding: 6px 7px; }
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */
@@ -1380,29 +1367,6 @@ body {
   flex: 1; text-align: center; font-family: var(--mono); font-size: 12.5px;
   color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   padding: 8px 0;
-}
-/* ROUND W, ITEM 3 — THE CUSTOM SIZE, beside the steps. It is a real `<input>`,
-   which is the whole reason it cannot fire the canvas shortcuts: App.tsx's
-   keydown handler opens with `if (isEditable(e.target)) return;` and
-   `isEditable` (App.tsx:367) returns true for `INPUT`. Bare `d`/`z`/`?` and the
-   arrow nudge are therefore inert while the caret is in this box.
-   `width: 62px` fits "2.0" with room for the `×` suffix; the box is the same
-   height as the segmented row beside it so the two sit on one line. */
-.insp-num {
-  width: 62px; flex: none; box-sizing: border-box;
-  background: var(--elevated); color: var(--fg);
-  border: 1px solid var(--border); border-radius: 7px;
-  padding: 6px 7px; font-family: var(--mono); font-size: 12px;
-  outline: none; transition: border-color .15s;
-}
-.insp-num:hover { border-color: var(--border-strong); }
-.insp-num:focus { border-color: var(--sel); }
-/* The unit is a LABEL, not part of the value: the input itself holds a bare
-   number, so `Number('2')` is all the handler has to parse and the `×` cannot
-   reach the parse. */
-.insp-num-row { display: flex; align-items: center; gap: 7px; }
-.insp-num-row .insp-num-unit {
-  font-family: var(--mono); font-size: 11px; color: var(--dim);
 }
 /* The section wrapper. Sections stack with the same rule the old hand-written
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a

@@ -1635,20 +1635,27 @@ assert('o.CollapsedDefault-is-not-mutated-by-the-fold-module',
   + 'inspector.ts still reads cardinality=true, flow=true after every write above');
 
 /* ===========================================================================
-   (p) ROUND W — THE FONT PICKER AND THE CUSTOM SIZE.
+   (p) ROUND W → ROUND X — THE FONT CONTROL AND THE CUSTOM SIZE.
 
    Both are §E.2 fields: a choice equal to the default stores ABSENCE. This
    section proves that for `font` and for a typed `1`, and it proves the two
    facts that only the FILE SYSTEM can answer: every `@font-face` carries a
    `unicode-range`, and every file it names EXISTS under `public/fonts/`.
 
-   WHY THE FILE CHECK MATTERS. The sheet is the only thing that names the 24
-   woff2 files, and a declaration pointing at a missing file is a SILENT
-   failure: the page renders in the fallback stack and nothing throws. A test
-   that only reads the CSS would pass on a sheet whose fonts are all absent.
+   ROUND X CHANGED THE TWO CONTROLS AND NOT THE TWO MODELS.
+     ITEM 3 — the font control stopped being `IconPickerRow` and became the
+     segmented row (four self-previewing buttons, one line). So the assertions
+     about the TRIGGER, the POPOVER and the two suppression hooks are gone with
+     the control — replaced by assertions about the row, and by ABSENCE
+     assertions on both hooks, because a suppression rule that matches nothing
+     reads as live behaviour.
+     ITEM 1 — the custom-size `<input>` is gone; Harvey's "rule giữ khi cần" is
+     not. The bounds, the clamp, the `scale` field and the `--ts-scale` read all
+     remain, and are asserted here so a later pass cannot quietly delete the
+     capability while the UI is gone.
    =========================================================================== */
 console.log('\n' + '='.repeat(78));
-console.log('(p) ROUND W — the font picker (ITEM 2) and the custom size (ITEM 3)');
+console.log('(p) ROUND W→X — the font ROW (ITEM 3) and the custom-size RULE (ITEM 1)');
 console.log('='.repeat(78));
 const {existsSync} = await import('node:fs');
 
@@ -1666,72 +1673,89 @@ assert('p.each-pick-carries-the-role-it-was-chosen-for',
   Object.entries(FONT_ROLES).every(([k, needle]) =>
     M.TEXT_FONT_OPTS.find(o => o.v === k)?.hint.toLowerCase().includes(needle.toLowerCase())),
   'mono→coding, ui→architecture, read→read, viet→Vietnamese diacritics');
-assert('p.the-picker-is-the-existing-primitive-and-not-a-select',
-  APP.includes('const FONT_OPTS') && APP.includes('<IconPickerRow')
-    && countOf(APP, 'options={FONT_OPTS}') === 1 && countOf(APP, '<FONT_OPTS') === 0
-    && countOf(APP, '<select') === 0,
-  `FONT_OPTS drives one IconPickerRow (trigger + popover, the §B #2-#6 idiom); App.tsx still `
-  + `renders ${countOf(APP, '<select')} native dropdowns anywhere`);
-assert('p.every-option-previews-its-own-family',
-  APP.includes("className=\"insp-opt-label insp-font-sample\"")
+/* ROUND X, ITEM 3 — the font field's control, read OFF the field itself. The
+   label `font` is unique in the panel, so the slice from it to its closing
+   `</div>` IS the field, and the slice is what is asserted — not the file. */
+const FONT_FIELD = (() => {
+  const i = APP.indexOf('<label>font</label>');
+  return i < 0 ? '' : APP.slice(i, APP.indexOf('</div>', i));
+})();
+console.log(`  the font field: ${FONT_FIELD.length} chars of code, control = `
+  + `${FONT_FIELD.includes('<ToggleRow') ? 'ToggleRow' : FONT_FIELD.includes('<IconPickerRow') ? 'IconPickerRow' : 'NONE'}`);
+assert('p.the-font-control-is-the-existing-segmented-row-and-is-not-a-select',
+  countOf(APP, '<select') === 0
+    && countOf(APP, 'options={FONT_OPTS}') === 1
+    && FONT_FIELD.includes('<ToggleRow')
+    && !FONT_FIELD.includes('IconPickerRow')
+    && FONT_FIELD.includes('wide')
+    && !FONT_FIELD.includes('className="hint"'),
+  'the font field renders ONE ToggleRow — the same `.insp-seg` grid Size and Align use — with the '
+  + '`wide` modifier for its word-length labels and NO hint under it; the panel still renders '
+  + `${countOf(APP, '<select')} native dropdowns anywhere`);
+assert('p.every-button-previews-its-own-family-and-prints-its-name-once',
+  APP.includes('className="insp-font-btn"')
     && APP.includes('fontFamily: TEXT_FONT_FAMILY[o.v]')
-    && STYLES_RAW.includes('.insp-font-sample'),
-  'each option renders its own NAME in its own family — via the `{o.art}` cell the picker already '
-  + 'draws on both the trigger and the popover, so no new prop was needed on IconPickerRow');
+    && countOf(APP, 'TEXT_FONT_FAMILY[o.v]') === 1
+    && blankComments(STYLES_RAW).includes('.insp-font-btn'),
+  'each of the four buttons renders its own NAME in its own family from ONE cell — the cell a '
+  + 'segmented button prints — so the row cannot construct the duplicate name ROUND W had to '
+  + 'suppress, and the preview the control exists for survives the change from popover to row');
 
-/* --- (p1b) ROUND W FIX — THE DUPLICATE NAME IN THE POPOVER ----------------
-   MEASURED DEFECT. `IconPickerRow` prints a row as a glyph cell + a label. For
-   the font picker the cell holds the SAMPLE, which already IS the name, so each
-   option rendered `Mono Mono`. The sheet suppressed the duplicate on the
-   TRIGGER only (`#insp-text-font:has(.insp-font-sample) .icon-trigger-name`),
-   and that rule cannot reach the option rows: the popover is the trigger
-   BUTTON's SIBLING inside `.icon-field`, so no selector starting at the font
-   field's id matches a row. The row therefore needs a HOOK of its own, passed
-   by the one caller that wants it. This section asserts the hook exists, that
-   it reaches the row, that it does NOT reach another picker, and that the rule
-   suppresses the plain label while leaving the sample. */
-const ROW_HOOK = 'icon-field-font';
-/* The rule as the sheet must spell it: scoped to the hook, on the option row,
-   and EXCLUDING the sample. Read off the sheet with comments blanked, so the
-   prose above the rule cannot satisfy the probe. */
+/* --- (p1b) THE DUPLICATE-NAME GUARD, GENERALISED (ROUND X, ITEM 3) ---------
+   ROUND W's defect: `IconPickerRow` prints a row as a glyph cell + a label, so a
+   font option whose cell held the family NAME rendered `Mono Mono`. The fix was
+   two suppression rules — one on the trigger, one on the option row via an
+   `icon-field-font` HOOK — plus the `rowClass` prop that carried it.
+   THE FONT CONTROL IS NO LONGER A PICKER, so there is no trigger, no popover
+   and no second name cell: each of the four buttons prints ONE span that is its
+   own name in its own family. The duplicate is impossible BY CONSTRUCTION, which
+   is a stronger guarantee than a rule that hides it — so this section now
+   asserts the ABSENCE of every hook ROUND W added (a suppression rule matching
+   nothing reads as live behaviour) and keeps the probe below, which is what
+   makes "absent" a measurement rather than a hope. */
 const STYLES_BLANK = blankComments(STYLES_RAW);
-const ROW_RULE_RE = /\.icon-field-font\s+\.insp-opt\s+\.insp-opt-label:not\(\.insp-font-sample\)\s*\{\s*display:\s*none\s*;?\s*\}/;
-const ROW_RULE = ROW_RULE_RE.exec(STYLES_BLANK);
-/* Every OTHER picker's `.icon-field` must be hookless: the hook is a prop, and
-   exactly ONE call site passes it. Counting the literal in App.tsx is what
-   makes "the rule cannot reach another picker" measured rather than asserted. */
-const HOOK_CALLS = countOf(APP, `rowClass="${ROW_HOOK}"`);
-const PICKS_TRIGGER_RULE = /#insp-text-font:has\(\.insp-font-sample\)\s+\.icon-trigger-name\s*\{\s*display:\s*none\s*;?\s*\}/.test(blankComments(STYLES_RAW));
-console.log(`  the option-row hook: rowClass="${ROW_HOOK}" ×${HOOK_CALLS} call site(s); option-row rule present: ${ROW_RULE !== null}; `
-  + `trigger rule still present: ${PICKS_TRIGGER_RULE}`);
-assert('p.the-sheet-suppresses-the-option-rows-duplicate-name',
-  ROW_RULE !== null,
-  'the option row hides its plain `.insp-opt-label` — the exact sibling that made every option read `Mono Mono`');
-assert('p.the-suppression-cannot-reach-another-picker',
-  HOOK_CALLS === 1
-    && PICKS.includes('rowClass')
+const STYLES_HOOKS = ['insp-font-sample', 'icon-field-font'].filter(h => STYLES_BLANK.includes(h));
+const APP_HOOKS = ['insp-font-sample', 'icon-field-font'].filter(h => APP.includes(h));
+const HOOK_CALLS = countOf(APP, 'rowClass');
+console.log(`  ROUND W suppression hooks left in the sheet: ${STYLES_HOOKS.length ? `[${STYLES_HOOKS.join(', ')}]` : 'NONE'}`
+  + `; in App.tsx: ${APP_HOOKS.length ? `[${APP_HOOKS.join(', ')}]` : 'NONE'}; rowClass call sites: ${HOOK_CALLS}`);
+assert('p.the-ROUND-W-suppression-hooks-are-all-gone',
+  STYLES_HOOKS.length === 0 && APP_HOOKS.length === 0 && HOOK_CALLS === 0,
+  'neither hook survives anywhere — the trigger/option-row suppression rules and the `icon-field-font` call '
+  + 'site went with the picker they existed for, so no rule is left matching nothing');
+assert('p.the-shared-picker-kept-its-optional-hook-and-nobody-uses-it',
+  PICKS.includes('rowClass')
     && countOf(PICKS, 'icon-field${rowClass') === 1
     && countOf(PICKS, 'rowClass ?') === 1,
-  `the hook is an OPTIONAL prop on IconPickerRow and exactly ONE call site passes it (App.tsx ×${HOOK_CALLS}) — `
-  + 'the shared picker is byte-identical for the other four, so a bare `.insp-opt-glyph + .insp-opt-label` rule '
-  + 'that would have emptied every other popover was NOT used');
-assert('p.the-sample-is-not-what-is-hidden',
-  ROW_RULE !== null && ROW_RULE[0].includes(':not(.insp-font-sample)'),
-  'the rule names the sample in a `:not()` — the cell that PRINTS the family is untouched, so the row still reads '
-  + 'its name once, in its own family, and the preview the picker exists for survives');
-assert('p.the-trigger-keeps-its-single-name',
-  PICKS_TRIGGER_RULE,
-  'the existing `#insp-text-font:has(.insp-font-sample) .icon-trigger-name` rule is still in the sheet, so the '
-  + 'trigger does not regress to `Viet Viet` and does not lose its name');
-/* NEGATIVE CONTROL — the probe must SEE the shape it warns about, or assert
-   (p) is a tautology. The pre-fix sheet carried no option-row rule at all. */
+  'IconPickerRow still carries the OPTIONAL `rowClass` prop (inert: no caller passes one), so the next picker '
+  + 'needing a scoped sheet rule does not have to re-add the plumbing — and the other four pickers are '
+  + 'byte-identical either way');
+/* THE ROW CANNOT PRINT A NAME TWICE: the option's `art` is one span, and that
+   span is the only thing the button prints (`ToggleRow` renders `o.art ?? o.label`
+   — ONE expression, never both). Counted in the FONT_OPTS literal. */
+const FONT_OPTS_BLOCK = (() => {
+  const i = APP.indexOf('const FONT_OPTS');
+  if (i < 0) return '';
+  const end = APP.indexOf('}));', i);
+  return end < 0 ? APP.slice(i) : APP.slice(i, end + 4);
+})();
+assert('p.the-four-font-buttons-print-their-name-ONCE-by-construction',
+  countOf(FONT_OPTS_BLOCK, 'insp-font-btn') === 1
+    && countOf(FONT_OPTS_BLOCK, '<span') === 1
+    && countOf(PICKS, 'o.art ?? o.label') === 1,
+  'the FONT_OPTS entry carries exactly ONE <span> — the name in its family — and ToggleRow prints `o.art ?? '
+  + 'o.label`, one expression and never both, so the two-cell `Mono Mono` shape cannot be re-created here');
+/* NEGATIVE CONTROL — the probe must SEE the shape it warns about, or the
+   absence assertion above is a tautology. Kept from ROUND W on purpose: if a
+   suppression rule is ever reintroduced, this is what recognises it. */
+const ROW_RULE_RE = /\.icon-field-font\s+\.insp-opt\s+\.insp-opt-label:not\(\.insp-font-sample\)\s*\{\s*display:\s*none\s*;?\s*\}/;
 const BARE_LABEL_RULE = '.insp-opt .insp-opt-label { display: none; }';
-assert('p.control-the-row-rule-probe-detects-an-unscoped-rule',
+assert('p.control-the-suppression-probe-still-detects-a-reintroduced-rule',
   ROW_RULE_RE.test('.icon-field-font .insp-opt .insp-opt-label:not(.insp-font-sample) { display: none; }')
     && !ROW_RULE_RE.test(BARE_LABEL_RULE)
     && /\.insp-opt-label\s*\{\s*display:\s*none/.test(BARE_LABEL_RULE),
-  'the pattern matches the SCOPED rule and does NOT match a bare `.insp-opt-label { display: none }` — the shape '
-  + 'the brief warned would empty every other picker, which the harness can still see when it appears');
+  'the pattern still matches the SCOPED suppression rule and does NOT match a bare `.insp-opt-label { display: '
+  + 'none }` — the shape the brief warned would empty every other picker, which the harness can still see');
 
 /* --- (p2) THE DECLARATIONS AND THE FILES --------------------------------- */
 const FACES = [...STYLES_RAW.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(m => m[1]);
@@ -1834,14 +1858,57 @@ assert('p.a-custom-value-overrides-the-step-and-they-never-coexist',
       && M.textStyleVars(custom, 'left')['--ts-scale'] === '1.7';
   })(),
   'one property, one writer: picking a step clears the custom value and typing one clears the step');
-assert('p.the-custom-input-is-a-real-input-and-clamped-on-commit',
-  APP.includes('id="insp-text-scale"') && APP.includes('type="number"')
-    && APP.includes('min={TEXT_SCALE_MIN}') && APP.includes('max={TEXT_SCALE_MAX}')
-    && APP.includes('writeTextStyle({scale: clampTextScale(n)})')
-    && countOf(APP, 'clampTextScale(') === 1,
-  'a real `<input type="number">` — which is what keeps the canvas shortcuts inert, because '
-  + "App.tsx's keydown opens with `if (isEditable(e.target)) return;` and `isEditable` (App.tsx:367) "
-  + 'returns true for INPUT — and the only write goes through the clamp');
+/* ROUND X, ITEM 1 — THE INPUT IS GONE, THE RULE IS NOT. This assertion is
+   INVERTED from ROUND W on purpose: it used to require `id="insp-text-scale"` +
+   `type="number"`; it now requires their ABSENCE, and simultaneously requires
+   every piece of the capability the input used to write. Deleted with the input:
+   the element, its id, the two bound props and the handler's `clampTextScale`
+   call. KEPT: `TEXT_SCALE_MIN`/`TEXT_SCALE_MAX`, `clampTextScale`, the optional
+   `scale` field, and `textStyleVars` reading it — so a board already carrying a
+   custom multiplier still renders it, and a later pass cannot delete the rule
+   while the UI is gone without failing here. */
+assert('p.the-custom-size-INPUT-is-gone-and-the-RULE-still-exists',
+  /* UI GONE — the element, its id, its class, its handler, its imports. APP is
+     comment-stripped, so the note explaining the removal cannot satisfy this. */
+  !APP.includes('insp-text-scale') && !APP.includes('insp-num')
+    && !/type="number"/.test(APP)
+    && countOf(APP, 'clampTextScale(') === 0
+    && countOf(APP, 'TEXT_SCALE_MIN') === 0 && countOf(APP, 'TEXT_SCALE_MAX') === 0
+    && !STYLES_BLANK.includes('.insp-num')
+    /* RULE KEPT — bounds, clamp, the field, and the render read. */
+    && TS.includes('export const TEXT_SCALE_MIN = 0.5')
+    && TS.includes('export const TEXT_SCALE_MAX = 2')
+    && TS.includes('export function clampTextScale')
+    && TS.includes('scale?: number')
+    && /out\['--ts-scale'\] = String\(scale\)/.test(TS),
+  'no input, no `insp-text-scale`, no `type="number"`, no clamp call and no bound import left in App.tsx; '
+  + 'the bounds, the clamp, `scale?: number` and the `--ts-scale` render read all remain in textStyle.ts');
+assert('p.a-stored-custom-scale-still-RENDERS-and-no-step-claims-it',
+  (() => {
+    /* The display rule, EXECUTED through the model the panel reads. */
+    const r = k => M.readTextStyle(k, 'left');
+    const custom = r({scale: 1.7});
+    const onStep = r({scale: 1.15});
+    const none = r(undefined);
+    const stored = r({size: 'xl'});
+    console.log(`  readTextStyle — {scale:1.7} → size=${JSON.stringify(custom.size)} scale=${custom.scale}; `
+      + `{scale:1.15} → size=${JSON.stringify(onStep.size)}; no textStyle → size=${JSON.stringify(none.size)}; `
+      + `{size:'xl'} → size=${JSON.stringify(stored.size)}`);
+    return custom.size === null && custom.scale === 1.7
+      && M.textStyleVars({scale: 1.7}, 'left')['--ts-scale'] === '1.7'
+      && onStep.size === 'lg'
+      && none.size === 'md'
+      && stored.size === 'xl';
+  })(),
+  '1.7 paints (--ts-scale "1.7") and lights NO step; 1.15 is the L step and lights it; a node with no '
+  + 'textStyle still shows M; a stored step shows itself — the control reports what PAINTS, so it cannot '
+  + 'claim M for a node painting 1.7');
+/* NEGATIVE CONTROL — the read must be able to distinguish the two cases, or the
+   assertion above passes on a read that always answers the same thing. */
+assert('p.control-the-step-lookup-distinguishes-custom-from-step',
+  M.stepForScale(1.7) === null && M.stepForScale(1.3) === 'xl'
+    && M.stepForScale(1) === 'md' && M.stepForScale(0.85) === 'sm',
+  'a multiplier that IS a step resolves to it; one that is not resolves to nothing');
 assert('p.control-the-clamp-detects-an-out-of-range-value',
   M.clampTextScale(0.1) !== 0.1 && M.clampTextScale(9) !== 9,
   'the bounds are enforced, not merely documented in a hint');

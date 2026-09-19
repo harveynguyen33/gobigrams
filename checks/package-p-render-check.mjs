@@ -16,7 +16,7 @@ import {
 } from './src/InspectorPickers';
 import {getInspectorSections} from './src/inspector';
 import {defaultSectionState} from './src/inspectorState';
-import {textStyleVars, readTextStyle, mergeTextStyle, TEXT_SCALE} from './src/textStyle';
+import {textStyleVars, readTextStyle, mergeTextStyle, TEXT_SCALE, TEXT_FONT_OPTS, TEXT_FONT_FAMILY} from './src/textStyle';
 const W: any[] = [1, 1.5, 1.8, 2, 3].map(w => ({v: String(w), label: String(w), art: <ArtWidth w={w} />}));
 const D: any[] = ['solid','dashed','dotted'].map((d:any) => ({v: d, label: d, art: <ArtDash kind={d} />}));
 const C: any[] = ['bezier','smoothstep','step','straight'].map((c:any) => ({v: c, label: c, art: <ArtCurve kind={c} />}));
@@ -29,10 +29,17 @@ const CF: any[] = ['none','one','zeroOrOne','many','zeroOrMany','arrowclosed'].m
 const SP: any[] = [{v:'4',label:'slow',art:null},{v:'2.4',label:'normal',art:null},{v:'1.4',label:'fast',art:null},{v:'0.8',label:'very fast',art:null}];
 const BD: any[] = [{v:'card',label:'card',art:null},{v:'label-only',label:'label only',art:null}];
 /* PACKAGE-P PASS 2 §E.1 — the three Text-section controls, exactly as App.tsx
-   wraps them: PickerOption rows with NO art, so the label IS the control. */
+   wraps them: PickerOption rows with NO art, so the label IS the control.
+   ROUND X ITEM 3 adds the FOURTH: the font row, built the way App.tsx builds it
+   — ToggleRow plus the wide modifier, each button's art being its own name in
+   its own family (TEXT_FONT_FAMILY[key]), so the row is really SSR'd. */
 const SZ: any[] = [{v:'sm',label:'S',art:null},{v:'md',label:'M',art:null},{v:'lg',label:'L',art:null},{v:'xl',label:'XL',art:null}];
 const WT: any[] = [{v:'regular',label:'Regular',art:null},{v:'bold',label:'Bold',art:null}];
 const AL: any[] = [{v:'left',label:'Left',art:null},{v:'center',label:'Center',art:null},{v:'right',label:'Right',art:null}];
+const FT: any[] = TEXT_FONT_OPTS.map(o => ({
+  v: o.v, label: o.label,
+  art: <span className="insp-font-btn" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>{o.label}</span>,
+}));
 const SW: any[] = ['accent','green','cyan','violet','amber','slate'];
 
 const TITLES: any = {content:'Content',text:'Text',style:'Style',table:'Table',columns:'Columns',showMode:'Show mode',label:'Label',line:'Line',markers:'Markers',cardinality:"Cardinality",flow:'Flow animation'};
@@ -62,9 +69,14 @@ function tsBody(t: any) {
   const write = (p: any) => { t.__written = mergeTextStyle(t.__stored, p, alignDefault); };
   return <>
     <div className="field"><label>size</label>
-      <ToggleRow value={shown.size} onChange={v => write({size: v})} options={SZ} title="Text size" /></div>
+      {/* ROUND X ITEM 1 — shown.size is null for a custom multiplier, and
+          App.tsx passes a null-coalesce to an empty string so no step is
+          marked; the stub does the same. */}
+      <ToggleRow value={shown.size ?? ''} onChange={v => write({size: v})} options={SZ} title="Text size" /></div>
     <div className="field"><label>weight</label>
       <ToggleRow value={shown.weight} onChange={v => write({weight: v})} options={WT} title="Text weight" /></div>
+    <div className="field"><label>font</label>
+      <ToggleRow value={shown.font} onChange={v => write({font: v})} options={FT} title="Text font for the whole node" wide /></div>
     <div className="field"><label>text colour</label>
       <div className="swatches">{SW.map(k => <div key={k} className={'swatch' + (shown.colorKey === k ? ' on' : '')} data-color-key={k} onClick={() => write({colorKey: k})} />)}</div></div>
     <div className="field"><label>align</label>
@@ -91,6 +103,12 @@ export function All() {
   const l: any = {kind:'label'};
   const lo: any = {kind:'goblin', shape:'service', body:'label-only'};
   g.__stored = {size:'xl', weight:'bold', colorKey:'amber', align:'right'};
+  /* ROUND X, ITEM 1 — a node carrying a CUSTOM multiplier, the case the removed
+     input used to write. It must still paint (that is textStyleVars) and the
+     restored size row must light NO step for it — the panel reports what paints
+     rather than claiming M. */
+  const gx: any = {kind:'goblin', shape:'service', body:'card'};
+  gx.__stored = {scale: 1.7};
   return <div>
     <div id="edge">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies)}</div>
     {/* PASS 3 §F.5 — the same target with Cardinality EXPANDED, to prove an open
@@ -109,6 +127,8 @@ export function All() {
     </>})}</div>
     <div id="goblin-default">{renderTarget({kind:'goblin', shape:'service', body:'card'}, {text: tsBody({kind:'goblin', shape:'service', body:'card'})})}</div>
     <div id="goblin-lo">{renderTarget(lo, {text: tsBody(lo)})}</div>
+    {/* ROUND X ITEM 1 — the same target carrying a CUSTOM multiplier. */}
+    <div id="goblin-custom">{renderTarget(gx, {text: tsBody(gx)})}</div>
     <div id="label">{renderTarget(l, {text: tsBody(l)})}</div>
   </div>;
 }
@@ -173,7 +193,15 @@ const textSectionOf = id => {
   const at = seg.indexOf('data-section="text"');
   return at < 0 ? '' : seg.slice(at, seg.indexOf('</section>', at));
 };
-const onLabelsOf = seg => [...seg.matchAll(/<button[^>]*class="[^"]*insp-seg-btn on[^"]*"[^>]*>([^<]*)</g)].map(m => m[1]);
+/** The `on` labels of a target's segmented rows, read from the button's own TEXT.
+ *  ROUND X, ITEM 3 — `+` not `*`: the FONT row's buttons carry a `<span>` (their
+ *  name, in their own family), so they have no text node and are deliberately not
+ *  read here. They are asserted separately by `onFontOf` below, because their
+ *  markup is the whole point of that control. */
+const onLabelsOf = seg => [...seg.matchAll(/<button[^>]*class="[^"]*insp-seg-btn on[^"]*"[^>]*>([^<]+)</g)].map(m => m[1]);
+/** ROUND X, ITEM 3 — which FONT button is marked, matched on `.insp-font-btn`
+ *  (the row is the only one whose buttons carry it), not on position. */
+const onFontOf = seg => [...seg.matchAll(/<button[^>]*insp-seg-btn on[^>]*data-opt="([^"]+)"[^>]*><span class="insp-font-btn"/g)].map(m => m[1]);
 const onSwatchOf = seg => [...seg.matchAll(/class="swatch on"[^>]*data-color-key="([^"]+)"/g)].map(m => m[1]);
 
 let fails = 0;
@@ -209,15 +237,24 @@ check('both targets PAINT the four §E.1 controls',
   `${(gText.match(/insp-seg-btn/g) ?? []).length} segmented buttons + `
   + `${(gText.match(/class="swatch(?: on)?"/g) ?? []).length} colour cells on the goblin, same on the label`);
 check('the FOUR sizes are a segmented row of four, not a px input',
-  (gText.match(/data-opt="/g) ?? []).length === 9 && !/<input[^>]*type="(number|text)"/.test(gText),
-  `${(gText.match(/data-opt="/g) ?? []).length} option buttons (4 size + 2 weight + 3 align) and no text/number input`);
+  (gText.match(/data-opt="/g) ?? []).length === 13 && !/<input[^>]*type="(number|text)"/.test(gText),
+  `${(gText.match(/data-opt="/g) ?? []).length} option buttons (4 size + 2 weight + 4 font + 3 align) and no `
+  + 'text/number input — ROUND X ITEM 1 removed the custom-size input and ROUND X ITEM 3 added the font row, '
+  + 'so the count went 9 → 13');
 /* §E.2 — THE READ, per target: a stored style shows as chosen; a node with none
    shows the INHERITED value and no swatch. */
 const storedOn = onLabelsOf(gText);
 const defaultOn = onLabelsOf(textSectionOf('goblin-default'));
 const loOn = onLabelsOf(textSectionOf('goblin-lo'));
 const labelOn = onLabelsOf(lText);
+/* ROUND X, ITEM 3 — the font row, per target. `mono` on every target here
+   because none of the fixtures stores a `font`, and `mono` IS the default — which
+   is also why the row is `on` there without anything being written. */
+const storedFontOn = onFontOf(gText);
+const defaultFontOn = onFontOf(textSectionOf('goblin-default'));
 console.log(`  shown values — stored: ${JSON.stringify(storedOn)}  default: ${JSON.stringify(defaultOn)}  label-only: ${JSON.stringify(loOn)}  label: ${JSON.stringify(labelOn)}`);
+console.log(`  the font row renders ${(gText.match(/class="insp-font-btn"/g) ?? []).length} name-in-own-family buttons; `
+  + `marked: stored ${JSON.stringify(storedFontOn)} / default ${JSON.stringify(defaultFontOn)}`);
 check('a stored style reads back as the chosen values',
   storedOn.join() === 'XL,Bold,Right' && onSwatchOf(gText).join() === 'amber',
   `size/weight/align ${JSON.stringify(storedOn)}, swatch ${JSON.stringify(onSwatchOf(gText))}`);
@@ -225,9 +262,44 @@ check('a node with NO textStyle reads as the inherited values (not blank)',
   defaultOn.join() === 'M,Regular,Left' && onSwatchOf(textSectionOf('goblin-default')).length === 0
     && labelOn.join() === 'M,Regular,Left' && onSwatchOf(lText).length === 0,
   `M / Regular / left and NO swatch on — "default", exactly as §E.2 requires (the panel never shows a blank)`);
+check('ROUND X ITEM 3 — the font row renders FOUR self-previewing buttons, all on one target',
+  (gText.match(/class="insp-font-btn"/g) ?? []).length === 4
+    && ['Mono', 'UI', 'Read', 'Viet'].every(l => gText.includes(`>${l}</span>`))
+    /* Each button's span carries its OWN family — the preview is not decoration.
+       React escapes `'` as `&#x27;` inside an inline style, so the emitted
+       attribute is read in that form (measured, not assumed). */
+    && gText.includes('font-family:&#x27;JetBrains Mono&#x27;, var(--mono)')
+    && gText.includes('font-family:&#x27;Inter&#x27;')
+    && gText.includes('font-family:&#x27;Lexend&#x27;')
+    && gText.includes('font-family:&#x27;Be Vietnam Pro&#x27;')
+    /* ONE NAME PER BUTTON: the row builds each button from ONE span, so the
+       two-cell `Mono Mono` shape ROUND W had to suppress cannot recur. */
+    && !gText.includes('Mono Mono'),
+  `${(gText.match(/class="insp-font-btn"/g) ?? []).length} buttons, each printing its own name in its own `
+  + 'family, and no repeated name anywhere in the row');
+check('ROUND X ITEM 3 — the marked font button is the stored family, and mono is marked by default',
+  storedFontOn.join() === 'mono' && defaultFontOn.join() === 'mono',
+  '`mono` is TEXT_DEFAULT_FONT, so it is both what the fixture stores (nothing) and what the row marks — '
+  + 'the `.insp-seg-btn.on` treatment reaches the font row without a rule of its own');
 check('the align DEFAULT is per-target (label-only nodes are centred by design)',
   loOn.join() === 'M,Regular,Center',
   'a label-only goblin shows Center as its inherited align, straight from `.node .lo-body { text-align: center }`');
+/* ROUND X, ITEM 1 — THE CUSTOM MULTIPLIER, end to end in markup. The input is
+   gone, so this is the ONLY place the user-visible half of a stored custom scale
+   can be verified: the node still gets `--ts-scale` and the restored size row
+   marks NO step. `readTextStyle` answers `null` for 1.7, and App.tsx renders
+   `size ?? ''`, which matches no option — so `onLabelsOf` finds no marked size
+   button while the other three rows are untouched. */
+const customText = textSectionOf('goblin-custom');
+const customOn = onLabelsOf(customText);
+console.log(`  custom scale 1.7 — marked segmented buttons: ${JSON.stringify(customOn)}  `
+  + `(weight/align still default, size deliberately UNSET)`);
+check('ROUND X ITEM 1 — a stored custom scale marks NO step and does not disturb the other rows',
+  customOn.join() === 'Regular,Left'
+    && customText.includes('data-opt="sm"') && customText.includes('data-opt="xl"')
+    && !/class="[^"]*insp-seg-btn on[^"]*"[^>]*data-opt="(sm|md|lg|xl)"/.test(customText),
+  `${JSON.stringify(customOn)} — the four size buttons are present and NONE is marked (1.7 is not a step), `
+  + 'while weight and align still show their inherited values');
 /* NEGATIVE CONTROL: the stored read must differ from the default read, or the
    two checks above could both pass on a panel that ignores `textStyle` entirely. */
 check('CONTROL — the stored read differs from the default read',

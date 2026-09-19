@@ -244,22 +244,47 @@ export function scaleOfTextStyle(ts: TextStyle | undefined): number {
   if (ts?.scale !== undefined) return ts.scale;
   return TEXT_SCALE[ts?.size ?? TEXT_DEFAULT_SIZE];
 }
+
+/** ROUND X, ITEM 1 — WHICH STEP (IF ANY) A PAINTED MULTIPLIER CORRESPONDS TO.
+ *
+ *  The custom-size INPUT is gone; the custom `scale` FIELD is not (Harvey:
+ *  "rule giữ khi cần"). A board that already carries `scale: 1.7` must still
+ *  RENDER it — `textStyleVars` reads `scale` first, unchanged — and the restored
+ *  segmented control must not lie about it. `1.7` is not any of the four steps,
+ *  so NO step is marked rather than the control lighting M for a multiplier M
+ *  does not paint. A stored value that DOES coincide with a step (`1.15`) shows
+ *  that step, because there it is the truth.
+ *
+ *  The no-write case needs no special case: `TEXT_SCALE['md'] === 1`, `1` is
+ *  never stored, and `scaleOfTextStyle` answers `1` for a node with no
+ *  `textStyle` — so an untouched node resolves to `md` through this same path.
+ *  A `null` return is the "matches none" case and is what the control paints as
+ *  nothing selected. */
+export function stepForScale(scale: number): TextSize | null {
+  for (const k of Object.keys(TEXT_SCALE) as TextSize[]) if (TEXT_SCALE[k] === scale) return k;
+  return null;
+}
+
 /** The values the panel SHOWS for a stored style: a missing field reads as the
  *  inherited default, never as a blank.
  *
- *  ROUND W, ITEM 3 — `scale` is what `--ts-scale` actually paints, read through
- *  `scaleOfTextStyle`, so the number in the box and the number on the node are
- *  one value and not two. `size` stays whichever STEP is stored (or `md`), which
- *  is what keeps the segmented control lit on M even while a custom 1.7 is in
- *  the box beside it. */
+ *  ROUND X, ITEM 1 — `size` IS DERIVED FROM WHAT PAINTS. It used to be "the
+ *  stored step, or `md`", which was fine only while a second control (the
+ *  custom-size input) carried the multiplier. With the input gone, that reading
+ *  would light M on a node painting 1.7 — the control and the node disagreeing
+ *  about the same property. `size` is therefore `stepForScale(painted)`: the
+ *  step whose scale IS the multiplier on the node, or `null` for a custom value
+ *  that matches no step. `scale` stays the painted number itself, so the two
+ *  fields are one truth read two ways and cannot drift. */
 export function readTextStyle(ts: TextStyle | undefined, alignDefault: TextAlign) {
+  const painted = scaleOfTextStyle(ts);
   return {
-    size: ts?.size ?? TEXT_DEFAULT_SIZE,
+    size: stepForScale(painted),
     weight: ts?.weight ?? TEXT_DEFAULT_WEIGHT,
     colorKey: ts?.colorKey ?? null,
     align: ts?.align ?? alignDefault,
     font: ts?.font ?? TEXT_DEFAULT_FONT,
-    scale: scaleOfTextStyle(ts),
+    scale: painted,
   };
 }
 
