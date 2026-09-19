@@ -366,6 +366,14 @@ const c4ContainerTemplate: TemplateSpec = {
    L3a — flowchart palette (ISO 5807). `preparation` adapts the gateway hexagon.
 =========================================================================== */
 
+/* ROUND AA, ITEM 3 — `Process` and `Decision` were filed under `basic` while
+   the other nine flowchart items passed `flowchart`: a typo from the palette
+   build, not a decision. They are the two most fundamental ISO 5807 shapes, so
+   they belong to their namesake section like every other flowchart symbol.
+   Effect: `Basic` now holds exactly `Text` (the one generic item, whose
+   definition lives in `PALETTE` and is referenced rather than duplicated), and
+   `Flowchart` holds the other ten. `types` is untouched, so the flowchart VIEW,
+   the search index and insertion are unaffected — only the SECTION moves. */
 const fc = (
   label: string, hint: string, shape: Shape, colorKey: ColorKey, title: string,
   category: PaletteCategory, types: DiagramType[], aliases: string[], geometry: string,
@@ -384,8 +392,8 @@ const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteI
 
 const FLOWCHART_PALETTE: PaletteItem[] = [
   fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium'),
-  fc('Process', 'rect · task', 'process', 'cyan', 'Process step', 'basic', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
-  fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'basic', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', {width: 150, height: 96}),
+  fc('Process', 'rect · task', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
+  fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'flowchart', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', {width: 150, height: 96}),
   fc('Input / Output', 'parallelogram', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
   fc('Document', 'wavy base · output', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base'),
   fc('Predefined process', 'double-bar rect', 'subprocess', 'cyan', 'Subprocess', 'flowchart', FLOW, ['subprocess', 'subproc', 'subroutine', 'fr-rect', 'predefined'], 'double-bar rect'),

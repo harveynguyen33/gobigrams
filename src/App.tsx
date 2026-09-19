@@ -91,6 +91,9 @@ import {
   COARSE_NODE_CLICK_DISTANCE_PX,
 } from './touch';
 import {usePanelCollapse, isPanelHidden} from './panelCollapse';
+/* ROUND AA, ITEM 2 — the marquee mode: its persisted value, its React Flow
+   enum, and the hook that owns both. */
+import {useMarqueeMode} from './marqueeMode';
 import {useInspectorSections} from './inspectorState';
 import {searchLibrary, groupByCategory} from './paletteSearch';
 import {
@@ -605,6 +608,13 @@ export default function App() {
    *  on disable is what un-paints it. A parallel guard added outside `enabled`
    *  would strand exactly that edge. */
   const {highlight, toggle: toggleHighlight} = useHoverHighlight();
+  /* ROUND AA, ITEM 2 — THE MARQUEE SELECTION MODE. Hoisted beside the other
+     persisted canvas prefs (`useAnimationGating`, `useHoverHighlight`), and it
+     RETURNS the React Flow `selectionMode` enum as well as the stored value, so
+     the live `<ReactFlow>` prop below follows the setting with no reload and
+     there is no second place that could map the value differently. Default is
+     `touch` (overlap); see `src/marqueeMode.ts`. */
+  const {mode: marqueeMode, selectionMode, setMode: setMarqueeMode} = useMarqueeMode();
   const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave} =
     useHoverChoreography(wrap, edgesRef, highlight && !readOnly);
   const {startInteraction, endInteraction} = useInteractionGuard(wrap);
@@ -4312,6 +4322,8 @@ export default function App() {
           onAnimate={toggleAnimate}
           highlight={highlight}
           onHighlight={toggleHighlight}
+          marquee={marqueeMode}
+          onMarquee={setMarqueeMode}
           returnFocusTo={settingsBtnRef}
         />
 
@@ -4323,9 +4335,12 @@ export default function App() {
           onChange={onImportFile}
         />
 
-        {/* J: Excalidraw-style canvas navigation — left-drag pans, Shift+drag
-            box-selects, plain scroll pans (free, both axes), Ctrl/Cmd+scroll
-            (trackpad pinch) zooms, Space+drag pans. */}
+        {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects
+            (see `selectionOnDrag`), Shift+drag box-selects from a node too,
+            middle/right drag + Space+drag pan, plain scroll pans (free, both
+            axes), Ctrl/Cmd+scroll (trackpad pinch) zooms. ROUND AA, ITEM 2 — the
+            marquee's own mode is the `selectionMode` prop below, driven by
+            Settings → Canvas → Marquee selection. */}
         {/* K1: ds-flow-wrap scopes the hover-choreography + perf-guard classes
             to THIS React Flow instance. K3: ds-animating-layout (added/removed
             around programmatic layouts) and ds-no-anim (animation gating). */}
@@ -4454,29 +4469,55 @@ export default function App() {
           zoomOnDoubleClick={false}
           // M3/S3.2 — KNOWN REACT FLOW TRAP, do not "simplify" this back to a
           // bare button array. `panOnDrag`'s array form constrains the MOUSE
-          // only. Pane's own `onPointerDownCapture` (dist/esm/index.js ~1481)
+          // only. Pane's own `onPointerDownCapture` (dist/esm/index.js:1481)
           // early-returns for `event.pointerType === 'touch'` whenever
           // `panOnDrag !== false` and no selection key is held — so a finger
           // can never reach the `selectionOnDrag` branch. DECISION: on a coarse
           // pointer one finger on the empty pane PANS (what a mobile user
           // expects); two fingers pan + pinch-zoom via `zoomOnPinch`. Box-select
           // therefore stays a mouse-only gesture (left-drag) or an explicit
-          // Shift-drag on a hybrid device — see the report.
+          // Shift-drag on a hybrid device.
+          //
+          // ROUND AA, ITEM 2 — THE GESTURE ARRANGEMENT, RESTATED, and it is
+          // UNCHANGED: `panOnDrag` is still `[1, 2]` in edit mode, so a plain
+          // LEFT-drag (button 0) is NOT a pan; `selectionOnDrag={!readOnly}`
+          // is what claims button 0 on the empty pane and draws the marquee.
+          // Panning stays on middle/right drag plus `panOnScroll` (free, both
+          // axes) and Space-drag. Left-drag PAN was never the behaviour and is
+          // still not: making it so would trade Harvey's box-select for a pan
+          // he did not ask for.
+          //
+          // `panOnDrag` is `!== false` in BOTH branches, which is what keeps
+          // the touch path alive: on a finger, `onPointerDownCapture` takes the
+          // early return at :1481 BEFORE the `isSelectionActive` test at :1491,
+          // so the gesture falls through to the pan-zoom filter and one finger
+          // pans. `readOnly ? true : [1, 2]` never changes that — `true` and a
+          // two-element array are both `!== false`.
           //
           // READ-ONLY BRANCH — do NOT collapse this ternary back to a literal
           // array. In review mode `selectionOnDrag` is `false` AND the array
-          // form here excludes button 0, so a plain LEFT-drag on the pane would
-          // match no branch at all and be a DEAD gesture (measured defect: the
-          // viewport does not move). Harvey's ask was literally a back-and-forth
-          // left-drag that touches no element, so in review mode ANY button
-          // pans: `true`. Outside review mode the value is still `[1, 2]`,
-          // byte-for-byte unchanged behaviour. `true` is `!== false`, so the
-          // touch early-return above still fires and one-finger touch panning
-          // is preserved. A left-drag here can never select: selection needs
+          // form here would exclude button 0, so a plain LEFT-drag on the pane
+          // would match no branch at all and be a DEAD gesture (measured defect:
+          // the viewport does not move). Harvey's ask was literally a
+          // back-and-forth left-drag that touches no element, so in review mode
+          // ANY button pans: `true`. Outside review mode the value is still
+          // `[1, 2]`. A left-drag here can never select: selection needs
           // `elementsSelectable` to be true (see `elementsSelectable={!readOnly}`
           // above), so no box-select / node toolbar / resize handle can appear.
           panOnDrag={readOnly ? true : [1, 2]}
           selectionOnDrag={!readOnly}
+          // ROUND AA, ITEM 2(a)/(b) — THE MARQUEE MODE. React Flow's own default
+          // is `SelectionMode.Full` (`@xyflow/system`: `enum SelectionMode {
+          // Partial = 'partial', Full = 'full' }`), and `Pane` passes
+          // `selectionMode === SelectionMode.Partial` as `getNodesInside`'s
+          // `partially` flag — so with no prop the marquee had to CONTAIN a node
+          // to select it. That was the measured defect: a box missing 60px on a
+          // node's right edge, or covering only its left half, selected nothing.
+          // The prop now READS THE SETTING (`useMarqueeMode` above), whose
+          // no-write default is `touch` -> `SelectionMode.Partial` (overlap),
+          // matching Figma / Excalidraw / draw.io / tldraw. Changing the setting
+          // re-renders this prop live; no reload.
+          selectionMode={selectionMode}
           selectionKeyCode={['Shift']}
           panOnScroll
           panOnScrollMode={PanOnScrollMode.Free}
@@ -4740,6 +4781,7 @@ export default function App() {
                       onChange={v => updateEdge({data: {flowDuration: Number(v)}})}
                       options={SPEED_OPTS}
                       title="Flow speed"
+                      half
                     />
                   </div>
                 </div>

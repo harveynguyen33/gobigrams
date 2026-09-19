@@ -318,7 +318,7 @@ export function ShapesPicker({value, onChange, color}: {
    `on` is painted with the panel's existing `.mbtn` vocabulary (`styles.css:1725`)
    so a selected button looks the same here as in the multi-select branch.
    =========================================================================== */
-export function ToggleRow({value, onChange, options, title, wide, grid3}: {
+export function ToggleRow({value, onChange, options, title, wide, grid3, half}: {
   value: string;
   onChange: (v: string) => void;
   options: PickerOption[];
@@ -349,10 +349,25 @@ export function ToggleRow({value, onChange, options, title, wide, grid3}: {
    *  81px cell, and it does so through the display value those rows actually
    *  have. The cell measurement is in the `.insp-seg.grid3` block below. */
   grid3?: boolean;
+  /** ROUND AA, ITEM 1 — THE OTHER WORD-ROW MODIFIER: TWO PER LINE.
+   *
+   *  A second per-line modifier rather than a re-use of `grid3`, because the two
+   *  describe different rows: `grid3` is a 3+3 grid of six, this is a 2+2 of
+   *  four. Both exist for the same reason — a row of WORD buttons cannot divide
+   *  the field by its own count without breaking a word — and both are written
+   *  as the same flex basis, in the same idiom (`grid3` is documented at the
+   *  `.insp-seg.grid3` block in `styles.css`).
+   *
+   *  WHICH ROWS NEED IT IS A MEASUREMENT, not a preference. The canvas Speed row
+   *  is the only one: at four across its longest label (`very fast`, 59.6px in
+   *  the app's 11px mono) exceeds the 41.5px content box the equal share gives
+   *  it, and the label would wrap. Every other segmented row's longest label
+   *  fits its own share; the numbers are in the `.insp-seg.half` block. */
+  half?: boolean;
 }) {
   return (
     <div
-      className={`swatches insp-seg${wide ? ' wide' : ''}${grid3 ? ' grid3' : ''}`}
+      className={`swatches insp-seg${wide ? ' wide' : ''}${grid3 ? ' grid3' : ''}${half ? ' half' : ''}`}
       role="group"
       aria-label={title}
     >

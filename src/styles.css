@@ -1343,9 +1343,37 @@ body {
 }
 .insp-shape-item.on .insp-shape-hint { color: var(--sel); }
 /* Segmented rows (§B #1, #8, #12). `.mbtn` supplies the button; the wrapper
-   supplies the row. `1fr` per button so a 2-button toggle and a 4-button
-   segmented row both fill the field width. */
-.insp-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
+   supplies the row.
+
+   ROUND AA, ITEM 1 — EQUAL WIDTHS, AND WHY THE ROW IS WRITTEN AS FLEX.
+   Measured on the live panel: the two ALIGN rows sized every button to its own
+   text (`Left` 45px / `Center` 58px / `Right` 51px), so the row read as ragged
+   exactly as Harvey described it — "nó đang lệch theo ký tự chữ". This block
+   used to declare `display: grid; grid-auto-flow: column; grid-auto-columns:
+   1fr`, which WOULD have made the cells equal — but every segmented row renders
+   as `<div className="swatches insp-seg">`, and `.swatches { display: flex }`
+   (styles.css:1557) carries the SAME specificity (one class each) and sits
+   LATER in the sheet. Every one of these rows therefore computed `display:
+   flex`, and the `grid-auto-columns` never applied to anything. That was the
+   defect, verbatim — a dead declaration, not a missing one.
+
+   THE FIX IS ONE RULE, AND IT SERVES A ROW OF ANY COUNT. `flex: 1 1 0` — a zero
+   basis and an equal share of the free space — divides the field equally among
+   N buttons with no per-count arithmetic and no pixel width to hard-code. The
+   3+3 font grid keeps its own `calc((100% - 10px) / 3)` basis (`.insp-seg.grid3`
+   below) because its basis is what forces the wrap at three; every other row
+   has its own count and needs no number at all.
+
+   THE GAP IS RE-STATED AS A COMPOUND SELECTOR because it lost the same cascade
+   the display did: `.swatches`'s 7px gap beat `.insp-seg`'s 5px everywhere,
+   while `.insp-seg.grid3` (two classes) won inside its own row — so the panel
+   carried a 7px gap in one row and a 5px gap in the next. `.swatches.insp-seg`
+   is two classes, so it beats `.swatches` wherever it sits in the sheet and
+   the segmented rows now share one gap. `.swatches` ITSELF IS UNTOUCHED: it
+   still serves the colour swatches and the shape-palette rows, which are not
+   segmented controls and must keep sizing to their 26px swatch. */
+.swatches.insp-seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.insp-seg .insp-seg-btn { flex: 1 1 0; min-width: 0; }
 .insp-seg-btn { display: grid; place-items: center; padding: 7px 6px; gap: 4px; }
 /* ROUND X, ITEM 3 — the FONT row's modifier: its buttons carry a WORD, not a
    one-glyph label, so they get more side padding and less vertical. Measured at
@@ -1378,6 +1406,31 @@ body {
    push its own cell wider than its share. */
 .insp-seg.grid3 { gap: 5px; }
 .insp-seg.grid3 .insp-seg-btn { flex: 1 1 calc((100% - 10px) / 3); min-width: 0; padding: 6px 7px; }
+/* ROUND AA, ITEM 1 — THE OTHER WORD-ROW MODIFIER: TWO PER LINE.
+ *
+ *  Equal shares are right for glyph rows and for short words, but a row of four
+ *  WORD buttons cannot divide the field four ways without breaking a word. The
+ *  canvas Speed row is the measured case: four buttons an equal share wide give
+ *  each a `(253 - 15) / 4 = 59.5px` cell and a `41.5px` content box (0.5px
+ *  borders and `5px 8px` padding — `.mbtn`, styles.css:2036, which wins this
+ *  property on the later-source tie with `.insp-seg-btn`), and the label
+ *  `very fast` measures 59.6px in DejaVu Sans Mono at 11px. Neither `.mbtn` nor
+ *  `.insp-seg-btn` sets `white-space`, so that label would WRAP at the space —
+ *  the row would still be equal and still inside the field, but one button would
+ *  be two lines tall. Before this round the row was content-sized and did not
+ *  wrap (its four buttons totalled 216.3 + 3x7 = 237.3px), so the wrap would be
+ *  a regression the equal-width change introduced.
+ *
+ *  TWO PER LINE, with the same flex-basis idiom as `grid3`: a `124px` cell whose
+ *  `108px` content box fits `very fast` with 48.4px of slack. This is the
+ *  precedent ROUND Z set for the font row — a row of words gets its own
+ *  per-line count — and it is a MODIFIER on the one shared control, not a
+ *  second control. The other six segmented rows divide cleanly at their natural
+ *  count and need no modifier: `slow` 26.5 / `normal` 39.7 / `fast` 26.5 /
+ *  `center` 39.7 / `start` 33.1 / `end` 19.9 / `card` 26.5 / `label only` 66.2 /
+ *  `Regular` 46.4 / `Bold` 26.5 / `XL` 13.7 are all inside their shares. */
+.insp-seg.half { gap: 5px; }
+.insp-seg.half .insp-seg-btn { flex: 1 1 calc((100% - 5px) / 2); min-width: 0; padding: 6px 7px; }
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */

@@ -2,6 +2,10 @@ import {Fragment, useCallback, useEffect, useMemo, useRef, useState} from 'react
 import {Palette, Frame, Cable, Keyboard, Info, X} from 'lucide-react';
 import ThemePicker from './ThemePicker';
 import {type Mode, type ThemeName} from './theme';
+/* ROUND AA, ITEM 2 — the marquee mode's values and its plain-language option
+   labels. Imported rather than re-declared: the control, the persisted value
+   and the React Flow prop must resolve through ONE definition. */
+import {MARQUEE_OPTS, type MarqueeMode} from './marqueeMode';
 
 /**
  * M2 — the Settings dialog.
@@ -67,6 +71,14 @@ type Props = {
    *  flag via useHoverHighlight; this row only reads it and asks to flip it. */
   highlight: boolean;
   onHighlight: () => void;
+  /** ROUND AA, ITEM 2 — THE MARQUEE SELECTION MODE. A real, persisted, live
+   *  control: App owns the value through `useMarqueeMode` (which also owns the
+   *  React Flow prop), and this row is the discoverable surface. The values are
+   *  the stored tokens; `MARQUEE_OPTS` carries the plain-language names that
+   *  print on the buttons. NOT a gesture row in the Shortcuts pane — see the
+   *  `SHORTCUTS_MOUSE` comment below for why that list stays as it is. */
+  marquee: MarqueeMode;
+  onMarquee: (m: MarqueeMode) => void;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 };
@@ -134,12 +146,27 @@ function Toggle({label, value, onToggle}: {
 /** A segmented control (role=radiogroup + role=radio): one tap picks a value
  *  and the current one is always visible. Mirrors ThemePicker's card grid —
  *  roving tabindex, so exactly one segment is in the Tab order, and
- *  ArrowLeft/ArrowRight/Home/End move the selection and fire `onPick`. */
-function Segmented({label, options, value, onPick}: {
+ *  ArrowLeft/ArrowRight/Home/End move the selection and fire `onPick`.
+ *
+ *  ROUND AA, ITEM 2 — GENERIC OVER THE VALUE TYPE, NOT DUPLICATED FOR STRINGS.
+ *  The Canvas group's first row (Grid size) is a list of NUMBERS and the new
+ *  marquee row is a list of MODE STRINGS (`touch` / `enclose`), so the same
+ *  radiogroup had to serve both. A second, near-identical control would be the
+ *  actual defect here — two roving-tabindex implementations that can drift
+ *  apart — so the component is generic and `String(n)` names each segment. The
+ *  call sites are unchanged in shape.
+ *
+ *  `labelOf` is the one addition that genericness needs: the marquee row's
+ *  VALUES are the stored tokens (`touch` / `enclose`) while the WORDS on the
+ *  buttons are the plain-language names. Printing the raw token would put
+ *  `enclose` in front of the user; the stored value stays the token. Absent, it
+ *  is `String(n)` — byte-identical to what every existing row printed. */
+function Segmented<T extends string | number>({label, options, value, onPick, labelOf}: {
   label: string;
-  options: number[];
-  value: number;
-  onPick: (n: number) => void;
+  options: readonly T[];
+  value: T;
+  onPick: (n: T) => void;
+  labelOf?: (n: T) => string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const selectedIdx = Math.max(0, options.indexOf(value));
@@ -175,13 +202,13 @@ function Segmented({label, options, value, onPick}: {
             type="button"
             role="radio"
             aria-checked={on}
-            aria-label={String(n)}
+            aria-label={labelOf ? labelOf(n) : String(n)}
             className={`settings-seg-btn${on ? ' on' : ''}`}
             tabIndex={i === focusIdx ? 0 : -1}
             ref={el => { refs.current[i] = el; }}
             onClick={() => pick(i)}
             onKeyDown={e => onKey(e, i)}
-          >{n}</button>
+          >{labelOf ? labelOf(n) : n}</button>
         );
       })}
     </div>
@@ -219,7 +246,15 @@ const SHORTCUTS_MOUSE: {what: string; how: string[]}[] = [
  *  from the canvas itself (and the canvas navigation the app documents
  *  elsewhere), so listing them was over-information. The `?` helper in App.tsx
  *  carries the SAME list — if you add or remove a row here, change it there in
- *  the same edit (item 4). Do not re-add those three anywhere. */
+ *  the same edit (item 4). Do not re-add those three anywhere.
+ *
+ *  ROUND AA, ITEM 2 — `Multi-select box` STAYS OFF THIS LIST, deliberately.
+ *  The marquee's new behaviour is a SETTING (Canvas → Marquee selection), which
+ *  is where a user changes it, and it is a real control rather than a
+ *  description. A gesture row here would only restate the gesture; it could not
+ *  say which of the two modes is active, and the row that was trimmed was
+ *  trimmed precisely because it was over-information. So no row is re-added and
+ *  no new token is invented — the setting IS the discoverable surface. */
 
 /* ---------- the panes ---------- */
 
@@ -240,7 +275,8 @@ function AppearancePane(props: Pick<Props, 'mode' | 'onMode' | 'resolved'>) {
 
 function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight'>) {
+  marquee, onMarquee,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -260,6 +296,19 @@ function CanvasPane({
         </Row>
         <Row label="Reduce motion" hint="hide edge and handle animation">
           <Toggle label="Reduce motion" value={!animate} onToggle={() => onAnimate()} />
+        </Row>
+        {/* ROUND AA, ITEM 2 — the marquee mode, a real control in the Canvas
+            group. Values print as plain language (`Touch` / `Enclose`) while the
+            stored token stays `touch` / `enclose`, and the hint states what each
+            one does in the terms Harvey used when he asked for it. */}
+        <Row label="Marquee selection" hint="what a drag-box on the empty canvas picks up">
+          <Segmented
+            label="Marquee selection"
+            options={MARQUEE_OPTS.map(o => o.v)}
+            value={marquee}
+            onPick={onMarquee}
+            labelOf={v => MARQUEE_OPTS.find(o => o.v === v)?.label ?? String(v)}
+          />
         </Row>
         <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">
           <Toggle label="Highlight connections" value={highlight} onToggle={() => onHighlight()} />
@@ -386,6 +435,7 @@ export default function Settings({
   noCycles, onNoCycles, oneIn, onOneIn, proximity, onProximity,
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate,
   highlight, onHighlight,
+  marquee, onMarquee,
   returnFocusTo,
 }: Props) {
   const [cat, setCat] = useState<SettingsCat>('appearance');
@@ -479,6 +529,8 @@ export default function Settings({
           onAnimate={onAnimate}
           highlight={highlight}
           onHighlight={onHighlight}
+          marquee={marquee}
+          onMarquee={onMarquee}
         />
       );
       case 'connections': return (
