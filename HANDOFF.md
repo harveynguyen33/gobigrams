@@ -1,7 +1,28 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (morning) · **Status:** ROUND V shipped (overflow). Pushed as **`8ee90b4`**.
-**Next: the inspector + text-styling work, spec'd from the Excalidraw research.**
+**Last session:** 2026-09-19 (midday) · **Status:** PACKAGE-P **pass 1** shipped (inspector: per-type sections +
+icon pickers) and PACKAGE-Q shipped (panel hotkeys). Pushed as **`8fff88b`**.
+**Next: PACKAGE-P pass 2 (the Text section + typing behaviour), then pass 3 (collapse UI).**
+
+> **PACKAGE-Q — panel hotkeys.** Group toggle `Cmd+Ctrl+Shift+\` (was `mod+Shift+\`); NEW per-side
+> `Cmd+Ctrl+Shift+[` (left) and `Cmd+Ctrl+Shift+]` (right); both chevrons now show their key as a tooltip with
+> `kbd` chips. **The measured trap:** all three chords carry Shift and **Shift mutates `e.key`** — `\`→`|`,
+> `[`→`{`, `]`→`}` — so the branches match on `e.code` (the same fix `Shift+1`/`Shift+2` already use).
+> **`mod` already meant meta-OR-ctrl**, so the old chord also fired on `Ctrl+Shift+\`; the new one requires the
+> actual pair. Non-Mac mirrors to `Ctrl+Shift+…`. All **five surfaces** updated together (handler · 2 chevron
+> tooltips · `?` sheet · Settings · README) — a mismatch between them was a shipped defect once. The
+> overlay-tier tooltip advertises **no** chord (none opens an overlay).
+>
+> **PACKAGE-P pass 1** — `src/inspector.ts` (NEW, one pure decision function mirroring upstream's
+> `shapeActionPredicates.ts`) + `src/InspectorPickers.tsx` (NEW). **All 12 `<select>`s converted; the app now
+> renders ZERO native dropdowns** (upstream has 0 too). The inspector renders from the ordered section list;
+> `group`/`note`/`actor`/`label-only` finally differ instead of all 19 shapes sharing one panel. Each section
+> carries `data-section` / `data-collapsed-default` so pass 3 reads the truth table instead of re-deriving it.
+> **The double-render fix (orchestrator-found, invisible to the 42/42 harness):** `secBody` both registered a
+> body AND returned it, and all 11 call sites rendered that return value — so every section painted TWICE and
+> Cardinality three times (one copy inside `flow`, one inside no section). `secBody` now registers only;
+> `renderSections` is the ONE painter. `checks/package-p-render-check.mjs` was added because presence-only
+> checks cannot see this class of defect.
 
 > **ROUND V — nothing may paint outside a node box.** Two MEASURED defects, both fixed at the CONTENT level:
 > a 43-char unbreakable word overflowed 259px RIGHT (`.node-title` is flex; the text span's `min-width:auto`
@@ -86,51 +107,35 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**PACKAGE-P SPEC IS WRITTEN AND VERIFIED — awaiting Harvey's approval before any build.**
-Read `PACKAGE-P-SPEC.md`. Written by `architect` from the Excalidraw research; the orchestrator
-independently re-checked every load-bearing claim against the source and resolved the one open conflict.
+**PACKAGE-P pass 2 — the Text section (size / weight / colour / align) + the §E.3 editing behaviours.**
+Then pass 3 (the collapse UI + `diagram-studio:inspector-sections` persistence). **Harvey reviews between
+passes.** The spec of record is `PACKAGE-P-SPEC.md` §E; pass 1 shipped §A/§B/§D (see the top of this file).
 
-**What it delivers** (Harvey's three asks: per-shape-type sections, icon pickers instead of text dropdowns,
-collapse the rarely-changed):
-- **One pure decision function** (`src/inspector.ts`, new) returning an ORDERED section list per target —
-  mirroring upstream's `shapeActionPredicates.ts`. Today the inspector has **3 branches and all 19 goblin
-  shapes share one panel**, so a `decision` diamond and a `database` cylinder show identical controls.
-  Field predicates (`hasKicker`/`hasMetric`/`hasIcon`) are derived from what `DiagramNode.tsx` actually
-  renders per shape, so `group` / `note` / `actor` / `label-only` finally differ.
-- **All 12 `<select>`s converted** — 10 to icon/trigger+popover pickers, flow count → stepper, flow speed →
-  segmented, `body` → 2-button toggle, the 19-shape picker → searchable `ShapePreview` popover. Target:
-  **zero bare `<select>`**, matching upstream (which has 0). The pattern already exists in this repo:
-  `src/IconPicker.tsx`.
-- **Collapse: no accordion** (upstream has none — stated as OUR pattern, not a copy). Edge **Cardinality** and
-  **Flow animation** fold by default; the goblin `body` toggle folds behind Style. Persisted under
-  `diagram-studio:inspector-sections`.
-- **Text section (option B)** + the three editing behaviours, and **font family deliberately OUT** (one node
-  already mixes `--mono` and `--sans`).
+**Pass 2 must also do the one thing pass 1 deliberately left OUT** (and said so in `src/inspector.ts`):
+`getInspectorSections` does **not** return a `text` section for a goblin yet, because the render layer cannot
+paint it — returning an id the panel cannot draw would make the decision function disagree with the panel.
+Pass 2 inserts `text` BETWEEN `content` and `style` in that one array, in the same pass that adds its body.
 
-**§H — five conflicts, TWO OF WHICH WERE MY OWN PROMPT ERRORS** (verified against source and corrected, not
-obeyed): `body` has 2 options not 19 (the 19-list is `shape`); Align/Distribute/Delete are in the
-**multi-select** branch, not the edge branch. Also found: a **second label editor already exists** (a panel
-`textarea` writing the same `text` as the in-place editor) — the spec removes it, closing a double-writer.
-**Escape resolved as KEEP = cancel** (shipped behaviour with a written rationale; Harvey asked for the controls
-while typing, not the key contract).
+**Pass 2's other load-bearing item:** the panel's label `<textarea>` (`App.tsx:~4523`) is a **second writer**
+for the same `text` the in-place `LabelNode` editor writes. The spec removes it — but ONLY in the same pass that
+adds its replacement (§E.3.1). Do not remove it alone.
 
-**BLOCKED ON HARVEY — 3 answers before the build starts** (asked; the mockup is
-`diagram-studio-research/mockup-inspector-rebuild.html`):
-1. Do the hand-drawn icons read correctly (stroke width as bars, line style as lines, curvature as 4 path
-   shapes, arrow heads as arrows)?
-2. Collapse: "rarely changed folded by default, showing its current value" — right, or keep everything open?
-3. Ordering per shape type — for an architecture box: **Text → Shape → Colour**, with Icon and Metric folded.
-   Agree or reorder?
+**Harvey re-tests:** click a node of each kind and confirm the panel differs per shape (`group` has no
+kicker/metric, `note` has no metric/icon); the 12 dropdowns are now icon pickers; the chevrons show
+`Cmd+Ctrl+Shift+[` / `]` on hover; and the three hotkeys toggle left / right / both.
 
-**Build order once approved — 3 gated passes, Harvey reviews between them:** (1) the section decision function
-+ icon pickers; (2) the Text section + the editing behaviours; (3) the collapse state. **Do NOT build in one
-go** — a mistake in pass 1 would otherwise be built on three times.
+**Known debt, unchanged:** `checks/package-q-reconnect-endpoints.mjs` reports **15** failures — 11 assert the
+endpoint disc the user asked to delete in ROUND T, 2 are its old fixture failures, and 2 more are its
+board-fixture assertions against the user's LIVE board (which he has been editing: it is now 9 nodes / 4 edges,
+not the 3/2 the harness hard-codes). It is left as the record; **do not "fix" a harness to hide a real change.**
 
 **Vault debt:** edge reshaping — ROUND S, T and U are NOT yet in ADR-031 / Change Log. Batch via pkm.
 `checks/round-s-edge-bend.mjs` covers (a)–(o).
 **Stale harness:** `checks/package-q-reconnect-endpoints.mjs` FAILS 13 (was 2): 11 assertions require the
 endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. Left as the record — do not "fix".
 
+## ✅ PACKAGE-Q 2026-09-19 — panel hotkeys (rebound group chord, per-side toggles, chevron tooltips)
+## ✅ PACKAGE-P pass 1 2026-09-19 — per-type sections + icon pickers (12 selects converted)
 ## ✅ ROUND V 2026-09-19 — nothing may paint outside a node box
 ## ✅ ROUND U 2026-09-18 — midpoint drag on bezier + straight (free 2-D)
 ## ✅ ROUND T 2026-09-18 — 2-D midpoint drag, slider removed, endpoint circle unpainted
