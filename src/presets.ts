@@ -390,17 +390,50 @@ const FLOW: DiagramType[] = ['flowchart'];
  *  literal, so the panel can never list `Note` twice. */
 const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteItem;
 
+/* ===========================================================================
+   ROUND AF — THE ONE DEFAULT SIZE FOR EVERY FLOWCHART SHAPE.
+
+   RATIO 2.0 IS NOT A TASTE, IT IS THE FRAME'S OWN RATIO. Every silhouette is
+   drawn ONCE in a normalised frame — `viewBox="0 0 200 100"` with
+   `preserveAspectRatio="none"` (`ShapeFrame`, src/shapes.tsx) — so the drawing is
+   STRETCHED to whatever box the node is handed, and 200:100 = 2.0 is the single
+   ratio at which each shape paints exactly as drawn. At every other ratio the
+   silhouette is distorted: a circle flattens into an ellipse, the terminal's
+   round caps go elliptical. The three sizes this palette used to carry were
+   1.50 (Terminal 270x180), 1.56 (Decision 150x96) and 1.00 (On-page connector
+   84x84) — all three distorted, and the thirteen entries with NO size fell to
+   `.node { min-width: 190px }` at auto height, i.e. a 190-wide sliver tens of
+   pixels tall. One size at one ratio removes the distortion instead of hiding
+   it, and removes the "one shape is huge and the rest are slivers" read.
+
+   WHY 290x145 AND NOT 280x140. 280x140 is the approved size and it has the right
+   SHAPE, but 140 is 1px BELOW this app's own resizer floor (`NODE_MIN_H` = 141,
+   src/DiagramNode.tsx). React Flow's resizer does not lift a below-floor node up
+   to the floor. Its clamp is
+   `getSizeClamp(size, minSize, maxSize) = max(0, minSize - size, size - maxSize)`,
+   which returns 1 for a 140-tall node, and a HORIZONTAL drag folds that into the
+   vertical delta as a SUBTRACTION — so grabbing a left/right grip silently
+   shrinks the height to 139, then 137, 133, 125 … to zero, because each drag
+   re-reads the height the previous one ate. EXECUTED against the shipped
+   `getDimensionsAfterResize` (see `checks/round-af-flowchart-sizes.mjs`): a
+   140-tall node collapses on a horizontal drag while a 145-tall node is inert.
+   145 clears the 141 height floor AND the 200 width floor with real slack, at
+   exactly ratio 2.0 (290/145 = 2.000). It is still ~13% less area than the
+   270x180 Terminal Harvey called too big, so the fix brings the Terminal DOWN
+   rather than inflating the other fifteen shapes. */
+export const FLOWCHART_NODE_SIZE = {width: 290, height: 145} as const;
+
 const FLOWCHART_PALETTE: PaletteItem[] = [
-  fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium', {width: 270, height: 180}),
-  fc('Process', 'rect · action step', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect'),
-  fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'flowchart', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', {width: 150, height: 96}),
-  fc('Input / Output', 'parallelogram · data', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram'),
-  fc('Document', 'wavy base · in or out', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base'),
-  fc('Predefined process', 'double-bar rect', 'subprocess', 'cyan', 'Subprocess', 'flowchart', FLOW, ['subprocess', 'subproc', 'subroutine', 'fr-rect', 'predefined'], 'double-bar rect'),
-  fc('Preparation', 'hexagon · setup', 'preparation', 'cyan', 'Initialise', 'flowchart', FLOW, ['initialization', 'initialisation', 'setup', 'init', 'hex'], 'hexagon'),
-  fc('Manual operation', 'trapezoid · by hand', 'manual', 'green', 'Manual step', 'flowchart', FLOW, ['manual step', 'manual', 'person'], 'trapezoid'),
-  fc('Delay', 'D-shape · wait', 'delay', 'amber', 'Wait', 'flowchart', FLOW, ['wait', 'pause'], 'D-shape'),
-  fc('On-page connector', 'circle · jump', 'connector', 'slate', 'A', 'flowchart', FLOW, ['connector', 'circle', 'reference', 'jump', 'on-page'], 'circle', {width: 84, height: 84}),
+  fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium', FLOWCHART_NODE_SIZE),
+  fc('Process', 'rect · action step', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect', FLOWCHART_NODE_SIZE),
+  fc('Decision', 'diamond · yes / no', 'decision', 'amber', 'Decision?', 'flowchart', FLOW, ['diam', 'diamond', 'question', 'branch'], 'diamond', FLOWCHART_NODE_SIZE),
+  fc('Input / Output', 'parallelogram · data', 'io', 'violet', 'Read input', 'flowchart', FLOW, ['io', 'input', 'output', 'data', 'parallelogram'], 'parallelogram', FLOWCHART_NODE_SIZE),
+  fc('Document', 'wavy base · in or out', 'document', 'violet', 'Document', 'flowchart', FLOW, ['doc', 'report', 'produced doc'], 'wavy base', FLOWCHART_NODE_SIZE),
+  fc('Predefined process', 'double-bar rect', 'subprocess', 'cyan', 'Subprocess', 'flowchart', FLOW, ['subprocess', 'subproc', 'subroutine', 'fr-rect', 'predefined'], 'double-bar rect', FLOWCHART_NODE_SIZE),
+  fc('Preparation', 'hexagon · setup', 'preparation', 'cyan', 'Initialise', 'flowchart', FLOW, ['initialization', 'initialisation', 'setup', 'init', 'hex'], 'hexagon', FLOWCHART_NODE_SIZE),
+  fc('Manual operation', 'trapezoid · by hand', 'manual', 'green', 'Manual step', 'flowchart', FLOW, ['manual step', 'manual', 'person'], 'trapezoid', FLOWCHART_NODE_SIZE),
+  fc('Delay', 'D-shape · wait', 'delay', 'amber', 'Wait', 'flowchart', FLOW, ['wait', 'pause'], 'D-shape', FLOWCHART_NODE_SIZE),
+  fc('On-page connector', 'circle · jump', 'connector', 'slate', 'A', 'flowchart', FLOW, ['connector', 'circle', 'reference', 'jump', 'on-page'], 'circle', FLOWCHART_NODE_SIZE),
   /* ROUND AD, ITEM 2 — the six additions. Colour keys follow the SAME semantic
      grouping as the ten above (Option B), so the key stays one idea:
        offpage          slate  — a routing marker, like On-page connector
@@ -409,12 +442,12 @@ const FLOWCHART_PALETTE: PaletteItem[] = [
        storeddata       violet — a store read/written, beside Document's violet
        looplimit        amber  — control (loop start), beside Decision / Delay
        internalstorage  violet — I/O-adjacent, a store; the cylinder's sibling */
-  fc('Off-page connector', 'home plate · another page', 'offpage', 'slate', 'Off page', 'flowchart', FLOW, ['off page', 'off-page', 'offpage', 'home plate', 'another page', 'next page'], 'home plate'),
-  fc('Manual input', 'sloped top · by keyboard', 'manualinput', 'green', 'Manual input', 'flowchart', FLOW, ['manual input', 'keyboard', 'typed', 'form', 'sloped top'], 'sloped top'),
-  fc('Display', 'curved trapezoid · show data', 'display', 'violet', 'Show result', 'flowchart', FLOW, ['display', 'screen', 'show', 'report', 'output device'], 'curved trapezoid'),
-  fc('Stored data', 'cylinder · read / write', 'storeddata', 'violet', 'Stored data', 'flowchart', FLOW, ['stored data', 'store', 'database', 'db', 'read write', 'cylinder'], 'cylinder'),
-  fc('Loop limit', 'notched top · loop start', 'looplimit', 'amber', 'Loop', 'flowchart', FLOW, ['loop limit', 'loop', 'loop start', 'notched top', 'iteration'], 'notched top'),
-  fc('Internal storage', 'pane rect · in-memory', 'internalstorage', 'violet', 'In memory', 'flowchart', FLOW, ['internal storage', 'in memory', 'memory', 'pane rect', 'ram'], 'pane rect'),
+  fc('Off-page connector', 'home plate · another page', 'offpage', 'slate', 'Off page', 'flowchart', FLOW, ['off page', 'off-page', 'offpage', 'home plate', 'another page', 'next page'], 'home plate', FLOWCHART_NODE_SIZE),
+  fc('Manual input', 'sloped top · by keyboard', 'manualinput', 'green', 'Manual input', 'flowchart', FLOW, ['manual input', 'keyboard', 'typed', 'form', 'sloped top'], 'sloped top', FLOWCHART_NODE_SIZE),
+  fc('Display', 'curved trapezoid · show data', 'display', 'violet', 'Show result', 'flowchart', FLOW, ['display', 'screen', 'show', 'report', 'output device'], 'curved trapezoid', FLOWCHART_NODE_SIZE),
+  fc('Stored data', 'cylinder · read / write', 'storeddata', 'violet', 'Stored data', 'flowchart', FLOW, ['stored data', 'store', 'database', 'db', 'read write', 'cylinder'], 'cylinder', FLOWCHART_NODE_SIZE),
+  fc('Loop limit', 'notched top · loop start', 'looplimit', 'amber', 'Loop', 'flowchart', FLOW, ['loop limit', 'loop', 'loop start', 'notched top', 'iteration'], 'notched top', FLOWCHART_NODE_SIZE),
+  fc('Internal storage', 'pane rect · in-memory', 'internalstorage', 'violet', 'In memory', 'flowchart', FLOW, ['internal storage', 'in memory', 'memory', 'pane rect', 'ram'], 'pane rect', FLOWCHART_NODE_SIZE),
   {
     label: 'Lane', hint: 'container · role', shape: 'group', colorKey: 'slate', kind: 'goblin',
     category: 'groups', types: FLOW, aliases: ['swimlane', 'pool', 'role', 'container', 'system'], geometry: 'dashed boundary band',
@@ -451,16 +484,16 @@ const flowchartApprovalTemplate: TemplateSpec = {
     lane('laneReq', 'Requester', 'lane · role', 30, 70, 940, 230),
     lane('laneFin', 'Finance', 'lane · role', 30, 320, 940, 230),
 
-    flowNode('a1', 'terminator', 'Start', 'green', 200, 130, {width: 270, height: 180}),
-    flowNode('a2', 'process', 'Submit purchase request', 'cyan', 180, 220),
-    flowNode('a3', 'io', 'Attach quote', 'violet', 430, 220),
-    flowNode('a4', 'decision', 'Amount > 1,000?', 'amber', 660, 200, {width: 150, height: 96}),
-    flowNode('a5', 'manual', 'Finance review', 'green', 660, 380),
-    flowNode('a6', 'decision', 'Approved?', 'amber', 420, 360, {width: 150, height: 96}),
-    flowNode('a7', 'document', 'Issue purchase order', 'violet', 180, 470),
-    flowNode('a8', 'terminator', 'End — approved', 'green', 430, 480, {width: 270, height: 180}),
-    flowNode('a9', 'connector', 'A', 'slate', 300, 380, {width: 84, height: 84}),
-    flowNode('a10', 'connector', 'A', 'slate', 300, 175, {width: 84, height: 84}),
+    flowNode('a1', 'terminator', 'Start', 'green', 200, 130, FLOWCHART_NODE_SIZE),
+    flowNode('a2', 'process', 'Submit purchase request', 'cyan', 180, 220, FLOWCHART_NODE_SIZE),
+    flowNode('a3', 'io', 'Attach quote', 'violet', 430, 220, FLOWCHART_NODE_SIZE),
+    flowNode('a4', 'decision', 'Amount > 1,000?', 'amber', 660, 200, FLOWCHART_NODE_SIZE),
+    flowNode('a5', 'manual', 'Finance review', 'green', 660, 380, FLOWCHART_NODE_SIZE),
+    flowNode('a6', 'decision', 'Approved?', 'amber', 420, 360, FLOWCHART_NODE_SIZE),
+    flowNode('a7', 'document', 'Issue purchase order', 'violet', 180, 470, FLOWCHART_NODE_SIZE),
+    flowNode('a8', 'terminator', 'End — approved', 'green', 430, 480, FLOWCHART_NODE_SIZE),
+    flowNode('a9', 'connector', 'A', 'slate', 300, 380, FLOWCHART_NODE_SIZE),
+    flowNode('a10', 'connector', 'A', 'slate', 300, 175, FLOWCHART_NODE_SIZE),
     {id: 'a11', type: 'label', position: {x: 120, y: 590}, data: {text: 'Rejections must state a reason.'}},
   ],
   edges: [

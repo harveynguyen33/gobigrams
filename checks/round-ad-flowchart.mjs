@@ -52,36 +52,56 @@ const NEW_SHAPES = [
 ];
 
 /* ===========================================================================
-   0 — THE TERMINAL'S PROPORTION (1.50 / 270x180), AND ITS GEOMETRY, ARITHMETIC.
+   0 — THE TERMINAL'S PROPORTION. SUPERSEDED BY ROUND AF.
+
+   ROUND AD set the Terminal to 270x180 = ratio 1.50. ROUND AF superseded that:
+   1.50 is one of the ratios at which the 200x100 frame STRETCHES the silhouette
+   (the round caps come out elliptical — roundness 0.75 of a true semicircle), and
+   it left the Terminal ~7x the area of the thirteen shapes that carried no size
+   at all. AF gave EVERY flowchart shape one size at ratio 2.0, the frame's own
+   ratio. The assertions below therefore hold the SUPERSEDING decision, and the
+   constant is read from the source rather than re-stated, so a future change to
+   it is caught here instead of being silently agreed with.
 =========================================================================== */
 console.log('='.repeat(78));
-console.log('AD-1 — the Terminal defaults to 270x180 = 1.50');
+console.log('AD-1 — the flowchart default size (SUPERSEDED by ROUND AF: 2.0, uniform)');
 console.log('='.repeat(78));
 
+/* ROUND AF — the size is ONE shared constant now (16 palette rows + 10 template
+   seeds), so it is resolved from its declaration rather than read per row. */
+const SIZE_CONST = (() => {
+  const m = /FLOWCHART_NODE_SIZE\s*=\s*\{width:\s*(\d+),\s*height:\s*(\d+)\}/.exec(PRESETS);
+  return m ? {width: +m[1], height: +m[2]} : null;
+})();
 const fcRows = [...PRESETS.matchAll(/fc\('([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)'([^\n]*)/g)]
   .map(m => ({label: m[1], hint: m[2], shape: m[3], colorKey: m[4], tail: m[5]}));
 const fcByLabel = new Map(fcRows.map(r => [r.label, r]));
 const sizeOf = tail => {
   const m = /\{width:\s*(\d+),\s*height:\s*(\d+)\}/.exec(tail);
-  return m ? {width: +m[1], height: +m[2]} : null;
+  if (m) return {width: +m[1], height: +m[2]};
+  if (/FLOWCHART_NODE_SIZE/.test(tail)) return SIZE_CONST;
+  return null;
 };
 console.log(`  fc() rows parsed from src/presets.ts: ${fcRows.length}`);
+console.log(`  FLOWCHART_NODE_SIZE (shared default): ${SIZE_CONST ? `${SIZE_CONST.width}x${SIZE_CONST.height}` : 'ABSENT'}`);
 
 const TERMINAL = fcByLabel.get('Terminal');
 const TERMINAL_SIZE = TERMINAL ? sizeOf(TERMINAL.tail) : null;
 console.log(`  Terminal palette row → shape=${TERMINAL?.shape} size=${TERMINAL_SIZE ? `${TERMINAL_SIZE.width}x${TERMINAL_SIZE.height}` : 'ABSENT (content-sized)'}`);
 assert('ad1.the-Terminal-palette-row-declares-the-approved-default-size',
   !!TERMINAL && TERMINAL.shape === 'terminator'
-    && TERMINAL_SIZE?.width === 270 && TERMINAL_SIZE?.height === 180,
+    && TERMINAL_SIZE?.width === SIZE_CONST?.width && TERMINAL_SIZE?.height === SIZE_CONST?.height
+    && SIZE_CONST != null,
   `the \`fc('Terminal', …)\` row carries ${TERMINAL_SIZE ? `${TERMINAL_SIZE.width}x${TERMINAL_SIZE.height}` : 'no size at all'}. ` +
-  'Before this round it carried NO size, so `addNodeByLabel` fell through `item.size ?? group ?? note ?? null` and the node was ' +
-  'CONTENT-SIZED — 304x180 was a content measurement, not a constant anywhere in the source. The approved default is now explicit.');
+  'Before ROUND AD it carried NO size (the node was CONTENT-SIZED, so `addNodeByLabel` fell through to `null`); AD made it explicit at ' +
+  '270x180 and ROUND AF moved the whole set to one ratio-2.0 size. It is now the shared constant, not a per-row literal.');
 
-assert('ad1.the-ratio-is-exactly-1.50',
-  TERMINAL_SIZE != null && TERMINAL_SIZE.width === TERMINAL_SIZE.height * 1.5,
+assert('ad1.the-ratio-is-exactly-2.0-the-frames-own-ratio',
+  TERMINAL_SIZE != null && TERMINAL_SIZE.width === TERMINAL_SIZE.height * 2,
   TERMINAL_SIZE
-    ? `${TERMINAL_SIZE.width} / ${TERMINAL_SIZE.height} = ${(TERMINAL_SIZE.width / TERMINAL_SIZE.height).toFixed(3)} — the approved 1.50 ` +
-      '(the pre-round content measurement was 304/180 = 1.689).'
+    ? `${TERMINAL_SIZE.width} / ${TERMINAL_SIZE.height} = ${(TERMINAL_SIZE.width / TERMINAL_SIZE.height).toFixed(3)}. ROUND AD approved 1.500 here; ` +
+      'ROUND AF superseded it, because 1.50 stretches the silhouette (the caps read 0.750 of a semicircle) while 2.0 is the frame\'s own ratio ' +
+      'and paints every shape exactly as drawn.'
     : 'the Terminal row declares NO size, so there is no ratio to check — see the assertion above.');
 
 /* THE TEMPLATE PATH CREATES TERMINALS TOO, so it must not disagree with the
@@ -92,28 +112,35 @@ const templateSizes = TEMPLATE_TERMINALS.map(s => sizeOf(s.replace(/^[^\n]*?flow
 console.log(`  template terminator nodes: ${TEMPLATE_TERMINALS.length}  sizes=[${templateSizes.map(s => s ? `${s.width}x${s.height}` : 'none').join(', ')}]`);
 assert('ad1.the-template-s-Terminal-nodes-carry-the-same-default-size',
   TEMPLATE_TERMINALS.length === 2
-    && templateSizes.every(s => s?.width === 270 && s?.height === 180),
+    && templateSizes.every(s => s?.width === SIZE_CONST?.width && s?.height === SIZE_CONST?.height),
   `${TEMPLATE_TERMINALS.length} \`terminator\` nodes in the Approval template, each ` +
   `${templateSizes.map(s => s ? `${s.width}x${s.height}` : 'unsized').join(' / ')} — so seed-from-template and drag-from-panel agree on one default.`);
 
 /* THE GEOMETRIC CATCH, AS ARITHMETIC ON THE SOURCE. The frame is a 200x100
    viewBox stretched (`preserveAspectRatio="none"`) to the node box, with a
-   fixed `rx=49`, so the end caps are ellipses whose radii scale with the box. */
+   fixed `rx=49`, so the end caps are ellipses whose radii scale with the box.
+   ROUND AF NOTE: this is the measurement that SUPERSEDED the 1.50 decision — it
+   shows 1.50 leaves the caps at 0.750 of a semicircle, and that only W = 2H
+   makes them circular. The chosen size is read from the constant so the check
+   follows the source rather than pinning the value it is meant to justify. */
 const VIEWBOX = /viewBox="0 0 200 100"/.test(SHAPES);
 const RX = 49;
 const capRadii = (w, h) => ({rh: RX * w / 200, rv: RX * h / 100});
 const at270 = capRadii(270, 180), at304 = capRadii(304, 180);
+const atChosen = capRadii(SIZE_CONST.width, SIZE_CONST.height);
 const roundness = r => r.rh / r.rv;
 console.log(`  frame: viewBox="0 0 200 100" present=${VIEWBOX}, stretch (preserveAspectRatio="none")=${/preserveAspectRatio="none"/.test(SHAPES)}, rx=${RX} fixed`);
-console.log(`  caps at 270x180: ${at270.rh.toFixed(2)} x ${at270.rv.toFixed(2)} px -> ${roundness(at270).toFixed(3)} of a semicircle`);
-console.log(`  caps at 304x180: ${at304.rh.toFixed(2)} x ${at304.rv.toFixed(2)} px -> ${roundness(at304).toFixed(3)} of a semicircle`);
-assert('ad1.the-narrower-box-makes-the-caps-MORE-elliptical-and-that-is-reported-not-hidden',
-  Math.abs(roundness(at270) - 0.750) < 0.002 && Math.abs(roundness(at304) - 0.844) < 0.002
-    && roundness(at270) < roundness(at304)
+console.log(`  caps at ${SIZE_CONST.width}x${SIZE_CONST.height} (chosen): ${atChosen.rh.toFixed(2)} x ${atChosen.rv.toFixed(2)} px -> ${roundness(atChosen).toFixed(3)} of a semicircle`);
+console.log(`  caps at 270x180 (AD's superseded size): ${at270.rh.toFixed(2)} x ${at270.rv.toFixed(2)} px -> ${roundness(at270).toFixed(3)} of a semicircle`);
+console.log(`  caps at 304x180 (the old content measurement): ${at304.rh.toFixed(2)} x ${at304.rv.toFixed(2)} px -> ${roundness(at304).toFixed(3)} of a semicircle`);
+assert('ad1.ratio-2.0-makes-the-caps-circular-and-AD-s-1.50-did-not',
+  Math.abs(roundness(atChosen) - 1) < 0.002
+    && Math.abs(roundness(at270) - 0.750) < 0.002
+    && roundness(at270) < roundness(atChosen)
     && !/viewBox="0 0 200 100"[\s\S]{0,200}preserveAspectRatio="xMidYMid/.test(SHAPES),
-  `narrowing the box moves the cap from ${roundness(at304).toFixed(3)} to ${roundness(at270).toFixed(3)} of a true semicircle — MORE elliptical, ` +
-  'not rounder, because `rh = 49*W/200` and `rv = 49*H/100` only agree when `W = 2H`. The viewBox and the rx are untouched, as required. ' +
-  `A circular cap at 1.50 would need W = 2H (360 at H=180), i.e. the OPPOSITE of the change Harvey asked for.`);
+  `the caps are circular at ${SIZE_CONST.width}x${SIZE_CONST.height} (${roundness(atChosen).toFixed(3)}) and elliptical at AD's 270x180 ` +
+  `(${roundness(at270).toFixed(3)}), because the cap radii 49*W/200 and 49*H/100 only agree when W = 2H. That is the measurement that ` +
+  'superseded the 1.50 decision. The viewBox and the rx are untouched, as required.');
 
 /* THE RESIZER FLOOR IS NOT MOVED, and the new default sits above it. */
 const CONSTS = {};
@@ -137,7 +164,7 @@ assert('ad1.the-resizer-floor-is-unchanged-and-the-new-default-clears-it',
     && (+CSS_MINW + +CONSTS.FLOOR_SLACK_PX) === 200
     && (+CONSTS.CONTENT_MIN_H + +CONSTS.FLOOR_SLACK_PX) === 141
     && !!TERMINAL_SIZE && TERMINAL_SIZE.width >= 200 && TERMINAL_SIZE.height >= 141,
-  `floors still 200x141 (CSS_CONTENT_MIN_W 190 + FLOOR_SLACK_PX ${CONSTS.FLOOR_SLACK_PX}); the 270x180 default clears both, ` +
+  `floors still 200x141 (CSS_CONTENT_MIN_W 190 + FLOOR_SLACK_PX ${CONSTS.FLOOR_SLACK_PX}); the ${TERMINAL_SIZE?.width}x${TERMINAL_SIZE?.height} default clears both, ` +
   'so the Terminal is resizable in both directions from the new default and 200x141 still binds as the floor.');
 
 /* ===========================================================================
