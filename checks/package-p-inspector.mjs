@@ -677,22 +677,28 @@ console.log(`  mergeTextStyle: ${MERGE.split('\n').length} lines; `
 assert('h.a-missing-field-is-NOT-written',
   /if \(!\(k in patch\)\) continue;/.test(MERGE)
     && /delete next\[k\]/.test(MERGE)
-    && /if \(v === undefined \|\| isTextDefault\(k, v, alignDefault\)\)/.test(MERGE)
+    && /if \(v === undefined \|\| isTextDefault\(k, v, alignDefault, vAlignDefault\)\)/.test(MERGE)
     && /Object\.keys\(next\)\.length \? next : undefined/.test(MERGE),
   'mergeTextStyle copies the stored object, skips any key NOT in the patch, DROPS a key whose value '
   + 'equals the inherited default, and collapses to `undefined` when nothing is left — so a node the '
   + 'user never touched keeps NO textStyle at all');
 assert('h.the-panel-WRITES-through-that-merge-and-never-directly',
-  APP.includes('mergeTextStyle(tsStored, patch, tsAlignDefault)')
+  /* ROUND Z FIX 2 — BOTH defaults ride in, the vertical one read off the same
+     target the horizontal one is. A two-argument call here would compile (the
+     model requires both, so it could not) and would silently re-introduce a
+     single global vertical default. */
+  APP.includes('mergeTextStyle(tsStored, patch, tsAlignDefault, tsVAlignDefault)')
     && countOf(APP, 'mergeTextStyle(') === 1
     && !/textStyle:\s*\{/.test(APP),
   'the only writer is `writeTextStyle`, one call into the merge; no call site constructs a textStyle '
   + 'object literal, which is what a "writes a value the user did not choose" bug looks like');
 assert('h.defaults-are-per-target-for-align-and-derived-not-hardcoded',
   TS.includes("body === 'label-only' ? 'center' : 'left'")
-    && APP.includes('alignForBody(inspTarget.kind ===') && APP.includes('readTextStyle(tsStored, tsAlignDefault)'),
-  "align's inherited value comes from the TARGET (a label-only node is centred by design), so the "
-  + 'panel cannot disagree with the sheet on what "default" means');
+    && TS.includes("body === 'label-only' ? 'middle' : 'top'")
+    && APP.includes('alignForBody(inspTarget.kind ===') && APP.includes('vAlignForBody(inspTarget.kind ===')
+    && APP.includes('readTextStyle(tsStored, tsAlignDefault, tsVAlignDefault)'),
+  "BOTH inherited values come from the TARGET (a label-only node is centred by design on both axes), so the "
+  + 'panel cannot disagree with the sheet on what "default" means — and (w1) below asserts the sheet half');
 assert('h.an-old-board-has-no-textStyle-and-gets-no-write',
   /export type TextStyle = \{/.test(TS)
     && /textStyle\?: TextStyle;/.test(readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8'))
@@ -723,18 +729,25 @@ assert('h.the-renderers-read-textStyle-through-ONE-door',
          the whole point of the pass: a door fed a hard-coded `left` would paint
          the wrong value on a label-only node. */
       const withDefault = countOf(s, 'textStyleVars(d.textStyle, alignForBody(');
+      /* ROUND Z FIX 2 — AND THE THIRD ARGUMENT must be the target's own VERTICAL
+         default. Two arguments would compile against an older model and give
+         every box one default, which is the defect: a card renders from its
+         padding-top (`top`) while only `.lo-body` centres (`middle`), so a
+         single constant has to be wrong for one of them. */
+      const withVDefault = countOf(s, 'vAlignForBody(');
       const props = countOf(src, "style={{'--nc': nc, ...tsVars}") + countOf(src, 'style={tsVars');
       console.log(`  ${name}: ${access} access(es) to the stored object, ${throughDoor} through the door, `
-        + `${withDefault} passing alignForBody, ${props} style site(s) carrying the vars`);
-      if (!(access === throughDoor && throughDoor === 1 && withDefault === 1)) return false;
+        + `${withDefault} passing alignForBody, ${withVDefault} passing vAlignForBody, `
+        + `${props} style site(s) carrying the vars`);
+      if (!(access === throughDoor && throughDoor === 1 && withDefault === 1 && withVDefault === 1)) return false;
       if (props < 1) return false;
     }
     return true;
   })(),
   'each node kind reads `d.textStyle` ONCE, into `textStyleVars`, WITH the target\'s own align default '
-  + '(`alignForBody`) and spreads the result onto the same style object that already carries `--nc` '
-  + '(DiagramNode: 4 branches) — so an old board\'s markup is unchanged (an empty spread adds nothing) '
-  + 'AND a stored align is painted against the right default');
+  + '(`alignForBody`) AND its own vertical default (`vAlignForBody`) and spreads the result onto the same '
+  + 'style object that already carries `--nc` (DiagramNode: 4 branches) — so an old board\'s markup is '
+  + 'unchanged (an empty spread adds nothing) AND a stored value is painted against the right default');
 assert('h.size-is-a-SCALE-not-a-px-value',
   /TEXT_SCALE: Record<TextSize, number> = \{sm: 0\.85, md: 1, lg: 1\.15, xl: 1\.3\}/.test(TS)
     && /--ts-scale/.test(TS) && !/fontSize/.test(TS)
@@ -851,6 +864,21 @@ await (await import('esbuild')).build({
 });
 const M = await import(`${MODEL_OUT}?t=${Date.now()}`);
 for (const f of [MODEL_ENTRY, MODEL_OUT]) { try { rmFile(f, {force: true}); } catch { /* gone */ } }
+/* ROUND Z FIX 2 — THE TARGET'S DEFAULTS ARE NOW ARGUMENTS OF THE MODEL, both of
+   them, exactly as `src/App.tsx` passes them. These three thin wrappers supply
+   the pair from the helper itself so a call site that is only about a
+   HORIZONTAL value (`align`) keeps the call it always had: a `center` align
+   default IS the label-only body in every existing case here, and everything
+   else is a card or a label. Written ONCE rather than re-listed at twenty call
+   sites, because a second copy of "which body is this" is a second answer that
+   can drift from the one the app uses. */
+const mVars = (ts, alignDefault, vAlignDefault) =>
+  M.textStyleVars(ts, alignDefault,
+    vAlignDefault ?? M.vAlignForBody(alignDefault === 'center' ? 'label-only' : undefined));
+const mMerge = (cur, patch, alignDefault) =>
+  M.mergeTextStyle(cur, patch, alignDefault,
+    M.vAlignForBody(alignDefault === 'center' ? 'label-only' : undefined));
+const mLabels = (ts, alignDefault) => M.readTextStyle(ts, alignDefault, M.vAlignForBody(undefined));
 console.log(`  textStyle.ts bundled + imported: alignForBody=${typeof M.alignForBody} `
   + `mergeTextStyle=${typeof M.mergeTextStyle} textStyleVars=${typeof M.textStyleVars}`);
 
@@ -868,8 +896,8 @@ const JUSTIFY = {left: 'flex-start', center: 'center', right: 'flex-end'};
 const alignBad = [];
 for (const d of REAL_DEFAULTS) {
   for (const pick of ALIGNS) {
-    const stored = M.mergeTextStyle(undefined, {align: pick}, d.def);
-    const vars = M.textStyleVars(stored, d.def);
+    const stored = mMerge(undefined, {align: pick}, d.def);
+    const vars = mVars(stored, d.def);
     const isDefault = pick === d.def;
     /* empty exactly when the pick IS the target's inherited value. */
     const okEmpty = isDefault
@@ -889,8 +917,8 @@ assert('k.stored-align-is-painted-for-every-target-default',
 /* The regression, asserted BY NAME so the next reader sees what this guards. */
 assert('k.label-only-plus-LEFT-is-painted-not-dropped',
   (() => {
-    const stored = M.mergeTextStyle(undefined, {align: 'left'}, M.alignForBody('label-only'));
-    const vars = M.textStyleVars(stored, M.alignForBody('label-only'));
+    const stored = mMerge(undefined, {align: 'left'}, M.alignForBody('label-only'));
+    const vars = mVars(stored, M.alignForBody('label-only'));
     console.log(`  label-only picks LEFT (its default is center): stored=${JSON.stringify(stored)} `
       + `vars=${JSON.stringify(vars)}`);
     return JSON.stringify(stored) === '{"align":"left"}'
@@ -908,7 +936,7 @@ assert('k.control-the-cross-check-detects-a-hard-coded-default',
       if (ts && ts.align && ts.align !== 'left') { out['--ts-align'] = ts.align; out['--ts-justify'] = JUSTIFY[ts.align]; }
       return out;
     };
-    const stored = M.mergeTextStyle(undefined, {align: 'left'}, 'center');
+    const stored = mMerge(undefined, {align: 'left'}, 'center');
     const got = naive(stored, 'center');
     console.log(`  reconstructed pre-fix renderer on label-only+left: stored=${JSON.stringify(stored)} `
       + `vars=${JSON.stringify(got)}  (empty = the bug this check catches)`);
@@ -922,16 +950,16 @@ assert('k.control-the-cross-check-detects-a-hard-coded-default',
 const sizeWeightBad = [];
 for (const d of REAL_DEFAULTS) {
   for (const pick of ['sm', 'md', 'lg', 'xl']) {
-    const stored = M.mergeTextStyle(undefined, {size: pick}, d.def);
-    const vars = M.textStyleVars(stored, d.def);
+    const stored = mMerge(undefined, {size: pick}, d.def);
+    const vars = mVars(stored, d.def);
     const want = M.TEXT_SCALE[pick] === 1;
     const ok = want ? (stored === undefined && !('--ts-scale' in vars))
       : (vars['--ts-scale'] === String(M.TEXT_SCALE[pick]) && stored?.size === pick);
     if (!ok) sizeWeightBad.push({field: 'size', d, pick, stored, vars});
   }
   for (const pick of ['regular', 'bold']) {
-    const stored = M.mergeTextStyle(undefined, {weight: pick}, d.def);
-    const vars = M.textStyleVars(stored, d.def);
+    const stored = mMerge(undefined, {weight: pick}, d.def);
+    const vars = mVars(stored, d.def);
     const want = pick === 'regular';
     const ok = want ? (stored === undefined && !('--ts-weight' in vars))
       : (vars['--ts-weight'] === '700' && stored?.weight === 'bold');
@@ -1659,20 +1687,76 @@ console.log('(p) ROUND W→X — the font ROW (ITEM 3) and the custom-size RULE 
 console.log('='.repeat(78));
 const {existsSync} = await import('node:fs');
 
-/* --- (p1) THE OPTION TABLE, and that each pick carries its role ---------- */
-const FONT_ROLES = {mono: 'cod', ui: 'architect', read: 'read', viet: 'Vietnam'};
+/* --- (p1) THE OPTION TABLE, and that each pick carries its role ----------
+   ROUND Z, ITEM 1 — SIX REAL FAMILY NAMES. The four role keys this section used
+   to assert are now the LEGACY set (`legacyFontKeyStillResolves` below covers
+   them); the live table is the six families, each with the role it was chosen
+   for and the full family name that the button's tooltip carries because the
+   short label is what fits a 3-column cell. */
+const FONT_ROLES = {jetbrains: 'cod', inter: 'neutral', plex: 'architect', shantell: 'hand', lexend: 'read', bevietnam: 'Vietnam'};
+const FONT_TITLES = {
+  jetbrains: 'JetBrains Mono', inter: 'Inter', plex: 'IBM Plex Sans',
+  shantell: 'Shantell Sans', lexend: 'Lexend', bevietnam: 'Be Vietnam Pro',
+};
+const FONT_LABELS = {
+  jetbrains: 'JetBrains', inter: 'Inter', plex: 'IBM Plex',
+  shantell: 'Shantell', lexend: 'Lexend', bevietnam: 'Be Vietnam',
+};
 console.log(`  TEXT_FONT_OPTS at src/textStyle.ts:${at(TS_RAW, 'export const TEXT_FONT_OPTS')}  `
   + `TEXT_FONT_FAMILY at :${at(TS_RAW, 'export const TEXT_FONT_FAMILY')}`);
-assert('p.font-option-table-exists-with-all-four-picks',
-  TS.includes('TEXT_FONT_OPTS') && M.TEXT_FONT_OPTS.length === 4
-    && M.TEXT_FONT_OPTS.map(o => o.v).join() === 'mono,ui,read,viet'
-    && M.TEXT_FONT_OPTS.every(o => typeof o.hint === 'string' && o.hint.length > 0),
-  `the four picks are [${M.TEXT_FONT_OPTS.map(o => o.v).join(', ')}], each with the role that `
-  + 'justifies it: ' + M.TEXT_FONT_OPTS.map(o => `${o.label}=${o.hint}`).join('; '));
+assert('p.font-option-table-exists-with-all-six-family-picks',
+  TS.includes('TEXT_FONT_OPTS') && M.TEXT_FONT_OPTS.length === 6
+    && M.TEXT_FONT_OPTS.map(o => o.v).join() === 'jetbrains,inter,plex,shantell,lexend,bevietnam'
+    && M.TEXT_FONT_OPTS.every(o => typeof o.hint === 'string' && o.hint.length > 0)
+    && M.TEXT_FONT_OPTS.every(o => o.title === FONT_TITLES[o.v] && o.label === FONT_LABELS[o.v]),
+  `the six picks are [${M.TEXT_FONT_OPTS.map(o => o.v).join(', ')}], each with the role that `
+  + 'justifies it and the full family name as its tooltip: '
+  + M.TEXT_FONT_OPTS.map(o => `${o.label}("${o.title}")=${o.hint}`).join('; '));
 assert('p.each-pick-carries-the-role-it-was-chosen-for',
   Object.entries(FONT_ROLES).every(([k, needle]) =>
     M.TEXT_FONT_OPTS.find(o => o.v === k)?.hint.toLowerCase().includes(needle.toLowerCase())),
-  'mono→coding, ui→architecture, read→read, viet→Vietnamese diacritics');
+  'jetbrains→coding, inter→neutral UI, plex→architecture, shantell→hand-drawn, lexend→reading, '
+  + 'bevietnam→Vietnamese');
+/* ROUND Z, ITEM 1 — THE SHORT LABEL IS A MEASUREMENT, NOT A TASTE.
+   Six buttons in two rows of three is Harvey's layout. The field is 253px, the
+   row gaps are 2x5px, so each cell is 81px and — `box-sizing: border-box` is
+   global (`styles.css:268`) — its CONTENT box is 81 - 2x7 padding - 2x1 border
+   = 65px. The full family names at 10px measure 84.0px (`JetBrains Mono`) and
+   75.2px (`Be Vietnam Pro`): both would wrap. The short labels at 10.5px are
+   56.7 / 22.5 / 42.4 / 41.0 / 37.4 / 58.9px — every one inside the box, with
+   `Be Vietnam` the worst case at 6.1px of slack. Asserted here as arithmetic on
+   the numbers the brief measured, so the label set cannot silently grow. */
+const CELL_PX = (253 - 2 * 5) / 3;
+const CONTENT_PX = CELL_PX - 2 * 7 - 2 * 1;
+const LABEL_PX_AT_10_5 = {JetBrains: 56.7, Inter: 22.5, 'IBM Plex': 42.4, Shantell: 41.0, Lexend: 37.4, 'Be Vietnam': 58.9};
+const FULL_NAME_PX_AT_10 = {'JetBrains Mono': 84.0, Inter: 22.5, 'IBM Plex Sans': 64.4, 'Shantell Sans': 64.7, Lexend: 37.4, 'Be Vietnam Pro': 75.2};
+console.log(`  the font cell: ${CELL_PX.toFixed(1)}px wide, ${CONTENT_PX.toFixed(1)}px content box`);
+for (const o of M.TEXT_FONT_OPTS) {
+  const w = LABEL_PX_AT_10_5[o.label], full = FULL_NAME_PX_AT_10[o.title];
+  console.log(`    ${o.label.padEnd(11)} ${String(w).padStart(5)}px @10.5 (slack ${(CONTENT_PX - w).toFixed(1)})`
+    + `   full "${o.title}" ${String(full).padStart(5)}px @10 ${full > CONTENT_PX ? 'DOES NOT FIT' : 'fits'}`);
+}
+assert('p.the-six-short-labels-fit-the-measured-cell-and-the-full-names-do-not',
+  /* every SHORT label fits with margin … */
+  M.TEXT_FONT_OPTS.every(o => LABEL_PX_AT_10_5[o.label] < CONTENT_PX)
+  /* … and at least two FULL names genuinely do not, which is WHY the short ones
+     exist. Without this half the check would pass on a table that never needed
+     short labels at all. */
+  && M.TEXT_FONT_OPTS.filter(o => FULL_NAME_PX_AT_10[o.title] > CONTENT_PX).length >= 2
+  && M.TEXT_FONT_OPTS.every(o => FONT_TITLES[o.v] === o.title),
+  `${M.TEXT_FONT_OPTS.length}/${M.TEXT_FONT_OPTS.length} short labels fit a ${CONTENT_PX.toFixed(1)}px cell at `
+  + '10.5px (worst case `Be Vietnam` 58.9px, 6.1px slack) while '
+  + M.TEXT_FONT_OPTS.filter(o => FULL_NAME_PX_AT_10[o.title] > CONTENT_PX).map(o => `"${o.title}" ${FULL_NAME_PX_AT_10[o.title]}px`).join(' and ')
+  + ` overflow it at 10px — so the full name is the button's \`title\` and the short label is what prints`);
+assert('p.the-label-prints-in-its-own-family-exactly-once',
+  /* Each option's art is ONE span, printing ONE label, styled with that option's
+     OWN resolved stack — so the name is the sample, and `ToggleRow` renders
+     `o.art ?? o.label`, one expression and never both. */
+  M.TEXT_FONT_OPTS.every(o => M.TEXT_FONT_FAMILY[o.v] != null)
+  && new Set(M.TEXT_FONT_OPTS.map(o => o.label)).size === 6
+  && new Set(M.TEXT_FONT_OPTS.map(o => o.title)).size === 6,
+  'six distinct labels, six distinct tooltips, six resolved stacks — the label and the sample are the SAME '
+  + 'span, so no family can print its name twice');
 /* ROUND X, ITEM 3 — the font field's control, read OFF the field itself. The
    label `font` is unique in the panel, so the slice from it to its closing
    `</div>` IS the field, and the slice is what is asserted — not the file. */
@@ -1687,19 +1771,71 @@ assert('p.the-font-control-is-the-existing-segmented-row-and-is-not-a-select',
     && countOf(APP, 'options={FONT_OPTS}') === 1
     && FONT_FIELD.includes('<ToggleRow')
     && !FONT_FIELD.includes('IconPickerRow')
-    && FONT_FIELD.includes('wide')
+    /* ROUND Z, ITEM 1 — the six-button modifier is `grid3`, NOT `wide`: six in a
+       single row gives a 37px cell, which the measurement above rules out. */
+    && FONT_FIELD.includes('grid3')
+    && !FONT_FIELD.includes('wide')
     && !FONT_FIELD.includes('className="hint"'),
-  'the font field renders ONE ToggleRow — the same `.insp-seg` grid Size and Align use — with the '
-  + '`wide` modifier for its word-length labels and NO hint under it; the panel still renders '
+  'the font field renders ONE ToggleRow — the same `.insp-seg` control Size and Align use — with the '
+  + '`grid3` modifier for its six word-length labels and NO hint under it; the panel still renders '
   + `${countOf(APP, '<select')} native dropdowns anywhere`);
 assert('p.every-button-previews-its-own-family-and-prints-its-name-once',
   APP.includes('className="insp-font-btn"')
     && APP.includes('fontFamily: TEXT_FONT_FAMILY[o.v]')
     && countOf(APP, 'TEXT_FONT_FAMILY[o.v]') === 1
+    && APP.includes('title: o.title')
     && blankComments(STYLES_RAW).includes('.insp-font-btn'),
-  'each of the four buttons renders its own NAME in its own family from ONE cell — the cell a '
-  + 'segmented button prints — so the row cannot construct the duplicate name ROUND W had to '
-  + 'suppress, and the preview the control exists for survives the change from popover to row');
+  'each of the six buttons renders its own SHORT NAME in its own family from ONE cell — the cell a '
+  + 'segmented button prints — and carries the full family name as its `title`, so the row cannot construct '
+  + 'the duplicate name ROUND W had to suppress and the preview the control exists for survives the change '
+  + 'from popover to row');
+
+/* ROUND Z, ITEM 1 — THE 3+3 GEOMETRY, as the arithmetic the sheet implements.
+   The brief's warning is explicit: the last two rounds each shipped a row that
+   looked right in source and was wrong on screen, so the geometry has to be
+   PROVEN. It is proven twice, from both sides:
+     (a) the sheet's own declarations, read out of the real file, must compute the
+         cell the labels were measured against — `calc((100% - 10px) / 3)` over a
+         253px field with 2x5px gaps is 81.0px, and with `box-sizing:
+         border-box` (the global `*` rule) the content box is 81 - 2x7 - 2x1 = 65px;
+     (b) the six labels must fit that 65px (already asserted by their measured
+         widths above), AND must NOT fit a 6-across row — which is what makes the
+         two-row layout a requirement rather than a preference.
+   The cascade trap the brief names is asserted too: `.swatches { display: flex }`
+   beats `.insp-seg { display: grid }` at equal specificity, later in the sheet, so
+   `grid3` must be written as flex sizing and must NOT rely on
+   `grid-template-columns` (which would compute against a flex container). */
+const GRID3_BLOCK = (() => {
+  const css = blankComments(STYLES_RAW);
+  const at = css.indexOf('.insp-seg.grid3');
+  if (at < 0) return '';
+  const end = css.indexOf('\n\n', at);
+  return css.slice(at, end < 0 ? at + 600 : end);
+})();
+const gapDecl = /gap:\s*(\d+)px/.exec(GRID3_BLOCK);
+const basisDecl = /flex:\s*1 1 calc\(\(100% - (\d+)px\) \/ (\d+)\)/.exec(GRID3_BLOCK);
+const SEVEN_ACROSS_CELL = (253 - 6 * 5) / 7;
+console.log(`  .insp-seg.grid3 → gap ${gapDecl?.[1]}px, basis ${basisDecl ? `calc((100% - ${basisDecl[1]}px) / ${basisDecl[2]})` : 'NONE'}`);
+console.log(`  cell at 253px: 3-across ${((253 - 2 * 5) / 3).toFixed(1)}px  vs  6-across ${SEVEN_ACROSS_CELL.toFixed(1)}px  vs  7-across ${((253 - 6 * 5) / 7).toFixed(1)}px`);
+assert('p.the-3plus3-row-is-flex-sized-to-the-measured-cell-and-not-a-grid',
+  /* (a) the declarations the sheet really carries */
+  gapDecl?.[1] === '5' && basisDecl?.[1] === '10' && basisDecl?.[2] === '3'
+  && GRID3_BLOCK.includes('min-width: 0')
+  /* (b) … and they are FLEX, because a grid column would compute against a flex
+     container (`.swatches { display: flex }` wins at equal specificity, later). */
+  && !GRID3_BLOCK.includes('grid-template-columns')
+  && GRID3_BLOCK.includes('flex: 1 1')
+  /* (c) the two-row layout is REQUIRED: the short labels fit 3-across (65px) but
+     not 6-across (37px), so six-in-one-row was never an option. */
+  && M.TEXT_FONT_OPTS.every(o => LABEL_PX_AT_10_5[o.label] < CONTENT_PX)
+  && M.TEXT_FONT_OPTS.filter(o => LABEL_PX_AT_10_5[o.label] > SEVEN_ACROSS_CELL - 16).length >= 4,
+  `2 rows x 3: gap ${gapDecl?.[1]}px, cell calc((100% - ${basisDecl?.[1]}px) / ${basisDecl?.[2]}) = 81.0px at the `
+  + `253px field, content box ${CONTENT_PX.toFixed(1)}px after 7px padding + 1px border (border-box is the global `
+  + `\`*\` rule); written as flex basis because \`.swatches { display: flex }\` beats \`.insp-seg { display: grid }\` `
+  + `at equal specificity later in the sheet, so a grid column would compute against a flex container and do `
+  + `nothing. Six across would give each button ${SEVEN_ACROSS_CELL.toFixed(1)}px, which `
+  + `${M.TEXT_FONT_OPTS.filter(o => LABEL_PX_AT_10_5[o.label] > SEVEN_ACROSS_CELL - 16).length}/6 labels exceed — `
+  + 'so 3+3 is arithmetic, not taste');
 
 /* --- (p1b) THE DUPLICATE-NAME GUARD, GENERALISED (ROUND X, ITEM 3) ---------
    ROUND W's defect: `IconPickerRow` prints a row as a glyph cell + a label, so a
@@ -1739,7 +1875,7 @@ const FONT_OPTS_BLOCK = (() => {
   const end = APP.indexOf('}));', i);
   return end < 0 ? APP.slice(i) : APP.slice(i, end + 4);
 })();
-assert('p.the-four-font-buttons-print-their-name-ONCE-by-construction',
+assert('p.the-six-font-buttons-print-their-name-ONCE-by-construction',
   countOf(FONT_OPTS_BLOCK, 'insp-font-btn') === 1
     && countOf(FONT_OPTS_BLOCK, '<span') === 1
     && countOf(PICKS, 'o.art ?? o.label') === 1,
@@ -1770,8 +1906,8 @@ console.log(`  @font-face blocks in src/styles.css: ${FACES.length}  `
 console.log(`  distinct unicode-ranges: ${ranges.size}  files referenced: ${FACES.length}  `
   + `files missing on disk: ${noFile.length}`);
 assert('p.every-font-face-declares-a-unicode-range',
-  FACES.length === 24 && noRange.length === 0,
-  `${FACES.length} @font-face blocks, ${noRange.length} without a unicode-range — 4 families × `
+  FACES.length === 36 && noRange.length === 0,
+  `${FACES.length} @font-face blocks, ${noRange.length} without a unicode-range — 6 families × `
   + '2 weights × 3 subsets, so a page fetches only the subset it renders');
 assert('p.every-referenced-font-file-EXISTS-under-public-fonts',
   noFile.length === 0 && FACES.every(f => faceFile(f) !== null),
@@ -1781,17 +1917,30 @@ assert('p.every-referenced-font-file-EXISTS-under-public-fonts',
     : `MISSING: [${noFile.join(', ')}]`);
 assert('p.the-three-ranges-are-the-three-subset-ranges',
   ranges.size === 3,
-  `the three ranges are latin / latin-ext / vietnamese, identical across all four families because `
+  `the three ranges are latin / latin-ext / vietnamese, identical across all six families because `
   + 'Google defines the subsets once — copied verbatim, none invented');
-assert('p.the-four-families-in-the-model-are-the-four-declared',
-  [...declared].sort().join('|') === 'Be Vietnam Pro|Inter|JetBrains Mono|Lexend'
+assert('p.the-six-families-in-the-model-are-the-six-declared',
+  [...declared].sort().join('|') === 'Be Vietnam Pro|IBM Plex Sans|Inter|JetBrains Mono|Lexend|Shantell Sans'
     && M.TEXT_FONT_OPTS.every(o => {
       const first = M.TEXT_FONT_FAMILY[o.v].match(/'([^']+)'/)?.[1]
         ?? M.TEXT_FONT_FAMILY[o.v].match(/var\((--[\w-]+)\)/)?.[1];
       return first != null;
     }),
   `declared: [${[...declared].sort().join(', ')}] — every pick's stack opens with a family the sheet `
-  + 'actually declares (or the `--mono` token whose declaration owns that family)');
+  + 'actually declares (or the `--mono` token whose declaration owns that family), and nothing is declared '
+  + 'that no pick can reach');
+/* ROUND Z, ITEM 1 — THE MODEL'S SIX KEYS AND THE SHEET'S SIX FAMILIES ARE THE
+   SAME SET, both directions. The generic half above only checks model→sheet;
+   this adds sheet→model, so a declared family with no button (or a button with no
+   `@font-face`) cannot ship either way. */
+const modelFirstFamily = v => M.TEXT_FONT_FAMILY[v].match(/'([^']+)'/)?.[1] ?? null;
+const modelFamilies = M.TEXT_FONT_OPTS.map(o => modelFirstFamily(o.v)).filter(Boolean);
+console.log(`  model→sheet families: [${modelFamilies.join(', ')}]`);
+assert('p.every-declared-family-is-reachable-from-a-button-and-vice-versa',
+  modelFamilies.length === 6 && M.TEXT_FONT_OPTS.length === 6
+    && modelFamilies.every(f => declared.has(f)),
+  `all ${modelFamilies.length} reachable families are declared, and the six declared families are exactly `
+  + 'the six buttons — so the sheet carries no orphan family and the row no dead button');
 /* NEGATIVE CONTROL — the file check must SEE an absent file. */
 assert('p.control-the-font-file-check-detects-an-absent-file',
   !existsSync(`${ROOT}/public/fonts/definitely-not-a-font.woff2`)
@@ -1799,11 +1948,12 @@ assert('p.control-the-font-file-check-detects-an-absent-file',
   'the probe returns false for a name the brief never mentions and true for a real file');
 
 /* --- (p3) THE DEFAULT PICK WRITES NOTHING (§E.2) ------------------------- */
+const FONT_KEYS = ['jetbrains', 'inter', 'plex', 'shantell', 'lexend', 'bevietnam'];
 const fontBad = [];
 for (const d of REAL_DEFAULTS) {
-  for (const pick of ['mono', 'ui', 'read', 'viet']) {
-    const stored = M.mergeTextStyle(undefined, {font: pick}, d.def);
-    const vars = M.textStyleVars(stored, d.def);
+  for (const pick of FONT_KEYS) {
+    const stored = mMerge(undefined, {font: pick}, d.def);
+    const vars = mVars(stored, d.def);
     const want = pick === M.TEXT_DEFAULT_FONT;
     const ok = want
       ? (stored === undefined && !('--ts-font' in vars))
@@ -1811,23 +1961,121 @@ for (const d of REAL_DEFAULTS) {
     if (!ok) fontBad.push({d, pick, stored, vars});
   }
 }
-console.log(`  font × ${REAL_DEFAULTS.length} target defaults × 4 picks: `
-  + `${REAL_DEFAULTS.length * 4 - fontBad.length}/${REAL_DEFAULTS.length * 4} as expected`);
+console.log(`  font × ${REAL_DEFAULTS.length} target defaults × ${FONT_KEYS.length} picks: `
+  + `${REAL_DEFAULTS.length * FONT_KEYS.length - fontBad.length}/${REAL_DEFAULTS.length * FONT_KEYS.length} as expected`);
 assert('p.a-pick-equal-to-the-default-writes-NOTHING',
-  fontBad.length === 0 && M.TEXT_DEFAULT_FONT === 'mono'
-    && M.mergeTextStyle(undefined, {font: 'mono'}, 'left') === undefined,
-  `${REAL_DEFAULTS.length * 4} cells — Mono stores nothing and paints nothing (a node the user `
-  + 'never touched keeps NO textStyle at all); the other three store the KEY and emit `--ts-font` '
+  fontBad.length === 0 && M.TEXT_DEFAULT_FONT === 'jetbrains'
+    && mMerge(undefined, {font: 'jetbrains'}, 'left') === undefined,
+  `${REAL_DEFAULTS.length * FONT_KEYS.length} cells — JetBrains stores nothing and paints nothing (a node the user `
+  + 'never touched keeps NO textStyle at all); the other five store the KEY and emit `--ts-font` '
   + 'as the resolved stack');
 /* NEGATIVE CONTROL for the same rule: a NON-default pick must not be dropped,
    or "the default writes nothing" would pass on a merge that writes nothing ever. */
 assert('p.control-a-non-default-pick-is-stored-and-painted',
   (() => {
-    const s = M.mergeTextStyle(undefined, {font: 'viet'}, 'left');
-    const v = M.textStyleVars(s, 'left');
-    return JSON.stringify(s) === '{"font":"viet"}' && v['--ts-font'] === M.TEXT_FONT_FAMILY.viet;
+    const s = mMerge(undefined, {font: 'bevietnam'}, 'left');
+    const v = mVars(s, 'left');
+    return JSON.stringify(s) === '{"font":"bevietnam"}' && v['--ts-font'] === M.TEXT_FONT_FAMILY.bevietnam;
   })(),
-  'Viet → stored {"font":"viet"} and painted as the Be Vietnam Pro stack');
+  'Be Vietnam → stored {"font":"bevietnam"} and painted as the Be Vietnam Pro stack');
+
+/* --- (p3b) THE LEGACY KEYS A BOARD MAY STILL CARRY (ROUND Z, ITEM 1) ------
+   ROUND W shipped four ROLE keys. They are still legal on disk, so every one of
+   them must resolve to the family it already painted — NOT to the default, and
+   not to nothing. This is the migration asserted as behaviour, not as a table. */
+const LEGACY_EXPECT = {mono: 'jetbrains', ui: 'inter', read: 'lexend', viet: 'bevietnam'};
+/* `mono` IS A SPECIAL CASE, AND IT IS ROUND W's OWN DEFINITION, NOT AN OMISSION.
+   ROUND W's `TEXT_DEFAULT_FONT` was `'mono'`, so `isTextDefault('font','mono')`
+   was TRUE and picking Mono stored ABSENCE — i.e. the control could never write
+   `font:'mono'` to a board. Only a hand-edited file can carry it, and it resolves
+   to this round's default, so it is a no-write for the same reason `middle` and
+   `md` are. The THREE keys a board can really carry are ui / read / viet, and each
+   must store verbatim and paint the stack it painted before. */
+const LEGACY_FROM_THE_UI = ['ui', 'read', 'viet'];
+const legacyBad = [];
+for (const [oldKey, newKey] of Object.entries(LEGACY_EXPECT)) {
+  const resolved = M.resolveFontKey(oldKey);
+  const stored = mMerge(undefined, {font: oldKey}, 'left');
+  const vars = mVars(stored, 'left');
+  const read = mLabels(stored, 'left').font;
+  const ok = LEGACY_FROM_THE_UI.includes(oldKey)
+    ? (resolved === newKey
+       /* a real choice, so it is stored VERBATIM — a board is not rewritten by
+          being opened, and the value it holds is still a legal one */
+       && stored?.font === oldKey
+       && vars['--ts-font'] === M.TEXT_FONT_FAMILY[newKey]
+       /* and the panel lights the button that repaints it */
+       && read === newKey)
+    /* `mono` → the default, so it writes nothing and emits nothing, exactly as
+       ROUND W's own default test treated it. */
+    : (resolved === M.TEXT_DEFAULT_FONT && stored === undefined && !('--ts-font' in vars)
+       && read === M.TEXT_DEFAULT_FONT);
+  if (!ok) legacyBad.push({oldKey, newKey, resolved, stored, vars, read});
+}
+console.log(`  legacy keys: ${Object.entries(LEGACY_EXPECT).map(([o, n]) => `${o}→${n}`).join('  ')}`
+  + `  (${Object.keys(LEGACY_EXPECT).length - legacyBad.length}/${Object.keys(LEGACY_EXPECT).length} resolve as painted before)`);
+assert('p.every-ROUND-W-role-key-still-resolves-to-the-family-it-painted',
+  legacyBad.length === 0,
+  legacyBad.length
+    ? `BROKEN: ${legacyBad.map(b => `${b.oldKey}→${b.resolved} (wanted ${b.newKey})`).join(', ')}`
+    : 'ui→inter, read→lexend, viet→bevietnam: each STORES VERBATIM (a board is never rewritten by being '
+      + 'opened) and emits the same stack it emitted in ROUND W, and the panel lights the button that '
+      + 'repaints it — so no stored board changed face when the control was relabelled. `mono` was ROUND W\'s '
+      + 'own no-write default (the UI could never store it), so it now resolves to THIS default and writes '
+      + 'nothing — the same treatment `middle` and `md` get');
+/* Every live key round-trips through the resolver unchanged, and an unknown value
+   is the ONLY thing that falls back — otherwise "everything resolves to jetbrains"
+   would satisfy the check above. */
+assert('p.the-resolver-is-identity-on-live-keys-and-falls-back-only-on-unknown-values',
+  FONT_KEYS.every(k => M.resolveFontKey(k) === k)
+    && M.resolveFontKey('comic-sans') === M.TEXT_DEFAULT_FONT
+    && M.resolveFontKey(undefined) === M.TEXT_DEFAULT_FONT,
+  'the six live keys resolve to themselves (so nothing is silently remapped), and only an unrecognised value '
+  + '— a hand-edited board, a key from a future round — answers the default');
+
+/* --- (p3c) VERTICAL ALIGN (ROUND Z, ITEM 2; REWRITTEN ROUND Z FIX 2) -------
+   The model's half — and the half that WAS WRONG. This block used to assert
+   `M.TEXT_DEFAULT_VALIGN === 'middle'` and that a card picking `middle` writes
+   nothing. All of it true, and all of it the defect: no card paints `middle`
+   with nothing stored. A card renders from its own `padding-top` (`top`), and
+   only a label-only node — whose element carries `.lo-body` — centres. The
+   default is therefore PER TARGET, answered by `vAlignForBody`, and the cells
+   below are written as the rule the defect violated: for every target and every
+   value, the pick stores absence EXACTLY when it equals THAT TARGET's default. */
+assert('p.vAlign-has-three-values-and-a-no-write-default-PER-TARGET',
+  M.TEXT_VALIGN_OPTS.map(o => o.v).join() === 'top,middle,bottom'
+    && typeof M.vAlignForBody === 'function'
+    && M.vAlignForBody('card') === 'top'
+    && M.vAlignForBody(undefined) === 'top'
+    && M.vAlignForBody('label-only') === 'middle',
+  'Top / Middle / Bottom, and the no-write value comes from the TARGET: `top` for a card and for a label '
+  + '(both render from their padding-top, before and after this round), `middle` only for a label-only node '
+  + '— the box that centres by design. A single global `middle` made the panel report Middle on nodes that '
+  + 'painted top, which is the defect this replaces');
+const VALIGN_TARGETS = [
+  {what: '.node-body / .note-body / .label-node', body: undefined, def: M.vAlignForBody(undefined)},
+  {what: '.node .lo-body (label-only)', body: 'label-only', def: M.vAlignForBody('label-only')},
+];
+const valignBad = [];
+for (const t of VALIGN_TARGETS) {
+  for (const [v, flex] of Object.entries(M.TEXT_VALIGN_FLEX)) {
+    const stored = M.mergeTextStyle(undefined, {vAlign: v}, 'left', t.def);
+    const vars = M.textStyleVars(stored, 'left', t.def);
+    const isDefault = v === t.def;
+    const ok = isDefault
+      ? (stored === undefined && !('--ts-valign' in vars) && !('--ts-align-items' in vars))
+      : (JSON.stringify(stored) === `{"vAlign":"${v}"}`
+         && vars['--ts-valign'] === v && vars['--ts-align-items'] === flex);
+    if (!ok) valignBad.push({what: t.what, v, def: t.def, stored, vars});
+  }
+}
+console.log(`  vAlign: ${Object.entries(M.TEXT_VALIGN_FLEX).map(([v, f]) => `${v}→${f}`).join('  ')}`
+  + `  (${VALIGN_TARGETS.length * 3 - valignBad.length}/${VALIGN_TARGETS.length * 3} cells as expected)`);
+assert('p.every-vAlign-value-is-one-field-and-one-property-pair-per-target',
+  valignBad.length === 0,
+  'for each target`s OWN default that value stores NOTHING and emits neither property (its flex keyword is '
+  + 'the sheet fallback) and the other two store ONLY `vAlign` and emit `--ts-valign` + `--ts-align-items`, '
+  + 'the single pair the padded box reads');
 
 /* --- (p4) THE CUSTOM SIZE ------------------------------------------------- */
 console.log(`  TEXT_SCALE_MIN=${M.TEXT_SCALE_MIN}  TEXT_SCALE_MAX=${M.TEXT_SCALE_MAX}`);
@@ -1840,22 +2088,22 @@ assert('p.the-clamp-bounds-are-0.5-and-2.0',
   + `1.7 → ${M.clampTextScale(1.7)} (inside the range is untouched)`);
 assert('p.a-literal-1-stores-ABSENCE',
   M.clampTextScale(1) === null
-    && M.mergeTextStyle(undefined, {scale: M.clampTextScale(1)}, 'left') === undefined
-    && M.mergeTextStyle({scale: 1.7}, {scale: M.clampTextScale(1)}, 'left') === undefined
-    && Object.keys(M.textStyleVars(M.mergeTextStyle(undefined, {scale: null}, 'left'), 'left')).length === 0,
+    && mMerge(undefined, {scale: M.clampTextScale(1)}, 'left') === undefined
+    && mMerge({scale: 1.7}, {scale: M.clampTextScale(1)}, 'left') === undefined
+    && Object.keys(mVars(mMerge(undefined, {scale: null}, 'left'), 'left')).length === 0,
   'typing 1 behaves exactly like picking M: the custom key is dropped and `--ts-scale` is not '
   + 'emitted, so a typed 1 and the default are ONE representation and cannot drift');
 assert('p.a-custom-value-overrides-the-step-and-they-never-coexist',
   (() => {
-    const custom = M.mergeTextStyle({size: 'lg'}, {scale: 1.7}, 'left');
-    const stepped = M.mergeTextStyle(custom, {size: 'xl'}, 'left');
-    const back = M.mergeTextStyle(stepped, {scale: 1.7}, 'left');
+    const custom = mMerge({size: 'lg'}, {scale: 1.7}, 'left');
+    const stepped = mMerge(custom, {size: 'xl'}, 'left');
+    const back = mMerge(stepped, {scale: 1.7}, 'left');
     console.log(`  lg+1.7 → ${JSON.stringify(custom)}   then XL → ${JSON.stringify(stepped)}   `
       + `then 1.7 again → ${JSON.stringify(back)}`);
     return JSON.stringify(custom) === '{"scale":1.7}'
       && JSON.stringify(stepped) === '{"size":"xl"}'
       && JSON.stringify(back) === '{"scale":1.7}'
-      && M.textStyleVars(custom, 'left')['--ts-scale'] === '1.7';
+      && mVars(custom, 'left')['--ts-scale'] === '1.7';
   })(),
   'one property, one writer: picking a step clears the custom value and typing one clears the step');
 /* ROUND X, ITEM 1 — THE INPUT IS GONE, THE RULE IS NOT. This assertion is
@@ -1886,7 +2134,7 @@ assert('p.the-custom-size-INPUT-is-gone-and-the-RULE-still-exists',
 assert('p.a-stored-custom-scale-still-RENDERS-and-no-step-claims-it',
   (() => {
     /* The display rule, EXECUTED through the model the panel reads. */
-    const r = k => M.readTextStyle(k, 'left');
+    const r = k => mLabels(k, 'left');
     const custom = r({scale: 1.7});
     const onStep = r({scale: 1.15});
     const none = r(undefined);
@@ -1895,7 +2143,7 @@ assert('p.a-stored-custom-scale-still-RENDERS-and-no-step-claims-it',
       + `{scale:1.15} → size=${JSON.stringify(onStep.size)}; no textStyle → size=${JSON.stringify(none.size)}; `
       + `{size:'xl'} → size=${JSON.stringify(stored.size)}`);
     return custom.size === null && custom.scale === 1.7
-      && M.textStyleVars({scale: 1.7}, 'left')['--ts-scale'] === '1.7'
+      && mVars({scale: 1.7}, 'left')['--ts-scale'] === '1.7'
       && onStep.size === 'lg'
       && none.size === 'md'
       && stored.size === 'xl';
@@ -1952,16 +2200,246 @@ const EDITOR_PROPS = tsPropsIn(sel => /\.label-node\b/.test(sel) && /\.node-labe
 /* The four the sheet is already known to pair. Required as a LIVENESS FLOOR:
    without them this rule would pass on a parse that found nothing at all. */
 const PAIRED = ['--ts-scale', '--ts-weight', '--ts-color', '--ts-align'];
+/* THE ONE PROPERTY ALLOWED TO BE UNPAIRED, named so the general rule below can
+   still fail on a SECOND unpaired property appearing. ROUND Z FIX — the entry
+   itself changed: it is now the flex keyword, not the semantic name, because
+   the semantic name no longer has any rule consumer at all (see (v2)).
+
+   `--ts-align-items` is read by `.label-node`'s own `justify-content`, and a flex
+   CONTAINER's placement of a child needs no cooperation from the child: the root
+   rule places `.label-text` at rest and the in-place editor mid-edit through one
+   mechanism, so the two states cannot disagree. A twin on the editor would be
+   INERT (an item's own `justify-content` distributes nothing) and WRONG (this is
+   a COLUMN flex, so there it would re-mean the horizontal axis). The four paired
+   properties are the opposite case: a `<textarea>` is a REPLACED control that
+   inherits none of font / colour / `text-align`, so their twin is the only thing
+   that paints them mid-edit. */
+const UNPAIRED_BY_DESIGN = ['--ts-align-items'];
 const UNPAIRED = [...LABEL_PROPS].filter(p => !EDITOR_PROPS.has(p)).sort();
+const UNPAIRED_UNEXPECTED = UNPAIRED.filter(p => !UNPAIRED_BY_DESIGN.includes(p));
 console.log(`  .label-node consumers:          ${[...LABEL_PROPS].sort().join(' ')}`);
 console.log(`  .label-node .node-label-input:  ${[...EDITOR_PROPS].sort().join(' ')}`);
+console.log(`  unpaired by design:             ${UNPAIRED_BY_DESIGN.join(' ') || 'none'}`
+  + `   unexpected: ${UNPAIRED_UNEXPECTED.join(' ') || 'none'}`);
 assert('p.every-ts-property-on-the-label-has-its-editor-twin',
-  UNPAIRED.length === 0 && PAIRED.every(p => LABEL_PROPS.has(p)),
-  UNPAIRED.length
-    ? `UNPAIRED on .node-label-input: ${UNPAIRED.join(', ')} — a textarea does not inherit `
+  UNPAIRED_UNEXPECTED.length === 0 && PAIRED.every(p => LABEL_PROPS.has(p)),
+  UNPAIRED_UNEXPECTED.length
+    ? `UNPAIRED on .node-label-input: ${UNPAIRED_UNEXPECTED.join(', ')} — a textarea does not inherit `
       + 'font-family, so this value paints at rest and is dropped mid-edit'
-    : `${LABEL_PROPS.size} properties on .label-node, all of them also on its editor; the four known `
-      + `pairs (${PAIRED.join(' ')}) are all present, so the rule is not passing on an empty parse`);
+    : `${LABEL_PROPS.size} properties on .label-node: the four known pairs (${PAIRED.join(' ')}) are all on the `
+      + `editor too, and the only unpaired one is ${UNPAIRED_BY_DESIGN.join(', ')} — the flex keyword read by `
+      + 'this root`s own flex CONTAINER, exempted by name, so the rule still fires on a second property '
+      + 'that loses its twin');
+
+/* ROUND Z FIX — THE BOXES' `justify-content` CONSUMERS, per text box, each with
+   that box's OWN current value as the fallback. FIVE rules read it — the goblin
+   body, the label-only body (already a column flex), the note body and the label
+   root, whose one `justify-content` places BOTH its children (`.label-text` at
+   rest and the editor mid-edit). The fallbacks are not decoration: they are the
+   values the boxes resolve to TODAY, and `middle` stores absence, so an untouched
+   node emits nothing and every box must land on exactly what it paints now.
+
+   THE PROPERTY NAME IS THE WHOLE FIX. Round Z's first pass pointed all five at
+   the SEMANTIC name (`top`/`middle`/`bottom`). A `var()` cannot look a keyword
+   up, so the browser saw `justify-content: bottom`, found it invalid and
+   discarded it — the declaration LOST and the control moved nothing, while every
+   assertion above still passed because the property was EMITTED. The sheet now
+   reads the flex keyword `textStyleVars` was already computing beside it. (v1)
+   below is the general stop; this block is the per-box measurement. */
+const ALIGN_ITEMS_WANT = {top: 'flex-start', middle: 'center', bottom: 'flex-end'};
+const VALIGN_WANT = new Map([
+  ['.node-body', 'flex-start'],
+  /* the rule is a two-selector list, so both arms are read — and both must fall
+     back to `center`, the literal the block declared before this round */
+  ['.node .lo-body', 'center'],
+  ['.node.label-only .lo-body', 'center'],
+  ['.note-body', 'flex-start'],
+  /* the label ROOT places BOTH its children (`.label-text` at rest, the editor
+     while editing) — this is the consumer the editor relies on instead of a twin */
+  ['.label-node', 'flex-start'],
+]);
+const valignConsumers = [];
+for (const b of CSS_BLOCKS) {
+  for (const m of b.body.matchAll(/justify-content:\s*var\(--ts-align-items,\s*([^)]+)\)/g)) {
+    valignConsumers.push({sel: b.sel, prop: 'justify-content', fallback: m[1].trim()});
+  }
+}
+for (const c of valignConsumers) {
+  console.log(`    ${c.sel.padEnd(32)} ${c.prop}: var(--ts-align-items, ${c.fallback})`);
+}
+const valignWrong = valignConsumers.filter(c => VALIGN_WANT.get(c.sel) !== c.fallback);
+/* A box reading the flex keyword 0 times is the pre-fix defect's signature (it
+   read the semantic name instead). Counted PER BOX so the failure detail below
+   can never print the success sentence for a box that does not read it at all —
+   a harness message that lies is the same family of trap as a harness that
+   measures presence instead of effect. */
+const boxesNotReading = [...VALIGN_WANT.keys()]
+  .map(sel => ({sel, n: valignConsumers.filter(c => c.sel === sel).length}))
+  .filter(b => b.n !== 1);
+assert('p.the-flex-keyword-is-read-by-every-text-box-with-that-boxs-own-fallback',
+  /* every box that owns text reads it exactly once … */
+  boxesNotReading.length === 0
+  /* … and the fallback IS the literal that box renders with today, so `middle`
+     (which stores absence) is pixel-identical to the sheet before this round. */
+  && valignWrong.length === 0,
+  boxesNotReading.length
+    ? `NOT READING THE FLEX KEYWORD: ${boxesNotReading.map(b => `${b.sel} → ${b.n} consumer(s)`).join(', ')}`
+      + ' — a box that reads 0 times is the shipped defect: the pre-fix sheet pointed these at the SEMANTIC name,'
+      + ' so the browser saw a keyword that is not one, discarded the declaration and left the box where it was'
+    : valignWrong.length
+      ? `WRONG FALLBACK: ${valignWrong.map(c => `${c.sel} → ${c.fallback} (want ${VALIGN_WANT.get(c.sel)})`).join(', ')}`
+        + ' — the fallback is the literal that box renders with today, and `middle` stores absence, so a wrong'
+        + ' literal moves an untouched node'
+      : `${valignConsumers.length} consumers — .node-body / .node .lo-body (both arms) / .note-body / `
+        + '.label-node read `justify-content` from the flex keyword with flex-start/center/flex-start/flex-start '
+        + '— exactly today`s values — so `middle` (which stores absence) leaves every box where it already sits');
+/* The label-only body's reader is asserted as the SAME property the block already
+   used for its vertical axis, or the control would fight the sheet rather than
+   drive it. ROUND Z FIX — the vertical declaration is the keyword property. */
+const loBody = CSS_BLOCKS.find(b => b.sel === '.node.label-only .lo-body' || b.sel === '.node .lo-body');
+assert('p.the-label-only-block-drives-its-existing-vertical-axis',
+  !!loBody && /justify-content:\s*var\(--ts-align-items,\s*center\)/.test(loBody.body)
+    && /align-items:\s*var\(--ts-justify,\s*center\)/.test(loBody.body),
+  'that block is already `flex-direction: column`, so `justify-content` WAS its vertical axis: the round routed '
+  + 'it through the flex keyword instead of adding a second mechanism, and its fallback stays `center`');
+
+/* ===========================================================================
+   (v1) EVERY `--ts-*` A RULE FEEDS TO A CSS PROPERTY MUST BE CONSUMED WITH A
+   VALUE THAT IS VALID FOR THAT PROPERTY.
+   ---------------------------------------------------------------------------
+   (v3) This is the regression that shipped past the 144-assertion suite: it
+   asserted the pair was EMITTED, and emission is not effect. `--ts-valign`
+   carried `bottom`, the sheet fed it to `justify-content`, the browser found
+   `justify-content: bottom` INVALID and DROPPED it, and the control moved
+   nothing while every test stayed green. The suite tested PRESENCE; these rules
+   test that the value REACHES a property and WINS there.
+
+   The three declarations below are the ones `textStyleVars` computes its flex
+   keywords FOR, so a consumer of them is checked against the mapping the module
+   itself applies. `justify-content` on a `flex-direction: column` container is
+   the VERTICAL axis — `flex-start` top, `center` middle, `flex-end` bottom —
+   which is why this pair is the one the boxes must read.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(v1) every --ts-* fed to a CSS property is consumed with a VALID value');
+console.log('='.repeat(78));
+/* Derived from M's own table, not restated: if `ALIGN_ITEMS` ever stops mapping
+   onto these keywords, both this rule and the sheet's fallback must move. */
+const VALID_FOR = new Map();
+for (const [v, flex] of Object.entries(ALIGN_ITEMS_WANT)) VALID_FOR.set(flex, v);
+const KEYWORD_CONSUMERS = [];
+const SEMANTIC_AS_KEYWORD = [];
+for (const b of CSS_BLOCKS) {
+  for (const m of b.body.matchAll(/([a-z-]+):\s*var\(--ts-([a-z-]+)(?:,\s*([^)]+))?\)/g)) {
+    const rec = {sel: b.sel, prop: m[1], tsProp: `--ts-${m[2]}`, fallback: (m[3] ?? '').trim()};
+    if (rec.tsProp === '--ts-align-items') KEYWORD_CONSUMERS.push(rec);
+    if (rec.tsProp === '--ts-valign' && ['justify-content', 'align-content', 'align-items', 'align-self'].includes(rec.prop)) {
+      SEMANTIC_AS_KEYWORD.push(rec);
+    }
+  }
+}
+const badKeyword = KEYWORD_CONSUMERS.filter(c => !VALID_FOR.has(c.fallback));
+console.log(`  rules reading the flex keyword: ${KEYWORD_CONSUMERS.length}`
+  + `   [${[...new Set(KEYWORD_CONSUMERS.map(c => c.sel))].join(', ')}]`);
+console.log(`  rules in the flex-keyword declarations that the flex keyword never supplies: ${badKeyword.length}`);
+assert('p.every-flex-keyword-consumer-reads-a-value-valid-for-the-property',
+  KEYWORD_CONSUMERS.length >= 5 && badKeyword.length === 0
+    && ['flex-start', 'center', 'flex-end'].every(v => VALID_FOR.has(v)),
+  badKeyword.length
+    ? `INVALID VALUE: ${badKeyword.map(c => `${c.sel} { ${c.prop}: var(${c.tsProp}, ${c.fallback}) }`).join('; ')}`
+      + ' — the property would be discarded by the browser and the control would move nothing'
+    : `${KEYWORD_CONSUMERS.length} declarations across ${new Set(KEYWORD_CONSUMERS.map(c => c.sel)).size} selectors read the`
+      + ' flex keyword, and each one`s fallback is either a keyword this sheet declares or the box`s own literal'
+      + ' (`flex-start` / `center`) — so with the property emitted the resolved value is valid for the property');
+
+/* DIRECTION SEMANTICS — `justify-content` is the MAIN axis, and the keyword
+   mapping is the VERTICAL one only because every consumer box is
+   `flex-direction: column`. In a column container the main axis runs top →
+   bottom, so `flex-start` is the TOP, `center` the MIDDLE, `flex-end` the
+   BOTTOM. Asserted per box rather than assumed: in a ROW flex the same three
+   keywords would mean left / center / right, so a box that is not a column flex
+   would move the text sideways and this control would be the wrong control. */
+const axisOf = KEYWORD_CONSUMERS.map(c => {
+  const b = CSS_BLOCKS.find(x => x.sel === c.sel && /justify-content:\s*var\(--ts-align-items,/.test(x.body));
+  return {sel: c.sel, column: !!b && /flex-direction:\s*column/.test(b.body)};
+});
+const rowBoxes = axisOf.filter(a => !a.column);
+console.log(`  vertical axis confirmed on ${axisOf.filter(a => a.column).length}/${axisOf.length} boxes: `
+  + axisOf.map(a => `${a.sel}${a.column ? '' : ' (NOT COLUMN)'}`).join(', '));
+assert('p.the-flex-keyword-drives-the-VERTICAL-axis-of-every-box-it-lands-on',
+  axisOf.length === 5 && rowBoxes.length === 0,
+  rowBoxes.length
+    ? `WRONG AXIS: ${rowBoxes.map(a => a.sel).join(', ')} is not a column flex, so \`justify-content\` there is the `
+      + 'HORIZONTAL axis and top/middle/bottom would land as left/center/right'
+    : 'all 5 boxes declare `flex-direction: column`, so `justify-content` is their MAIN axis, which runs '
+      + 'top → bottom: `flex-start` = top, `center` = middle, `flex-end` = bottom — exactly the three values '
+      + '`TEXT_VALIGN_FLEX` supplies for top / middle / bottom');
+/* NEGATIVE CONTROL — flip one box to a ROW flex and the axis check must fire, or
+   it is only reading that a keyword is present somewhere. */
+const ROW_SHEET = CSS_SHEET.replace(/(\.node-body\s*\{[^}]*?)flex-direction:\s*column/, '$1flex-direction: row');
+const rowAxis = [];
+for (const m of ROW_SHEET.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const sel of m[1].split(',')) {
+    const s = sel.trim().replace(/\s+/g, ' ');
+    if (s === '.node-body' && /justify-content:\s*var\(--ts-align-items,/.test(m[2]) && !/flex-direction:\s*column/.test(m[2])) {
+      rowAxis.push(s);
+    }
+  }
+}
+assert('p.control-the-axis-check-fires-when-a-box-becomes-a-ROW-flex',
+  rowAxis.length === 1,
+  `with .node-body mutated to \`flex-direction: row\` the axis check reports ${rowAxis.length} box off the `
+  + 'vertical axis — it measures the direction rather than trusting that the keyword reached a flex box');
+
+/* ===========================================================================
+   (v2) THE SEMANTIC-NAME GUARD — no rule may pass `--ts-valign` to a CSS
+   property. Its value is a SEMANTIC name (`top` / `middle` / `bottom`) and a
+   `var()` cannot translate one into a keyword, so ANY rule reading it as a
+   keyword is broken by construction, not merely mis-set. (v3) On the pre-fix
+   tree this count is 5; today it is 0.
+   =========================================================================== */
+console.log(`  rules feeding the SEMANTIC name to a CSS property: ${SEMANTIC_AS_KEYWORD.length}`
+  + (SEMANTIC_AS_KEYWORD.length ? `  ${SEMANTIC_AS_KEYWORD.map(c => c.sel).join(', ')}` : ''));
+assert('p.no-rule-feeds-the-semantic-alignment-name-to-a-css-property',
+  SEMANTIC_AS_KEYWORD.length === 0,
+  SEMANTIC_AS_KEYWORD.length
+    ? `BROKEN-BY-CONSTRUCTION: ${SEMANTIC_AS_KEYWORD.map(c => `${c.sel} { ${c.prop}: var(${c.tsProp}`).join('; ')}`
+      + ' — a semantic name is not a CSS keyword, a `var()` cannot look one up, so the declaration is INVALID and'
+      + ' is discarded, leaving the property unset: this is exactly the defect that made the control inert while'
+      + ' the suite stayed green'
+    : '0 rules feed the semantic name to a CSS property — it survives only as the value the panel HIGHLIGHTS, '
+      + 'and its keyword twin is what the boxes read');
+/* If the property that IS read ever loses its emitter, every box silently falls
+   back and the control is inert again — by a different route. Asserted against
+   the module, so `textStyleVars` and the sheet cannot drift apart. */
+assert('p.the-read-property-is-the-one-the-module-EMITS',
+  JSON.stringify(mVars(mMerge(undefined, {vAlign: 'bottom'}, 'left'), 'left'))
+      === '{"--ts-valign":"bottom","--ts-align-items":"flex-end"}'
+  && VALID_FOR.size === 3,
+  'a stored `bottom` emits `--ts-align-items: flex-end` — the property the five rules above consume, and a value '
+  + 'valid for `justify-content` — so the write reaches the box instead of being discarded');
+
+/* NEGATIVE CONTROLS — the rules must FIRE on the pre-fix sheet. (v3) This is the
+   same analysis re-run on a MUTATED copy: the consumers put back onto the
+   semantic name, exactly as they shipped. A parse that silently found nothing
+   would report an empty set for both and pass, so each control pins the count. */
+const semanticConsumersIn = sheet => {
+  const out = [];
+  for (const m of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const sel of m[1].split(',')) {
+      for (const d of m[2].matchAll(/justify-content:\s*var\(--ts-valign(?:,\s*([^)]+))?\)/g)) {
+        out.push({sel: sel.trim().replace(/\s+/g, ' '), fallback: (d[1] ?? '').trim()});
+      }
+    }
+  }
+  return out;
+};
+const PREFIX_SHEET = CSS_SHEET.replace(/var\(--ts-align-items,/g, 'var(--ts-valign,');
+assert('p.control-v2-reports-the-shipped-defect-when-the-consumers-are-put-back',
+  semanticConsumersIn(PREFIX_SHEET).length === 5 && semanticConsumersIn(CSS_SHEET).length === 0,
+  `on the pre-fix copy ${semanticConsumersIn(PREFIX_SHEET).length} declarations feed the semantic name to `
+  + '`justify-content` — the five the browser discarded — and 0 on the real sheet: the guard is measuring the '
+  + 'defect it was written for, not a parse that found nothing');
 
 /* NEGATIVE CONTROLS — the rule must FIRE on the defect it was written for.
    This is the same analysis re-run on a MUTATED copy of the sheet: the editor
@@ -1983,10 +2461,13 @@ const analyse = sheet => {
   }
   return [...root].filter(p => !ed.has(p)).sort();
 };
-const noFontTwin = analyse(CSS_SHEET.replace(
-  /\.label-node \.node-label-input \{ font-family: var\(--ts-font[^}]*\}\n/, ''));
-const noWeights = analyse(CSS_SHEET.replace(
-  /\.label-node \.node-label-input \{ font-weight: var\(--ts-weight[^}]*\}\n/, ''));
+/* ROUND Z, ITEM 2 — the exemption applies here too, or every control would
+   report `--ts-valign` alongside the property it is really hunting. */
+const unexpected = list => list.filter(p => !UNPAIRED_BY_DESIGN.includes(p));
+const noFontTwin = unexpected(analyse(CSS_SHEET.replace(
+  /\.label-node \.node-label-input \{ font-family: var\(--ts-font[^}]*\}\n/, '')));
+const noWeights = unexpected(analyse(CSS_SHEET.replace(
+  /\.label-node \.node-label-input \{ font-weight: var\(--ts-weight[^}]*\}\n/, '')));
 assert('p.control-the-pair-rule-detects-the-font-defect-in-place',
   noFontTwin.length === 1 && noFontTwin[0] === '--ts-font',
   `with the font-family editor rule deleted the mutated sheet reports ${JSON.stringify(noFontTwin)} `
@@ -1995,6 +2476,135 @@ assert('p.control-the-pair-rule-is-not-keyed-to-font',
   noWeights.length === 1 && noWeights[0] === '--ts-weight',
   `with the font-WEIGHT editor rule deleted instead it reports ${JSON.stringify(noWeights)} — the rule `
   + 'is general over the property, not a special case for the one that shipped broken');
+/* NEGATIVE CONTROL for the EXEMPTION itself: the list must be exactly the one
+   property, or "exempted by name" would become an exemption for everything. */
+assert('p.control-the-exemption-list-is-exactly-one-property',
+  UNPAIRED_BY_DESIGN.length === 1 && UNPAIRED_BY_DESIGN[0] === '--ts-align-items'
+    && unexpected(['--ts-align-items', '--ts-pretend']).join() === '--ts-pretend',
+  'the exemption admits the flex keyword and NOTHING else — a second unpaired property still fails the general '
+  + 'rule, which is what keeps the exemption from turning into a blanket');
+
+/* ===========================================================================
+   (w1) THE NO-WRITE STATE MUST RENDER AS THE DECLARED DEFAULT — per box.
+   ---------------------------------------------------------------------------
+   (w3) WHY THIS FAILS ON THE PRE-FIX TREE. The suite below passed 149/149 with
+   the defect live, because it asserted that the property was EMITTED with a
+   valid keyword. It never asserted that the value NOT WRITTEN paints what the
+   panel reports — so `middle` (the model's default, which stores absence)
+   rendered as `flex-start` on every card and the suite stayed green. That is the
+   fifth defect of this family in this project, so the rule written here is the
+   general one rather than the single cell that shipped broken: for EVERY box
+   that consumes the property, the box's own fallback literal must BE the flex
+   keyword of that box's own no-write value. Each side has ONE source of truth
+   and the two are asserted to agree — never the same literal written twice.
+
+   HOW IT FIRES ON THE PRE-FIX STATE: the negative control at the end re-runs
+   this exact analysis with the model's default forced back to a single global
+   `middle` — what shipped — and requires the three boxes that really render from
+   their `padding-top` to be reported. On the literal pre-fix tree the model has
+   no per-target default at all (`W_M` is null) and this assert fails on that.
+   =========================================================================== */
+const VBOXES = [
+  /* `.node-body` / `.note-body` / `.label-node`: content begins at each box's own
+     `padding-top` — that IS `top`, and it is what all three painted before this
+     round (none of them declared `display: flex` at all). */
+  {sel: '.node-body', body: undefined},
+  {sel: '.note-body', body: undefined},
+  {sel: '.label-node', body: undefined},
+  /* The label-only node renders `<div class="node-body lo-body">`, so BOTH arms
+     of that two-selector rule are read; each declares the same `center`. */
+  {sel: '.node .lo-body', body: 'label-only'},
+  {sel: '.node.label-only .lo-body', body: 'label-only'},
+];
+const vBoxFallback = sel => {
+  const b = CSS_BLOCKS.find(x => x.sel === sel && /justify-content:\s*var\(--ts-align-items,/.test(x.body));
+  const m = b && b.body.match(/justify-content:\s*var\(--ts-align-items,\s*([^)]+)\)/);
+  return m ? m[1].trim() : null;
+};
+const vBoxRules = VBOXES.map(box => ({...box, fallback: vBoxFallback(box.sel)}));
+/* ONE source of truth for the mapping: the model's own exported table. The
+   sheet-side copy (`ALIGN_ITEMS_WANT`) is asserted EQUAL to it rather than
+   re-listed against literal keywords, so the two halves cannot drift apart. */
+console.log(`  TEXT_VALIGN_FLEX (the model's one mapping): ${JSON.stringify(M.TEXT_VALIGN_FLEX)}`);
+assert('w1.the-vertical-mapping-is-one-table-asserted-equal-on-both-sides',
+  JSON.stringify(M.TEXT_VALIGN_FLEX) === JSON.stringify(ALIGN_ITEMS_WANT)
+    && new Set(Object.values(M.TEXT_VALIGN_FLEX)).size === 3
+    && M.TEXT_VALIGN_FLEX.top === 'flex-start'
+    && M.TEXT_VALIGN_FLEX.middle === 'center'
+    && M.TEXT_VALIGN_FLEX.bottom === 'flex-end',
+  'top / middle / bottom → flex-start / center / flex-end: three DISTINCT keywords, and the correct ones for '
+  + '`justify-content` on a `flex-direction: column` box, whose main axis runs top → bottom. The sheet-side '
+  + 'copy is asserted equal to the model`s table instead of being spelled a second time');
+/* The model's per-target answer, or null on the pre-fix tree where it does not
+   exist yet — the rule must fail there rather than throw. */
+const W_M = typeof M.vAlignForBody === 'function' ? M.vAlignForBody : null;
+/** The rule, parameterised by "what does the panel claim for this target?" so the
+ *  SAME code can be pointed at the pre-fix answer for the (w3) control. */
+const w1Wrong = defFor => vBoxRules
+  .filter(b => b.fallback === null || b.fallback !== M.TEXT_VALIGN_FLEX[defFor(b.body)])
+  .map(b => `${b.sel} → ${b.fallback ?? 'NO CONSUMER'} (want ${b.fallback === null ? 'a consumer' : M.TEXT_VALIGN_FLEX[defFor(b.body)]})`);
+for (const b of vBoxRules) {
+  console.log(`    ${b.sel.padEnd(32)} body=${String(b.body).padEnd(10)} fallback=${String(b.fallback).padEnd(10)}`
+    + ` no-write=${W_M ? W_M(b.body) : '?'} → want ${M.TEXT_VALIGN_FLEX[W_M ? W_M(b.body) : 'top']}`);
+}
+assert('w1.the-default-value-RENDERS-as-the-declared-default-on-every-box',
+  W_M !== null && vBoxRules.every(b => b.fallback !== null) && w1Wrong(W_M).length === 0,
+  W_M === null
+    ? 'the model has no per-target vertical default (`vAlignForBody`), so this rule cannot hold: one global '
+      + 'default is necessarily a different value from the one three of these five fallbacks render'
+    : w1Wrong(W_M).length
+      ? `DEFAULT DOES NOT RENDER: ${w1Wrong(W_M).join('; ')} — the panel would report the default while those `
+        + 'boxes paint their own fallback literal'
+      : `${vBoxRules.length} consumers — each box's fallback IS the flex keyword of that box's own no-write value `
+        + '(top → flex-start on .node-body / .note-body / .label-node; middle → center on both arms of '
+        + '.lo-body) — so the value the panel reports is the value the pixels show, with NOTHING stored');
+/* (w2) THE THREE VALUES ARE DISTINCT AND CORRECT, and the state that writes
+   nothing is exactly the pick equal to that target's own default — whose keyword
+   is the literal the box already renders, so the fallback paints it. */
+const w2Cells = [];
+for (const body of [undefined, 'label-only']) {
+  const def = W_M ? W_M(body) : 'middle';
+  for (const v of ['top', 'middle', 'bottom']) {
+    const stored = M.mergeTextStyle(undefined, {vAlign: v}, 'left', def);
+    const vars = M.textStyleVars(stored, 'left', def);
+    w2Cells.push({
+      body: body ?? '(card/label)', def, pick: v,
+      emitted: '--ts-align-items' in vars ? vars['--ts-align-items'] : null,
+      stored: stored === undefined,
+    });
+  }
+}
+const w2Wrong = w2Cells.filter(c => c.stored !== (c.pick === c.def)
+  || (!c.stored && c.emitted !== M.TEXT_VALIGN_FLEX[c.pick]));
+console.log('  (w2) per target and value:');
+for (const c of w2Cells) {
+  console.log(`       ${c.body.padEnd(14)} default=${c.def.padEnd(7)} pick=${c.pick.padEnd(7)} `
+    + `→ ${c.emitted ?? 'nothing stored (the fallback paints it)'}`);
+}
+assert('w2.each-value-emits-its-own-keyword-and-the-no-write-state-is-the-fallback',
+  w2Wrong.length === 0
+    && ['flex-start', 'center', 'flex-end'].every(k => Object.values(M.TEXT_VALIGN_FLEX).includes(k))
+    && valignConsumers.length === VBOXES.length
+    && valignConsumers.every(c => c.fallback === 'flex-start' || c.fallback === 'center'),
+  w2Wrong.length
+    ? `MISMATCH: ${JSON.stringify(w2Wrong)}`
+    : 'top / middle / bottom emit flex-start / center / flex-end — distinct, and each one lands where its '
+      + 'label says on a column flex — and the ONLY state that writes nothing is the pick equal to that '
+      + 'target`s own default, whose keyword is the literal that box already falls back to');
+/* (w3) THE NEGATIVE CONTROL. A global `middle` for every target is the state that
+   shipped; the rule must report the three boxes that do not render it. */
+const w3PreFix = w1Wrong(() => 'middle');
+console.log(`  (w3) with a global \`middle\` default the rule reports: `
+  + `${w3PreFix.join('; ') || 'NOTHING — the rule would not have caught the defect'}`);
+assert('w3.control-the-rule-reports-the-shipped-defect-in-place',
+  w3PreFix.length === 3
+    && ['.node-body', '.note-body', '.label-node']
+      .every(sel => w3PreFix.some(s => s.startsWith(sel))),
+  `with the model's default forced back to a single global \`middle\` — what shipped — this rule reports `
+  + `${w3PreFix.length} boxes whose fallback is not that default's keyword `
+  + `(${w3PreFix.map(s => s.split(' ')[0]).join(', ')}), which is exactly the disagreement the 149-assertion `
+  + 'suite could not see: it measured that the property was EMITTED, never that the value NOT WRITTEN is the '
+  + 'one that paints');
 
 /* ===========================================================================
    SUMMARY

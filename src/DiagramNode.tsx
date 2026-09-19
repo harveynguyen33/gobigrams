@@ -3,7 +3,7 @@ import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {lucideByName} from './lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
 import {resolveColor, type ColorKey} from './colors';
-import {textStyleVars, alignForBody, type TextStyle} from './textStyle';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './textStyle';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in
  *  both directions; the .node body fills the RF wrapper, so any width/height
@@ -229,8 +229,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      node renders `text-align: center` by design, so `center` — not `left` — is
      the value that renders anyway there. `alignForBody` is the single answer
      both this renderer and the panel use, so `mergeTextStyle` can never store a
-     choice this function then refuses to paint. */
-  const tsVars = textStyleVars(d.textStyle, alignForBody(d.body));
+     choice this function then refuses to paint.
+     ROUND Z FIX 2 — the THIRD argument is the same idea on the vertical axis,
+     and it is why this is a function of `d.body` rather than a constant: a card
+     renders from its `padding-top` (so `top` is its no-write value) while this
+     same expression on a `label-only` node carries `.lo-body`, whose box
+     centres by design (so `middle` is). An untouched node therefore still emits
+     nothing AND still paints exactly what it painted before this round. */
+  const tsVars = textStyleVars(d.textStyle, alignForBody(d.body), vAlignForBody(d.body));
 
   // Container shapes get React Flow's resize affordance when selected (C3).
   // React Flow writes width/height back into node.style, so the size persists.

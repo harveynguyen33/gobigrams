@@ -47,12 +47,17 @@ import {
   type PickerOption,
 } from './InspectorPickers';
 /* PACKAGE-P §E — the Text section's data half. ONE import covers both targets:
-   the model is target-agnostic, and `alignForBody` supplies the only thing that
-   differs between them (a label-only node is centred by design). */
+   the model is target-agnostic, and the two `*ForBody` helpers supply the only
+   things that differ between them: a label-only node is centred by design on
+   BOTH axes (a card is left and starts at its padding-top). ROUND Z FIX 2 added
+   the vertical one — the defect it fixes was a single global `middle` that no
+   card ever painted. */
 import {
   TEXT_SIZE_OPTS, TEXT_WEIGHT_OPTS, TEXT_ALIGN_OPTS, TEXT_FONT_OPTS, TEXT_FONT_FAMILY,
-  alignForBody, mergeTextStyle, readTextStyle,
+  TEXT_VALIGN_OPTS,
+  alignForBody, vAlignForBody, mergeTextStyle, readTextStyle,
   type TextStyle, type TextSize, type TextWeight, type TextAlign, type TextFont,
+  type TextVAlign,
 } from './textStyle';
 import {
   PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch,
@@ -3145,6 +3150,12 @@ export default function App() {
      `TEXT_FONT_FAMILY` in `src/textStyle.ts` — one place, not two. */
   const FONT_OPTS: PickerOption[] = TEXT_FONT_OPTS.map(o => ({
     v: o.v, label: o.label,
+    /* ROUND Z, ITEM 1 — THE BUTTON'S TOOLTIP IS THE FULL FAMILY NAME. The label
+       is short because the full one does not fit a 3-column cell (measured: at
+       10px `JetBrains Mono` is 84.0px and `Be Vietnam Pro` 75.2px, against a
+       65px content box), so the short name is what prints and the real family
+       name is what hovering says. */
+    title: o.title,
     /* ROUND X, ITEM 3 — THE PREVIEW IS THE BUTTON'S OWN CONTENT. Each option
        prints its own family NAME in its own family. That is the one thing a
        native `<select>` cannot do, and it is why this control survives the
@@ -3157,6 +3168,9 @@ export default function App() {
       </span>
     ),
   }));
+  /* ROUND Z, ITEM 2 — the three vertical positions. Plain data, same idiom as
+     the three tables above: no art, so the label IS the control. */
+  const VALIGN_OPTS: PickerOption[] = TEXT_VALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   /** Crow's-foot vocabulary (§B #9/#10) — IE / IDEF1X notation, drawn. */
   const CROW_FOOT: {v: string; label: string}[] = [
     {v: 'none', label: 'none'},
@@ -3319,13 +3333,18 @@ export default function App() {
    *  existing pushHistory-once-per-commit path. The label kind goes through the
    *  SAME `update()`: it is the selected node, exactly as the goblin is. */
   const tsAlignDefault = alignForBody(inspTarget.kind === 'goblin' ? inspTarget.body : undefined);
+  /* ROUND Z FIX 2 — the vertical default is read off the SAME target, by the
+     same shape of helper. `alignForBody` and `vAlignForBody` are one answer each
+     for panel, merge and emitter, so no two of them can describe the box
+     differently. */
+  const tsVAlignDefault = vAlignForBody(inspTarget.kind === 'goblin' ? inspTarget.body : undefined);
   const tsStored = (selected?.data as any)?.textStyle as TextStyle | undefined;
-  const tsShown = readTextStyle(tsStored, tsAlignDefault);
+  const tsShown = readTextStyle(tsStored, tsAlignDefault, tsVAlignDefault);
   const writeTextStyle = (patch: Partial<TextStyle>) => {
     // undefined result means "nothing left to store" — the key is dropped
     // rather than left as an empty object, so `textStyle: undefined` never
     // reaches a board file.
-    update({textStyle: mergeTextStyle(tsStored, patch, tsAlignDefault)} as any);
+    update({textStyle: mergeTextStyle(tsStored, patch, tsAlignDefault, tsVAlignDefault)} as any);
   };
 
   /** PACKAGE-P §E.1 — THE TEXT SECTION'S BODY, written ONCE and registered by
@@ -3392,24 +3411,24 @@ export default function App() {
           in `src/styles.css`, one per row that owns node text. */}
       <div className="field">
         <label>font</label>
-        {/* ROUND X, ITEM 3 — four buttons, one row, each previewing its own
-            family. `wide` is a MODIFIER on the one segmented control, not a
-            fork of it: this row's labels are words (Mono / UI / Read / Viet)
-            where the S×4 and Align rows carry one or two glyphs, so it needs
-            wider buttons and the same `.insp-seg` grid otherwise.
+        {/* ROUND Z, ITEM 1 — SIX FAMILIES, TWO ROWS OF THREE, REAL NAMES.
+            Harvey: "Font name hơi kì, nên theo tên Font" + "nếu 6 nút thì 3 3
+            cho đẹp". The buttons print short labels because the full family
+            names do not fit a 3-column cell (measured: `JetBrains Mono` 84.0px
+            and `Be Vietnam Pro` 75.2px at 10px, against a 65px content box),
+            and each carries its real name as the tooltip. `grid3` is the
+            two-row modifier; the geometry is measured in the `.insp-seg.grid3`
+            block in `src/styles.css`.
 
-            THE HINT THAT USED TO SIT UNDER THIS CONTROL IS GONE — with four
-            self-previewing buttons the control states its own scope, which is
-            the same principle Harvey gave for the label branch (item 4). The
-            "applies to the whole node" fact is still true (one `--ts-font` on
-            the node root, eight consumers in the sheet); it just no longer
-            needs a sentence a user has to read. */}
+            THE HINT THAT USED TO SIT UNDER THIS CONTROL IS STILL GONE — with
+            six self-previewing buttons the control states its own scope, and
+            the whole Text section carries zero hints. */}
         <ToggleRow
           value={tsShown.font}
           onChange={v => writeTextStyle({font: v as TextFont})}
           options={FONT_OPTS}
           title="Text font for the whole node"
-          wide
+          grid3
         />
       </div>
       <div className="field">
@@ -3418,11 +3437,25 @@ export default function App() {
       </div>
       <div className="field">
         <label>align</label>
+        {/* ROUND Z, ITEM 2 — TWO ROWS IN ONE FIELD: the horizontal row Harvey
+            already had (Left / Center / Right, storing `align`), and the new
+            vertical one (Top / Middle / Bottom, storing `vAlign`). Both are the
+            same segmented control, both write through the same lazy-write
+            helper, and the vertical one is ALWAYS PRESENT for a text target —
+            the research flagged hiding it (Excalidraw force-sets `middle` when
+            text binds, Figma has no control at all) as the anti-pattern to
+            avoid. No hint: the whole Text section carries zero hints. */}
         <ToggleRow
           value={tsShown.align}
           onChange={v => writeTextStyle({align: v as TextAlign})}
           options={ALIGN_OPTS}
           title="Text align"
+        />
+        <ToggleRow
+          value={tsShown.vAlign}
+          onChange={v => writeTextStyle({vAlign: v as TextVAlign})}
+          options={VALIGN_OPTS}
+          title="Text vertical align"
         />
       </div>
     </>

@@ -127,7 +127,17 @@ export const ArtLabelPos = ({pos}: {pos: 'center' | 'start' | 'end'}) => (
    Same lifecycle as `IconPicker.tsx`: outside mousedown closes, Escape closes,
    the popover autofocuses nothing but is keyboard-reachable.
    =========================================================================== */
-export type PickerOption = {v: string; label: string; art: ReactNode};
+export type PickerOption = {
+  v: string;
+  label: string;
+  art: ReactNode;
+  /** ROUND Z, ITEM 1 — THE BUTTON'S TOOLTIP, WHEN IT IS NOT THE LABEL.
+   *  Six families do not fit a 3-column row at a legible size, so the font
+   *  control prints a SHORT label (`JetBrains`, `Be Vietnam`) and puts the real
+   *  family name here, where hovering still tells the truth. Absent for every
+   *  other option, whose label already IS its name. */
+  title?: string;
+};
 
 export function IconPickerRow({value, onChange, options, title, id, rowClass}: {
   value: string;
@@ -308,7 +318,7 @@ export function ShapesPicker({value, onChange, color}: {
    `on` is painted with the panel's existing `.mbtn` vocabulary (`styles.css:1725`)
    so a selected button looks the same here as in the multi-select branch.
    =========================================================================== */
-export function ToggleRow({value, onChange, options, title, wide}: {
+export function ToggleRow({value, onChange, options, title, wide, grid3}: {
   value: string;
   onChange: (v: string) => void;
   options: PickerOption[];
@@ -320,9 +330,32 @@ export function ToggleRow({value, onChange, options, title, wide}: {
    *  padding differs, applied with `.insp-seg.wide` so there is still exactly ONE
    *  segmented control in the panel. */
   wide?: boolean;
+  /** ROUND Z, ITEM 1 — THE SIX-BUTTON MODIFIER: TWO ROWS OF THREE.
+   *
+   *  A second modifier rather than a change to `wide`, because the two describe
+   *  different rows: `wide` is a 4-across row of words, this is a 3+3 grid. Six
+   *  buttons in one 6-across row would give each a 37px cell — the measurement
+   *  below is what rules that out, not taste.
+   *
+   *  IT IS IMPLEMENTED AS FLEX, NOT AS A GRID, and that is a deliberate reading
+   *  of this sheet's cascade rather than a preference. `.insp-seg` declares
+   *  `display: grid`, but every segmented row in the app renders through
+   *  `<div className="swatches insp-seg">` and `.swatches { display: flex }`
+   *  (styles.css:1526) has the SAME specificity and sits LATER in the file — so
+   *  all four rows compute `display: flex; flex-wrap: wrap` today, and a
+   *  `grid-template-columns` on the same element would compute against a flex
+   *  container and do nothing at all. `flex-basis` with `box-sizing:
+   *  border-box` (the global `*` rule, styles.css:268) produces the identical
+   *  81px cell, and it does so through the display value those rows actually
+   *  have. The cell measurement is in the `.insp-seg.grid3` block below. */
+  grid3?: boolean;
 }) {
   return (
-    <div className={`swatches insp-seg${wide ? ' wide' : ''}`} role="group" aria-label={title}>
+    <div
+      className={`swatches insp-seg${wide ? ' wide' : ''}${grid3 ? ' grid3' : ''}`}
+      role="group"
+      aria-label={title}
+    >
       {options.map(o => (
         <button
           type="button"
@@ -330,7 +363,12 @@ export function ToggleRow({value, onChange, options, title, wide}: {
           className={`mbtn insp-seg-btn${o.v === value ? ' on' : ''}`}
           data-opt={o.v}
           aria-pressed={o.v === value}
-          title={o.label}
+          /* ROUND Z, ITEM 1 — THE FULL FAMILY NAME ON HOVER. The font row's
+             labels are short only because the full ones do not fit; the button
+             still has to say which family it is, and a tooltip is where that
+             belongs. Every other option has no `title`, so the label stays the
+             tooltip exactly as before. */
+          title={o.title ?? o.label}
           onClick={() => onChange(o.v)}
         >
           {o.art ?? o.label}

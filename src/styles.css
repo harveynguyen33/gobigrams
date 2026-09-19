@@ -1003,7 +1003,14 @@ body {
    around it. `resize: none` suppresses the browser's own grip: the node's
    React Flow resizer is the one resize affordance on this element, and a
    second, differently-behaving grip inside it would be a defect. */
-.label-node.editing { display: block; }
+/* ROUND Z, ITEM 2 — THIS RULE NO LONGER SETS `display`.
+   It used to declare `display: block`, which was the default the root already
+   had — and it is now actively wrong: the root is a flex container (the rule at
+   the end of this sheet) so that the SAME custom property can place the text
+   both at rest and while the in-place editor is open. Forcing `block` here would
+   make the editor's `align-self` inert the moment editing started, i.e. exactly
+   the "paints at rest, dropped mid-edit" defect this sheet has shipped three
+   times. The `cursor: text` half of the editing state lives in the rule below. */
 .node-label-input {
   display: block; width: 100%; min-width: 0;
   resize: none; overflow: hidden; white-space: pre-wrap;
@@ -1314,7 +1321,7 @@ body {
    `font-size` matches `.insp-opt`'s row size so the preview reads at the size
    the popover used to give it; the measurement that proves the row fits is on
    `.insp-seg.wide` above. */
-.insp-font-btn { flex: none; font-size: 12.5px; }
+.insp-font-btn { flex: none; font-size: 10.5px; }
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list
    rather than `.insp-opt-list`'s single-line rows. */
@@ -1347,6 +1354,30 @@ body {
    no label is shrunk to make it. Everything else — the grid, the button, the
    `.on` treatment — is the shared control, untouched. */
 .insp-seg.wide .insp-seg-btn { padding: 6px 7px; }
+/* ROUND Z, ITEM 1 — THE SIX-BUTTON MODIFIER: TWO ROWS OF THREE.
+
+   THE GEOMETRY, and why it is written as flex rather than as a grid.
+   `.insp-seg` declares `display: grid`, but every segmented row renders through
+   `<div className="swatches insp-seg">` and `.swatches` (styles.css:1526) sets
+   `display: flex` at the SAME specificity, later in the sheet — so all four rows
+   compute `display: flex; flex-wrap: wrap` and a `grid-template-columns` here
+   would be applied to a flex container and do nothing. The same later-rule
+   cascade also means the computed GAP is `.swatches`'s 7px, not `.insp-seg`'s
+   5px, so this rule states the 5px it depends on instead of inheriting a value
+   two rules decide.
+
+   THE MEASURED CELL. The panel field is 253px wide (`.panel` inner width minus
+   `.panel-body`'s 12px padding either side), the row holds three cells and two
+   5px gaps, so each cell is `(253 - 10) / 3 = 81.0px`, stated as the flex basis
+   `calc((100% - 10px) / 3)` so it holds at any future field width.
+   `box-sizing: border-box` is global (styles.css:268), so the 7px side padding
+   and the 1px border live INSIDE that 81px and the content box is
+   `81 - 14 - 2 = 65px` — the number `.insp-font-btn`'s 10.5px labels are
+   measured against. `min-width: 0` is the same belt `.node-title > span` needed:
+   a flex item's `min-width: auto` is its longest word, which would let a label
+   push its own cell wider than its share. */
+.insp-seg.grid3 { gap: 5px; }
+.insp-seg.grid3 .insp-seg-btn { flex: 1 1 calc((100% - 10px) / 3); min-width: 0; padding: 6px 7px; }
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */
@@ -2468,7 +2499,7 @@ kbd {
      so a node with nothing stored renders exactly as it did before. Both
      declarations that used to pin this block to the middle live in THIS rule —
      the higher-specificity branch is not a rival any more, it is here. */
-  align-items: var(--ts-justify, center); justify-content: center;
+  align-items: var(--ts-justify, center); justify-content: var(--ts-align-items, center);
   min-height: 100%; text-align: var(--ts-align, center); gap: 3px;
 }
 .node .lo-title {
@@ -3614,6 +3645,76 @@ kbd {
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* ROUND Z, ITEM 1 — TWO MORE FAMILIES, SAME SHAPE AS THE FOUR ABOVE.
+   IBM Plex Sans and Shantell Sans were already on disk (the two new families in
+   `public/fonts/`, 6 files each); these are the declarations that make them
+   reachable. The `unicode-range` values are copied VERBATIM from each family's
+   Google Fonts CSS (`/tmp/fontcheck` holds the downloaded vietnamese subsets the
+   ranges were confirmed against) — never invented, and identical to the three
+   ranges already used above, because Google defines each subset once.
+   `font-display: swap` matches every other block: an offline machine paints the
+   fallback stack immediately instead of waiting on a woff2 that cannot arrive. */
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/ibm-plex-sans-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/shantell-sans-400-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/shantell-sans-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/shantell-sans-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/shantell-sans-700-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/shantell-sans-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Shantell Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/shantell-sans-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ROUND W, ITEM 2 — THE SELECTOR. Every rule below keeps the EXACT stack its
    base rule declares as the `var()` fallback, so a node carrying no `--ts-font`
    resolves to what it paints today and nothing moves. Same discipline as
@@ -3635,3 +3736,95 @@ kbd {
    carries no family of its own (see its own block above), so without this line it
    falls back to the UA default and the text changes typeface mid-edit. */
 .label-node .node-label-input { font-family: var(--ts-font, var(--mono)); }
+
+/* ===========================================================================
+   ROUND Z, ITEM 2 — VERTICAL ALIGN: THE PADDED BOX IS THE LABEL BOUNDS.
+
+   Harvey: "Align chỉ có left center right. Tôi nghĩ chắc cần vertical align
+   nữa nhỉ". draw.io's model, adopted exactly as its source states it
+   (`mxShape.getLabelBounds` → `getLabelMargins` → `mxUtils.getDirectedBounds`):
+
+     THE INSET AND THE ALIGNMENT ARE TWO LAYERS. The per-shape `padding` on
+     `.node-body` / `.lo-body` is the INSET REGISTRY and it is NOT touched by
+     this round: it is what keeps text off a cylinder cap or a diamond corner.
+     The alignment resolves INSIDE that already-padded box, so no value here can
+     push text into the silhouette. That is why the alignment is `justify-content`
+     on the padded box itself rather than a position on the node.
+
+   WHY THE BOX MUST FILL. `justify-content` distributes FREE SPACE, and a box
+   sized to its own content has none — so a box that stays content-sized would
+   make this control inert everywhere. `.node-body` and `.note-body` therefore
+   take `min-height: 100%` (`.lo-body` already carries it, style.css:2472, and
+   `.label-node` already carries `height: 100%`, style.css:3394). The padded box
+   is now the node's full height and its padding is unchanged, so the TEXT's
+   at-rest position is untouched: with neither property emitted the fallback
+   below is the literal that renders today.
+
+   THE FALLBACKS ARE THE BOXES' CURRENT VALUES, one per consumer — the same
+   discipline every other `--ts-*` consumer in this sheet follows:
+     .node-body              flex-start   (block layout put the rows at the top)
+     .node .lo-body          center       (its own rule already centred, 2471)
+     .note-body              flex-start
+     .label-node             flex-start
+   `middle` is the stored default and stores ABSENCE, so an untouched node emits
+   nothing and every box resolves to the literal it renders with today.
+
+   THE LABEL'S EDITOR NEEDS NO TWIN, and that is a measurement rather than an
+   omission: the editor is a flex ITEM of `.label-node`, so the root's own
+   `justify-content` above places it — and it places `.label-text` at rest the
+   same way. The five other `--ts-*` properties do carry an editor twin because a
+   `<textarea>` does not INHERIT font/colour/`text-align`; position is not
+   inherited from anywhere, it is computed by the container. An
+   `align-self: var(--ts-valign)` on the editor would be inert (its `width: 100%`
+   leaves no cross-axis space) AND, because this is a COLUMN flex, would mean the
+   HORIZONTAL axis. Absent by construction; exempted by name in the harness.
+
+   THE FLOOR IS ALIGNMENT-INVARIANT. The padded box is the node's box either
+   way; only the rows inside it move. The one thing to know is the overflow
+   case: `.node-body`'s `max-height: 100%` + `overflow: hidden` (ROUND V) still
+   clips, and a `bottom`/`middle` value on a box whose content already overflows
+   lets the clip hide the TOP of that content instead of the bottom. That is
+   inherent to aligning overflowing content in a fixed box, it is not a floor
+   change, and it is reported in this round's notes.
+
+   WHAT THIS DOES CHANGE ON SCREEN, stated rather than hidden: `.node-body`
+   carrying `min-height: 100%` means the POST-IT gradient
+   (`styles.css:2381`, on `.node.shape-actor > .node-body`) now covers a resized
+   actor node completely instead of stopping at its content. A card, a note and
+   a label are unaffected: cards paint no background on the body, the note's
+   gradient is on its ROOT, and a label's text box already filled. At a node's
+   natural size nothing changes anywhere, because `min-height: 100%` against an
+   automatic height is automatic.
+   =========================================================================== */
+.node-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
+.note-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
+/* ROUND Z FIX 2 — THE FALLBACK IS THE BOX'S OWN NO-WRITE VALUE, and for this one
+   it is `flex-start` (top): before this round the root had no `display: flex` at
+   all, so its text began at `padding-top`, and `top` is what it must keep for a
+   node with no `textStyle`. `vAlignForBody(undefined)` says exactly this on the
+   model's side, and `checks/package-p-inspector.mjs` (w1) asserts the two agree. */
+.label-node { display: flex; flex-direction: column; justify-content: var(--ts-align-items, flex-start); }
+/* WHY THERE IS NO `.label-node .node-label-input` TWIN HERE, unlike `--ts-scale`,
+   `--ts-weight`, `--ts-color`, `--ts-align` and `--ts-font` (all five of which
+   DO carry one, and the harness asserts that generally).
+
+   Those five need the twin because a `<textarea>` is a REPLACED element whose
+   FONT, COLOUR and inner `text-align` are not inherited from its parent — a
+   declaration on the root alone is silently dropped the moment editing starts.
+
+   POSITION IS NOT INHERITED EITHER, BUT IT DOES NOT NEED TO BE: the editor is a
+   flex ITEM of this root, and a flex item is placed by its CONTAINER's
+   `justify-content`. `justify-content: var(--ts-valign, …)` above therefore
+   places the textarea in the editing state and `.label-text` at rest, through the
+   one mechanism, and their position cannot disagree.
+
+   An `align-self: var(--ts-valign, …)` on the editor would be both WRONG and
+   inert, and the inertness is what makes it dangerous rather than harmless: this
+   is a COLUMN flex, so the cross axis is HORIZONTAL and `align-self` there means
+   left/center/right — it would silently be a second, contradicting spelling of
+   `--ts-align`. Measured: it could not even do that, because `.node-label-input`
+   is `width: 100%` and a 100%-wide item has no cross-axis free space to
+   distribute, so the declaration would compute to nothing at all. A declaration
+   whose only effect is to mislead is the defect this sheet keeps a sweep for, so
+   it is absent by construction and the harness exempts this ONE property by name
+   (see `p.the-flex-keyword-is-read-by-every-text-box-with-that-boxs-own-fallback`). */

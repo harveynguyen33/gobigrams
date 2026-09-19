@@ -1,6 +1,6 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
-import {textStyleVars, alignForBody, type TextStyle} from './textStyle';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './textStyle';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
 
@@ -90,8 +90,15 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
      A label kind has NO `body`, so its inherited align is the plain one:
      `.label-node { text-align: var(--ts-align, left) }` (`styles.css:3307-3308`)
      — i.e. `alignForBody(undefined)`. Passing it (rather than letting the
-     model assume) keeps this renderer and the panel on one answer. */
-  const tsVars = textStyleVars(d.textStyle, alignForBody(undefined));
+     model assume) keeps this renderer and the panel on one answer.
+
+     ROUND Z FIX 2 — the vertical default is passed the same way, and for a
+     label it is `top`: `.label-node` is a plain `display: flex` column whose
+     content starts at its `padding-top`, so `vAlignForBody(undefined)` is `top`
+     — NOT the `middle` a single global constant used to claim. Reading the
+     default off the target is what keeps the no-write state painting what the
+     box already paints. */
+  const tsVars = textStyleVars(d.textStyle, alignForBody(undefined), vAlignForBody(undefined));
 
   // Same gate as `DiagramNode`: the resizer exists only while selected. In
   // read-only review mode nothing can become selected (`elementsSelectable`

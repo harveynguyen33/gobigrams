@@ -16,7 +16,7 @@ import {
 } from './src/InspectorPickers';
 import {getInspectorSections} from './src/inspector';
 import {defaultSectionState} from './src/inspectorState';
-import {textStyleVars, readTextStyle, mergeTextStyle, TEXT_SCALE, TEXT_FONT_OPTS, TEXT_FONT_FAMILY} from './src/textStyle';
+import {textStyleVars, readTextStyle, mergeTextStyle, TEXT_SCALE, TEXT_FONT_OPTS, TEXT_FONT_FAMILY, TEXT_VALIGN_OPTS, TEXT_VALIGN_FLEX, resolveFontKey, isTextDefault, vAlignForBody} from './src/textStyle';
 const W: any[] = [1, 1.5, 1.8, 2, 3].map(w => ({v: String(w), label: String(w), art: <ArtWidth w={w} />}));
 const D: any[] = ['solid','dashed','dotted'].map((d:any) => ({v: d, label: d, art: <ArtDash kind={d} />}));
 const C: any[] = ['bezier','smoothstep','step','straight'].map((c:any) => ({v: c, label: c, art: <ArtCurve kind={c} />}));
@@ -37,9 +37,11 @@ const SZ: any[] = [{v:'sm',label:'S',art:null},{v:'md',label:'M',art:null},{v:'l
 const WT: any[] = [{v:'regular',label:'Regular',art:null},{v:'bold',label:'Bold',art:null}];
 const AL: any[] = [{v:'left',label:'Left',art:null},{v:'center',label:'Center',art:null},{v:'right',label:'Right',art:null}];
 const FT: any[] = TEXT_FONT_OPTS.map(o => ({
-  v: o.v, label: o.label,
+  v: o.v, label: o.label, title: o.title,
   art: <span className="insp-font-btn" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>{o.label}</span>,
 }));
+/* ROUND Z ITEM 2 — the vertical align row, built the way App.tsx builds it. */
+const VA: any[] = TEXT_VALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
 const SW: any[] = ['accent','green','cyan','violet','amber','slate'];
 
 const TITLES: any = {content:'Content',text:'Text',style:'Style',table:'Table',columns:'Columns',showMode:'Show mode',label:'Label',line:'Line',markers:'Markers',cardinality:"Cardinality",flow:'Flow animation'};
@@ -65,8 +67,12 @@ export function renderTarget(t: any, bodies: any, fold?: any) {
    transcription of it. */
 function tsBody(t: any) {
   const alignDefault = t.kind === 'goblin' && t.body === 'label-only' ? 'center' : 'left';
-  const shown = readTextStyle(t.__stored, alignDefault);
-  const write = (p: any) => { t.__written = mergeTextStyle(t.__stored, p, alignDefault); };
+  /* ROUND Z FIX 2 — the vertical default is read off the SAME target, exactly as
+     src/App.tsx and both renderers do: 'top' for a card, 'middle' for the
+     label-only body (whose element carries .lo-body). */
+  const vAlignDefault = vAlignForBody(t.kind === 'goblin' ? t.body : undefined);
+  const shown = readTextStyle(t.__stored, alignDefault, vAlignDefault);
+  const write = (p: any) => { t.__written = mergeTextStyle(t.__stored, p, alignDefault, vAlignDefault); };
   return <>
     <div className="field"><label>size</label>
       {/* ROUND X ITEM 1 — shown.size is null for a custom multiplier, and
@@ -76,11 +82,13 @@ function tsBody(t: any) {
     <div className="field"><label>weight</label>
       <ToggleRow value={shown.weight} onChange={v => write({weight: v})} options={WT} title="Text weight" /></div>
     <div className="field"><label>font</label>
-      <ToggleRow value={shown.font} onChange={v => write({font: v})} options={FT} title="Text font for the whole node" wide /></div>
+      <ToggleRow value={shown.font} onChange={v => write({font: v})} options={FT} title="Text font for the whole node" grid3 /></div>
     <div className="field"><label>text colour</label>
       <div className="swatches">{SW.map(k => <div key={k} className={'swatch' + (shown.colorKey === k ? ' on' : '')} data-color-key={k} onClick={() => write({colorKey: k})} />)}</div></div>
     <div className="field"><label>align</label>
-      <ToggleRow value={shown.align} onChange={v => write({align: v})} options={AL} title="Text align" /></div>
+      <ToggleRow value={shown.align} onChange={v => write({align: v})} options={AL} title="Text align" />
+      {/* ROUND Z ITEM 2 — the vertical row, ALWAYS PRESENT for a text target. */}
+      <ToggleRow value={shown.vAlign} onChange={v => write({vAlign: v})} options={VA} title="Text vertical align" /></div>
   </>;
 }
 
@@ -109,6 +117,13 @@ export function All() {
      rather than claiming M. */
   const gx: any = {kind:'goblin', shape:'service', body:'card'};
   gx.__stored = {scale: 1.7};
+  /* ROUND Z FIX 2 — AND A NODE THAT STORES A VERTICAL CHOICE. Before this fix a
+     card's 'top' and its "nothing stored" were INDISTINGUISHABLE (both emitted
+     nothing, both painted flex-start), so no fixture could tell the two apart
+     and the defect was invisible. This one stores Middle, which on a card is a
+     REAL choice — the box is no longer where it was. */
+  const gv: any = {kind:'goblin', shape:'service', body:'card'};
+  gv.__stored = {vAlign: 'middle'};
   return <div>
     <div id="edge">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies)}</div>
     {/* PASS 3 §F.5 — the same target with Cardinality EXPANDED, to prove an open
@@ -129,6 +144,11 @@ export function All() {
     <div id="goblin-lo">{renderTarget(lo, {text: tsBody(lo)})}</div>
     {/* ROUND X ITEM 1 — the same target carrying a CUSTOM multiplier. */}
     <div id="goblin-custom">{renderTarget(gx, {text: tsBody(gx)})}</div>
+    {/* ROUND Z FIX 2 — a CARD that stores a vertical CHOICE. On a card 'top' is
+        the no-write value, so this is the only fixture whose panel row can show
+        something other than the default: it proves the row is driven by the
+        stored field and not by the target's default. */}
+    <div id="goblin-valign">{renderTarget(gv, {text: tsBody(gv)})}</div>
     <div id="label">{renderTarget(l, {text: tsBody(l)})}</div>
   </div>;
 }
@@ -140,19 +160,51 @@ export function Model() {
   return <pre>
 {JSON.stringify({
   /* nothing chosen yet → nothing stored, and nothing rendered */
-  oldBoardVars: textStyleVars(undefined, 'left'),
+  oldBoardVars: textStyleVars(undefined, 'left', 'top'),
   /* every field at its inherited value → NOTHING is written */
-  onlyDefaults: mergeTextStyle(undefined, {size:'md', weight:'regular', align:'left'}, 'left'),
+  onlyDefaults: mergeTextStyle(undefined, {size:'md', weight:'regular', align:'left', vAlign:'top'}, 'left', 'top'),
   /* a real choice → only that key */
-  oneChoice: mergeTextStyle(undefined, {size:'xl'}, 'left'),
+  oneChoice: mergeTextStyle(undefined, {size:'xl'}, 'left', 'top'),
   /* a default chosen LATER clears it back out */
-  cleared: mergeTextStyle({size:'xl', weight:'bold'}, {size:'md', weight:'regular'}, 'left'),
+  cleared: mergeTextStyle({size:'xl', weight:'bold'}, {size:'md', weight:'regular'}, 'left', 'top'),
   /* the label-only default: center is the inherited value THERE */
-  loDefaultCenter: mergeTextStyle(undefined, {align:'center'}, 'center'),
-  loExplicitCenterIsAChoice: mergeTextStyle(undefined, {align:'center'}, 'left'),
+  loDefaultCenter: mergeTextStyle(undefined, {align:'center'}, 'center', 'middle'),
+  loExplicitCenterIsAChoice: mergeTextStyle(undefined, {align:'center'}, 'left', 'top'),
   /* the render vars a full style produces */
-  fullVars: textStyleVars({size:'xl', weight:'bold', colorKey:'amber', align:'right'}, 'left'),
+  fullVars: textStyleVars({size:'xl', weight:'bold', colorKey:'amber', align:'right'}, 'left', 'top'),
   scale: TEXT_SCALE,
+  /* ROUND Z ITEM 1 — THE LEGACY KEYS, run through the REAL resolver. A board
+     saved by ROUND W carries one of these four, and each must resolve to the
+     family that key already painted. */
+  legacyFonts: {
+    mono: resolveFontKey('mono'), ui: resolveFontKey('ui'),
+    read: resolveFontKey('read'), viet: resolveFontKey('viet'),
+  },
+  legacyVars: {
+    /* The STORED key goes in, not the resolved one: this asserts the whole
+       chain a real board exercises — stored viet -> resolveFontKey -> the
+       --ts-font value the renderer would spread onto the node. The whole vars
+       object is emitted so the assertion outside can index it. */
+    viet: textStyleVars({font: 'viet'}, 'left', 'top'),
+    read: textStyleVars({font: 'read'}, 'left', 'top'),
+  },
+  unknownFont: resolveFontKey('comic-sans'),
+  /* viet resolves to bevietnam, NOT to the default key — so it is a real
+     choice and must be stored rather than dropped. */
+  legacyIsNotDefault: isTextDefault('font', 'viet', 'left', 'top'),
+  /* ROUND Z ITEM 2 (REWRITTEN ROUND Z FIX 2) — the vertical align's lazy write
+     and its one property, PER TARGET: 'middle' is a real choice on a card (a card
+     renders from its padding-top) and the no-write value on a label-only node. */
+  valignCardTopStored: mergeTextStyle(undefined, {vAlign:'top'}, 'left', vAlignForBody(undefined)),
+  valignCardMiddleStored: mergeTextStyle(undefined, {vAlign:'middle'}, 'left', vAlignForBody(undefined)),
+  valignLoMiddleStored: mergeTextStyle(undefined, {vAlign:'middle'}, 'center', vAlignForBody('label-only')),
+  valignVars: textStyleVars({vAlign:'middle'}, 'left', vAlignForBody(undefined)),
+  /* a card picking Top writes NOTHING (Top IS the card default) — so the
+     "emits its keyword" fixture is the label-only target, where Top is a choice */
+  valignTopVars: textStyleVars({vAlign:'top'}, 'left', vAlignForBody('label-only')),
+  valignReadCard: readTextStyle(undefined, 'left', vAlignForBody(undefined)).vAlign,
+  valignReadLabelOnly: readTextStyle(undefined, 'center', vAlignForBody('label-only')).vAlign,
+  valignMap: TEXT_VALIGN_FLEX,
 }, null, 0)}
   </pre>;
 }
@@ -237,10 +289,11 @@ check('both targets PAINT the four §E.1 controls',
   `${(gText.match(/insp-seg-btn/g) ?? []).length} segmented buttons + `
   + `${(gText.match(/class="swatch(?: on)?"/g) ?? []).length} colour cells on the goblin, same on the label`);
 check('the FOUR sizes are a segmented row of four, not a px input',
-  (gText.match(/data-opt="/g) ?? []).length === 13 && !/<input[^>]*type="(number|text)"/.test(gText),
-  `${(gText.match(/data-opt="/g) ?? []).length} option buttons (4 size + 2 weight + 4 font + 3 align) and no `
-  + 'text/number input — ROUND X ITEM 1 removed the custom-size input and ROUND X ITEM 3 added the font row, '
-  + 'so the count went 9 → 13');
+  (gText.match(/data-opt="/g) ?? []).length === 18 && !/<input[^>]*type="(number|text)"/.test(gText),
+  `${(gText.match(/data-opt="/g) ?? []).length} option buttons (4 size + 2 weight + 6 font + 3 align + `
+  + '3 vAlign) and no text/number input — ROUND X ITEM 1 removed the custom-size input, ROUND X ITEM 3 added '
+  + 'the font row, and ROUND Z grew the font row from 4 keys to 6 and added the Top/Middle/Bottom row, so the '
+  + 'count went 13 → 18');
 /* §E.2 — THE READ, per target: a stored style shows as chosen; a node with none
    shows the INHERITED value and no swatch. */
 const storedOn = onLabelsOf(gText);
@@ -256,34 +309,63 @@ console.log(`  shown values — stored: ${JSON.stringify(storedOn)}  default: ${
 console.log(`  the font row renders ${(gText.match(/class="insp-font-btn"/g) ?? []).length} name-in-own-family buttons; `
   + `marked: stored ${JSON.stringify(storedFontOn)} / default ${JSON.stringify(defaultFontOn)}`);
 check('a stored style reads back as the chosen values',
-  storedOn.join() === 'XL,Bold,Right' && onSwatchOf(gText).join() === 'amber',
-  `size/weight/align ${JSON.stringify(storedOn)}, swatch ${JSON.stringify(onSwatchOf(gText))}`);
+  /* ROUND Z FIX 2 — `Top` is the fifth row now for a CARD: the fixture stores no
+     `vAlign`, and a card's inherited value is `top` (it renders from its
+     padding-top). It used to read `Middle` while the box painted flex-start,
+     which was the defect stated as a panel value. */
+  storedOn.join() === 'XL,Bold,Right,Top' && onSwatchOf(gText).join() === 'amber',
+  `size/weight/align/vAlign ${JSON.stringify(storedOn)}, swatch ${JSON.stringify(onSwatchOf(gText))}`);
 check('a node with NO textStyle reads as the inherited values (not blank)',
-  defaultOn.join() === 'M,Regular,Left' && onSwatchOf(textSectionOf('goblin-default')).length === 0
-    && labelOn.join() === 'M,Regular,Left' && onSwatchOf(lText).length === 0,
-  `M / Regular / left and NO swatch on — "default", exactly as §E.2 requires (the panel never shows a blank)`);
-check('ROUND X ITEM 3 — the font row renders FOUR self-previewing buttons, all on one target',
-  (gText.match(/class="insp-font-btn"/g) ?? []).length === 4
-    && ['Mono', 'UI', 'Read', 'Viet'].every(l => gText.includes(`>${l}</span>`))
+  defaultOn.join() === 'M,Regular,Left,Top' && onSwatchOf(textSectionOf('goblin-default')).length === 0
+    && labelOn.join() === 'M,Regular,Left,Top' && onSwatchOf(lText).length === 0,
+  `M / Regular / left / TOP on a card and on a label (both render from their padding-top) and NO swatch on — `
+  + '"default", exactly as §E.2 requires (the panel never shows a blank)');
+check('ROUND Z ITEM 1 — the font row renders SIX self-previewing buttons, all on one target',
+  (gText.match(/class="insp-font-btn"/g) ?? []).length === 6
+    && ['JetBrains', 'Inter', 'IBM Plex', 'Shantell', 'Lexend', 'Be Vietnam'].every(l => gText.includes(`>${l}</span>`))
     /* Each button's span carries its OWN family — the preview is not decoration.
        React escapes `'` as `&#x27;` inside an inline style, so the emitted
        attribute is read in that form (measured, not assumed). */
     && gText.includes('font-family:&#x27;JetBrains Mono&#x27;, var(--mono)')
     && gText.includes('font-family:&#x27;Inter&#x27;')
+    && gText.includes('font-family:&#x27;IBM Plex Sans&#x27;')
+    && gText.includes('font-family:&#x27;Shantell Sans&#x27;')
     && gText.includes('font-family:&#x27;Lexend&#x27;')
     && gText.includes('font-family:&#x27;Be Vietnam Pro&#x27;')
+    /* THE FULL FAMILY NAME IS STILL AVAILABLE, as the button's `title` — the
+       short label prints, the real name answers a hover. */
+    && gText.includes('title="JetBrains Mono"') && gText.includes('title="Be Vietnam Pro"')
     /* ONE NAME PER BUTTON: the row builds each button from ONE span, so the
        two-cell `Mono Mono` shape ROUND W had to suppress cannot recur. */
     && !gText.includes('Mono Mono'),
   `${(gText.match(/class="insp-font-btn"/g) ?? []).length} buttons, each printing its own name in its own `
-  + 'family, and no repeated name anywhere in the row');
-check('ROUND X ITEM 3 — the marked font button is the stored family, and mono is marked by default',
-  storedFontOn.join() === 'mono' && defaultFontOn.join() === 'mono',
-  '`mono` is TEXT_DEFAULT_FONT, so it is both what the fixture stores (nothing) and what the row marks — '
+  + 'family, each carrying its full family name as the tooltip, and no repeated name anywhere in the row');
+check('ROUND Z ITEM 1 — the marked font button is the stored family, and JetBrains is marked by default',
+  storedFontOn.join() === 'jetbrains' && defaultFontOn.join() === 'jetbrains',
+  '`jetbrains` is TEXT_DEFAULT_FONT, so it is both what the fixture stores (nothing) and what the row marks — '
   + 'the `.insp-seg-btn.on` treatment reaches the font row without a rule of its own');
+/* ROUND Z, ITEM 1 — THE LEGACY-KEY MIGRATION, read off the REAL model. A board
+   that stored one of ROUND W's four role keys must resolve to the family that key
+   already painted, and must light THAT button — not fall back to the default. */
+console.log(`  legacy keys → ${JSON.stringify(MODEL.legacyFonts)}`);
+check('ROUND Z ITEM 1 — every ROUND W role key still resolves to the family it painted',
+  MODEL.legacyFonts.mono === 'jetbrains' && MODEL.legacyFonts.ui === 'inter'
+    && MODEL.legacyFonts.read === 'lexend' && MODEL.legacyFonts.viet === 'bevietnam'
+    && MODEL.legacyVars.viet['--ts-font'].startsWith("'Be Vietnam Pro'")
+    && MODEL.legacyVars.read['--ts-font'].startsWith("'Lexend'"),
+  'mono→jetbrains, ui→inter, read→lexend, viet→bevietnam: a stored `viet` still paints the Be Vietnam Pro '
+  + 'stack and a stored `read` the Lexend stack, so relabelling the control moved no existing board');
+/* NEGATIVE CONTROL — the resolver must FALL BACK for a value it does not know,
+   and must not treat a legacy key as the default (or the migration above would be
+   indistinguishable from "everything resolves to jetbrains"). */
+check('ROUND Z ITEM 1 — CONTROL: an unknown key falls back, a legacy key does not',
+  MODEL.unknownFont === 'jetbrains' && MODEL.legacyIsNotDefault === false,
+  'a hand-edited `font: "comic-sans"` resolves to the default instead of painting the unquoted fallback, '
+  + 'and a stored `viet` is NOT read as the default (so it is stored, not dropped)');
 check('the align DEFAULT is per-target (label-only nodes are centred by design)',
-  loOn.join() === 'M,Regular,Center',
-  'a label-only goblin shows Center as its inherited align, straight from `.node .lo-body { text-align: center }`');
+  loOn.join() === 'M,Regular,Center,Middle',
+  'a label-only goblin shows Center as its inherited align, straight from `.node .lo-body { text-align: center }` '
+  + '(and Middle as its vertical default, which that same box already centres at)');
 /* ROUND X, ITEM 1 — THE CUSTOM MULTIPLIER, end to end in markup. The input is
    gone, so this is the ONLY place the user-visible half of a stored custom scale
    can be verified: the node still gets `--ts-scale` and the restored size row
@@ -295,16 +377,54 @@ const customOn = onLabelsOf(customText);
 console.log(`  custom scale 1.7 — marked segmented buttons: ${JSON.stringify(customOn)}  `
   + `(weight/align still default, size deliberately UNSET)`);
 check('ROUND X ITEM 1 — a stored custom scale marks NO step and does not disturb the other rows',
-  customOn.join() === 'Regular,Left'
+  customOn.join() === 'Regular,Left,Top'
     && customText.includes('data-opt="sm"') && customText.includes('data-opt="xl"')
     && !/class="[^"]*insp-seg-btn on[^"]*"[^>]*data-opt="(sm|md|lg|xl)"/.test(customText),
   `${JSON.stringify(customOn)} — the four size buttons are present and NONE is marked (1.7 is not a step), `
-  + 'while weight and align still show their inherited values');
+  + 'while weight, align and vAlign still show their inherited values (vAlign = Top on this card)');
+/* ROUND Z FIX 2 — THE STORED VERTICAL CHOICE, read off the markup. The fixture
+   stores `vAlign:'middle'` on a CARD, where that is a real choice. */
+const valignOn = onLabelsOf(textSectionOf('goblin-valign'));
+console.log(`  card storing vAlign:'middle' — marked segmented buttons: ${JSON.stringify(valignOn)}`);
+check('ROUND Z FIX 2 — a stored vertical CHOICE shows in the row (Middle on a card, where Top is the default)',
+  valignOn.join() === 'Right,Middle' || valignOn.join() === 'Left,Middle' || valignOn.includes('Middle'),
+  `${JSON.stringify(valignOn)} — a card that stores Middle marks Middle. Under the pre-fix default this node's `
+  + 'row and an untouched card`s row were the SAME (both read Middle) while both boxes painted top, so the '
+  + 'stored value and the no-write state could not be told apart in the panel either');
 /* NEGATIVE CONTROL: the stored read must differ from the default read, or the
    two checks above could both pass on a panel that ignores `textStyle` entirely. */
 check('CONTROL — the stored read differs from the default read',
   storedOn.join() !== defaultOn.join() && onSwatchOf(gText).length !== onSwatchOf(textSectionOf('goblin-default')).length,
   'the section is really driven by the node data, not by constants');
+
+/* ROUND Z, ITEM 2 — THE VERTICAL ROW, in the emitted markup and in the model.
+   The row is always present for a text target (the research flagged hiding it —
+   Excalidraw force-sets `middle` when text binds — as the anti-pattern), it
+   prints Top / Middle / Bottom, and its lazy write stores absence for `middle`
+   and exactly one property pair for a real choice. */
+console.log(`  vAlign — middle stores ${JSON.stringify(MODEL.valignMiddle)}, top stores ${JSON.stringify(MODEL.valignTop)}`);
+console.log(`  vAlign — vars for top: ${JSON.stringify(MODEL.valignVars)}; a node with none reads ${JSON.stringify(MODEL.valignRead)}`);
+check('ROUND Z ITEM 2 — the vertical row is present on BOTH text targets and prints its three values',
+  ['>Top<', '>Middle<', '>Bottom<'].every(t => gText.includes(t) && lText.includes(t))
+    && gText.includes('aria-label="Text vertical align"') && lText.includes('aria-label="Text vertical align"'),
+  'Top / Middle / Bottom render for the goblin AND the label target, side by side with Left / Center / Right — '
+  + 'the control is never hidden, so a text target always has both axes');
+check('ROUND Z FIX 2 — the no-write value is PER TARGET: `top` on a card, `middle` on a label-only node',
+  MODEL.valignCardTopStored === undefined
+    && JSON.stringify(MODEL.valignCardMiddleStored) === '{"vAlign":"middle"}'
+    && MODEL.valignLoMiddleStored === undefined
+    && MODEL.valignReadCard === 'top' && MODEL.valignReadLabelOnly === 'middle',
+  'a card picking Top stores nothing (a card renders from its padding-top, so Top IS its default and an '
+  + 'untouched card reads back Top); a card picking Middle stores `vAlign` — a real choice that moves the '
+  + 'pixels; a label-only node picking Middle stores nothing, because its box is centred by design');
+check('ROUND Z FIX 2 — a stored choice lands as the two custom properties, one write for the box',
+  JSON.stringify(MODEL.valignVars) === '{"--ts-valign":"middle","--ts-align-items":"center"}'
+    && JSON.stringify(MODEL.valignTopVars) === '{"--ts-valign":"top","--ts-align-items":"flex-start"}'
+    && JSON.stringify(MODEL.valignMap) === '{"top":"flex-start","middle":"center","bottom":"flex-end"}',
+  JSON.stringify(MODEL.valignVars) + ' — `--ts-valign` is what the panel highlights, `--ts-align-items` is '
+  + 'what the padded box reads as `justify-content`; the keyword is the mapping the box needs, so a card '
+  + 'that chose Middle really paints centre (and Top paints flex-start), instead of a semantic name the '
+  + 'browser would discard');
 
 /* PASS 3 §C/§F.4 — the fold is now REAL, and on a fresh profile it is §A.3's
    truth table: Cardinality and Flow folded, everything else open. The readout

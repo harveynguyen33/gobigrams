@@ -38,8 +38,38 @@ import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey} from './colors';
 export type TextSize = 'sm' | 'md' | 'lg' | 'xl';
 export type TextWeight = 'regular' | 'bold';
 export type TextAlign = 'left' | 'center' | 'right';
-/** ROUND W, ITEM 2 — WHICH FAMILY THE WHOLE NODE PAINTS IN. */
-export type TextFont = 'mono' | 'ui' | 'read' | 'viet';
+/** ROUND W, ITEM 2 — WHICH FAMILY THE WHOLE NODE PAINTS IN.
+ *
+ *  ROUND Z, ITEM 1 — SIX REAL FAMILY NAMES, NOT FOUR INVENTED ROLES. Harvey:
+ *  "Font name hơi kì, nên theo tên Font". The four keys below (`mono`, `ui`,
+ *  `read`, `viet`) were ROLE names; the control now says the family, and the
+ *  keys are the family. Every one of the six was MEASURED, not chosen by taste:
+ *  each family's vietnamese woff2 was downloaded, its cmap read, and all 24
+ *  Vietnamese diacritic codepoints confirmed present. The families that failed
+ *  that measurement (Atkinson Hyperlegible, Fira Code, Caveat, Architects
+ *  Daughter — none ships a `vietnamese` subset at all) are NOT in this union. */
+export type TextFont = 'jetbrains' | 'inter' | 'plex' | 'shantell' | 'lexend' | 'bevietnam';
+
+/** ROUND Z, ITEM 1 — THE FOUR KEYS A BOARD MAY ALREADY CARRY.
+ *
+ *  `TextStyle.font` shipped in ROUND W with these four role names, so a board
+ *  saved by that build has one of them on disk. They are NOT deleted and NOT
+ *  renamed in place: a stored value is data, and `LEGACY_FONT_KEY` is the ONE
+ *  place old→new is decided. `TextStyle.font` is therefore typed as the union
+ *  of both, which is the truth about what a board file can hold. */
+export type LegacyTextFont = 'mono' | 'ui' | 'read' | 'viet';
+/** What `TextStyle.font` accepts on READ. `resolveFontKey` maps it to `TextFont`. */
+export type TextFontStored = TextFont | LegacyTextFont;
+
+/** ROUND Z, ITEM 2 — WHERE THE TEXT SITS VERTICALLY INSIDE ITS PADDED BOX.
+ *
+ *  Harvey: "Align chỉ có left center right. Tôi nghĩ chắc cần vertical align
+ *  nữa nhỉ". The values and the default are draw.io's, verified in mxGraph's
+ *  source (`mxText.js`: `this.valign = (valign != null) ? valign :
+ *  mxConstants.ALIGN_MIDDLE`), and the model is draw.io's too: the padded box is
+ *  the LABEL BOUNDS and the alignment resolves INSIDE it, so a choice here can
+ *  never move text onto a cylinder cap or a diamond corner. */
+export type TextVAlign = 'top' | 'middle' | 'bottom';
 
 /** §E.2 — persisted verbatim on `node.data.textStyle`. Every field OPTIONAL and
  *  every field independently absent: a node with `{weight: 'bold'}` and nothing
@@ -54,8 +84,21 @@ export type TextStyle = {
   /** ROUND W, ITEM 2 — a family KEY, resolved through `TEXT_FONT_FAMILY` below.
    *  Stored as a key and not as a stack for the same reason `colorKey` is: a
    *  literal family list here would be a second copy of the sheet's stacks and
-   *  would pin a node to the theme's current fonts forever. */
-  font?: TextFont;
+   *  would pin a node to the theme's current fonts forever.
+   *
+   *  ROUND Z, ITEM 1 — TYPED AS THE UNION, because that is what is on disk. A
+   *  board written by ROUND W holds `'mono' | 'ui' | 'read' | 'viet'`; a board
+   *  written now holds one of the six family keys. Reading either is
+   *  `resolveFontKey`'s job, and writing is always a live key. */
+  font?: TextFontStored;
+  /** ROUND Z, ITEM 2 — the vertical position of the text INSIDE its padded
+   *  box. The value that renders anyway stores ABSENCE, exactly like `size:
+   *  'md'`, `weight: 'regular'` and `font: 'jetbrains'` — but WHICH value that
+   *  is depends on the TARGET (`vAlignForBody`): `top` for a card, a note and a
+   *  label, `middle` for a label-only node, whose box is centred by design.
+   *  ROUND Z FIX 2 corrected this from one global `middle`; a single constant
+   *  cannot describe a box that renders from its own `padding-top`. */
+  vAlign?: TextVAlign;
   /** ROUND W, ITEM 3 — a CUSTOM multiplier beside the four steps, 0.5..2.0.
    *  Mutually exclusive with `size` by construction: setting one clears the
    *  other, because both land on the same `--ts-scale` property and two writers
@@ -110,16 +153,34 @@ export const TEXT_ALIGN_OPTS: {v: TextAlign; label: string}[] = [
    property resolves to a real family list. It is therefore emitted as the
    resolved STACK (`TEXT_FONT_FAMILY[key]`), and the fallback is what makes the
    no-write case work.
-   THE FAMILIES ARE LOCAL. `public/fonts/` holds 24 woff2 files, one per family ×
-   weight × subset, declared by the `@font-face` blocks in `src/styles.css`.
-   Nothing here mentions a CDN and nothing is downloaded at runtime — the app
-   stays offline. */
-export const TEXT_FONT_OPTS: {v: TextFont; label: string; hint: string}[] = [
-  {v: 'mono', label: 'Mono', hint: 'coding / technical'},
-  {v: 'ui', label: 'UI', hint: 'neutral UI text — architecture diagrams'},
-  {v: 'read', label: 'Read', hint: 'designed for reading ease'},
-  {v: 'viet', label: 'Viet', hint: 'for Vietnamese diacritics'},
+   THE FAMILIES ARE LOCAL. `public/fonts/` holds 36 woff2 files — six families ×
+   two weights × three subsets — declared by the `@font-face` blocks in
+   `src/styles.css`. Nothing here mentions a CDN and nothing is downloaded at
+   runtime — the app stays offline. */
+export const TEXT_FONT_OPTS: {v: TextFont; label: string; title: string; hint: string}[] = [
+  {v: 'jetbrains', label: 'JetBrains', title: 'JetBrains Mono', hint: 'technical / code'},
+  {v: 'inter', label: 'Inter', title: 'Inter', hint: 'neutral UI'},
+  {v: 'plex', label: 'IBM Plex', title: 'IBM Plex Sans', hint: 'architecture'},
+  {v: 'shantell', label: 'Shantell', title: 'Shantell Sans', hint: 'hand-drawn'},
+  {v: 'lexend', label: 'Lexend', title: 'Lexend', hint: 'reading ease'},
+  {v: 'bevietnam', label: 'Be Vietnam', title: 'Be Vietnam Pro', hint: 'built for Vietnamese'},
 ];
+
+/* ROUND Z, ITEM 1 — WHY THE BUTTON PRINTS A SHORT LABEL AND THE TITLE CARRIES
+   THE REAL NAME, and why that is a MEASUREMENT rather than a preference.
+
+   Six options in two rows of three is Harvey's layout ("nếu 6 nút thì 3 3 cho
+   đẹp"). The panel field is 253px, the row gaps are 2×5px, so a cell is 81px and
+   its content box is 65px (7px side padding + 1px border, `box-sizing:
+   border-box`). Measured at 10px, the FULL family names are 84.0px (`JetBrains
+   Mono`) and 75.2px (`Be Vietnam Pro`) — both wider than the box they would sit
+   in, i.e. they would wrap and break the row's height. `IBM Plex Sans` (64.4px)
+   and `Shantell Sans` (64.7px) fit by less than a pixel, which is not a margin.
+   The SHORT labels at 10.5px are 56.7 / 22.5 / 42.4 / 41.0 / 37.4 / 58.9px —
+   every one inside 65px with room to spare. So `label` is what the button
+   prints and `title` is what hovering says; the two are the same family, and
+   the button still renders the name IN that family, which is the whole reason
+   the control exists. */
 
 /** ROUND W, ITEM 2 — the ONE place a family is chosen, and the reason it is
  *  here rather than in the `.tsx`.
@@ -132,17 +193,136 @@ export const TEXT_FONT_OPTS: {v: TextFont; label: string; hint: string}[] = [
  *  `@font-face` in the sheet and requires it to appear here — so a family that
  *  is declared but never chosen (or chosen but never declared) cannot ship.
  *
- *  `mono`'s stack is `--mono` WITH the web font in front, so the default is
+ *  `jetbrains`'s stack is `--mono` WITH the web font in front, so the default is
  *  today's exact stack plus the family as an alias — deliberately the only one
- *  of the four that changes no glyph on an already-installed machine. */
+ *  of the six that changes no glyph on an already-installed machine. */
 export const TEXT_FONT_FAMILY: Record<TextFont, string> = {
-  mono: "'JetBrains Mono', var(--mono)",
-  ui: "'Inter', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif",
-  read: "'Lexend', 'Lexend Fallback', ui-sans-serif, system-ui, sans-serif",
-  viet: "'Be Vietnam Pro', 'Be Vietnam Pro Fallback', ui-sans-serif, system-ui, sans-serif",
+  jetbrains: "'JetBrains Mono', var(--mono)",
+  inter: "'Inter', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif",
+  plex: "'IBM Plex Sans', 'IBM Plex Sans Fallback', ui-sans-serif, system-ui, sans-serif",
+  shantell: "'Shantell Sans', 'Shantell Sans Fallback', ui-sans-serif, system-ui, sans-serif",
+  lexend: "'Lexend', 'Lexend Fallback', ui-sans-serif, system-ui, sans-serif",
+  bevietnam: "'Be Vietnam Pro', 'Be Vietnam Pro Fallback', ui-sans-serif, system-ui, sans-serif",
 };
 
-export const TEXT_DEFAULT_FONT: TextFont = 'mono';
+/** ROUND Z, ITEM 1 — THE OLD→NEW MAP, AND WHY IT IS A MAP AND NOT A RENAME.
+ *
+ *  A board saved before this round carries one of ROUND W's four ROLE keys on
+ *  disk. `'viet'` there painted Be Vietnam Pro, so it must STILL paint Be
+ *  Vietnam Pro — a board must not change face because the control was relabelled.
+ *  The four keys are therefore kept in `LegacyTextFont`, `TextStyle.font` accepts
+ *  them, and this table is the ONE place the translation is decided. Nothing
+ *  silently drops a stored value; `resolveFontKey` is what every reader calls.
+ *
+ *    mono → jetbrains   (it already resolved to 'JetBrains Mono', var(--mono))
+ *    ui   → inter       (it already resolved to 'Inter')
+ *    read → lexend      (it already resolved to 'Lexend')
+ *    viet → bevietnam   (it already resolved to 'Be Vietnam Pro')
+ *
+ *  THE KEYS ARE UNCHANGED KEYS, NOT NEW FAMILIES: each row names the family the
+ *  old key already painted, so the mapping cannot move an existing board. */
+export const LEGACY_FONT_KEY: Record<LegacyTextFont, TextFont> = {
+  mono: 'jetbrains', ui: 'inter', read: 'lexend', viet: 'bevietnam',
+};
+
+/** Does this string name one of the six families this build declares? A stored
+ *  value that is neither a live key nor a known legacy key — a hand-edited
+ *  board, a key from a future round — is not a key, and the caller decides. */
+export function isFontKey(v: unknown): v is TextFont {
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(TEXT_FONT_FAMILY, v);
+}
+
+/** ROUND Z, ITEM 1 — EVERY READER'S ONE ENTRY POINT for a stored `font`.
+ *
+ *  A live key resolves to itself; a legacy key resolves through `LEGACY_FONT_KEY`;
+ *  anything else resolves to the default. It is a FUNCTION rather than an index
+ *  so the fallback cannot be forgotten at one call site: `TEXT_FONT_FAMILY[v]`
+ *  on an unknown key is `undefined`, which would paint the unquoted fallback
+ *  list and silently change the face of a node whose value nobody recognises. */
+export function resolveFontKey(stored: TextFontStored | undefined): TextFont {
+  if (isFontKey(stored)) return stored;
+  if (typeof stored === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_FONT_KEY, stored)) {
+    return LEGACY_FONT_KEY[stored as LegacyTextFont];
+  }
+  return TEXT_DEFAULT_FONT;
+}
+
+/* ROUND Z, ITEM 1 — THE MEASUREMENT THE SIX FAMILIES WERE CHOSEN BY, AS DATA.
+   Every family above passed it and the four that failed are absent from the
+   union: Atkinson Hyperlegible, Fira Code, Caveat and Architects Daughter ship
+   NO `vietnamese` subset at all, so no amount of cmap testing could pass them.
+   `checks/package-p-inspector.mjs` runs this function over each family's
+   vietnamese codepoints, so "measured" is a property of the harness rather than
+   a sentence in a comment. */
+export const VIETNAMESE_GLYPH_RANGE: [number, number][] = [
+  [0x0102, 0x0103], [0x0110, 0x0111], [0x0128, 0x0129], [0x0168, 0x0169],
+  [0x01a0, 0x01a1], [0x01af, 0x01b0], [0x0300, 0x0301], [0x0303, 0x0304],
+  [0x0308, 0x0309], [0x0323, 0x0323], [0x0329, 0x0329], [0x1ea0, 0x1ef9],
+  [0x20ab, 0x20ab],
+];
+
+/** True when the font describes EVERY codepoint in `VIETNAMESE_GLYPH_RANGE`.
+ *  `cmap` is anything with a `has(code)` — a real opentype.js cmap in the
+ *  harness, a stub in a negative control. */
+export function hasVietnameseGlyphs(cmap: {has(code: number): boolean}): boolean {
+  return VIETNAMESE_GLYPH_RANGE.every(([lo, hi]) => {
+    for (let c = lo; c <= hi; c++) if (!cmap.has(c)) return false;
+    return true;
+  });
+}
+
+export const TEXT_DEFAULT_FONT: TextFont = 'jetbrains';
+
+/** ROUND Z, ITEM 2 — the three vertical positions, in the order the control
+ *  prints them. ROUND Z FIX 2 REMOVED THE GLOBAL DEFAULT THAT USED TO SIT HERE.
+ *
+ *  It was `'middle'` (`TEXT_DEFAULT_VALIGN`), justified by draw.io's
+ *  `ALIGN_MIDDLE` — and it was WRONG FOR THIS SHEET. Before this round every one
+ *  of these boxes was a plain block (`.node-body`, `.note-body` and
+ *  `.label-node` declared no `display: flex` at all), so each laid its text out
+ *  from its own `padding-top`: that IS the `top` of the box. `.node .lo-body`
+ *  was — and still is — `justify-content: center`, and it is the element a
+ *  label-only node renders (`class="node-body lo-body"`), so THAT box is the one
+ *  that genuinely centres. There was therefore never a single no-write value:
+ *  the boxes disagreed before the control existed, and a global default made the
+ *  panel report `middle` for nodes painting top.
+ *
+ *  The fix is the shape the horizontal axis already uses (`alignForBody`): the
+ *  no-write value is a property of the TARGET, not a constant. See
+ *  `vAlignForBody` below. This table's order is unchanged, so the control is. */
+export const TEXT_VALIGN_OPTS: {v: TextVAlign; label: string}[] = [
+  {v: 'top', label: 'Top'}, {v: 'middle', label: 'Middle'}, {v: 'bottom', label: 'Bottom'},
+];
+
+/** THE ONE MAPPING, semantic name → flex keyword, for the vertical axis.
+ *
+ *  `justify-content` on a `flex-direction: column` box IS that box's vertical
+ *  axis: `flex-start` is its top, `center` its middle, `flex-end` its bottom.
+ *  `textStyleVars` emits the keyword through this table and every consumer rule
+ *  in the sheet reads `justify-content: var(--ts-align-items, …)`, so the three
+ *  vertical values can never be spelled two ways. Named without a `DEFAULT` in
+ *  it on purpose: it holds no default — the no-write value is per-target. */
+export const TEXT_VALIGN_FLEX: Record<TextVAlign, string> = {
+  top: 'flex-start', middle: 'center', bottom: 'flex-end',
+};
+
+/** THE NO-WRITE VALUE, BY TARGET — the vertical half of `alignForBody`, and read
+ *  the same way by the panel, the merge and the emitter.
+ *
+ *  `.node .lo-body` centres its one sentence BY DESIGN (`styles.css`, L3a) and is
+ *  `flex-direction: column`, so `center`/`middle` is what THAT box renders with
+ *  nothing stored. Every other target renders from its `padding-top`
+ *  (`.node-body`, `.note-body` and `.label-node` were plain blocks until this
+ *  round), so for them the value that renders with nothing stored is `top` —
+ *  which is also what draw.io's `.node-body`-shaped boxes do unpadded, and what
+ *  every existing board's pixels already show.
+ *
+ *  So a card reads back as Top and a label-only node as Middle. Each box's own
+ *  `justify-content` fallback is the other half of this same statement, and
+ *  `checks/package-p-inspector.mjs` asserts the two halves agree per box. */
+export const vAlignForBody = (body: 'card' | 'label-only' | undefined): TextVAlign =>
+  body === 'label-only' ? 'middle' : 'top';
+
 export {COLOR_KEYS, COLOR_VAR};
 
 /** `justify-content` for the two FLEX text rows. `text-align` cannot reach a
@@ -158,14 +338,30 @@ export function isTextDefault(
   key: keyof TextStyle,
   v: unknown,
   alignDefault: TextAlign,
+  vAlignDefault: TextVAlign,
 ): boolean {
   if (key === 'size') return v === TEXT_DEFAULT_SIZE;
   if (key === 'weight') return v === TEXT_DEFAULT_WEIGHT;
   if (key === 'align') return v === alignDefault;
-  /* ROUND W, ITEM 2 — `mono` renders anyway, so picking Mono stores ABSENCE,
+  /* ROUND W, ITEM 2 — `jetbrains` renders anyway, so picking it stores ABSENCE,
    *  exactly like M and Regular. Target-independent, like size and weight: the
-   *  sheet's own stacks ARE the mono/sans mix every node already paints. */
-  if (key === 'font') return v === TEXT_DEFAULT_FONT;
+   *  sheet's own stacks ARE the mono/sans mix every node already paints.
+   *
+   *  ROUND Z, ITEM 1 — ASKED THROUGH `resolveFontKey`, NOT BY EQUALITY. A board
+   *  still carrying ROUND W's `'mono'` is a node that renders JetBrains Mono,
+   *  which is this round's default; comparing the raw value against
+   *  `TEXT_DEFAULT_FONT` would read that as a real choice and store a
+   *  permanently-set field on a node the user never touched. The resolver is
+   *  the same one the renderer uses, so "is this the default" and "what does
+   *  this paint" can never disagree. */
+  if (key === 'font') return resolveFontKey(v as TextFontStored | undefined) === TEXT_DEFAULT_FONT;
+  /* ROUND Z, ITEM 2 — the value an untouched node OF THIS TARGET renders, so it
+   *  stores absence like every other default here. ROUND Z FIX 2 — asked against
+   *  the TARGET's default (`vAlignForBody`), never a global `middle`: `middle`
+   *  is a REAL choice on a card (it centres a box that otherwise renders from its
+   *  padding-top) and the no-write value only on a label-only node. A global
+   *  constant here would have dropped a card's Middle, which is a pixel move. */
+  if (key === 'vAlign') return v === vAlignDefault;
   /* colorKey has NO default: the theme's text colour is not a swatch, so any
    * key the user picks is a real choice and is always stored. */
   return false;
@@ -182,19 +378,23 @@ export function isTextDefault(
  *  the caller writes no key at all rather than an empty object.
  *
  *  `alignDefault` is passed in because align has no global default (see
- *  `alignForBody`). */
+ *  `alignForBody`). ROUND Z FIX 2 — `vAlignDefault` is passed in for exactly the
+ *  same reason and from the same place (`vAlignForBody`): the vertical default
+ *  is `top` on a card and `middle` on a label-only node, so `middle` must be
+ *  stored where it is a real choice and dropped where the box already centres. */
 export function mergeTextStyle(
   cur: TextStyle | undefined,
   patch: Partial<TextStyle>,
   alignDefault: TextAlign,
+  vAlignDefault: TextVAlign,
 ): TextStyle | undefined {
   const next: TextStyle = {...(cur ?? {})};
   // Fixed key order, so a delete-then-re-add cannot reorder the object and make
   // a value-equality check below read as a change.
-  for (const k of ['size', 'weight', 'colorKey', 'align', 'font', 'scale'] as (keyof TextStyle)[]) {
+  for (const k of ['size', 'weight', 'colorKey', 'align', 'font', 'vAlign', 'scale'] as (keyof TextStyle)[]) {
     if (!(k in patch)) continue;
     const v = patch[k];
-    if (v === undefined || isTextDefault(k, v, alignDefault)) delete next[k];
+    if (v === undefined || isTextDefault(k, v, alignDefault, vAlignDefault)) delete next[k];
     else (next as Record<string, unknown>)[k] = v;
   }
   /* ROUND W, ITEM 3 — THE MUTUAL EXCLUSION, and why it lives here rather than in
@@ -276,14 +476,28 @@ export function stepForScale(scale: number): TextSize | null {
  *  step whose scale IS the multiplier on the node, or `null` for a custom value
  *  that matches no step. `scale` stays the painted number itself, so the two
  *  fields are one truth read two ways and cannot drift. */
-export function readTextStyle(ts: TextStyle | undefined, alignDefault: TextAlign) {
+export function readTextStyle(
+  ts: TextStyle | undefined,
+  alignDefault: TextAlign,
+  vAlignDefault: TextVAlign,
+) {
   const painted = scaleOfTextStyle(ts);
   return {
     size: stepForScale(painted),
     weight: ts?.weight ?? TEXT_DEFAULT_WEIGHT,
     colorKey: ts?.colorKey ?? null,
     align: ts?.align ?? alignDefault,
-    font: ts?.font ?? TEXT_DEFAULT_FONT,
+    /* ROUND Z, ITEM 1 — RESOLVED, so the control highlights the family that
+     *  actually paints. A board carrying ROUND W's `'viet'` reads as
+     *  `bevietnam` here, which is the button that repaints it; reading the raw
+     *  `'viet'` would light NO button while the node painted Be Vietnam Pro. */
+    font: resolveFontKey(ts?.font),
+    /* ROUND Z, ITEM 2 — a missing field reads as the inherited default, never
+     *  as a blank, exactly like `weight` and `align` above. ROUND Z FIX 2 — the
+     *  inherited default is the TARGET's (`vAlignForBody`), so the panel reads
+     *  back Top on a card — which is what that card paints — and Middle on a
+     *  label-only node, which is the only box that centres. */
+    vAlign: ts?.vAlign ?? vAlignDefault,
     scale: painted,
   };
 }
@@ -307,10 +521,23 @@ export function readTextStyle(ts: TextStyle | undefined, alignDefault: TextAlign
  *  `TEXT_SCALE['md'] === 1` is the multiplicative identity and `'regular'` is
  *  the inherited weight FOR EVERY TARGET (`.label-node`, `.note-node`,
  *  `.node-sub` all read `var(--ts-weight, 400)`), so those two tests are
- *  target-INDEPENDENT by construction. */
+ *  target-INDEPENDENT by construction.
+ *
+ *  ROUND Z FIX 2 — `vAlignDefault` IS A PARAMETER FOR THE SAME REASON as
+ *  `alignDefault`, and it is the fix for the defect this round shipped. The
+ *  vertical default is NOT a constant: `.node .lo-body` centres by design, so a
+ *  label-only node is already `middle` with nothing stored, while `.node-body`,
+ *  `.note-body` and `.label-node` all render from their `padding-top` — `top` —
+ *  because none of them was a flex container before this round. A single global
+ *  `middle` therefore had to be wrong for one group or the other, and it was: it
+ *  emitted nothing for `middle` while every card fell back to `flex-start`, so
+ *  the panel said Middle and the pixels said Top. `vAlignForBody` answers it per
+ *  target, and each box's own `justify-content` fallback states the same thing on
+ *  the sheet's side. */
 export function textStyleVars(
   ts: TextStyle | undefined,
   alignDefault: TextAlign,
+  vAlignDefault: TextVAlign,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (!ts) return out;
@@ -325,8 +552,27 @@ export function textStyleVars(
   if (isColorKey(ts.colorKey)) out['--ts-color'] = COLOR_VAR[ts.colorKey];
   /* ROUND W, ITEM 2 — ONE property, the WHOLE node. Each of the sheet's text
      rules keeps its own stack as the fallback, so an untouched node emits
-     nothing here and is byte-identical to before this round. */
-  if (ts.font && ts.font !== TEXT_DEFAULT_FONT) out['--ts-font'] = TEXT_FONT_FAMILY[ts.font];
+     nothing here and is byte-identical to before this round.
+     ROUND Z, ITEM 1 — read through `resolveFontKey`, so a board carrying a
+     ROUND W role key emits the SAME stack it emitted then (the default key, for
+     all four, since each legacy key resolves to the family it already painted)
+     and no stored board changes face. */
+  const font = resolveFontKey(ts.font);
+  if (font !== TEXT_DEFAULT_FONT) out['--ts-font'] = TEXT_FONT_FAMILY[font];
+  /* ROUND Z, ITEM 2 — ONE MORE property beside `--ts-align`/`--ts-justify`, on
+     the node root, consumed by each text box's own rule in the sheet with that
+     box's CURRENT literal as the fallback.
+     ROUND Z FIX 2 — THE NO-WRITE TEST IS PER-TARGET (`vAlignForBody`). The value
+     that renders anyway is `top` for a card, a note and a label (they render from
+     `padding-top` and did so before this round) and `middle` for a label-only
+     node (`.node .lo-body` centres by design). Testing against a global `middle`
+     was the defect: it dropped a card's Top — a real choice that moves the
+     pixels — and it emitted nothing for `middle` on a card, where the sheet's
+     `flex-start` fallback then painted TOP under a panel reporting Middle. */
+  if (ts.vAlign && ts.vAlign !== vAlignDefault) {
+    out['--ts-valign'] = ts.vAlign;
+    out['--ts-align-items'] = TEXT_VALIGN_FLEX[ts.vAlign];
+  }
   if (ts.align && ts.align !== alignDefault) {
     out['--ts-align'] = ts.align;
     out['--ts-justify'] = JUSTIFY[ts.align];
