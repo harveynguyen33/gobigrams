@@ -2287,7 +2287,7 @@ kbd {
   top: 0; left: 0; right: 0; bottom: auto;
   height: 44px; max-width: none; padding: 0 12px 0 14px;
   border: none; border-radius: 14px 14px 0 0;
-  background: transparent; font-size: 11.5px;
+  background: transparent; font-size: calc(11.5px * var(--ts-scale, 1));
   display: flex; align-items: center; gap: 6px;
 }
 
@@ -2316,11 +2316,17 @@ kbd {
 .node.label-only { border-radius: 0; background: transparent; }
 .node.label-only .lo-body, .node .lo-body {
   position: relative; padding: 14px 16px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 100%; text-align: center; gap: 3px;
+  display: flex; flex-direction: column;
+  /* The horizontal axis of this column-flex block reads the Text section's
+     variables; the block's own inherited value (center, below) is the fallback,
+     so a node with nothing stored renders exactly as it did before. Both
+     declarations that used to pin this block to the middle live in THIS rule —
+     the higher-specificity branch is not a rival any more, it is here. */
+  align-items: var(--ts-justify, center); justify-content: center;
+  min-height: 100%; text-align: var(--ts-align, center); gap: 3px;
 }
 .node .lo-title {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; align-items: center; justify-content: var(--ts-justify, center); gap: 6px;
   font-family: var(--sans); font-size: 13.5px; font-weight: 600;
   color: var(--fg); line-height: 1.25;
 }
@@ -2333,7 +2339,7 @@ kbd {
 .node.shape-manual .lo-body { padding: 14px 30px 20px; }
 .node.shape-delay .lo-body { padding: 14px 30px 14px 12px; }
 .node.shape-connector .lo-body { padding: 8px; }
-.node.shape-connector .lo-title { font-size: 12px; }
+.node.shape-connector .lo-title { font-size: calc(12px * var(--ts-scale, 1)); }
 .node.shape-terminator .lo-body { padding: 14px 30px; }
 .node.shape-document .lo-body { padding: 12px 18px 22px; }
 .node.shape-subprocess .lo-body { padding: 14px 34px; }
@@ -2453,7 +2459,7 @@ kbd {
 .node.shape-connector {
   display: grid; place-items: center;
 }
-.node.shape-connector .node-title { font-size: 12px; justify-content: center; }
+.node.shape-connector .node-title { font-size: calc(12px * var(--ts-scale, 1)); justify-content: var(--ts-justify, center); }
 .node.shape-connector .node-kicker,
 .node.shape-connector .node-sub,
 .node.shape-connector .node-metric { display: none; }
@@ -3217,3 +3223,94 @@ kbd {
    `.node-label-input` is untouched: the node's React Flow resizer remains the
    only resize affordance. */
 .label-node.editing .node-label-input { max-height: 100%; overflow-y: auto; }
+
+/* ===========================================================================
+   PACKAGE-P §E — THE TEXT SECTION: size / weight / colour / align, as tokens.
+
+   ONE WRITE, A WHOLE TEXT BLOCK. Every control lands as a custom property on
+   the node root (`src/textStyle.ts` builds the object, both node kinds spread
+   it), and each rule below changes only what it owns:
+
+     --ts-scale    a MULTIPLIER over the size the base rule already declares.
+                   NOT a px value, and that is the load-bearing decision: one
+                   node paints FOUR sizes (kicker 10.5 / title 14.5 / sub 11.5 /
+                   metric 20) and that spread IS the node's hierarchy. Setting
+                   all four to one number would flatten it and push the
+                   worst-case content past the resizer floor this repo derives
+                   `NODE_MIN_H` from. A multiplier moves the block and keeps the
+                   relationships.
+     --ts-weight   the weight, on the rows where weight MEANS something.
+     --ts-color    the text colour — DISTINCT from `--nc`, which stays the
+                   outline / icon / glow accent.
+     --ts-align    `text-align` for the block.
+     --ts-justify  `justify-content` for the two rows that are `display: flex`
+                   (`.node-title`, `.node .lo-title`). `text-align` cannot move
+                   a flex item, so centring a title needs this second property;
+                   without it the control would silently do nothing to the one
+                   row most people want centred.
+
+   EVERY FALLBACK IS WHAT THE BASE RULE ALREADY DECLARES, so a node carrying no
+   `--ts-*` at all resolves each `var()` to the value it paints today and
+   NOTHING MOVES. That single property is what makes an OLD BOARD (no
+   `textStyle` anywhere) render exactly as before, and it is what the two
+   harnesses assert against this file. The block is LAST in the sheet on
+   purpose: same specificity, later wins, so it layers over the base rules
+   without an `!important` anywhere. Tokens only — no colour literal enters.
+
+   WEIGHT, PER ROW, and why (§E.1 asks which fields it applies to). The node's
+   own typographic intent is a DIM pair — kicker (600) and sub (400) — and a
+   LOUD pair — title (650) and metric (700). The control therefore moves the
+   LOUD pair, and "Regular" restores that intent rather than flattening
+   everything to 400. It is one choice with two anchors, so it reads as "make
+   the important text bolder" instead of "make the whole box heavier", which is
+   the only reading that does not destroy the size hierarchy §E protects.
+   A LABEL is one field on every line, so there the whole block takes it.
+   `group-label` keeps its own 600 in both states — its chip is 11px on the
+   node's border and was not measured at another weight, so it is left out of
+   the bold choice rather than guessed at (stated as a divergence in the pass
+   report, not silently included).
+
+   SIZE, PER ROW: `connector` keeps its own 12px title and 12px label-only text
+   (`.node.shape-connector …` are higher specificity than the rules below and
+   stay in charge), and `group-label small` is the group's sub-line at 10px.
+   =========================================================================== */
+.node-kicker { font-size: calc(10.5px * var(--ts-scale, 1)); }
+.node-title { font-size: calc(14.5px * var(--ts-scale, 1)); }
+.node-sub { font-size: calc(11.5px * var(--ts-scale, 1)); }
+.node-metric { font-size: calc(20px * var(--ts-scale, 1)); }
+.node-metric small { font-size: calc(11px * var(--ts-scale, 1)); }
+.node .lo-title { font-size: calc(13.5px * var(--ts-scale, 1)); }
+.node .lo-sub { font-size: calc(10.5px * var(--ts-scale, 1)); }
+.note-node { font-size: calc(13px * var(--ts-scale, 1)); }
+.note-title { font-size: calc(13px * var(--ts-scale, 1)); }
+.group-label { font-size: calc(11px * var(--ts-scale, 1)); }
+.group-label small { font-size: calc(10px * var(--ts-scale, 1)); }
+.label-node { font-size: calc(13px * var(--ts-scale, 1)); }
+.label-node .node-label-input { font-size: calc(13px * var(--ts-scale, 1)); }
+
+.node-title { font-weight: var(--ts-weight, 650); }
+.node-metric { font-weight: var(--ts-weight, 700); }
+.node .lo-title { font-weight: var(--ts-weight, 600); }
+.node .lo-sub { font-weight: var(--ts-weight, 400); }
+.note-node { font-weight: var(--ts-weight, 400); }
+.note-title { font-weight: var(--ts-weight, 650); }
+.label-node { font-weight: var(--ts-weight, 400); }
+.label-node .node-label-input { font-weight: var(--ts-weight, 400); }
+
+.node-kicker, .node-sub { color: var(--ts-color, var(--dim)); }
+.node-title { color: var(--ts-color, var(--fg)); }
+.node-metric { color: var(--ts-color, var(--nc, var(--acc))); }
+.node .lo-title { color: var(--ts-color, var(--fg)); }
+.node .lo-sub { color: var(--ts-color, var(--dim)); }
+.note-node { color: var(--ts-color, var(--fg)); }
+.group-label { color: var(--ts-color, var(--nc, var(--fg))); }
+.label-node { color: var(--ts-color, var(--fg)); }
+.label-node .node-label-input { color: var(--ts-color, var(--fg)); }
+
+.node-body { text-align: var(--ts-align, left); }
+.node .lo-body { text-align: var(--ts-align, center); }
+.note-body { text-align: var(--ts-align, left); }
+.label-node { text-align: var(--ts-align, left); }
+.label-node .node-label-input { text-align: var(--ts-align, left); }
+.node-title { justify-content: var(--ts-justify, flex-start); }
+.node .lo-title { justify-content: var(--ts-justify, center); }

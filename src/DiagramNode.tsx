@@ -3,6 +3,7 @@ import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {lucideByName} from './lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
 import {resolveColor, type ColorKey} from './colors';
+import {textStyleVars, alignForBody, type TextStyle} from './textStyle';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in
  *  both directions; the .node body fills the RF wrapper, so any width/height
@@ -118,6 +119,12 @@ export type NodeKind = {
   c4Type?: string;
   /** L3b: C4 relationship technology, rendered dim after the edge label. */
   techn?: string;
+  /** PACKAGE-P §E.2 — the Text section's stored style. OPTIONAL and every field
+   *  optional: a board that predates the section has none, and `textStyleVars`
+   *  returns `{}` for it, so such a node renders byte-for-byte as it always
+   *  did. Nothing here is a size in px — see `src/textStyle.ts` for why `size`
+   *  is a SCALE. */
+  textStyle?: TextStyle;
 };
 
 /* ITEM 2 (2026-09-17) — THE AUTO-SHOW NODE TOOLBAR IS GONE.
@@ -212,6 +219,18 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as NodeKind;
   const shape = asShape(d.shape);
   const nc = resolveColor(d);
+  /* PACKAGE-P §E.2 — the Text section's custom properties, on the node ROOT.
+     ONE object spread covers kicker, title, sub and metric (they all read
+     `var(--ts-*)`), and an untouched node contributes no key at all, so the
+     sheet's own fallbacks apply and nothing is repainted. Same object literal
+     that already carries `--nc`, so no second style attribute is introduced.
+
+     The SECOND argument is the target's own align default: a `label-only`
+     node renders `text-align: center` by design, so `center` — not `left` — is
+     the value that renders anyway there. `alignForBody` is the single answer
+     both this renderer and the panel use, so `mergeTextStyle` can never store a
+     choice this function then refuses to paint. */
+  const tsVars = textStyleVars(d.textStyle, alignForBody(d.body));
 
   // Container shapes get React Flow's resize affordance when selected (C3).
   // React Flow writes width/height back into node.style, so the size persists.
@@ -240,7 +259,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     return (
       <div
         className={`note-node${selected ? ' selected' : ''}`}
-        style={{'--nc': nc} as React.CSSProperties}
+        style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
         <NodeHandles />
@@ -260,7 +279,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   if (shape === 'group') {
     // K5: 44px header banner + a 32px circular icon badge overlapping above it.
     return (
-      <div className={`group-node${selected ? ' selected' : ''}${d.icon ? ' has-badge' : ''}`} style={{'--nc': nc} as React.CSSProperties}>
+      <div className={`group-node${selected ? ' selected' : ''}${d.icon ? ' has-badge' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
         {resizer}
         <NodeHandles />
         <div className="group-head" aria-hidden="true" />
@@ -280,7 +299,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     return (
       <div
         className={`node shape-${shape} label-only${selected ? ' selected' : ''}`}
-        style={{'--nc': nc} as React.CSSProperties}
+        style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
         <NodeHandles />
@@ -298,7 +317,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   }
 
   return (
-    <div className={`node shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc} as React.CSSProperties}>
+    <div className={`node shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
       <NodeHandles />
       <ShapeFrame shape={shape} />

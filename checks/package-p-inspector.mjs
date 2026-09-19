@@ -25,6 +25,10 @@ const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
 const INSP_RAW = readFileSync(`${ROOT}/src/inspector.ts`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
+/* PACKAGE-P PASS 2 (§E) — the Text section's data half, and the in-place editor
+   whose blur-commit behaviour (e) and (i) are about. */
+const TS_RAW = readFileSync(`${ROOT}/src/textStyle.ts`, 'utf8');
+const LABEL_RAW = readFileSync(`${ROOT}/src/LabelNode.tsx`, 'utf8');
 
 /** Strip block + line comments. The `[^:]` before `//` keeps `https://`. */
 const stripTs = s => s
@@ -33,6 +37,11 @@ const stripTs = s => s
 const APP = stripTs(APP_RAW);
 const PICKS = stripTs(PICKS_RAW);
 const INSP = stripTs(INSP_RAW);
+const TS = stripTs(TS_RAW);
+/* The label editor is stripped with the SAME rule, so a docblock that merely
+   QUOTES the hold's mechanism cannot satisfy the "does the hold exist" probe.
+   The comment strip is what makes (i) an assertion about code. */
+const LABEL = stripTs(LABEL_RAW);
 
 const lines = s => s.split('\n');
 const APP_L = lines(APP_RAW);
@@ -112,12 +121,12 @@ const TABLE = (t, want) => {
 };
 
 /* --- the ordered id lists -------------------------------------------------- */
-assert('a.goblin-of-every-shape → [content, style]',
-  SHAPE_IDS.every(s => JSON.stringify(ids({kind: 'goblin', shape: s, body: 'card'})) === '["content","style"]'),
-  `${SHAPE_IDS.length} shapes, both body values below`);
-assert('a.goblin-of-every-shape × both body values → [content, style]',
+assert('a.goblin-of-every-shape → [content, text, style]',
+  SHAPE_IDS.every(s => JSON.stringify(ids({kind: 'goblin', shape: s, body: 'card'})) === '["content","text","style"]'),
+  `${SHAPE_IDS.length} shapes, both body values below  (PASS 2 inserted \`text\` between content and style)`);
+assert('a.goblin-of-every-shape × both body values → [content, text, style]',
   SHAPE_IDS.every(s => ['card', 'label-only'].every(b =>
-    JSON.stringify(ids({kind: 'goblin', shape: s, body: b})) === '["content","style"]')),
+    JSON.stringify(ids({kind: 'goblin', shape: s, body: b})) === '["content","text","style"]')),
   `${SHAPE_IDS.length * 2} combinations`);
 assert('a.label → [text]',
   JSON.stringify(ids({kind: 'label'})) === '["text"]', JSON.stringify(ids({kind: 'label'})));
@@ -419,9 +428,19 @@ assert('e.edge-branch-renders-through-the-list',
   countOf(APP, 'renderSections()') === 4 && countOf(APP, 'secBody(') >= 9,
   `renderSections() called in all four branches (${countOf(APP, 'renderSections()')}); `
   + `${countOf(APP, 'secBody(')} section bodies registered`);
-assert('e.the-panel-label-textarea-is-still-there',
-  countOf(APP, 'rows={4}') === 1 && APP.includes("secBody('text'"),
-  '§E.3.1 removes it in PASS 2 with its replacement — pass 1 must not leave the label with no editor');
+/* PASS 2 (§E.3a) REVERSED THIS ASSERTION ON PURPOSE. Pass 1 asserted the label's
+   panel <textarea> was still there, because removing it before its replacement
+   existed would have left the label kind with no editor in the panel at all.
+   The replacement (`tsBody`, the shared Text section) now exists, so the
+   textarea must be GONE — it was a SECOND writer for the same `text`. The check
+   moved to (g) below, where it is a "must be 0" plus a proof that the in-place
+   editor survives, so the count of text editors is exactly one. */
+assert('e.the-panel-label-textarea-is-gone-and-its-replacement-is-not-empty',
+  countOf(APP, 'rows={4}') === 0
+    && countOf(APP, '<textarea') === 0
+    && APP.includes("secBody('text', tsBody)"),
+  `${countOf(APP, '<textarea')} <textarea> in App.tsx; the label branch registers the shared `
+  + 'Text section body (`tsBody`), which is not an empty shell');
 
 /* ===========================================================================
    (f) RENDER COUNT — registration is not a render.
@@ -518,6 +537,783 @@ assert('f.cardinality-body-is-built-only-for-an-erd-edge',
   })(),
   'the call site is gated on `inspSections` itself, not on the painter filtering it away afterwards — '
   + 'the same list the painter walks, so there is no second copy of the ERD rule');
+
+/* ===========================================================================
+   PACKAGE-P PASS 2 (§E) — the Text section, its persistence, and the two
+   editing behaviours. Same discipline as above: the DECISION is imported and
+   CALLED, the rest is read out of the real sources with comments stripped.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(f) §A.3/§E — the Text section is IN the list, and only the list changed');
+console.log('='.repeat(78));
+console.log(`src/textStyle.ts — the model: ${TS.split('\n').length} lines of code `
+  + `(textStyle.ts:${at(TS_RAW, 'export function mergeTextStyle')} mergeTextStyle, `
+  + `:${at(TS_RAW, 'export function textStyleVars')} textStyleVars)`);
+
+const GOBLIN_WANT = '["content","text","style"]';
+const GOBLIN_BODIES = ['card', 'label-only'];
+const goblinAll = SHAPE_IDS.flatMap(s => GOBLIN_BODIES.map(b => ({
+  s, b, got: JSON.stringify(ids({kind: 'goblin', shape: s, body: b})),
+})));
+const goblinBad = goblinAll.filter(x => x.got !== GOBLIN_WANT);
+console.log(`  goblin × 19 shapes × 2 bodies: ${goblinAll.length - goblinBad.length}/${goblinAll.length} `
+  + `return ${GOBLIN_WANT}`);
+for (const x of goblinBad.slice(0, 3)) console.log(`  ! ${x.s}/${x.b} → ${x.got}`);
+assert('f.every-goblin-lists-content-text-style-in-that-order',
+  SHAPE_IDS.length === 19 && goblinBad.length === 0,
+  `${SHAPE_IDS.length} shapes × ${GOBLIN_BODIES.length} body values, all ${GOBLIN_WANT} — \`text\` is `
+  + 'between `content` and `style`, which is exactly what the pass-1 omission note promised');
+/* `text` must be in the MIDDLE, not merely present: a list that appended it
+   would satisfy a `.includes` check and paint the section in the wrong place. */
+assert('f.text-sits-before-style-not-after-it',
+  ids({kind: 'goblin', shape: 'service', body: 'card'}).indexOf('text')
+    < ids({kind: 'goblin', shape: 'service', body: 'card'}).indexOf('style'),
+  JSON.stringify(ids({kind: 'goblin', shape: 'service', body: 'card'})));
+assert('f.a-label-still-lists-exactly-text',
+  JSON.stringify(ids({kind: 'label'})) === '["text"]',
+  JSON.stringify(ids({kind: 'label'})) + '  (its `text` is now the SAME section a goblin gets, not a namesake)');
+/* THE PASS-2 OMISSION NOTE IS GONE — this is the task-1 deliverable, and it is
+   asserted on the RAW source, not the stripped one: the note lived in a comment,
+   so a "no longer describes an omission" check has to read the comments. */
+assert('f.the-note-no-longer-describes-the-omission',
+  !/TWO DELIBERATE PASS-1 OMISSIONS/.test(INSP_RAW)
+    && !/text IS NOT RETURNED FOR A GOBLIN/.test(INSP_RAW)
+    && /PASS 2 COMPLETED/.test(INSP_RAW),
+  'src/inspector.ts now states the omission as CLOSED, and the header keeps the reason the ORDER is '
+  + 'what it is (one decision point, not three nested ternaries)');
+/* NEGATIVE CONTROL for the ordering assertions: a target that must NOT have it. */
+assert('f.control-non-goblin-targets-are-unchanged-from-pass-1',
+  JSON.stringify(ids({kind: 'table'})) === '["table","columns","showMode"]'
+    && JSON.stringify(ids({kind: 'edge'})) === '["label","line","markers","flow"]'
+    && JSON.stringify(ids({kind: 'edge', presetId: 'erd'})) === '["label","line","markers","cardinality","flow"]'
+    && !ids({kind: 'table'}).includes('text') && !ids({kind: 'edge'}).includes('text'),
+  'table [table,columns,showMode]; non-ERD edge [label,line,markers,flow]; ERD edge adds cardinality '
+  + 'before flow; NO target other than goblin/label gained a `text` section');
+
+console.log('\n' + '='.repeat(78));
+console.log('(g) §E.3(a) — exactly ONE text editor is left');
+console.log('='.repeat(78));
+const appTextareas = countOf(APP, '<textarea');
+const labelTextareas = countOf(LABEL, '<textarea');
+const labelBranchAt = at(APP_RAW, ") : selected.type === 'label' ? (");
+const labelBranch = (() => {
+  const i = APP.indexOf(") : selected.type === 'label' ? (");
+  const j = APP.indexOf(') : (', i);
+  return APP.slice(i, j > i ? j : undefined);
+})();
+console.log(`  App.tsx <textarea> renders: ${appTextareas}   src/LabelNode.tsx: ${labelTextareas}`);
+console.log(`  label branch: App.tsx:${labelBranchAt} (${labelBranch.split('\n').length} lines) `
+  + `— registers: ${labelBranch.includes("secBody('text', tsBody)")}`);
+assert('g.the-panel-label-textarea-is-removed',
+  appTextareas === 0 && countOf(APP, 'rows={4}') === 0,
+  `${appTextareas} <textarea> left anywhere in App.tsx — the panel no longer holds a second writer `
+  + 'for the same `text`');
+assert('g.the-in-place-editor-still-exists',
+  labelTextareas === 1 && /className="edge-label-input node-label-input nodrag"/.test(LABEL)
+    && /onCommitText\?\.\(id, draft\)/.test(LABEL),
+  `src/LabelNode.tsx renders ${labelTextareas} <textarea> — the canvas editor, unchanged`);
+assert('g.exactly-one-text-editor-remains',
+  appTextareas + labelTextareas === 1,
+  `${appTextareas} in the panel + ${labelTextareas} in place = ONE writer for a label's text`);
+/* NEGATIVE CONTROL — the counter must SEE a textarea if one comes back. */
+assert('g.control-textarea-counter-detects-a-reintroduction',
+  countOf('<div><textarea rows={4} /></div>', '<textarea') === 1
+    && countOf('<div><span>a textarea</span></div>', '<textarea') === 0,
+  'counts a real render (1) and ignores prose that merely says the word (0)');
+/* The replacement must not be an EMPTY shell — removing the textarea and
+   registering nothing would leave the label target with no section at all. */
+assert('g.the-replacement-is-not-empty',
+  labelBranch.includes("secBody('text', tsBody)")
+    && countOf(APP, "secBody('text', tsBody)") === 2
+    && ['size', 'weight', 'text colour', 'align'].every(l => APP.includes(`<label>${l}</label>`)),
+  `2 registrations of tsBody (goblin + label), one body, and it carries all four §E.1 controls`);
+
+console.log('\n' + '='.repeat(78));
+console.log('(h) §E.2 — textStyle is ADDITIVE, and only chosen keys are written');
+console.log('='.repeat(78));
+console.log(`  option tables at src/textStyle.ts:${at(TS_RAW, 'export const TEXT_SIZE_OPTS')} (size), `
+  + `:${at(TS_RAW, 'export const TEXT_WEIGHT_OPTS')} (weight), `
+  + `:${at(TS_RAW, 'export const TEXT_ALIGN_OPTS')} (align); colour reuses COLOR_KEYS (§E.1)`);
+assert('h.an-option-table-exists-for-size-weight-and-align',
+  TS.includes('TEXT_SIZE_OPTS') && TS.includes('TEXT_WEIGHT_OPTS') && TS.includes('TEXT_ALIGN_OPTS')
+    && countOf(TS, "{v: 'sm'") === 1 && countOf(TS, "{v: 'regular'") === 1
+    && countOf(TS, "{v: 'center'") === 1
+    && APP.includes('TEXT_SIZE_OPTS.map') && APP.includes('TEXT_WEIGHT_OPTS.map')
+    && APP.includes('TEXT_ALIGN_OPTS.map'),
+  'the three tables live once in the model and are wrapped once in App — the panel does not re-list them');
+assert('h.colour-is-a-KEY-never-a-hex',
+  TS.includes("out['--ts-color'] = COLOR_VAR[ts.colorKey]")
+    && TS.includes('isColorKey') && TS.includes("colorKey?: ColorKey")
+    && !/#[0-9a-fA-F]{3,6}\b/.test(TS_RAW),
+  'the stored field is `colorKey?: ColorKey` and the render value is `COLOR_VAR[...]` — a symbolic '
+  + 'key through src/colors.ts:20, the same route the outline colour takes');
+/* THE WRITER. Read as its own declaration and asserted on the four properties
+   that make it LAZY — a writer that always wrote would satisfy "there is an
+   option table" and still violate §E.2. */
+const MERGE = (() => {
+  const i = TS.indexOf('export function mergeTextStyle');
+  const j = TS.indexOf('export function readTextStyle', i);
+  return TS.slice(i, j > i ? j : undefined);
+})();
+console.log(`  mergeTextStyle: ${MERGE.split('\n').length} lines; `
+  + `deletes default-valued keys: ${/delete next\[k\]/.test(MERGE)}; `
+  + `returns undefined when empty: ${/Object\.keys\(next\)\.length \? next : undefined/.test(MERGE)}`);
+assert('h.a-missing-field-is-NOT-written',
+  /if \(!\(k in patch\)\) continue;/.test(MERGE)
+    && /delete next\[k\]/.test(MERGE)
+    && /if \(v === undefined \|\| isTextDefault\(k, v, alignDefault\)\)/.test(MERGE)
+    && /Object\.keys\(next\)\.length \? next : undefined/.test(MERGE),
+  'mergeTextStyle copies the stored object, skips any key NOT in the patch, DROPS a key whose value '
+  + 'equals the inherited default, and collapses to `undefined` when nothing is left — so a node the '
+  + 'user never touched keeps NO textStyle at all');
+assert('h.the-panel-WRITES-through-that-merge-and-never-directly',
+  APP.includes('mergeTextStyle(tsStored, patch, tsAlignDefault)')
+    && countOf(APP, 'mergeTextStyle(') === 1
+    && !/textStyle:\s*\{/.test(APP),
+  'the only writer is `writeTextStyle`, one call into the merge; no call site constructs a textStyle '
+  + 'object literal, which is what a "writes a value the user did not choose" bug looks like');
+assert('h.defaults-are-per-target-for-align-and-derived-not-hardcoded',
+  TS.includes("body === 'label-only' ? 'center' : 'left'")
+    && APP.includes('alignForBody(inspTarget.kind ===') && APP.includes('readTextStyle(tsStored, tsAlignDefault)'),
+  "align's inherited value comes from the TARGET (a label-only node is centred by design), so the "
+  + 'panel cannot disagree with the sheet on what "default" means');
+assert('h.an-old-board-has-no-textStyle-and-gets-no-write',
+  /export type TextStyle = \{/.test(TS)
+    && /textStyle\?: TextStyle;/.test(readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8'))
+    && /textStyle\?: TextStyle;/.test(LABEL_RAW)
+    && /if \(!ts\) return out;/.test(TS),
+  'the field is optional in the stored type on BOTH node kinds, and `textStyleVars(undefined)` returns '
+  + 'an empty object — so an old board contributes no `--ts-*` and cannot repaint');
+/* The RENDERERS. An old board cannot repaint only if the node kinds read
+   `textStyle` through exactly one door: `textStyleVars`. A second read — a
+   `d.textStyle?.size` reaching for a px number, say — would be a path the model
+   does not control, so it is asserted as a count, per kind. */
+assert('h.the-renderers-read-textStyle-through-ONE-door',
+  (() => {
+    for (const [file, src, name] of [
+      ['src/DiagramNode.tsx', readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8'), 'DiagramNode'],
+      ['src/LabelNode.tsx', LABEL_RAW, 'LabelNode'],
+    ]) {
+      const s = stripTs(src);
+      // EVERY access to the stored object, however it is spelled.
+      const access = countOf(s, 'd.textStyle') + countOf(s, '.textStyle?');
+      /* The door is `textStyleVars(d.textStyle`, WITHOUT the closing paren:
+         PASS 2 added the target's align default as a second argument
+         (`textStyleVars(d.textStyle, alignForBody(...))`), so anchoring on the
+         old one-arg literal would count 0 and fail a correct tree — while still
+         counting every read of the stored object through the door. */
+      const throughDoor = countOf(s, 'textStyleVars(d.textStyle');
+      /* ...and that second argument must BE the target's own default, which is
+         the whole point of the pass: a door fed a hard-coded `left` would paint
+         the wrong value on a label-only node. */
+      const withDefault = countOf(s, 'textStyleVars(d.textStyle, alignForBody(');
+      const props = countOf(src, "style={{'--nc': nc, ...tsVars}") + countOf(src, 'style={tsVars');
+      console.log(`  ${name}: ${access} access(es) to the stored object, ${throughDoor} through the door, `
+        + `${withDefault} passing alignForBody, ${props} style site(s) carrying the vars`);
+      if (!(access === throughDoor && throughDoor === 1 && withDefault === 1)) return false;
+      if (props < 1) return false;
+    }
+    return true;
+  })(),
+  'each node kind reads `d.textStyle` ONCE, into `textStyleVars`, WITH the target\'s own align default '
+  + '(`alignForBody`) and spreads the result onto the same style object that already carries `--nc` '
+  + '(DiagramNode: 4 branches) — so an old board\'s markup is unchanged (an empty spread adds nothing) '
+  + 'AND a stored align is painted against the right default');
+assert('h.size-is-a-SCALE-not-a-px-value',
+  /TEXT_SCALE: Record<TextSize, number> = \{sm: 0\.85, md: 1, lg: 1\.15, xl: 1\.3\}/.test(TS)
+    && /--ts-scale/.test(TS) && !/fontSize/.test(TS)
+    && countOf(STYLES_RAW, 'var(--ts-scale, 1)') >= 13,
+  'the four steps are multipliers (0.85/1/1.15/1.3), never a px number: one node paints FOUR sizes '
+  + `(10.5/14.5/11.5/20) and ${countOf(STYLES_RAW, 'var(--ts-scale, 1)')} rules multiply their own by it, `
+  + 'so the hierarchy survives and the resizer floors stay untouched');
+
+console.log('\n' + '='.repeat(78));
+console.log('(i) §E.3(b) — the blur-commit hold, scoped to the inspector');
+console.log('='.repeat(78));
+const HOLD_SEL = /const INSPECTOR_HOLD_SELECTOR = '([^']+)'/.exec(LABEL)?.[1];
+/** Every `<aside className="…">` class string in App.tsx. Matched against the
+ *  selector the hold uses, so the guard and the element it guards cannot drift. */
+const asideSel = [...APP_RAW.matchAll(/<aside className="([^"]+)"/g)].map(m => m[1]);
+console.log(`  hold selector in LabelNode.tsx: ${HOLD_SEL}`);
+console.log(`  <aside> class names in App.tsx: [${asideSel.join(', ')}]`);
+assert('i.the-hold-exists-and-reads-the-pointer-target',
+  /const holdCommit = useRef\(false\)/.test(LABEL)
+    && /if \(!holdCommit\.current\) commit\(\);/.test(LABEL)
+    && /closest\?\.\(INSPECTOR_HOLD_SELECTOR\)/.test(LABEL)
+    && /window\.addEventListener\('pointerdown', onDown, true\)/.test(LABEL),
+  'a window-level CAPTURE listener arms the hold on a press whose target is inside the panel, and '
+  + '`onBlur` consults it before committing — the press happens outside the node, so a listener on '
+  + 'the node could never see it');
+assert('i.the-hold-is-scoped-to-the-inspector-and-the-selector-is-real',
+  HOLD_SEL === '.panel.right' && asideSel.includes('panel right'),
+  `the selector "${HOLD_SEL}" matches the real <aside className="panel right"> that renders the panel — `
+  + 'asserted on BOTH halves, so a renamed panel cannot silently disarm the hold');
+assert('i.the-hold-always-disarms-on-leave',
+  /window\.addEventListener\('pointerup', onUp, true\)/.test(LABEL)
+    && /window\.addEventListener\('pointercancel', onUp, true\)/.test(LABEL)
+    && /removeEventListener\('pointerdown', onDown, true\)/.test(LABEL)
+    && /if \(!editing\) \{\s*holdCommit\.current = false;\s*return;/.test(LABEL),
+  'pointerup/pointercancel release it, the effect cleanup removes all three listeners and disarms, and '
+  + 'a stale hold cannot outlive edit mode');
+assert('i.Escape-and-Cmd-Enter-are-UNCHANGED',
+  /if \(e\.key === 'Enter' && \(e\.metaKey \|\| e\.ctrlKey\)\) \{ e\.preventDefault\(\); commit\(\); \}/.test(LABEL)
+    && /else if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); cancel\(\); \}/.test(LABEL)
+    && /const cancel = \(\) => \{/.test(LABEL),
+  '§E.3 "deliberately NOT changing": the hold is a guard AROUND the handlers, not a rewrite of them — '
+  + 'Escape still cancels, Cmd/Ctrl+Enter still commits');
+assert('i.no-hold-outside-edit-mode',
+  /if \(!editing\) \{\s*holdCommit\.current = false;/.test(LABEL) && /, \[editing\]\);/.test(LABEL),
+  'the listener set is created only while `editing`, and torn down by the effect on every exit');
+
+console.log('\n' + '='.repeat(78));
+console.log('(j) NEGATIVE CONTROL — duplicate/delete while editing: nothing was added');
+console.log('='.repeat(78));
+/* §H.6: single-node and label selections have NO duplicate/delete in the panel —
+   they exist only in the multi-select branch, which never co-occurs with
+   in-place editing (one node cannot be selected twice). So the rule is a NO-OP
+   here and the only correct change is NO change. Both halves are asserted: the
+   single-target branches have none, and the multi-select branch still has
+   exactly what pass 1 had. */
+const SINGLE_BRANCHES = (() => {
+  const i = APP.indexOf(") : selected?.type === 'table' ? (");
+  return APP.slice(i);
+})();
+console.log(`  single-target branches: ${countOf(SINGLE_BRANCHES, 'duplicateSelection')} duplicate, `
+  + `${countOf(SINGLE_BRANCHES, 'deleteSelection')} delete`);
+console.log(`  multi-select branch:    ${countOf(MULTI, 'duplicateSelection')} duplicate, `
+  + `${countOf(MULTI, 'deleteSelection')} delete`);
+assert('j.no-duplicate-or-delete-in-any-single-target-branch',
+  countOf(SINGLE_BRANCHES, 'duplicateSelection') === 0 && countOf(SINGLE_BRANCHES, 'deleteSelection') === 0,
+  'node / table / label branches carry no duplicate and no delete — §H.6 is a no-op here');
+assert('j.no-editing-gate-was-invented-for-it',
+  !/isEditing/.test(APP) && !/data-editing/.test(APP) && countOf(APP, 'holdCommit') === 0
+    && countOf(APP, 'duplicateSelection') === 6 && countOf(APP, 'deleteSelection') === 4,
+  'no `isEditing`/`data-editing` flag was added to App.tsx to hide controls that do not exist, and no '
+  + 'part of the hold leaked into the panel. The two handler names still appear exactly as often as '
+  + 'they did at the end of pass 1 (6 / 4 — their definitions and the multi-select call sites); the '
+  + 'assertion that matters is (j) above: ZERO of them inside any single-target branch');
+assert('j.control-the-multi-select-branch-is-untouched',
+  MULTI.includes('duplicateSelection()') && MULTI.includes('deleteSelection')
+    && countOf(MULTI, '<Section') === 0 && countOf(MULTI, 'renderSections()') === 0,
+  'pass 1\'s (e) negative control still holds: the only place those controls live is unchanged');
+
+/* ===========================================================================
+   (k) THE CROSS-CHECK — a STORED choice is always a PAINTED choice.
+   ===========================================================================
+   WHY THIS EXISTS. Every check above tests `alignForBody` and `textStyleVars`
+   SEPARATELY, so a disagreement BETWEEN them was invisible: pass 1 shipped a
+   green 72/72 while `textStyleVars` hard-coded `left` as "the value that
+   renders anyway". On a `label-only` node — whose text block is `text-align:
+   center` BY DESIGN (`styles.css:3305`) — the user could pick Left, the merge
+   would STORE `{"align":"left"}` (correctly: on that target `left` is a real
+   choice), and the renderer would then DROP it, because its assumed default
+   was `left`. Stored, never painted; the user's Left was indistinguishable
+   from an untouched node.
+
+   THE INVARIANT, stated as a decision, for EVERY (target default, pick) pair:
+   `textStyleVars(mergeTextStyle(undefined, {align: pick}, default), default)`
+   is EMPTY exactly when `pick === default`, and writes `--ts-align` +
+   `--ts-justify` otherwise. The `label-only` + `left` cell is the regression
+   case and is named below.
+
+   The two functions are IMPORTED AND CALLED, not transcribed. `src/textStyle.ts`
+   cannot be imported by Node directly — it imports `./colors` extensionless
+   (`src/colors.ts:x`), which Node's ESM resolver refuses — so it is bundled
+   with the esbuild that is ALREADY a dev dependency (the same technique
+   `checks/package-p-render-check.mjs` uses). No new dependency, and no second
+   copy of the rule. */
+console.log('\n' + '='.repeat(78));
+console.log('(k) §E.2 CROSS-CHECK — a stored choice is always painted');
+console.log('='.repeat(78));
+const {writeFileSync, rmSync: rmFile} = await import('node:fs');
+const MODEL_ENTRY = `${ROOT}/.p-inspector-model.ts`;
+const MODEL_OUT = `${ROOT}/.p-inspector-model.mjs`;
+writeFileSync(MODEL_ENTRY, "export * from './src/textStyle';\n");
+await (await import('esbuild')).build({
+  entryPoints: [MODEL_ENTRY], bundle: true, format: 'esm', platform: 'node',
+  outfile: MODEL_OUT, logLevel: 'error',
+});
+const M = await import(`${MODEL_OUT}?t=${Date.now()}`);
+for (const f of [MODEL_ENTRY, MODEL_OUT]) { try { rmFile(f, {force: true}); } catch { /* gone */ } }
+console.log(`  textStyle.ts bundled + imported: alignForBody=${typeof M.alignForBody} `
+  + `mergeTextStyle=${typeof M.mergeTextStyle} textStyleVars=${typeof M.textStyleVars}`);
+
+/* The two defaults the real targets produce, read from the helper itself — not
+   re-listed here, or the check could drift from the rule it is checking. */
+const REAL_DEFAULTS = [
+  {what: 'card (`.node-body` → left)', body: 'card', def: M.alignForBody('card')},
+  {what: 'label (`.label-node` → left)', body: undefined, def: M.alignForBody(undefined)},
+  {what: 'label-only (`.lo-body` → center)', body: 'label-only', def: M.alignForBody('label-only')},
+];
+console.log(`  defaults read from alignForBody: ${REAL_DEFAULTS.map(d => `${d.body ?? '(none)'}=${d.def}`).join('  ')}`);
+
+const ALIGNS = ['left', 'center', 'right'];
+const JUSTIFY = {left: 'flex-start', center: 'center', right: 'flex-end'};
+const alignBad = [];
+for (const d of REAL_DEFAULTS) {
+  for (const pick of ALIGNS) {
+    const stored = M.mergeTextStyle(undefined, {align: pick}, d.def);
+    const vars = M.textStyleVars(stored, d.def);
+    const isDefault = pick === d.def;
+    /* empty exactly when the pick IS the target's inherited value. */
+    const okEmpty = isDefault
+      ? Object.keys(vars).length === 0 && stored === undefined
+      : vars['--ts-align'] === pick && vars['--ts-justify'] === JUSTIFY[pick] && stored?.align === pick;
+    const tag = (d.body === 'label-only' && pick === 'left') ? '  <-- THE REGRESSION CASE' : '';
+    console.log(`  ${okEmpty ? ' ' : '!'} default=${d.def.padEnd(6)} pick=${pick.padEnd(6)} `
+      + `stored=${JSON.stringify(stored) ?? 'undefined'} vars=${JSON.stringify(vars)}${tag}`);
+    if (!okEmpty) alignBad.push({d, pick, stored, vars});
+  }
+}
+assert('k.stored-align-is-painted-for-every-target-default',
+  REAL_DEFAULTS.length === 3 && alignBad.length === 0,
+  `${REAL_DEFAULTS.length} target defaults × ${ALIGNS.length} values = `
+  + `${REAL_DEFAULTS.length * ALIGNS.length} cells — every stored align paints `
+  + '--ts-align + --ts-justify, and only the value that renders anyway stores nothing');
+/* The regression, asserted BY NAME so the next reader sees what this guards. */
+assert('k.label-only-plus-LEFT-is-painted-not-dropped',
+  (() => {
+    const stored = M.mergeTextStyle(undefined, {align: 'left'}, M.alignForBody('label-only'));
+    const vars = M.textStyleVars(stored, M.alignForBody('label-only'));
+    console.log(`  label-only picks LEFT (its default is center): stored=${JSON.stringify(stored)} `
+      + `vars=${JSON.stringify(vars)}`);
+    return JSON.stringify(stored) === '{"align":"left"}'
+      && vars['--ts-align'] === 'left' && vars['--ts-justify'] === 'flex-start';
+  })(),
+  'a label-only goblin stores `{align:"left"}` (left is NOT its inherited value) AND the renderer '
+  + 'paints it — before the fix it stored the choice and emitted {} , i.e. saved and never shown');
+/* NEGATIVE CONTROL — the cross-check must SEE a re-introduced assumption. */
+assert('k.control-the-cross-check-detects-a-hard-coded-default',
+  (() => {
+    /* The old body, reconstructed: align compared against the LITERAL `left`
+       while the target's default is `center`. This is why (k) exists. */
+    const naive = (ts, def) => {
+      const out = {};
+      if (ts && ts.align && ts.align !== 'left') { out['--ts-align'] = ts.align; out['--ts-justify'] = JUSTIFY[ts.align]; }
+      return out;
+    };
+    const stored = M.mergeTextStyle(undefined, {align: 'left'}, 'center');
+    const got = naive(stored, 'center');
+    console.log(`  reconstructed pre-fix renderer on label-only+left: stored=${JSON.stringify(stored)} `
+      + `vars=${JSON.stringify(got)}  (empty = the bug this check catches)`);
+    return Object.keys(got).length === 0 && stored?.align === 'left';
+  })(),
+  'the pre-fix body drops the same stored value this harness now requires to be painted');
+/* The same cross-check shape for the OTHER two fields, which have no per-target
+   default at all — asserted as target-INDEPENDENT, i.e. the result must be the
+   same for every default, so a future `alignForBody`-shaped default there would
+   fail this check rather than slip through. */
+const sizeWeightBad = [];
+for (const d of REAL_DEFAULTS) {
+  for (const pick of ['sm', 'md', 'lg', 'xl']) {
+    const stored = M.mergeTextStyle(undefined, {size: pick}, d.def);
+    const vars = M.textStyleVars(stored, d.def);
+    const want = M.TEXT_SCALE[pick] === 1;
+    const ok = want ? (stored === undefined && !('--ts-scale' in vars))
+      : (vars['--ts-scale'] === String(M.TEXT_SCALE[pick]) && stored?.size === pick);
+    if (!ok) sizeWeightBad.push({field: 'size', d, pick, stored, vars});
+  }
+  for (const pick of ['regular', 'bold']) {
+    const stored = M.mergeTextStyle(undefined, {weight: pick}, d.def);
+    const vars = M.textStyleVars(stored, d.def);
+    const want = pick === 'regular';
+    const ok = want ? (stored === undefined && !('--ts-weight' in vars))
+      : (vars['--ts-weight'] === '700' && stored?.weight === 'bold');
+    if (!ok) sizeWeightBad.push({field: 'weight', d, pick, stored, vars});
+  }
+}
+assert('k.size-and-weight-have-NO-per-target-default',
+  sizeWeightBad.length === 0,
+  `${REAL_DEFAULTS.length * 6} cells (4 sizes + 2 weights × 3 defaults) — identical outcome for every `
+  + 'target, because `md` is the multiplicative identity and `regular` is the inherited weight '
+  + 'everywhere (`styles.css:3285-3292`); neither is `alignForBody`-shaped, so neither needs a parameter');
+
+/* ===========================================================================
+   (l) SPECIFICITY SWEEP — a var() override that cannot WIN is not a control.
+   ===========================================================================
+   WHY THIS EXISTS. (a)-(k) ask whether a value is STORED and whether it is
+   EMITTED. Neither asks what (l) asks: whether the emitted value DECIDES
+   anything. A sheet may set the same property on the same element in an
+   EARLIER rule whose selector is more specific, and CSS then ignores the
+   override wherever it sits in the file. Pass 1 shipped a green 72/72 with
+   exactly that shape: the label-only body's branch rule (0,3,0) pinned
+   `text-align` AND `align-items` to a literal before the (0,2,0) override
+   could speak, so the user's Left landed in a declaration that lost. A
+   presence-only check is blind to it, which is why this one measures.
+
+   WHAT IT MEASURES. src/styles.css is read with comments BLANKED (blanked,
+   never removed, so every byte offset — and therefore every reported line
+   number — stays true), split into rules, and each selector is reduced to
+   (ids, classes, elements). For every `var(--ts-<x>, <fallback>)` declaration:
+     1. CAN IT WIN? Is there an EARLIER rule setting the SAME property on a
+        selector with the SAME SUBJECT (last compound) and HIGHER specificity?
+        Equal specificity is correct — later wins; only higher is a defect.
+     2. IS ITS FALLBACK THE BASE VALUE? The fallback must equal the literal the
+        base rule already declares, or a node with nothing stored moves.
+   The SUBJECT test keeps it honest: a rule on `.lo-title` is never counted
+   against one on `.lo-body`, and a rule on `.node-body small` is never counted
+   against one on `.node-body` (the element step is part of the subject).
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(l) SPECIFICITY SWEEP — every var(--ts-*) consumer vs the rules above it');
+console.log('='.repeat(78));
+
+// Blank comment bodies but keep every byte offset (newlines included), so a
+// line number derived from the result is the line number a reader sees.
+function blankComments(s) {
+  return s.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+}
+
+// Top-level rules, descending into at-rules. `start` = byte offset of the
+// selector's first non-space character in the ORIGINAL text.
+function splitRules(text, atRule, offset, out) {
+  let depth = 0, prelude = '', body = '', startAbs = -1, bodyStartAbs = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') {
+      depth++;
+      if (depth === 1) { body = ''; bodyStartAbs = offset + i + 1; } else body += ch;
+      continue;
+    }
+    if (ch === '}') {
+      if (depth === 0) continue;
+      depth--;
+      if (depth === 0) {
+        const sel = prelude.trim();
+        const at = /^@[\w-]+/.exec(sel);
+        if (at) splitRules(body, at[0], bodyStartAbs, out);
+        else if (sel) out.push({sel, decls: body, at: atRule, start: startAbs});
+        prelude = ''; body = ''; startAbs = -1;
+      } else body += ch;
+      continue;
+    }
+    if (depth === 0) {
+      if (startAbs < 0 && !/\s/.test(ch)) startAbs = offset + i;
+      prelude += ch;
+    } else body += ch;
+  }
+  return out;
+}
+
+function splitSelectorList(sel) {
+  const out = []; let depth = 0, buf = '';
+  for (const ch of sel) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === ',' && depth === 0) { out.push(buf.trim()); buf = ''; continue; }
+    buf += ch;
+  }
+  if (buf.trim()) out.push(buf.trim());
+  return out;
+}
+
+// Declarations at THIS rule's level; a nested rule's prelude is discarded.
+function declsOf(body) {
+  const out = []; let depth = 0, buf = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '{') { depth++; buf = ''; continue; }
+    if (ch === '}') { if (depth > 0) depth--; continue; }
+    if (depth > 0) continue;
+    if (ch === ';') { if (buf.trim()) out.push(buf.trim()); buf = ''; continue; }
+    buf += ch;
+  }
+  if (buf.trim()) out.push(buf.trim());
+  return out;
+}
+
+function propValue(d) {
+  const i = d.indexOf(':');
+  if (i < 0) return null;
+  const prop = d.slice(0, i).trim(), value = d.slice(i + 1).trim();
+  return prop && value ? {prop, value} : null;
+}
+
+// (ids, classes, elements). Attribute selectors count as a class, pseudo-
+// elements as an element, and `:hover` as a class — the usual approximation,
+// applied IDENTICALLY to both sides of every comparison below, which is what
+// makes the verdict meaningful even where a browser's exact number differs.
+function specOf(raw) {
+  const s = raw.replace(/\[[^\]]*\]/g, '#ATTR#').replace(/\([^)]*\)/g, '()');
+  const ids = (s.match(/#[\w-]+/g) || []).length;
+  const pets = (s.match(/::[\w-]+/g) || []).length;
+  const classes = (s.match(/\.[\w-]+/g) || []).length + (s.match(/#ATTR#/g) || []).length
+    + (s.match(/(?<!:):[\w-]+/g) || []).length;
+  const els = (s.match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) || []).length + pets;
+  return {ids, classes, els};
+}
+
+// What the selector actually STYLES: its last compound. Two rules style the
+// same element only if this agrees, which is what stops a sibling row from
+// being reported as a rival.
+function subjectKey(sel) {
+  const last = (sel.split(/\s*[>+~]\s*|\s+/).filter(Boolean).pop()) || '';
+  const cls = (last.match(/\.[\w-]+/g) || []).join('');
+  return cls || last;
+}
+
+// Every var(--ts-*[, fallback]) inside a declared value, paren-matched so a
+// NESTED var (the `calc(Npx * var(--ts-scale, 1))` form) is seen too.
+function varUses(value) {
+  const out = []; const re = /var\(/g; let m;
+  while ((m = re.exec(value)) !== null) {
+    let depth = 1, arg = '', i = m.index + 4;
+    for (; i < value.length && depth > 0; i++) {
+      const ch = value[i];
+      if (ch === '(') depth++;
+      else if (ch === ')') { depth--; if (depth === 0) break; }
+      arg += ch;
+    }
+    const comma = arg.indexOf(',');
+    const name = (comma < 0 ? arg : arg.slice(0, comma)).trim();
+    if (name.startsWith('--ts-')) {
+      out.push({name, fallback: comma < 0 ? null : arg.slice(comma + 1).trim()});
+    }
+    re.lastIndex = i;
+  }
+  return out;
+}
+
+// The class tokens a selector matches on — used to decide whether two rules
+// can even style the same element.
+function classSet(sel) {
+  return new Set((sel.match(/\.[\w-]+/g) || []).map(s => s.slice(1)));
+}
+function subset(a, b) {
+  for (const x of a) if (!b.has(x)) return false;
+  return true;
+}
+const SPEC_GREATER = (b, a) => b.ids > a.ids
+  || (b.ids === a.ids && b.classes > a.classes)
+  || (b.ids === a.ids && b.classes === a.classes && b.els > a.els);
+const specEqual = (b, a) => b.ids === a.ids && b.classes === a.classes && b.els === a.els;
+const specStr = s => `(${s.ids},${s.classes},${s.els})`;
+
+// The whole sweep, as a pure function of a sheet's TEXT — which is what lets
+// the three controls below feed it a known-bad sheet instead of trusting it on
+// the one file it was written for.
+function sweepSheet(text) {
+  const css = blankComments(text);
+  const lineIndex = new Uint32Array(css.length + 1);
+  { let line = 1;
+    for (let i = 0; i < css.length; i++) { lineIndex[i] = line; if (css[i] === '\n') line++; }
+    lineIndex[css.length] = line; }
+  const lineAt = off => lineIndex[Math.max(0, Math.min(off, css.length))];
+
+  const rules = splitRules(css, '(top level)', 0, []);
+
+  /* Per individual SELECTOR (not per rule): the LITERAL value it declares for
+     `<subject>|<property>`. A var() declaration is not a base — it is a
+     consumer, collected below. Keying by subject rather than by the raw
+     selector is what lets `.node .lo-body` (line 3311) be compared with the
+     `.node .lo-body` arm of the 2317 selector list. */
+  const bases = [];
+  rules.forEach((r, ri) => {
+    for (const t of splitSelectorList(r.sel)) {
+      const spec = specOf(t), cls = classSet(t), subject = subjectKey(t);
+      for (const d of declsOf(r.decls)) {
+        const pv = propValue(d);
+        if (!pv || /var\(/.test(pv.value)) continue;
+        bases.push({ri, key: `${subject}|${pv.prop}`, value: pv.value, sel: t, spec, cls,
+          line: lineAt(r.start)});
+      }
+    }
+  });
+
+  const consumers = [];
+  rules.forEach((r, ri) => {
+    for (const d of declsOf(r.decls)) {
+      const pv = propValue(d);
+      if (!pv) continue;
+      for (const u of varUses(pv.value)) {
+        consumers.push({ri, line: lineAt(r.start), sel: r.sel, prop: pv.prop,
+          name: u.name, fallback: u.fallback, value: pv.value,
+          selectors: splitSelectorList(r.sel)});
+      }
+    }
+  });
+
+  const violations = [], fallbackBad = [];
+  for (const c of consumers) {
+    /* INTERFERENCE — when are two rules rivals at all? Only if they can style
+       the same element: they must end in the same compound (`lo-body` is never
+       confused with `lo-title`, and the element step is part of it, so
+       `node-body small` is not confused with `node-body`), AND one selector's
+       class set must contain the other's. The subset half is what keeps two
+       unrelated rows that merely share a trailing element apart: `.group-label
+       small` and `.node-metric small` are disjoint by class, so neither's
+       literal is treated as the other's base. */
+    let beat = false, base = null;
+    for (const m of c.selectors) {
+      const key = `${subjectKey(m)}|${c.prop}`;
+      const aSpec = specOf(m), aCls = classSet(m);
+      for (const b of bases) {
+        if (b.ri >= c.ri || b.key !== key) continue;
+        if (!subset(aCls, b.cls) && !subset(b.cls, aCls)) continue;
+        if (SPEC_GREATER(b.spec, aSpec)) {
+          violations.push({c, theirSel: b.sel, theirLine: b.line, theirs: specStr(b.spec),
+            ours: specStr(aSpec), theirValue: b.value});
+          beat = true;
+        } else if (specEqual(b.spec, aSpec) && (!base || b.ri > base.ri)) {
+          /* Equal specificity: the LATEST one before us is the declaration we
+             layer over — that is the value an untouched node would paint. */
+          base = b;
+        }
+      }
+    }
+    c.beat = beat; c.base = base;
+    if (!beat && base) {
+      /* IS THE FALLBACK WHAT THE BASE RENDERS? Two shapes are legitimate.
+         `--ts-scale` is a MULTIPLIER over the px the base rule already
+         declares, so its declaration reads `calc(<that px> * var(--ts-scale,
+         1))` and its fallback must be the identity `1` — with nothing stored
+         the calc evaluates to the base px itself. Every other variable must
+         fall back to the base literal verbatim (a token reference like
+         `var(--dim)` included: the comparison is textual, so the two rules are
+         required to agree). A consumer whose only earlier rivals are LESS
+         specific is skipped: it is not layering over a base, it is declaring
+         its own value, which the sheet cannot contradict. */
+      const scaleFactor = /^calc\(\s*(.+?)\s*\*\s*var\(--ts-scale,\s*1\)\s*\)$/.exec(c.value)?.[1];
+      const isScaleVar = c.name === '--ts-scale';
+      const okScale = isScaleVar && c.fallback === '1' && scaleFactor !== undefined
+        && scaleFactor.replace(/\s+/g, '') === base.value.replace(/\s+/g, '');
+      const okLiteral = !isScaleVar && c.fallback !== null && c.fallback === base.value;
+      if (!okScale && !okLiteral) {
+        fallbackBad.push({c, base: base.value, baseLine: base.line, scaleFactor});
+      }
+    }
+  }
+  return {css, rules, consumers, violations, fallbackBad, lineAt};
+}
+
+/* --- the real sheet ------------------------------------------------------- */
+const SWEEP = sweepSheet(STYLES_RAW);
+const RAW_VAR_USES = countOf(SWEEP.css, 'var(--ts-');
+console.log(`  rules parsed: ${SWEEP.rules.length}   var(--ts-*) occurrences: ${SWEEP.consumers.length} `
+  + `of ${RAW_VAR_USES} raw (a value may carry two)`);
+
+const byVar = new Map();
+for (const c of SWEEP.consumers) {
+  if (!byVar.has(c.name)) byVar.set(c.name, []);
+  byVar.get(c.name).push(c);
+}
+console.log('\n  property-by-property (the earlier literal rule is what must LOSE to it):');
+for (const [name, list] of [...byVar.entries()].sort()) {
+  console.log(`\n  ${name}  — ${list.length} consumer(s)`);
+  for (const c of list) {
+    const lose = SWEEP.violations.filter(v => v.c === c);
+    const mine = specStr(specOf(c.selectors[0]));
+    console.log(`    line ${String(c.line).padStart(4)}  ${c.prop.padEnd(16)} ${c.sel}`);
+    console.log(`              fallback ${JSON.stringify(c.fallback)}  ` +
+      (c.beat ? '** DEFECT: an earlier more specific rule pins this property **'
+        : c.base ? `lays over styles.css:${c.base.line} \`${c.base.sel}\` ` +
+          `${specStr(c.base.spec)} (${c.base.value}) -> equal specificity, ours ${mine}, later wins`
+          : `no earlier rule of equal specificity sets this property on this subject (ours ${mine})`));
+  }
+}
+console.log(`\n  losing pairs: ${SWEEP.violations.length}   fallback-vs-base mismatches: ${SWEEP.fallbackBad.length}`);
+for (const v of SWEEP.violations.slice(0, 10)) {
+  console.log(`  ! ${v.c.sel} { ${v.c.prop}: var(${v.c.name}) } at styles.css:${v.c.line}  ` +
+    `is beaten by \`${v.theirSel}\` ${v.theirs} vs ${v.ours} at styles.css:${v.theirLine} (sets ${v.c.prop}: ${v.theirValue})`);
+}
+for (const f of SWEEP.fallbackBad.slice(0, 10)) {
+  console.log(`  ! ${f.c.sel} { ${f.c.prop} } fallback ${JSON.stringify(f.c.fallback)} ` +
+    `!= the base \`${f.base}\` at styles.css:${f.baseLine}`);
+}
+
+/* THE TWO ROWS THE USER REPORTED, asserted by name: the label-only body must
+   read BOTH of its axes from the variables with the sheet's own pre-fix
+   literals as defaults, and the title row must read the horizontal one. */
+const LO_BODY = SWEEP.rules.find(r => r.sel.includes('.lo-body') && r.sel.includes('.label-only'));
+const loBodyDecls = LO_BODY ? declsOf(LO_BODY.decls).map(propValue).filter(Boolean) : [];
+const declOn = (sel, prop) => {
+  const r = SWEEP.rules.find(x => x.sel.trim() === sel);
+  if (!r) return null;
+  const d = declsOf(r.decls).map(propValue).filter(Boolean).find(p => p.prop === prop);
+  return d ? d.value : null;
+};
+console.log(`\n  the label-only body rule (styles.css:${LO_BODY ? SWEEP.lineAt(LO_BODY.start) : '?'}) declares ` +
+  `${loBodyDecls.filter(d => /--ts-/.test(d.value)).map(d => `${d.prop}: ${d.value}`).join(' | ')}`);
+console.log(`  .node .lo-title declares justify-content: ${declOn('.node .lo-title', 'justify-content')}`);
+
+assert('l.every-var-ts-consumer-was-swept',
+  SWEEP.consumers.length >= 20 && SWEEP.consumers.length === RAW_VAR_USES,
+  `${SWEEP.consumers.length} var(--ts-*) declarations found in src/styles.css (comments blanked, so a `+
+  'docblock mentioning the names cannot inflate the count)');
+assert('l.no-earlier-rule-outranks-a-var-ts-consumer',
+  SWEEP.violations.length === 0,
+  SWEEP.violations.length === 0
+    ? `${SWEEP.consumers.length} consumers, each with a subject-equal earlier rule of EQUAL or LOWER specificity — ` +
+      'later-in-sheet wins, so every --ts-* value actually decides'
+    : `${SWEEP.violations.length} consumer(s) whose value LOSES to an earlier more specific rule`);
+assert('l.the-label-only-body-reads-both-axes-with-its-own-literals',
+  loBodyDecls.some(d => d.prop === 'text-align' && d.value === 'var(--ts-align, center)')
+    && loBodyDecls.some(d => d.prop === 'align-items' && d.value === 'var(--ts-justify, center)')
+    && !loBodyDecls.some(d => d.prop === 'text-align' && d.value === 'center')
+    && !loBodyDecls.some(d => d.prop === 'align-items' && d.value === 'center'),
+  'the rule that OWNS this block reads `text-align` and `align-items` from the variables, and the fallback on ' +
+  'each is `center` — the exact literal it declared before — so an untouched node is pixel-identical');
+assert('l.the-title-row-reads-the-horizontal-axis',
+  declOn('.node .lo-title', 'justify-content') === 'var(--ts-justify, center)',
+  'the 2322 rule and the 3316 rule now agree through the variable instead of the earlier literal pinning it');
+assert('l.every-fallback-equals-the-base-value-it-falls-back-to',
+  SWEEP.fallbackBad.length === 0,
+  `${SWEEP.consumers.filter(c => c.base).length} consumers have an earlier base rule of equal specificity ` +
+  `on their subject; ${SWEEP.fallbackBad.length} fall back to something other than what that base renders ` +
+  '(a `--ts-scale` consumer falls back to the identity `1` while its base reads `calc(<px> * var(--ts-scale, 1))`)');
+
+/* --- THE CONTROLS — the sweep must fail on the pre-fix shape -------------- */
+/* The sheet EXACTLY as the reported bug had it: the branch rule pins both axes
+   with a literal at (0,3,0), and the override further down only speaks about
+   `text-align` at (0,2,0) — so one declaration loses and the other is never
+   made at all. */
+const PRE_FIX = `.outer { text-align: center; }
+.node.label-only .lo-body, .node .lo-body { display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; }
+.node .lo-body { text-align: var(--ts-align, center); }`;
+/* An override that DID wire both axes but under the lower-specificity selector:
+   the shape a naive "just read the variable" repair leaves behind. */
+const PRE_FIX_BOTH = `.node.label-only .lo-body, .node .lo-body { display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; }
+.node .lo-body { text-align: var(--ts-align, center); align-items: var(--ts-justify, center); }`;
+const POST_FIX = `.node .lo-body { text-align: center; align-items: center; }
+.node .lo-body { text-align: var(--ts-align, center); align-items: var(--ts-justify, center); }`;
+const OTHER_ROW = `.node .lo-title { text-align: right; }
+.node .lo-body { text-align: var(--ts-align, center); }`;
+const preFixSweep = sweepSheet(PRE_FIX);
+const preFixBothSweep = sweepSheet(PRE_FIX_BOTH);
+const postFixSweep = sweepSheet(POST_FIX);
+const otherRowSweep = sweepSheet(OTHER_ROW);
+console.log(`\n  controls — pre-fix: ${preFixSweep.violations.length} violation(s); ` +
+  `both-axes-under-the-low-selector: ${preFixBothSweep.violations.length}; ` +
+  `repaired: ${postFixSweep.violations.length}; different-subject rule: ${otherRowSweep.violations.length}`);
+for (const v of preFixSweep.violations) {
+  console.log(`    pre-fix defect seen: \`${v.theirSel}\` ${v.theirs} beats \`${v.c.sel}\` ${v.ours} on ${v.c.prop}`);
+}
+for (const v of preFixBothSweep.violations) {
+  console.log(`    wired-but-outranked:  \`${v.theirSel}\` ${v.theirs} beats \`${v.c.sel}\` ${v.ours} on ${v.c.prop}`);
+}
+assert('l.control-the-sweep-fails-on-the-pre-fix-shape',
+  preFixSweep.violations.length === 1
+    && preFixSweep.violations[0].theirSel === '.node.label-only .lo-body'
+    && preFixSweep.violations[0].c.prop === 'text-align',
+  `the unrepaired sheet reports ${preFixSweep.violations.length} losing declaration — \`text-align\`, beaten by ` +
+  'the (0,3,0) branch arm of the very rule list the override names. This is the check that would have caught ' +
+  'the shipped bug, and it is red on that tree');
+assert('l.control-the-sweep-sees-BOTH-axes-lose',
+  preFixBothSweep.violations.length === 2
+    && preFixBothSweep.violations.every(v => v.theirSel === '.node.label-only .lo-body')
+    && preFixBothSweep.violations.map(v => v.c.prop).sort().join() === 'align-items,text-align',
+  `an override that wires both axes but keeps the lower selector still loses BOTH (${preFixBothSweep.violations.length} ` +
+  'declarations reported) — the flex `align-items` half is not invisible just because `text-align` was the ' +
+  'property named in the report') ;
+assert('l.control-the-sweep-passes-the-repaired-shape',
+  postFixSweep.violations.length === 0 && postFixSweep.fallbackBad.length === 0,
+  'equal specificity, later in the sheet: no violation, and `center` matches the base `center`');
+assert('l.control-the-subject-test-does-not-cross-rows',
+  otherRowSweep.violations.length === 0,
+  'a more specific earlier rule on a DIFFERENT subject (the title row) is not counted against the body row — ' +
+  'without the subject test every node rule would look like a rival of every other');
 
 /* ===========================================================================
    SUMMARY

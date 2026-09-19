@@ -259,7 +259,12 @@ const gatesOnDbl = jsxHasProp(LABEL, 'div', 'onDoubleClick');
    `onBlur` is reached. Measured, not guessed: with the helper, `onBlur` read as
    absent while the attribute is plainly there. A direct probe over the stripped
    file is the honest one for a multi-line element with arrows in it. */
-const commitsOnBlur = /onBlur=\{commit\}/.test(LABEL);
+const commitsOnBlur = /onBlur=\{\(\) => \{ if \(!holdCommit\.current\) commit\(\); \}\}/.test(LABEL);
+/* PACKAGE-P §E.3(b) — the hold that guard consults, asserted as part of S9 so
+   removing the panel textarea cannot also remove the reason blur was guarded. */
+const blurHoldScoped = /const holdCommit = useRef\(false\)/.test(LABEL)
+  && /closest\?\.\(INSPECTOR_HOLD_SELECTOR\)/.test(LABEL)
+  && /const INSPECTOR_HOLD_SELECTOR = '\.panel\.right'/.test(LABEL);
 const commitsOnModEnter = /e\.key === 'Enter' && \(e\.metaKey \|\| e\.ctrlKey\)/.test(LABEL);
 const cancels = /e\.key === 'Escape'/.test(LABEL) && /const cancel = \(\) => \{/.test(LABEL);
 const cancelRestores = /setDraft\(d\.text \?\? ''\);\s*setEditing\(false\);/.test(LABEL);
@@ -308,10 +313,15 @@ console.log(`  rfNodes injects onCommitText/readOnly, label kind only : ${appInj
 console.log(`  commitLabelText: pushHistory once per commit           : ${commitOnceHistory}`);
 console.log(`  commitLabelText: writes the passed id                  : ${commitKeysOnId}`);
 console.log(`  commitLabelText: no-op guard                           : ${commitNoOpGuard}`);
-/* The inspector writer must still be there and still be the same semantics. */
+/* The inspector writer used to be a SECOND writer for the same `text`, and it
+   is GONE (PACKAGE-P §E.3). The semantics it shared with the in-place editor —
+   `update()` keyed on its selected id, `pushHistory()` once per commit — still
+   hold, and they are asserted below so the removal cannot quietly take the
+   history discipline with it. */
 const inspectorTextarea = /selected\.type === 'label' \? \([\s\S]*?<textarea[\s\S]*?onChange=\{e => update\(\{text: e\.target\.value\}/.test(APP);
+const noPanelTextarea = !/<textarea/.test(APP);
 const updateFn = /const update = \(patch[\s\S]*?\n  \};/.exec(APP)?.[0] ?? '';
-console.log(`  the inspector textarea still writes via update()        : ${inspectorTextarea}`);
+console.log(`  the panel's label <textarea> is removed (PACKAGE-P §E.3)  : ${noPanelTextarea}`);
 console.log(`  update() still keyed on its selected id + pushHistory once : ${/if \(!sel\) return;/.test(updateFn) && (updateFn.match(/pushHistory\(\);/g) ?? []).length === 1}`);
 
 /* Tokens only — no literal colour in the two rules ROUND S added. */
@@ -402,8 +412,10 @@ assert('S8 Escape cancels — the draft is restored before the editor closes',
   'cancel() sets draft back to the stored text, then closes');
 
 assert('S9 blur commits, and Cmd/Ctrl+Enter commits',
-  commitsOnBlur && commitsOnModEnter,
-  'onBlur={commit}; e.key === Enter && (metaKey || ctrlKey) -> commit');
+  commitsOnBlur && commitsOnModEnter && blurHoldScoped,
+  'the blur handler is now `onBlur={() => { if (!holdCommit.current) commit(); }}` — blur still '
+  + 'commits, but PACKAGE-P §E.3 holds that commit while the pointer is inside the inspector, so a '
+  + 'Text-section click does not end the edit. Cmd/Ctrl+Enter still commits unconditionally.');
 
 assert('S10 plain Enter is NOT hijacked (it must insert a newline in a textarea)',
   noBareEnterHijack,
@@ -425,9 +437,19 @@ assert('S14 the editor is a nodrag region (a selection must not start a node dra
   hasNodragScoped && hasNodrag,
   'the class is on the <textarea> itself; @xyflow/system useDrag drops a pointerdown whose target matches `.nodrag`');
 
-assert('S15 the inspector textarea still writes through update() — two writers, one semantics',
-  inspectorTextarea && /if \(!sel\) return;/.test(updateFn) && (updateFn.match(/pushHistory\(\);/g) ?? []).length === 1,
-  'both writers call pushHistory once per commit and map the same node shape');
+/* PACKAGE-P §E.3 REVERSED THIS ASSERTION, deliberately and in the same pass
+   that removed its subject. ROUND S asserted `two writers, one semantics` — the
+   panel's <textarea> AND the in-place editor both writing `text`. That second
+   writer is now REMOVED (its replacement, the Text section, edits STYLE not
+   `text`), so the correct statement is: the panel holds no text writer at all,
+   the in-place editor is the only one, and the shared history discipline
+   (`update()` keyed on the selected id, ONE pushHistory per commit) survives on
+   the writer that remains. Stated as a count, so a reintroduction fails. */
+assert('S15 the panel\'s second text writer is REMOVED and `update()` keeps its semantics',
+  noPanelTextarea && !inspectorTextarea && editor
+    && /if \(!sel\) return;/.test(updateFn) && (updateFn.match(/pushHistory\(\);/g) ?? []).length === 1,
+  `${APP.match(/<textarea/g)?.length ?? 0} <textarea> in App.tsx (0 expected); the in-place editor is `
+  + 'the only writer left; update() still no-ops without a selection and pushes history exactly once');
 
 assert('S16 the new rule uses tokens only',
   labelInputRule != null && !/#[0-9a-fA-F]{3,8}\b/.test(newRules),

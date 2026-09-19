@@ -1,5 +1,6 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
+import {textStyleVars, alignForBody, type TextStyle} from './textStyle';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
 
@@ -64,10 +65,33 @@ export type LabelKind = {
   /** ROUND S — review mode, threaded through `data` for the same reason (the
    *  read-only flag had to reach the edge renderer this way too — fix L). */
   readOnly?: boolean;
+  /** PACKAGE-P §E.2 — the Text section's stored style, same shape and same
+   *  lazy-write discipline as the goblin kind (`src/textStyle.ts`). Absent on
+   *  every board written before PACKAGE-P, and an absent one renders exactly as
+   *  today: `textStyleVars` returns `{}` and the sheet's fallbacks win. */
+  textStyle?: TextStyle;
 };
+
+/** PACKAGE-P §E.3(b) — the inspector panel, as a selector.
+ *  The Text section's controls live inside this element, so "the pointer is
+ *  inside the inspector" is a DOM question with a DOM answer rather than a
+ *  prop threaded down from App. `src/App.tsx` renders the panel as
+ *  `<aside className="panel right">`; if that class ever changes, the hold
+ *  silently stops arming — which is why `checks/package-p-inspector.mjs`
+ *  asserts BOTH halves (this string and the `<aside>` that carries it). */
+const INSPECTOR_HOLD_SELECTOR = '.panel.right';
 
 const LabelNode = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as LabelKind;
+  /* PACKAGE-P §E.2 — same custom properties, same one-spread mechanism as
+     `src/DiagramNode.tsx`, so the Text section styles this kind with the same
+     four writes it uses on a goblin. Empty object when nothing is stored.
+
+     A label kind has NO `body`, so its inherited align is the plain one:
+     `.label-node { text-align: var(--ts-align, left) }` (`styles.css:3307-3308`)
+     — i.e. `alignForBody(undefined)`. Passing it (rather than letting the
+     model assume) keeps this renderer and the panel on one answer. */
+  const tsVars = textStyleVars(d.textStyle, alignForBody(undefined));
 
   // Same gate as `DiagramNode`: the resizer exists only while selected. In
   // read-only review mode nothing can become selected (`elementsSelectable`
@@ -107,6 +131,54 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
   const [draft, setDraft] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
 
+  /* PACKAGE-P §E.3(b) — HOLD THE BLUR-COMMIT WHILE THE POINTER IS IN THE PANEL.
+
+     THE DEFECT THIS CLOSES: the Text section only works "while typing" if
+     clicking one of its controls does not end the edit. The editor is INSIDE
+     the node, so as soon as the pointer lands on the panel React Flow drops the
+     node selection and the textarea blurs — and `onBlur` commits, mid-edit,
+     before the user's chosen Bold/colour/size is even applied to the node they
+     are still typing into.
+
+     THE MECHANISM is the one the spec names (`temporarilyDisableSubmit`,
+     X1 §2.5.4): arm a HOLD on a pointerdown that lands inside the inspector,
+     release it on pointerup/pointercancel. It is armed at the WINDOW in the
+     CAPTURE phase and reads `event.target`, not the node's own box, because the
+     press happens outside this element entirely — a listener on the node could
+     not see it at all.
+
+     WHY WINDOW AND NOT THE PANEL ELEMENT: the panel is mounted before any node
+     is, so there is no ref to reach it from here, and adding one would be a
+     second thing that can drift from the `<aside>` it points at. One selector
+     string, asserted by the harness, is the smaller contract.
+
+     THE HANDLERS BELOW ARE UNCHANGED, ON PURPOSE: `onBlur` still commits,
+     Escape still cancels, ⌘/Ctrl+Enter still commits (§E.3, "deliberately NOT
+     changing"). The hold is a guard AROUND them — it only decides whether THIS
+     one blur is a commitment or an interruption. */
+  const holdCommit = useRef(false);
+  useEffect(() => {
+    if (!editing) {
+      holdCommit.current = false;
+      return;
+    }
+    const insidePanel = (e: Event) =>
+      !!(e.target as Element | null)?.closest?.(INSPECTOR_HOLD_SELECTOR);
+    const onDown = (e: Event) => { holdCommit.current = insidePanel(e); };
+    const onUp = () => { holdCommit.current = false; };
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      // The panel can be collapsed/unmounted mid-edit; a stale hold would then
+      // swallow the next real blur, so leaving edit mode always disarms.
+      holdCommit.current = false;
+    };
+  }, [editing]);
+
   // One reader for the mode, used by the gesture — same as GoblinEdge's `ro`.
   const ro = !!d.readOnly;
 
@@ -139,6 +211,7 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
   return (
     <div
       className={`label-node${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
+      style={tsVars as React.CSSProperties}
       onDoubleClick={e => {
         // The node is draggable; without this the gesture also reaches the
         // pane / NodeWrapper. Same stop as GoblinEdge's label.
@@ -170,7 +243,7 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
           value={draft}
           rows={Math.max(1, draft.split('\n').length)}
           onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
+          onBlur={() => { if (!holdCommit.current) commit(); }}
           onKeyDown={e => {
             // `isEditable` in App.tsx keeps every app shortcut inert while this
             // is focused, so Escape/⌘Z reach ONLY this handler.

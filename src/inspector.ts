@@ -118,23 +118,23 @@ const sec = (id: SectionId): InspectorSection => ({id, collapsedDefault: COLLAPS
             (picked at creation, rarely changed — but colour is frequent, so the
             section stays open while its `body` switch folds behind it).
 
-   TWO DELIBERATE PASS-1 OMISSIONS, both stated as omissions rather than
-   half-built sections:
+   PASS 2 COMPLETED THE ONE OMISSION THIS FUNCTION EVER HAD. §A.3 gives every
+   goblin a Text section and every label one; until now the goblin list carried
+   only `content` and `style`, because returning an id the render layer cannot
+   paint would make this function's answer disagree with the panel — the worst
+   possible state for the module whose whole job is to be the single source of
+   truth. The Text section (§E — size / weight / colour / align, persisted as
+   `node.data.textStyle`) now HAS a painter and a body, so `text` is returned
+   for a goblin and sits BETWEEN `content` and `style`, exactly where the
+   omission note promised it would go. Nothing else about the ordering changed.
 
-   1. `text` IS NOT RETURNED FOR A GOBLIN. §A.3 gives every goblin a Text
-      section, but the Text section is PASS 2 (§E) and the task scope for this
-      pass is §A + §B + §D. Returning an id the render layer cannot paint would
-      make this function's answer disagree with the panel — the worst possible
-      state for the thing whose whole job is to be the single source of truth.
-      PASS 2 INSERTS `text` BETWEEN `content` AND `style` HERE. Nothing else
-      about the ordering changes.
-   2. `text` IS RETURNED FOR A LABEL, and it is the section that already exists
-      today: §D calls a label's pair "Text → Text style", which in the current
-      source is the single `label` branch (`App.tsx:4517-4530`) holding the
-      4-row `<textarea>`. That textarea is explicitly NOT removed in this pass
-      (§E.3.1 removes it in pass 2, in the same pass as its replacement), so the
-      section keeps its current id and its current contents. It is NOT
-      `kind: 'goblin'`, so it is never asked for a Content or Style section.
+   A LABEL'S `text` SECTION IS NOW THE SAME SECTION, not a namesake. It used to
+   be the `label` branch's 4-row `<textarea>` — a SECOND writer for the `text`
+   the in-place editor on the canvas writes (`src/LabelNode.tsx`). §E.3 removes
+   that textarea in the same pass that lands its replacement, so a label target
+   renders size / weight / colour / align here and has exactly ONE text editor:
+   the in-place one. It is still NOT `kind: 'goblin'`, so it is never asked for
+   a Content or Style section.
 --------------------------------------------------------------------------- */
 export function getInspectorSections(target: InspectorTarget): InspectorSection[] {
   switch (target.kind) {
@@ -153,6 +153,6 @@ export function getInspectorSections(target: InspectorTarget): InspectorSection[
     case 'label':
       return (['text'] as const).map(sec);
     case 'goblin':
-      return (['content', 'style'] as const).map(sec);
+      return (['content', 'text', 'style'] as const).map(sec);
   }
 }

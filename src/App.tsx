@@ -46,6 +46,14 @@ import {
   ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtLabelPos, ArtWidth,
   type PickerOption,
 } from './InspectorPickers';
+/* PACKAGE-P §E — the Text section's data half. ONE import covers both targets:
+   the model is target-agnostic, and `alignForBody` supplies the only thing that
+   differs between them (a label-only node is centred by design). */
+import {
+  TEXT_SIZE_OPTS, TEXT_WEIGHT_OPTS, TEXT_ALIGN_OPTS,
+  alignForBody, mergeTextStyle, readTextStyle,
+  type TextStyle, type TextSize, type TextWeight, type TextAlign,
+} from './textStyle';
 import {
   PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch,
   LAYOUTS, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
@@ -3101,6 +3109,15 @@ export default function App() {
     {v: 'card', label: 'card', art: null},
     {v: 'label-only', label: 'label only', art: null},
   ];
+  /* PACKAGE-P §E.1 — the Text section's three option tables. They carry NO art:
+     §E.1 specifies a 4-step segmented size control, a 2-button weight toggle and
+     a 3-button align row, and `ToggleRow` renders `o.art ?? o.label` — so the
+     labels ARE the control, which is also why no glyph had to be invented for
+     them. The tables themselves live in `src/textStyle.ts` (one source, shared
+     with the harness) and are wrapped here only to satisfy `PickerOption`. */
+  const SIZE_OPTS: PickerOption[] = TEXT_SIZE_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
+  const WEIGHT_OPTS: PickerOption[] = TEXT_WEIGHT_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
+  const ALIGN_OPTS: PickerOption[] = TEXT_ALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   /** Crow's-foot vocabulary (§B #9/#10) — IE / IDEF1X notation, drawn. */
   const CROW_FOOT: {v: string; label: string}[] = [
     {v: 'none', label: 'none'},
@@ -3206,6 +3223,94 @@ export default function App() {
         </div>
       ))}
     </div>
+  );
+
+  /** PACKAGE-P §E.2 — THE TEXT SECTION'S READER AND WRITER, and the reason they
+   *  are a READER and a WRITER rather than one object.
+   *
+   *  READ (`tsShown`) is what the panel SHOWS: a node with no `textStyle`, or a
+   *  field it never set, reads as the inherited value — M, Regular, no swatch,
+   *  and the align the TARGET already renders with (`alignForBody`: a
+   *  `label-only` node is centred by design, everything else is left). That is
+   *  why the panel can say "default" in words without a second copy of the
+   *  sheet's rules living in JSX.
+   *
+   *  WRITE (`writeTextStyle`) is what it STORES, and it is the lazy write
+   *  (§E.2): choosing the inherited value again stores ABSENCE, so a field
+   *  switched back to Default leaves nothing behind and a node the user never
+   *  touched keeps `textStyle === undefined`. Same discipline as the colour
+   *  swatches below, which write `colorKey` and derive `color` rather than
+   *  storing both. `mergeTextStyle` does the decision; this only maps it onto
+   *  the node — through `update()` for the selected node, so the write rides the
+   *  existing pushHistory-once-per-commit path. The label kind goes through the
+   *  SAME `update()`: it is the selected node, exactly as the goblin is. */
+  const tsAlignDefault = alignForBody(inspTarget.kind === 'goblin' ? inspTarget.body : undefined);
+  const tsStored = (selected?.data as any)?.textStyle as TextStyle | undefined;
+  const tsShown = readTextStyle(tsStored, tsAlignDefault);
+  const writeTextStyle = (patch: Partial<TextStyle>) => {
+    // undefined result means "nothing left to store" — the key is dropped
+    // rather than left as an empty object, so `textStyle: undefined` never
+    // reaches a board file.
+    update({textStyle: mergeTextStyle(tsStored, patch, tsAlignDefault)} as any);
+  };
+
+  /** PACKAGE-P §E.1 — THE TEXT SECTION'S BODY, written ONCE and registered by
+   *  both targets that list the section (`goblin` §A.3 + `label` §E.3). Writing
+   *  it twice would be two copies of four controls that must agree; the four
+   *  reads all come from `tsShown` and the four writes all go through
+   *  `writeTextStyle`, so the only per-target difference is the DEFAULT the read
+   *  falls back to — which is already inside `tsShown`.
+   *
+   *  The colour control is §E.1's own instruction: "reuses the existing colour
+   *  swatch row", i.e. the same `swatchRow` the Style section uses, so it
+   *  stores a KEY and paints `var(--c-*)`. It is a DIFFERENT field from the
+   *  Style section's colour — that one drives the outline, icon, metric and
+   *  glow (`--nc`), this one drives the text.
+   *
+   *  Font family and opacity/fill are deliberately ABSENT (§E.1): one node
+   *  already mixes `--mono` and `--sans`, so a single family control would be a
+   *  lie, and neither has a DOM analogue. */
+  const tsBody = (
+    <>
+      <div className="field">
+        <label>size</label>
+        <ToggleRow
+          value={tsShown.size}
+          onChange={v => writeTextStyle({size: v as TextSize})}
+          options={SIZE_OPTS}
+          title="Text size"
+        />
+      </div>
+      <div className="field">
+        <label>weight</label>
+        <ToggleRow
+          value={tsShown.weight}
+          onChange={v => writeTextStyle({weight: v as TextWeight})}
+          options={WEIGHT_OPTS}
+          title="Text weight"
+        />
+      </div>
+      <div className="field">
+        <label>text colour</label>
+        {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k}))}
+        <div className="hint" style={{paddingTop: 4}}>
+          Text only — the node outline keeps its own colour.
+        </div>
+      </div>
+      <div className="field">
+        <label>align</label>
+        <ToggleRow
+          value={tsShown.align}
+          onChange={v => writeTextStyle({align: v as TextAlign})}
+          options={ALIGN_OPTS}
+          title="Text align"
+        />
+      </div>
+      <div className="hint">
+        Size scales the whole text block — title, kicker, sub and metric move
+        together, keeping their hierarchy. Default (M) is not stored on the node.
+      </div>
+    </>
   );
 
   // ---- M3/S2d: the inspector is DOCKED, exactly like the palette ----
@@ -4724,23 +4829,21 @@ export default function App() {
             <>
               <span className="badge">label</span>
               <div style={{height: 12}} />
-              {/* §A.1 note 2 in `src/inspector.ts`: this section is the label's
-                  `text` section. Its `<textarea>` is DELIBERATELY still here —
-                  §E.3.1 removes it in PASS 2, in the same pass that lands the
-                  replacement Text section, because removing it earlier would
-                  leave the label with no editor at all in the panel while the
-                  in-place editor is closed. */}
-              {(() => { secBody('text', <>
-              <div className="field">
-                <label>text</label>
-                <textarea
-                  rows={4}
-                  value={(((selected.data as any).text ?? '') as string)}
-                  onChange={e => update({text: e.target.value} as any)}
-                />
-              </div>
-              </>); return null; })()}
-              <div className="hint">Free text annotation — no handles, no border.</div>
+              {/* PACKAGE-P §E.3(a) — THE PANEL'S SECOND TEXT WRITER IS GONE.
+                  This branch used to register a 4-row <textarea> as its `text`
+                  section, i.e. a SECOND writer for the same `text` the in-place
+                  editor on the canvas writes (`src/LabelNode.tsx`). §E.3 removes
+                  it in the same pass that lands its replacement, so the two can
+                  never be out of step. `text` now registers the SAME Text
+                  section a goblin gets (one body, one writer, two targets), and
+                  this kind has exactly ONE text editor: the in-place one that a
+                  double-click opens on the node itself. The section is not an
+                  empty shell — it carries size / weight / colour / align, which
+                  is what that editor's text is painted with, and its controls
+                  are usable WHILE the editor is open (§E.3(b) holds the
+                  blur-commit while the pointer is inside this panel). */}
+              {(() => { secBody('text', tsBody); return null; })()}
+              <div className="hint">Free text annotation — no handles, no border. Double-click it on the canvas to edit the text.</div>
               {renderSections()}
             </>
           ) : (
@@ -4791,6 +4894,11 @@ export default function App() {
                   </div>
                 )}
               </>); return null; })()}
+              {/* PACKAGE-P §E.1/§A.3 — the Text section, BETWEEN Content and
+                  Style (the order is `src/inspector.ts`'s, not this file's).
+                  `tsBody` is the one body both targets register: a goblin here,
+                  a label in the branch above. */}
+              {(() => { secBody('text', tsBody); return null; })()}
               {(() => { secBody('style', <>
                 <div className="field">
                   <label>shape</label>
