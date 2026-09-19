@@ -39,6 +39,14 @@ import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
 import {
+  getInspectorSections, hasIcon, hasKicker, hasMetric, type InspectorTarget, type SectionId,
+} from './inspector';
+import {
+  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
+  ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtLabelPos, ArtWidth,
+  type PickerOption,
+} from './InspectorPickers';
+import {
   PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch,
   LAYOUTS, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset, type PathId,
@@ -3019,6 +3027,135 @@ export default function App() {
     {v: MarkerType.Arrow, label: 'Open arrow'},
   ];
 
+  /* ---- PACKAGE-P §B: the option tables the pickers render ----------------
+     Each table is the SAME value set the `<select>` it replaces carried, so the
+     conversion changes the control and nothing about what is stored. `art` is
+     the glyph; `label` is both the trigger text and the row text. */
+  const MARKER_OPTS: PickerOption[] = [
+    {v: 'none', label: 'none', art: <ArtArrow kind="none" />},
+    {v: MarkerType.ArrowClosed, label: 'closed arrow', art: <ArtArrow kind="closed" />},
+    {v: MarkerType.Arrow, label: 'open arrow', art: <ArtArrow kind="open" />},
+  ];
+  /** same table, mirrored — the head-START control is the head-END one flipped. */
+  const MARKER_OPTS_START: PickerOption[] = [
+    {v: 'none', label: 'none', art: <ArtArrow kind="none" flip />},
+    {v: MarkerType.ArrowClosed, label: 'closed arrow', art: <ArtArrow kind="closed" flip />},
+    {v: MarkerType.Arrow, label: 'open arrow', art: <ArtArrow kind="open" flip />},
+  ];
+  const WIDTH_OPTS: PickerOption[] = [1, 1.5, 1.8, 2, 3].map(w => ({
+    v: String(w), label: String(w), art: <ArtWidth w={w} />,
+  }));
+  const DASH_OPTS: PickerOption[] = (['solid', 'dashed', 'dotted'] as const).map(d => ({
+    v: d, label: d, art: <ArtDash kind={d} />,
+  }));
+  const CURVE_OPTS: PickerOption[] = (['bezier', 'smoothstep', 'step', 'straight'] as const).map(c => ({
+    v: c, label: c, art: <ArtCurve kind={c} />,
+  }));
+  /** The label's position along the edge — a 3-button segmented row (§B #1). */
+  const OFFSET_OPTS: PickerOption[] = [
+    {v: 'center', label: 'center', art: <ArtLabelPos pos="center" />},
+    {v: 'start', label: 'start', art: <ArtLabelPos pos="start" />},
+    {v: 'end', label: 'end', art: <ArtLabelPos pos="end" />},
+  ];
+  /** Flow speed (§B #8) — 4 ordinal words, short enough for inline buttons. */
+  const SPEED_OPTS: PickerOption[] = [
+    {v: '4', label: 'slow', art: null},
+    {v: '2.4', label: 'normal', art: null},
+    {v: '1.4', label: 'fast', art: null},
+    {v: '0.8', label: 'very fast', art: null},
+  ];
+  /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
+  const BODY_OPTS: PickerOption[] = [
+    {v: 'card', label: 'card', art: null},
+    {v: 'label-only', label: 'label only', art: null},
+  ];
+  /** Crow's-foot vocabulary (§B #9/#10) — IE / IDEF1X notation, drawn. */
+  const CROW_FOOT: {v: string; label: string}[] = [
+    {v: 'none', label: 'none'},
+    {v: 'one', label: 'one (bar)'},
+    {v: 'zeroOrOne', label: 'zero or one (ring + bar)'},
+    {v: 'many', label: 'many (crow\u2019s foot)'},
+    {v: 'zeroOrMany', label: 'zero or many (ring + foot)'},
+    {v: MarkerType.ArrowClosed, label: 'arrow'},
+  ];
+  const CROW_END_OPTS: PickerOption[] = CROW_FOOT.map(o => ({
+    ...o, art: <ArtCardinality kind={o.v} />,
+  }));
+  const CROW_START_OPTS: PickerOption[] = CROW_FOOT.map(o => ({
+    ...o, art: <ArtCardinality kind={o.v} flip />,
+  }));
+
+  /* ---- PACKAGE-P §A.1: THE decision ------------------------------------
+     ONE target, built here from the state that already exists, handed to the
+     pure function in `src/inspector.ts`. Every branch below then renders from
+     the returned ordered list, so the panel's shape is decided in exactly one
+     place instead of by three nested ternaries in the render. */
+  const inspTarget: InspectorTarget =
+    edgeMode || selCount >= 2 ? {kind: 'edge', presetId: preset.id}
+      : selected?.type === 'table' ? {kind: 'table'}
+      : selected?.type === 'label' ? {kind: 'label'}
+      : selected
+        ? {kind: 'goblin', shape: asShape((selected.data as any).shape),
+           body: (((selected.data as any).body ?? 'card') as 'card' | 'label-only')}
+        : {kind: 'label'};
+  const inspSections = getInspectorSections(inspTarget);
+  /* ---- PACKAGE-P §A.1/§D: the ordered render ----------------------------
+     Each branch REGISTERS its section bodies into `sectionBody` and then prints
+     `renderSections()` — the ORDER comes from `inspSections`, i.e. from
+     `src/inspector.ts` §D, not from the order the branches happen to build them
+     in. That is the whole point of the pass: reordering the panel is now an edit
+     to one array in a pure module, not a re-shuffle of 500 lines of JSX.
+
+     `data-section` lands on every rendered section (§F.3 asserts the ordered
+     list); `data-collapsed` is the literal `'false'` because there is no fold UI
+     yet — §C's trigger rows and the `diagram-studio:inspector-sections`
+     persistence are PASS 3. `data-collapsed-default` carries §A.3's truth table
+     as data so pass 3 reads it instead of re-deriving it. */
+  const sectionBody: Record<string, React.ReactNode> = {};
+  const secBody = (id: SectionId, node: React.ReactNode) => { sectionBody[id] = node; };
+  /** A branch is SHARED by several target kinds, so it may only REGISTER a body
+   *  for a section the DECISION actually lists. `renderSections()` filters as
+   *  well, but relying on that filter alone would hide the mistake: the body
+   *  would still be built — its controlled reads and derived values evaluated —
+   *  for a panel that never paints it. So the gate is expressed against
+   *  `inspSections`, the same ordered list the painter walks: one source of
+   *  truth, never a second copy of the ERD rule. */
+  const hasSection = (id: SectionId) => inspSections.some(s => s.id === id);
+  const SECTION_TITLES: Record<SectionId, string> = {
+    content: 'Content',
+    text: 'Text',
+    style: 'Style',
+    table: 'Table',
+    columns: 'Columns',
+    showMode: 'Show mode',
+    label: 'Label',
+    line: 'Line',
+    markers: 'Markers',
+    cardinality: "Cardinality (crow\u2019s foot)",
+    flow: 'Flow animation',
+  };
+  /* A section is only PAINTED when the current branch REGISTERED a body for it.
+     `content` and `style` are goblin-only; `table`/`columns`/`showMode` are
+     table-only; on a fresh board the fallback target is `{kind:'label'}`, whose
+     `text` body the label branch registers. A section with no body would be an
+     empty shell with a title, so it is skipped rather than rendered blank. */
+  const renderSections = () => inspSections
+    .filter(s => sectionBody[s.id] != null)
+    .map(s => (
+      <Section
+        key={s.id}
+        id={s.id}
+        title={SECTION_TITLES[s.id]}
+        collapsedDefault={s.collapsedDefault}
+      >
+        {sectionBody[s.id]}
+      </Section>
+    ));
+  /** §B #11's preview colour is the node's LIVE outline colour, so the shape
+   *  silhouettes recolour with the node exactly as the palette row does. */
+  const nodeColor = selected ? resolveColor(selected.data as any) : COLOR_VAR.accent;
+
+
   /** L1 — the inspector swatches are COLOUR KEYS, painted with the live
    *  `var(--c-*)` token, so the swatch itself recolours with the theme. Picking
    *  one stores the key (not a hex), which is what makes light mode work. */
@@ -4102,130 +4239,131 @@ export default function App() {
             <>
               <span className="badge">edge</span>
               <div style={{height: 12}} />
-              <div className="sec-label" style={{marginTop: 0}}>Label</div>
-              <div className="field">
-                <label>label</label>
-                <input
-                  value={(selectedEdge!.label ?? '') as string}
-                  placeholder="arrow name"
-                  onChange={e => updateEdge({label: e.target.value})}
-                />
-              </div>
-              {preset.edges.labelPresets?.length ? (
+              {(() => { secBody('label', <>
                 <div className="field">
-                  <label>intent label{preset.edges.technField ? ' (label · technology)' : ''}</label>
-                  <div className="swatches" style={{gap: 6}}>
-                    {preset.edges.labelPresets.map(l => (
-                      <button
-                        key={l}
-                        type="button"
-                        className="mbtn"
-                        title={`Use “${l}”`}
-                        onClick={() => {
-                          const [label, techn] = l.split(' · ');
-                          updateEdge({label, data: preset.edges.technField ? {techn: techn ?? undefined} : undefined});
-                        }}
-                      >{l}</button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {preset.edges.technField ? (
-                <div className="field">
-                  <label>technology</label>
+                  <label>label</label>
                   <input
-                    value={(((selectedEdge!.data as any)?.techn ?? '') as string)}
-                    placeholder="e.g. HTTPS/JSON, SMTP, Kafka"
-                    onChange={e => updateEdge({data: {techn: e.target.value || undefined}})}
+                    value={(selectedEdge!.label ?? '') as string}
+                    placeholder="arrow name"
+                    onChange={e => updateEdge({label: e.target.value})}
                   />
                 </div>
-              ) : null}
-              <div className="field">
-                <label>label position</label>
-                <select
-                  value={eOffset}
-                  onChange={e => updateEdge({data: {offset: e.target.value as 'center' | 'start' | 'end'}})}
-                >
-                  <option value="center">center</option>
-                  <option value="start">start</option>
-                  <option value="end">end</option>
-                </select>
-              </div>
-              <div className="sec-label">Line</div>
-              <div className="field">
-                <label>stroke color</label>
-                {swatchRow(eStrokeKey, setEdgeColor)}
-              </div>
+                {preset.edges.labelPresets?.length ? (
+                  <div className="field">
+                    <label>intent label{preset.edges.technField ? ' (label · technology)' : ''}</label>
+                    <div className="swatches" style={{gap: 6}}>
+                      {preset.edges.labelPresets.map(l => (
+                        <button
+                          key={l}
+                          type="button"
+                          className="mbtn"
+                          title={`Use “${l}”`}
+                          onClick={() => {
+                            const [label, techn] = l.split(' · ');
+                            updateEdge({label, data: preset.edges.technField ? {techn: techn ?? undefined} : undefined});
+                          }}
+                        >{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {preset.edges.technField ? (
+                  <div className="field">
+                    <label>technology</label>
+                    <input
+                      value={(((selectedEdge!.data as any)?.techn ?? '') as string)}
+                      placeholder="e.g. HTTPS/JSON, SMTP, Kafka"
+                      onChange={e => updateEdge({data: {techn: e.target.value || undefined}})}
+                    />
+                  </div>
+                ) : null}
+                <div className="field">
+                  <label>label position</label>
+                  <ToggleRow
+                    value={eOffset}
+                    onChange={v => updateEdge({data: {offset: v as 'center' | 'start' | 'end'}})}
+                    options={OFFSET_OPTS}
+                    title="Label position"
+                  />
+                </div>
+              </>); return null; })()}
+              {(() => { secBody('line', <>
+                <div className="field">
+                  <label>stroke color</label>
+                  {swatchRow(eStrokeKey, setEdgeColor)}
+                </div>
               <div className="field-row">
                 <div className="field">
                   <label>stroke width</label>
-                  <select
+                  <IconPickerRow
+                    id="insp-stroke-width"
                     value={eWidth}
-                    onChange={e => updateEdge({style: {strokeWidth: Number(e.target.value)}})}
-                  >
-                    <option value="1">1</option>
-                    <option value="1.5">1.5</option>
-                    <option value="1.8">1.8</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                    onChange={v => updateEdge({style: {strokeWidth: Number(v)}})}
+                    options={WIDTH_OPTS}
+                    title="Stroke width"
+                  />
                 </div>
                 <div className="field">
                   <label>line style</label>
-                  <select
+                  <IconPickerRow
+                    id="insp-line-style"
                     value={eDash}
-                    onChange={e => updateEdge({style: {strokeDasharray: dashArray(e.target.value)}})}
-                  >
-                    <option value="solid">solid</option>
-                    <option value="dashed">dashed</option>
-                    <option value="dotted">dotted</option>
-                  </select>
+                    onChange={v => updateEdge({style: {strokeDasharray: dashArray(v)}})}
+                    options={DASH_OPTS}
+                    title="Line style"
+                  />
                 </div>
               </div>
               <div className="field">
                 <label>curvature</label>
-                <select
+                <IconPickerRow
+                  id="insp-curvature"
                   value={ePathType}
-                  onChange={e => {
-                    const id = e.target.value as PathType;
+                  onChange={v => {
+                    const id = v as PathType;
+                    /* G: the chosen curvature becomes the default for the NEXT
+                       edges drawn. The preference is persisted, never written
+                       back onto other edges, and the control still shows
+                       `ePathType` — the SELECTED edge — so an older bezier edge
+                       keeps reading `bezier` while the default is `smoothstep`.
+                       NOTHING HERE TOUCHES `bendX`/`bendY`: the picker sets
+                       `edge.type` and calls `rememberEdgePath`, exactly as the
+                       select it replaces did. */
                     updateEdge({type: PATH_TYPES[id]});
-                    // G: the chosen curvature becomes the default for the NEXT
-                    // edges drawn. The preference is persisted, never written
-                    // back onto other edges, and the select still shows
-                    // `ePathType` — the SELECTED edge — so an older bezier edge
-                    // keeps reading `bezier` while the default is `smoothstep`.
                     if (id !== 'custom') rememberEdgePath(id);
                   }}
-                >
-                  <option value="bezier">bezier</option>
-                  <option value="smoothstep">smoothstep</option>
-                  <option value="step">step</option>
-                  <option value="straight">straight</option>
-                </select>
+                  options={CURVE_OPTS}
+                  title="Curvature"
+                />
               </div>
-              <div className="sec-label">Markers</div>
+              </>); return null; })()}
+              {(() => { secBody('markers', <>
               <div className="field-row">
                 <div className="field">
                   <label>arrow head</label>
-                  <select
+                  <IconPickerRow
+                    id="insp-marker-end"
                     value={eMarkerEnd}
-                    onChange={e => updateEdge({markerEnd: markerFor(e.target.value, eStroke)})}
-                  >
-                    {markerOptions.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-                  </select>
+                    onChange={v => updateEdge({markerEnd: markerFor(v, eStroke)})}
+                    options={MARKER_OPTS}
+                    title="Arrow head"
+                  />
                 </div>
                 <div className="field">
                   <label>head start</label>
-                  <select
+                  <IconPickerRow
+                    id="insp-marker-start"
                     value={eMarkerStart}
-                    onChange={e => updateEdge({markerStart: markerFor(e.target.value, eStroke)})}
-                  >
-                    {markerOptions.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-                  </select>
+                    onChange={v => updateEdge({markerStart: markerFor(v, eStroke)})}
+                    options={MARKER_OPTS_START}
+                    title="Head start"
+                  />
                 </div>
               </div>
-              <div className="field">
-                <label>flow animation</label>
+              </>); return null; })()}
+              {(() => { secBody('flow', <>
+                <div className="field">
+                  <label>flow animation</label>
                 <div className="swatches" style={{gap: 6}}>
                   {([
                     ['none', 'None'],
@@ -4258,24 +4396,21 @@ export default function App() {
                 <div className="field-row">
                   <div className="field">
                     <label>count</label>
-                    <select
-                      value={String(eFlowCount)}
-                      onChange={e => updateEdge({data: {flowCount: Number(e.target.value)}})}
-                    >
-                      {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    <Stepper
+                      value={eFlowCount}
+                      onChange={n => updateEdge({data: {flowCount: n}})}
+                      min={1} max={6}
+                      title="Flow count"
+                    />
                   </div>
                   <div className="field">
                     <label>speed</label>
-                    <select
+                    <ToggleRow
                       value={String(eFlowSpeed)}
-                      onChange={e => updateEdge({data: {flowDuration: Number(e.target.value)}})}
-                    >
-                      <option value="4">slow</option>
-                      <option value="2.4">normal</option>
-                      <option value="1.4">fast</option>
-                      <option value="0.8">very fast</option>
-                    </select>
+                      onChange={v => updateEdge({data: {flowDuration: Number(v)}})}
+                      options={SPEED_OPTS}
+                      title="Flow speed"
+                    />
                   </div>
                 </div>
               )}
@@ -4304,54 +4439,49 @@ export default function App() {
                   </div>
                 </div>
               )}
-              {preset.id === 'erd' ? (
-                <>
-                  <div className="sec-label">Cardinality (crow's foot)</div>
+              {/* The ERD gate that used to sit here (`preset.id === 'erd' ? … :
+                  null`) now lives in the DECISION (`src/inspector.ts` §A.3 writes
+                  the Cardinality condition as `kind === 'edge' && preset.id ===
+                  'erd'`), so a non-ERD edge never reaches this line: the section
+                  is absent from `inspSections` and `secBody` is never called for
+                  it. Keeping the gate here as well would be the second, divergent
+                  copy of the same rule. §C additionally folds this section by
+                  default; pass 1 renders it open. */}
+              {hasSection('cardinality') && (() => { secBody('cardinality', <>
                   <div className="field-row">
                     <div className="field">
                       <label>source end</label>
-                      <select
+                      <IconPickerRow
+                        id="insp-card-start"
                         value={(((selectedEdge!.markerStart as any)?.type ?? 'none') as string)}
-                        onChange={e => {
-                          const v = e.target.value;
+                        onChange={v => {
                           updateEdge({markerStart: isCrowFoot(v)
                             ? ({type: v, color: eStroke, width: 18, height: 12} as any)
                             : (v === 'none' ? undefined : ({type: v as MarkerType, color: eStroke, width: 14, height: 14} as any))});
                         }}
-                      >
-                        <option value="none">none</option>
-                        <option value="one">one (bar)</option>
-                        <option value="zeroOrOne">zero or one (ring + bar)</option>
-                        <option value="many">many (crow's foot)</option>
-                        <option value="zeroOrMany">zero or many (ring + foot)</option>
-                        <option value={MarkerType.ArrowClosed}>arrow</option>
-                      </select>
+                        options={CROW_START_OPTS}
+                        title="Cardinality: source end"
+                      />
                     </div>
                     <div className="field">
                       <label>target end</label>
-                      <select
+                      <IconPickerRow
+                        id="insp-card-end"
                         value={(((selectedEdge!.markerEnd as any)?.type ?? 'none') as string)}
-                        onChange={e => {
-                          const v = e.target.value;
+                        onChange={v => {
                           updateEdge({markerEnd: isCrowFoot(v)
                             ? ({type: v, color: eStroke, width: 18, height: 12} as any)
                             : (v === 'none' ? undefined : ({type: v as MarkerType, color: eStroke, width: 14, height: 14} as any))});
                         }}
-                      >
-                        <option value="none">none</option>
-                        <option value="one">one (bar)</option>
-                        <option value="zeroOrOne">zero or one (ring + bar)</option>
-                        <option value="many">many (crow's foot)</option>
-                        <option value="zeroOrMany">zero or many (ring + foot)</option>
-                        <option value={MarkerType.ArrowClosed}>arrow</option>
-                      </select>
+                        options={CROW_END_OPTS}
+                        title="Cardinality: target end"
+                      />
                     </div>
                   </div>
                   <div className="hint" style={{paddingTop: 2}}>
                     Derived: <b>{cardinalityLabel((selectedEdge!.markerStart as any)?.type, (selectedEdge!.markerEnd as any)?.type) || '—'}</b>
                   </div>
-                </>
-              ) : null}
+              </>); return null; })()}
               <div className="field">
                 <label>animated (dash on the line)</label>
                 <button
@@ -4361,6 +4491,7 @@ export default function App() {
                   {selectedEdge!.animated ? 'on' : 'off'}
                 </button>
               </div>
+              </>); return null; })()}
               {/* K3: the payload-animation control moved to Settings → Canvas
                   ("Reduce motion"), where the preference belongs; the state and
                   its persisted override stay in useAnimationGating. */}
@@ -4368,6 +4499,7 @@ export default function App() {
                 Double-click the label on the canvas to rename it (<kbd>Enter</kbd> commit ·
                 <kbd>Esc</kbd> cancel). Every change is undoable with <kbd>⌘/Ctrl Z</kbd>.
               </div>
+              {renderSections()}
             </>
           ) : selCount >= 2 ? (
             <>
@@ -4417,7 +4549,7 @@ export default function App() {
             <>
               <span className="badge">table</span>
               <div style={{height: 12}} />
-              <div className="sec-label" style={{marginTop: 0}}>Table</div>
+              {(() => { secBody('table', <>
               <div className="field">
                 <label>name</label>
                 <input
@@ -4437,7 +4569,8 @@ export default function App() {
                 <label>color (symbolic key)</label>
                 {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
               </div>
-              <div className="sec-label">Columns</div>
+              </>); return null; })()}
+              {(() => { secBody('columns', <>
               {((((selected.data as any).columns ?? []) as TableColumn[])).map((c, i) => (
                 <div className="tcol-edit" key={c.id}>
                   <input
@@ -4491,8 +4624,9 @@ export default function App() {
                     {id: `c${idc++}`, name: 'new_column', type: 'text'}],
                 } as any)}
               >+ add column</button>
-              <div className="sec-label">Show mode</div>
-              <div className="field">
+              </>); return null; })()}
+              {(() => { secBody('showMode', <>
+                <div className="field">
                 <div className="swatches" style={{gap: 6}}>
                   {([['ALL_FIELDS', 'All'], ['KEY_ONLY', 'Keys'], ['TABLE_NAME', 'Names']] as const).map(([v, lbl]) => (
                     <button
@@ -4504,10 +4638,12 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              </>); return null; })()}
               <div className="hint">
                 FK edges attach column-to-column — drag from a column's left dot to the
                 referenced column. Crow's feet show the cardinality.
               </div>
+              {renderSections()}
             </>
           ) : !selected ? (
             <div className="empty">
@@ -4518,6 +4654,13 @@ export default function App() {
             <>
               <span className="badge">label</span>
               <div style={{height: 12}} />
+              {/* §A.1 note 2 in `src/inspector.ts`: this section is the label's
+                  `text` section. Its `<textarea>` is DELIBERATELY still here —
+                  §E.3.1 removes it in PASS 2, in the same pass that lands the
+                  replacement Text section, because removing it earlier would
+                  leave the label with no editor at all in the panel while the
+                  in-place editor is closed. */}
+              {(() => { secBody('text', <>
               <div className="field">
                 <label>text</label>
                 <textarea
@@ -4526,7 +4669,9 @@ export default function App() {
                   onChange={e => update({text: e.target.value} as any)}
                 />
               </div>
+              </>); return null; })()}
               <div className="hint">Free text annotation — no handles, no border.</div>
+              {renderSections()}
             </>
           ) : (
             <>
@@ -4538,67 +4683,85 @@ export default function App() {
               )}
               <div style={{height: 12}} />
               {preset.note && <div className="preset-warn" style={{padding: '0 0 10px'}}>{preset.note}</div>}
-              <div className="sec-label" style={{marginTop: 0}}>Content</div>
-              {(['kicker', 'title', 'sub'] as const).map(f => (
-                <div className="field" key={f}>
-                  <label>{f}</label>
-                  <input
-                    value={((selected.data as any)[f] ?? '') as string}
-                    onChange={e => update({[f]: e.target.value} as any)}
-                  />
-                </div>
-              ))}
-              <div className="sec-label">Metrics</div>
-              <div className="field-row">
+              {(() => { secBody('content', <>
+                {hasKicker(inspTarget) && (
+                  <div className="field">
+                    <label>kicker</label>
+                    <input
+                      value={((selected.data as any).kicker ?? '') as string}
+                      onChange={e => update({kicker: e.target.value} as any)}
+                    />
+                  </div>
+                )}
+                {(['title', 'sub'] as const).map(f => (
+                  <div className="field" key={f}>
+                    <label>{f}</label>
+                    <input
+                      value={((selected.data as any)[f] ?? '') as string}
+                      onChange={e => update({[f]: e.target.value} as any)}
+                    />
+                  </div>
+                ))}
+                {hasMetric(inspTarget) && (
+                  <div className="field-row">
+                    <div className="field">
+                      <label>metric</label>
+                      <input
+                        value={((selected.data as any).metric ?? '') as string}
+                        onChange={e => update({metric: e.target.value} as any)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>unit</label>
+                      <input
+                        value={((selected.data as any).metricUnit ?? '') as string}
+                        onChange={e => update({metricUnit: e.target.value} as any)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>); return null; })()}
+              {(() => { secBody('style', <>
                 <div className="field">
-                  <label>metric</label>
-                  <input
-                    value={((selected.data as any).metric ?? '') as string}
-                    onChange={e => update({metric: e.target.value} as any)}
+                  <label>shape</label>
+                  <ShapesPicker
+                    value={asShape((selected.data as any).shape)}
+                    onChange={v => update({shape: v as Shape} as any)}
+                    color={resolveColor(selected.data as any)}
                   />
                 </div>
+                {/* §C: the `body` switch is a rarely-changed 2-way toggle, so it
+                    lives INSIDE the Style section rather than getting a section
+                    of its own. Pass 1 renders it as a plain field (no fold). */}
                 <div className="field">
-                  <label>unit</label>
-                  <input
-                    value={((selected.data as any).metricUnit ?? '') as string}
-                    onChange={e => update({metricUnit: e.target.value} as any)}
+                  <label>body</label>
+                  <ToggleRow
+                    value={(((selected.data as any).body ?? 'card') as string)}
+                    onChange={v => update({body: v as 'card' | 'label-only'} as any)}
+                    options={BODY_OPTS}
+                    title="Body"
                   />
                 </div>
-              </div>
-              <div className="sec-label">Style</div>
-              <div className="field">
-                <label>shape</label>
-                <select
-                  value={asShape((selected.data as any).shape)}
-                  onChange={e => update({shape: e.target.value as Shape} as any)}
-                >
-                  {SHAPES.map(s => <option key={s.id} value={s.id}>{s.label} — {s.hint}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>body</label>
-                <select
-                  value={(((selected.data as any).body ?? 'card') as string)}
-                  onChange={e => update({body: e.target.value as 'card' | 'label-only'} as any)}
-                >
-                  <option value="card">card</option>
-                  <option value="label-only">label only</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>icon</label>
-                <IconPicker
-                  value={((selected.data as any).icon ?? '') as string}
-                  onPick={name => update({icon: name ?? ''} as any)}
-                />
-              </div>
-              <div className="field">
-                <label>color</label>
-                {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
-              </div>
-              <div className="hint">
-                Color drives the shape outline, icon, metric and glow.
-              </div>
+                {/* §A.2: `note` draws no IconGlyph, so the field is absent —
+                    not disabled — for exactly that shape. */}
+                {hasIcon(inspTarget) && (
+                  <div className="field">
+                    <label>icon</label>
+                    <IconPicker
+                      value={((selected.data as any).icon ?? '') as string}
+                      onPick={name => update({icon: name ?? ''} as any)}
+                    />
+                  </div>
+                )}
+                <div className="field">
+                  <label>color</label>
+                  {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
+                </div>
+                <div className="hint">
+                  Color drives the shape outline, icon, metric and glow.
+                </div>
+              </>); return null; })()}
+              {renderSections()}
             </>
           )}
         </div>

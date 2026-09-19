@@ -1283,6 +1283,85 @@ body {
 }
 .icon-raw:focus { border-color: var(--sel); }
 
+/* ---------- PACKAGE-P: inspector sections + pickers ----------
+   TOKENS ONLY — the file's hex-literal count is a gate (127) and this block
+   adds none: every colour is a `var()`, and all three picker glyphs stroke
+   `currentColor`, so the button's own `color` (and therefore the theme) drives
+   the art. No new hex, no new dependency. */
+.insp-glyph { display: block; overflow: visible; }
+/* The picker triggers show 26x18 art instead of a 17px lucide glyph, so the
+   glyph cell must be as wide as the art or the silhouette is clipped. Scoped to
+   `.insp-trigger-glyph` so the node-icon picker (`IconPicker.tsx`) keeps its
+   18x18 cell untouched. */
+.insp-trigger-glyph { width: 26px; height: 18px; }
+.insp-pop { width: 288px; }
+.insp-opt-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+.insp-opt {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 9px; cursor: pointer; text-align: left;
+  font-family: var(--mono); font-size: 11.5px;
+  transition: border-color .12s, color .12s;
+}
+.insp-opt:hover { border-color: var(--sel); color: var(--sel); }
+.insp-opt.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
+.insp-opt-glyph { display: grid; place-items: center; width: 26px; height: 18px; flex: none; }
+.insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The 19-shape list: two lines per row (label + hint), so it is its own list
+   rather than `.insp-opt-list`'s single-line rows. */
+.insp-shape-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+.insp-shape-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 9px; cursor: pointer; text-align: left;
+  transition: border-color .12s, color .12s;
+}
+.insp-shape-item:hover { border-color: var(--sel); color: var(--sel); }
+.insp-shape-item.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
+.insp-shape-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.insp-shape-text .insp-opt-label { font-family: var(--mono); font-size: 11.5px; }
+.insp-shape-hint {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.insp-shape-item.on .insp-shape-hint { color: var(--sel); }
+/* Segmented rows (§B #1, #8, #12). `.mbtn` supplies the button; the wrapper
+   supplies the row. `1fr` per button so a 2-button toggle and a 4-button
+   segmented row both fill the field width. */
+.insp-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
+.insp-seg-btn { display: grid; place-items: center; padding: 7px 6px; gap: 4px; }
+.insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
+.insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
+/* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */
+.insp-stepper {
+  display: flex; align-items: center; gap: 0;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--elevated); overflow: hidden;
+}
+.insp-step-btn {
+  width: 34px; height: 32px; flex: none;
+  background: transparent; border: 0; color: var(--fg);
+  font-family: var(--mono); font-size: 15px; line-height: 1; cursor: pointer;
+  transition: color .12s;
+}
+.insp-step-btn:hover:not(:disabled) { color: var(--sel); }
+.insp-step-btn:disabled { color: var(--dim2); cursor: not-allowed; }
+.insp-step-val {
+  flex: 1; text-align: center; font-family: var(--mono); font-size: 12.5px;
+  color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  padding: 8px 0;
+}
+/* The section wrapper. Sections stack with the same rule the old hand-written
+   `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
+   gap between neighbours, none before the first. */
+.insp-section + .insp-section {
+  margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--border);
+}
+.insp-sec-title { margin: 0 0 10px 2px; }
+.insp-sec-body { display: block; }
+
 /* ---------- inspector ---------- */
 .field { margin-bottom: 13px; }
 .field label {
