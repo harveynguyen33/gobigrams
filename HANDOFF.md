@@ -1,8 +1,41 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P complete + **ROUND W** shipped (section
-header hierarchy · font picker · custom size) with both follow-up fixes.
+**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P complete + ROUND W + **ROUND X** shipped.
 **Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+
+> ## ✅ ROUND X (2026-09-19) — Harvey's UI feedback on the Text section
+>
+> **1. THE SIZE ROW WAS BROKEN, measured live: S/M/L/XL all at `left: 1005` — STACKED INTO A COLUMN** (the
+> `.insp-seg` row measured 31×121px). Cause: ROUND W's `.insp-num-row` flex wrapper handed all 253px to the
+> input and starved the grid. **Fixed per Harvey: "Trả lại như cũ ko cần input, nhưng rule giữ khi cần"** — the
+> input and the dead `.insp-num*` rules are gone; `TEXT_SCALE_MIN/MAX`, `clampTextScale` and the `scale` field
+> **stay**, so a board carrying a custom scale still RENDERS it (verified: `{scale:2.0}` paints `--ts-scale:2`,
+> title 29px). `readTextStyle().size` now derives the marked step from what PAINTS, so `{scale:1.15}` marks L
+> and `{scale:2.0}` marks **nothing** — deliberate, not a leftover.
+>
+> **THE CASCADE TRAP BEHIND IT (found, flagged, not fixed):** `.insp-seg` declares
+> `display: grid; grid-auto-columns: 1fr` but **`.swatches { display: flex }` beats it** at equal specificity,
+> later in the sheet — verified: **all four** segmented rows (size/weight/align/font) compute `display: flex;
+> flex-wrap: wrap`. The grid declaration has never had any effect and the buttons are auto-width. That is how
+> the size buttons could be squeezed to 25px. **Before touching any `.insp-seg`/`.swatches` rule, know this.**
+>
+> **2.** The custom-size hint deleted (it described a control that no longer exists).
+>
+> **3. THE FONT CONTROL IS NOW FOUR SELF-PREVIEWING BUTTONS IN ONE ROW** (`ToggleRow wide`, the same `.insp-seg`
+> idiom Size and Align use — a modifier, not a fork). Measured: one row, each in its own family
+> (Mono/UI/Read/Viet), **184px in a 253px field**, no overflow, no label shrunk. Names print **once** by
+> construction, so ROUND W's suppression hooks are gone and asserted absent.
+>
+> **4.** The label branch's "Free text annotation…" hint deleted, plus a full `.hint` audit (8 entries,
+> classified visible-teaching vs invisible-fact). Only the two named were removed.
+>
+> **Verified live:** S/M/L/XL on one row with distinct lefts (1005/1037/1068/1100) and no input; the four font
+> buttons all at one top with their own families; and **all four controls act independently** — XL then M
+> returns `--ts-scale` to unset (the lazy write), and Viet/Bold/Right each land without disturbing the others.
+>
+> **Harness note:** `scripts/measure-font-row.py` (new) measures the four labels' advance widths straight out
+> of the woff2 files. Its conclusion (FITS) is right but its arithmetic assumes the grid that does not apply —
+> trust the live measurement, not its model, if you change the row.
 
 > ## ✅ ROUND W (2026-09-19) — section header, font picker, custom size
 >
