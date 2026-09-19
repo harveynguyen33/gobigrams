@@ -86,32 +86,45 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**ROUND V is shipped — nothing more queued on overflow.** Harvey's re-test: drag a shape's resize grips as
-small as they go, and put one very long word in a node's title; the text must wrap inside the box and nothing
-may escape it.
+**PACKAGE-P SPEC IS WRITTEN AND VERIFIED — awaiting Harvey's approval before any build.**
+Read `PACKAGE-P-SPEC.md`. Written by `architect` from the Excalidraw research; the orchestrator
+independently re-checked every load-bearing claim against the source and resolved the one open conflict.
 
-**NEXT WORK — the inspector rebuild + text styling. Spec FIRST, mockup for approval, then build in
-gated passes.** Decision already taken by Harvey: **text styling lives in the right panel (option B)**, and he
-wants it **"like Excalidraw"**, plus the panel **reorganised per shape type**, with **icon pickers instead of
-text dropdowns** and **rarely-used controls collapsed**.
+**What it delivers** (Harvey's three asks: per-shape-type sections, icon pickers instead of text dropdowns,
+collapse the rarely-changed):
+- **One pure decision function** (`src/inspector.ts`, new) returning an ORDERED section list per target —
+  mirroring upstream's `shapeActionPredicates.ts`. Today the inspector has **3 branches and all 19 goblin
+  shapes share one panel**, so a `decision` diamond and a `database` cylinder show identical controls.
+  Field predicates (`hasKicker`/`hasMetric`/`hasIcon`) are derived from what `DiagramNode.tsx` actually
+  renders per shape, so `group` / `note` / `actor` / `label-only` finally differ.
+- **All 12 `<select>`s converted** — 10 to icon/trigger+popover pickers, flow count → stepper, flow speed →
+  segmented, `body` → 2-button toggle, the 19-shape picker → searchable `ShapePreview` popover. Target:
+  **zero bare `<select>`**, matching upstream (which has 0). The pattern already exists in this repo:
+  `src/IconPicker.tsx`.
+- **Collapse: no accordion** (upstream has none — stated as OUR pattern, not a copy). Edge **Cardinality** and
+  **Flow animation** fold by default; the goblin `body` toggle folds behind Style. Persisted under
+  `diagram-studio:inspector-sections`.
+- **Text section (option B)** + the three editing behaviours, and **font family deliberately OUT** (one node
+  already mixes `--mono` and `--sans`).
 
-**The research this must be spec'd from** — `diagram-studio-research/excalidraw/`:
-`SYNTHESIS.md` (read this first) · `X1-text-editor.md` · `X2-right-panel.md` · `X3-panel-by-type.md` ·
-`ORCH-FINDINGS-icons-and-collapse.md`. Pinned at Excalidraw `c0ad61c`.
+**§H — five conflicts, TWO OF WHICH WERE MY OWN PROMPT ERRORS** (verified against source and corrected, not
+obeyed): `body` has 2 options not 19 (the 19-list is `shape`); Align/Distribute/Delete are in the
+**multi-select** branch, not the edge branch. Also found: a **second label editor already exists** (a panel
+`textarea` writing the same `text` as the in-place editor) — the spec removes it, closing a double-writer.
+**Escape resolved as KEEP = cancel** (shipped behaviour with a written rationale; Harvey asked for the controls
+while typing, not the key contract).
 
-**The four load-bearing facts** (all orchestrator-verified against upstream source):
-1. Excalidraw has **0 `<select>`** in its panel — icon/toggle buttons and `trigger + popover` throughout.
-2. **No accordion exists.** The frequency-driven mechanism is `CompactShapeActions` — *"the collapsed,
-   popover-driven layout"* — same actions, two densities. Copy that, not a home-made accordion.
-3. **Nothing renders next to the text while editing.** The panel stays live because *editing is a target*
-   (`showSelectedShapeActions`) — so copying it means our panel must target `editingNodeId ?? selectedNodeId`,
-   keep focus, and hide duplicate/delete while editing.
-4. The per-type decision is **one predicate function returning boolean flags** (`shapeActionPredicates.ts`),
-   consumed by every layout. That is the structure to copy — our inspector currently has no per-type branch.
+**BLOCKED ON HARVEY — 3 answers before the build starts** (asked; the mockup is
+`diagram-studio-research/mockup-inspector-rebuild.html`):
+1. Do the hand-drawn icons read correctly (stroke width as bars, line style as lines, curvature as 4 path
+   shapes, arrow heads as arrows)?
+2. Collapse: "rarely changed folded by default, showing its current value" — right, or keep everything open?
+3. Ordering per shape type — for an architecture box: **Text → Shape → Colour**, with Icon and Metric folded.
+   Agree or reorder?
 
-**BLOCKED ON HARVEY (one open question, asked, not yet answered):** in his Excalidraw screenshot he sees **4**
-font-family buttons; upstream ships **3** fonts + a 4th icon that OPENS the picker. Harmless either way, but do
-not guess which he means.
+**Build order once approved — 3 gated passes, Harvey reviews between them:** (1) the section decision function
++ icon pickers; (2) the Text section + the editing behaviours; (3) the collapse state. **Do NOT build in one
+go** — a mistake in pass 1 would otherwise be built on three times.
 
 **Vault debt:** edge reshaping — ROUND S, T and U are NOT yet in ADR-031 / Change Log. Batch via pkm.
 `checks/round-s-edge-bend.mjs` covers (a)–(o).
