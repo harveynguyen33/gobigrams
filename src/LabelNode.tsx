@@ -148,7 +148,13 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
         setDraft(d.text ?? '');
         setEditing(true);
       }}
-      title={editing || ro ? undefined : 'Double-click to edit this text'}
+      /* ROUND V — the tooltip has to be narrower than the box it describes.
+         The fixed caption this replaces was 65 characters wide, i.e. wider than
+         a small label's whole box, and `overflow: hidden` suppresses the native
+         tooltip of an element that actually overflows — so it would vanish
+         exactly on the labels that need it. The stored TEXT is always narrower
+         than the thing it describes; the hint rides along only while it fits. */
+      title={editing || ro ? undefined : `${shown}${shown.length <= 24 ? '  ·  Double-click to edit' : ''}`}
     >
       {resizer}
       {editing ? (
@@ -173,7 +179,12 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
           }}
         />
       ) : (
-        shown
+        /* ROUND V — the read-only text gets its OWN box (`.label-text`) rather
+           than sharing the root's. It is a plain block filling the root, so it
+           wraps and clips exactly like the bare text did, but this root's border
+           stays unclipped — which is what keeps the four resize grips (10px
+           squares centred on that border) fully grabbable. */
+        <div className="label-text">{shown}</div>
       )}
     </div>
   );

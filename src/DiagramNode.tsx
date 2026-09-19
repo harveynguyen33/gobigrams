@@ -245,9 +245,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         {resizer}
         <NodeHandles />
         {postit}
-        {d.kicker && <div className="node-kicker">{d.kicker}</div>}
-        {d.title && <div className="note-title">{d.title}</div>}
-        {d.sub && <div className="node-sub">{d.sub}</div>}
+        {/* ROUND V — the text lives in its own box so the root's border can stay
+            unclipped: the four connect dots and, when selected, the four resize
+            grips are centred ON that border. */}
+        <div className="note-body">
+          {d.kicker && <div className="node-kicker">{d.kicker}</div>}
+          {d.title && <div className="note-title">{d.title}</div>}
+          {d.sub && <div className="node-sub">{d.sub}</div>}
+        </div>
       </div>
     );
   }

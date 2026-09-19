@@ -2985,3 +2985,129 @@ kbd {
 .edge-bend-handle:active { background: var(--sel); border-color: var(--sel); }
 .edge-bend-handle:active { cursor: grabbing; }
 .edge-bend-handle::after { content: ''; position: absolute; inset: -9px; }
+
+/* =====================================================================
+   ROUND V (2026-09-19) — NOTHING MAY PAINT OUTSIDE A NODE BOX.
+
+   Harvey: "ngoài ra khi tôi kéo scale shapes, khi quá lớn, text hoặc các gì
+   bên trong có thể bị overflow khỏi box. Cần đảm bảo ko bao giờ ra khỏi."
+
+   TWO MEASURED DEFECTS, and the one rule that fixes each:
+     A  goblin `title`, ONE unbreakable 43-char word, box 200x141  ->  259px out
+        on the RIGHT. Cause: `.node-title` is `display: flex` and its text
+        `<span>` is a flex item, so `min-width: auto` made that item as wide as
+        the LONGEST WORD (423px) — a box cannot wrap what it is wider than.
+     D  Text (`label`) node, an ordinary sentence, box 140x40  ->  65px out
+        BELOW. Cause: `.label-node` had `min-height: 100%` (a FILL rule) and
+        nothing capped its height.
+
+   THE WRAP TRAP, measured in a browser on a 200px box shaped like `.node-title`
+   with the same 43-char word — this is why `overflow: hidden` alone is NOT the
+   fix, and why `break-word` alone is not either:
+     overflow-wrap: normal                     165px out
+     break-word on the flex container          165px out
+     anywhere                                  contained, WRAPS
+     break-word + min-width: 0 on the span     contained, wraps
+     break-word + overflow: hidden             165px out — clipped MID-WORD, and
+                                               that loses the user's text
+   So the fix is `anywhere` (or `break-word` + `min-width: 0`), with
+   `overflow: hidden` as the belt — never as the sole mechanism.
+
+   WHY THE CLIP IS INNER. `.shape-frame` (the visible card: `position: absolute;
+   inset: 0`) and the four connect dots are CHILDREN of `.node` and sit ON or
+   just outside its border, so `overflow: hidden` on `.node` would cut the frame
+   and the dots off it. The clip therefore goes on the TEXT CONTAINER only:
+   `.node-body` / `.lo-body`, plus `.label-text` / `.note-body` for the two kinds
+   whose ROOT is their text container. Those two are the sharpest case, because
+   their ACTIVE root ALSO carries the four resize grips — 10px squares with a
+   6px `::after` hit area, all centred on the border, so clipping the root would
+   leave four 5x5 wedges that are hard to grab where the four 10x10 affordances
+   are today. So the text gets its own inner box and the root stays unclipped.
+   `.node` keeps `overflow: visible`, asserted as a negative control by
+   `checks/round-v-overflow.mjs`.
+
+   THE VERTICAL HALF, and why each kind needs a definite height. `overflow:
+   hidden` on a container whose height is `auto` clips NOTHING vertically: the
+   container just grows with its content. A percentage `max-height` has the same
+   trap one level up — against a containing block whose height is `auto` it is
+   INDEFINITE and is dropped, so it clips nothing either.
+     · `.node-body`: its containing block is `.node`, whose height is `auto`
+       (only `min-height: 100%`) — hence `.node:not(.label-only) { height: 100% }`,
+       which makes the chain definite so the cap binds.
+     · `.label-text` / `.note-body`: their containing block is their own kind's
+       root. `.note-node` already declares `height: 100%`, so the cap binds there
+       with no extra rule; `.label-node` declared only `min-height: 100%`, so the
+       root takes `height: 100%` below — and with it `min-height: 100%` stays
+       satisfied, because the used height can never be under it.
+     In BOTH cases the percentage is indeterminate exactly when the React Flow
+   wrapper carries no stored size — the demo board's `n100`, the flowchart `a11`
+   annotation — and there the box keeps sizing to its own content exactly as it
+   does today, because `100%` of an automatic height is automatic.
+
+   `:not(.label-only)` IS DELIBERATE, not tidiness. `.node .lo-body` carries
+   `min-height: 100%`. Making that percentage live would pull every flowchart
+   label out of the position its per-shape padding gives it and drop it into the
+   middle of the shape — a pixel change to nodes that are not broken. Excluding
+   the label-only body leaves that percentage inert exactly as it is today.
+
+   WHAT IS UNCHANGED, BY CONSTRUCTION. A node whose text FITS is untouched on
+   both axes: `height: 100%` equals today's `min-height: 100%` as soon as the
+   content is shorter than the box, and `overflow-wrap: anywhere` never moves a
+   line that has a space to break at (it only breaks a word that has no other
+   break opportunity). The floors (200 x 141 / CSS 190) are NOT touched —
+   raising them is the lazy version of this fix, and it would leave nodes
+   un-shrinkable. No colour literal is added: every value here is a keyword, a
+   percentage or a token.
+
+   THE ELLIPSIS RULE. No `text-overflow` is introduced: truncating the user's own
+   text to "CDC Sou…" hides data. Wrapping + clipping keeps every character, at
+   the cost of needing a bigger box — which is the user's gesture. The
+   `text-overflow: ellipsis` already on `.tnode-*` and on the sidebar rows is
+   untouched, and no word-break rule is added to those rows: they are
+   `nowrap` + ellipsis + a fixed column layout.
+   ===================================================================== */
+/* The card's text container. `box-sizing: border-box` is global (line 268), so
+   `max-height: 100%` includes the padding and the padding stays inside the box. */
+.node-body { overflow: hidden; max-height: 100%; overflow-wrap: anywhere; }
+/* The chain that makes that percentage bind — see the header. */
+.node:not(.label-only) { height: 100%; }
+/* `min-width: 0` on the flex ITEM (not the container): the second half of the
+   measured-good pair above, and the belt to `anywhere`'s braces. `.node-ico` is
+   already `flex: none`, so the text span is the only shrinking item. */
+.node-title > span:last-child,
+.node .lo-title > span:last-child,
+.group-label > span { min-width: 0; }
+.node-kicker, .node-title, .node-sub, .node-metric { overflow-wrap: anywhere; }
+/* label-only flowchart body: clipped horizontally by its own box; its
+   `min-height: 100%` stays declared and stays inert (see the header). */
+.node .lo-body { overflow: hidden; overflow-wrap: anywhere; }
+.node .lo-title, .node .lo-sub { overflow-wrap: anywhere; }
+/* the note kind is resizable too. Its text goes into an inner box, NOT onto the
+   root: the root hosts the four connect dots and, when selected, the four resize
+   grips, all centred on its border, and it has `height: 100%` (so it can never
+   grow) — so clipping it would cut them off. Only text is affected: the folded
+   corner and the icon watermark are positioned INSIDE this box. */
+.note-node { overflow-wrap: anywhere; }
+.note-body { max-height: 100%; overflow: hidden; }
+.note-title { overflow-wrap: anywhere; }
+/* `.group-label` keeps `white-space: nowrap` on purpose: its chip is absolutely
+   positioned ON the group's border (`top: -11px`), so letting it wrap to a
+   second line would move the chip and grow it. It already carries
+   `overflow: hidden`; this only makes a future relaxation of `nowrap` break
+   words instead of spilling them. */
+.group-label { overflow-wrap: anywhere; }
+/* The Text node: the text goes into an inner box (same reason as the note root —
+   this root's active state carries the four grips on its border), and THAT box
+   is capped at the node's box and clipped. The root takes `height: 100%` so the
+   cap has a definite box to resolve against (see the header) and declares NO
+   overflow in any state: the four grips and the four connect dots always sit on
+   its border uncut. */
+.label-node { overflow-wrap: anywhere; height: 100%; }
+.label-text { max-height: 100%; overflow: hidden; }
+/* The in-place editor is the same text, in its other state, so a draft longer
+   than the box must still be readable — and it scrolls ITSELF rather than making
+   the root a scroll container, which would clip the border affordances above.
+   The cap resolves because the root's height is now definite. `resize: none` on
+   `.node-label-input` is untouched: the node's React Flow resizer remains the
+   only resize affordance. */
+.label-node.editing .node-label-input { max-height: 100%; overflow-y: auto; }
