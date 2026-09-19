@@ -1,10 +1,45 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (midday) · **Status:** ✅ **PACKAGE-P COMPLETE — all three passes shipped and
-orchestrator-verified** (per-type sections + icon pickers · the Text section · the fold UI + persistence).
-PACKAGE-Q (panel hotkeys) shipped the same session.
-**Next: Harvey's Mac test of PACKAGE-P + PACKAGE-Q, then PACKAGE-N (the palette redesign) — its spec is
-already written.**
+**Last session:** 2026-09-19 (afternoon) · **Status:** ✅ PACKAGE-P complete + **ROUND W** shipped (section
+header hierarchy · font picker · custom size) with both follow-up fixes.
+**Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+
+> ## ✅ ROUND W (2026-09-19) — section header, font picker, custom size
+>
+> Harvey's three asks from the inspector screenshot. Gates `tsc=0 build=0 hex=127`; harness 117 → 131.
+>
+> **1. THE SECTION HEADER DID NOT READ AS A HEADER.** Measured: the section title and a `.field label` were
+> **identical** (both 11px, both `rgb(138,138,146)`), so a header looked like one more field label and a folded
+> section was a 17px dim strip whose only affordance was a 10px dim caret. Now title 13px / `var(--fg)`, caret a
+> 16px SVG at full foreground with rotate-on-open, row 17 → 27px.
+>
+> **2. A FONT PICKER — Mono (JetBrains Mono, default) / UI (Inter) / Read (Lexend) / Viet (Be Vietnam Pro)**,
+> applied to the **whole node** as Harvey chose. Four families **shipped in `public/fonts/`** (24 woff2, 688K,
+> 400+700 × latin/latin-ext/vietnamese) as 24 `@font-face` rules with per-subset `unicode-range`; **no CDN, the
+> app stays offline.** **WHY THOSE FOUR: the obvious "easy read" pick — Atkinson Hyperlegible — has NO
+> vietnamese subset**, so it would silently fall back for every accented glyph. The picker previews each option
+> **in its own family**. `mono` renders anyway, so picking Mono stores **absence**.
+>
+> **3. A CUSTOM SIZE** beside the steps: `<input type=number>`, min .5 / max 2 / step .1, typed `1` stores
+> absence. **The 2.0x overflow risk was measured, not assumed:** a node at the resizer floor (200×141) with
+> worst-case content has its title box 20px below the node — **clipped, not painted** (`.node-body` carries
+> `overflow:hidden` per ROUND V; `elementFromPoint` below the box returns the canvas). Floors untouched.
+>
+> **TWO FOLLOW-UP DEFECTS, both the SAME bug class — one rule reaching one of its two render sites:**
+> - The picker painted each option's name **twice** (`Mono Mono`). The `:has()` rule suppressing the duplicate
+>   targeted the TRIGGER only. Fixed with a `icon-field-font` hook + `:not(.insp-font-sample)`, so it cannot
+>   reach another picker (verified: shape and icon pickers keep their labels).
+> - The font **skipped the in-place editor**: a label at rest painted `"Be Vietnam Pro"` while its editor
+>   painted `ui-monospace`, so Vietnamese diacritics rendered in a different font while typing than while
+>   reading. `--ts-weight/color/align` each carried TWO consumers (label + `.node-label-input`); `--ts-font`
+>   had only one. **This was the third instance of that class in one session**, so the harness now asserts the
+>   asymmetry **generally** over all four `--ts-*` properties, not per-property.
+>
+> **Verified live:** all five properties MATCH between the label at rest and its open editor; both vietnamese
+> faces load; the goblin's four rows all take the chosen family; every woff2 fetches 200 `font/woff2`.
+> **`.edge-label-input` needs no `ts-*`** — the `text` section is listed for `goblin` and `label` only, so an
+> edge is not a text-style target. The option row's `title` attribute deliberately keeps printing the name on
+> hover: it is the row's only accessible name.
 
 > ## ✅ PACKAGE-P COMPLETE (2026-09-19) — the inspector rebuild
 >
