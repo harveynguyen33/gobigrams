@@ -129,12 +129,20 @@ export const ArtLabelPos = ({pos}: {pos: 'center' | 'start' | 'end'}) => (
    =========================================================================== */
 export type PickerOption = {v: string; label: string; art: ReactNode};
 
-export function IconPickerRow({value, onChange, options, title, id}: {
+export function IconPickerRow({value, onChange, options, title, id, rowClass}: {
   value: string;
   onChange: (v: string) => void;
   options: PickerOption[];
   title: string;
   id: string;
+  /** ROUND W FIX — an OPTIONAL class for the `.icon-field` wrapper, so ONE
+   *  caller can scope sheet rules to its own rows. `.icon-field` wraps exactly
+   *  one picker and each picker gets its own element, so a class on this
+   *  wrapper reaches this picker's trigger AND its popover rows and cannot
+   *  reach any other picker's. It is a prop rather than a literal because the
+   *  font picker is the only caller that needs it (`src/App.tsx` passes
+   *  `icon-field-font`) — the other four pickers are untouched, byte for byte. */
+  rowClass?: string;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -156,7 +164,7 @@ export function IconPickerRow({value, onChange, options, title, id}: {
   const current = options.find(o => o.v === value) ?? options[0];
 
   return (
-    <div className="icon-field" ref={box}>
+    <div className={`icon-field${rowClass ? ` ${rowClass}` : ''}`} ref={box}>
       <button
         type="button"
         id={id}

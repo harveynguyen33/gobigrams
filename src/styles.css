@@ -1319,6 +1319,21 @@ body {
 .insp-opt-glyph:has(.insp-font-sample) { width: auto; justify-content: start; }
 .icon-trigger-glyph:has(.insp-font-sample) { width: auto; }
 #insp-text-font:has(.insp-font-sample) .icon-trigger-name { display: none; }
+/* ROUND W FIX — THE SAME SUPPRESSION IN THE POPOVER, which the trigger rule
+   above cannot reach. Measured in the DOM: `.icon-pop` is the trigger
+   BUTTON's sibling inside `.icon-field`, so the option rows are never
+   descendants of the font field's id and no selector starting at that id
+   matches them. The row therefore carries a HOOK OF ITS OWN —
+   `icon-field-font`, added in `IconPickerRow` ONLY when its caller passes
+   `rowClass`, and passed by exactly one caller (`src/App.tsx`: the font
+   picker). `.icon-field` wraps ONE picker, so the hook reaches this picker's
+   option rows and cannot reach another picker's; a bare sibling rule would
+   have silently emptied every other picker in the panel.
+   THE SAMPLE IS NOT TOUCHED. `:not(.insp-font-sample)` is what states that:
+   the cell holding the preview is the informative half and stays visible, in
+   its own family, and remains the row's only label. The plain sibling beside
+   it is the duplicate, and it goes. */
+.icon-field-font .insp-opt .insp-opt-label:not(.insp-font-sample) { display: none; }
 .insp-font-sample { flex: none; font-size: 13.5px; }
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list

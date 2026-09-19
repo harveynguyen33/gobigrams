@@ -3411,6 +3411,7 @@ export default function App() {
         <label>font</label>
         <IconPickerRow
           id="insp-text-font"
+          rowClass="icon-field-font"
           value={tsShown.font}
           onChange={v => writeTextStyle({font: v as TextFont})}
           options={FONT_OPTS}

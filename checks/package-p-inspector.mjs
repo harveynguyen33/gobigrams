@@ -1068,9 +1068,13 @@ function subjectKey(sel) {
   return cls || last;
 }
 
-// Every var(--ts-*[, fallback]) inside a declared value, paren-matched so a
-// NESTED var (the `calc(Npx * var(--ts-scale, 1))` form) is seen too.
-function varUses(value) {
+// Every var(<prefix>[, fallback]) inside a declared value, paren-matched so a
+// NESTED var (the `calc(Npx * var(--ts-scale, 1))` form) is seen too. The
+// prefix is a parameter so `--ts-font` can be swept on its OWN (ROUND W FIX):
+// a bare `--ts-` sweep proves a MEMBER of that family is fine, not that the
+// one variable this round added is. The default keeps every existing caller
+// behaviourally identical.
+function varUses(value, varPrefix = '--ts-') {
   const out = []; const re = /var\(/g; let m;
   while ((m = re.exec(value)) !== null) {
     let depth = 1, arg = '', i = m.index + 4;
@@ -1082,7 +1086,7 @@ function varUses(value) {
     }
     const comma = arg.indexOf(',');
     const name = (comma < 0 ? arg : arg.slice(0, comma)).trim();
-    if (name.startsWith('--ts-')) {
+    if (name.startsWith(varPrefix)) {
       out.push({name, fallback: comma < 0 ? null : arg.slice(comma + 1).trim()});
     }
     re.lastIndex = i;
@@ -1107,8 +1111,9 @@ const specStr = s => `(${s.ids},${s.classes},${s.els})`;
 
 // The whole sweep, as a pure function of a sheet's TEXT — which is what lets
 // the three controls below feed it a known-bad sheet instead of trusting it on
-// the one file it was written for.
-function sweepSheet(text) {
+// the one file it was written for. `varPrefix` defaults to the `--ts-` family;
+// `--ts-font` is swept by passing it on its own (ROUND W FIX).
+function sweepSheet(text, varPrefix = '--ts-') {
   const css = blankComments(text);
   const lineIndex = new Uint32Array(css.length + 1);
   { let line = 1;
@@ -1129,7 +1134,17 @@ function sweepSheet(text) {
       const spec = specOf(t), cls = classSet(t), subject = subjectKey(t);
       for (const d of declsOf(r.decls)) {
         const pv = propValue(d);
-        if (!pv || /var\(/.test(pv.value)) continue;
+        if (!pv) continue;
+        /* A base is what an element paints with NOTHING stored. A declaration
+           that READS the swept variable is a consumer, not a base. But a
+           declaration that reads some OTHER token — `font-family: var(--mono)`
+           — IS a base, and for a TOKEN-VALUED property every base in this sheet
+           is one. Excluding on a bare `var(` therefore left `--ts-font` with NO
+           bases whatsoever, which made its half of the sweep VACUOUS: it could
+           not report a loss or a fallback mismatch on a property whose every
+           literal is a token reference. That is the gap this pass closes, and
+           the reason the prefix had to become a parameter. */
+        if (varUses(pv.value, varPrefix).length > 0) continue;
         bases.push({ri, key: `${subject}|${pv.prop}`, value: pv.value, sel: t, spec, cls,
           line: lineAt(r.start)});
       }
@@ -1141,7 +1156,7 @@ function sweepSheet(text) {
     for (const d of declsOf(r.decls)) {
       const pv = propValue(d);
       if (!pv) continue;
-      for (const u of varUses(pv.value)) {
+      for (const u of varUses(pv.value, varPrefix)) {
         consumers.push({ri, line: lineAt(r.start), sel: r.sel, prop: pv.prop,
           name: u.name, fallback: u.fallback, value: pv.value,
           selectors: splitSelectorList(r.sel)});
@@ -1330,6 +1345,116 @@ assert('l.control-the-subject-test-does-not-cross-rows',
   otherRowSweep.violations.length === 0,
   'a more specific earlier rule on a DIFFERENT subject (the title row) is not counted against the body row — ' +
   'without the subject test every node rule would look like a rival of every other');
+
+/* ===========================================================================
+   (l2) THE `--ts-font` SWEEP — the same measurement, run on ONE variable.
+   ===========================================================================
+   WHY A SECOND SWEEP WHEN (l) ALREADY READS THE FAMILY. (l) matches
+   `var(--ts-` — a PREFIX — so it reports `--ts-font` among its members and
+   would go on passing if this round's eight rules were the only thing in the
+   file that still worked. A family-wide count cannot answer "is THE variable
+   this round added actually winning", which is the question ROUND W's font
+   control stands or falls on. So the SAME machinery (varUses/sweepSheet, both
+   now parameterised) is run against `--ts-font` alone: if any of the eight
+   rows had an EARLIER rule of higher specificity pinning its `font-family`, the
+   picker would paint nothing on that row and (l) would not have said so.
+   `--ts-font` sits in eight PLAIN overrides (not the `calc(… * var(--ts-…))`
+   form (l) grew up on), which is exactly why it needed its own pass rather
+   than an eye: the failure mode is invisible in the source and only shows as
+   one row of a node not changing when the picker moves.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('(l2) THE --ts-font SWEEP — the eight node-text rows, against the rules above them');
+console.log('='.repeat(78));
+
+/* The eight rows, as SUBJECT KEYS (the sweep's own notion of "the element this
+   rule styles"), each with the stack its PRE-ITEM-2 base rule declares. That
+   pair is the contract: the consumer's fallback must be byte-identical to this
+   stack, or a node with NOTHING STORED changes family. */
+const TS_FONT_ROWS = [
+  ['.node-kicker', 'var(--mono)'],
+  ['.node-title', 'var(--sans)'],
+  ['.node-sub', 'var(--mono)'],
+  ['.node-metric', 'var(--mono)'],
+  ['.lo-title', 'var(--sans)'],
+  ['.lo-sub', 'var(--mono)'],
+  ['.note-node', 'var(--mono)'],
+  ['.label-node', 'var(--mono)'],
+];
+const FAMILY_BASE = new Map(TS_FONT_ROWS);
+const TS_FONT = sweepSheet(STYLES_RAW, '--ts-font');
+console.log(`  rules parsed: ${TS_FONT.rules.length}   var(--ts-font, …) consumers: ${TS_FONT.consumers.length}`);
+for (const c of TS_FONT.consumers) {
+  const subj = subjectKey(c.selectors[0]);
+  const want = FAMILY_BASE.get(subj);
+  const lose = TS_FONT.violations.filter(v => v.c === c);
+  console.log(`    line ${String(c.line).padStart(4)}  ${c.prop.padEnd(12)} ${c.sel}`);
+  console.log(`              fallback ${JSON.stringify(c.fallback)}` +
+    (lose.length ? `  ** LOSES to \`${lose[0].theirSel}\` ${lose[0].theirs} at :${lose[0].theirLine} **`
+      : c.base ? `  -> equal specificity (later wins), base \`${c.base.sel}\` @:${c.base.line}`
+        : '  (no earlier rule of equal specificity on this subject)') +
+    (want === undefined ? '  !! NOT ONE OF THE EIGHT ROWS' : ''));
+}
+
+const fontSubjects = TS_FONT.consumers.map(c => subjectKey(c.selectors[0]));
+const fontDupes = fontSubjects.filter((s, i) => fontSubjects.indexOf(s) !== i);
+console.log(`  subjects: ${TS_FONT.consumers.length} consumers, ${new Set(fontSubjects).size} distinct, dupes: [${[...new Set(fontDupes)].join(', ')}]`);
+console.log(`  LOSING: ${TS_FONT.violations.length}   fallback-vs-base mismatches: ${TS_FONT.fallbackBad.length}`);
+
+assert('l2.a-ts-font-has-exactly-one-consumer-per-node-text-row',
+  TS_FONT.consumers.length === 8 && fontDupes.length === 0
+    && [...new Set(fontSubjects)].sort().join('|') === TS_FONT_ROWS.map(r => r[0]).sort().join('|'),
+  `the eight rows (${TS_FONT_ROWS.map(r => r[0]).join(', ')}) each read \`--ts-font\` exactly once — ` +
+  'one write sets the whole node, and no row reads it twice');
+assert('l2.b-no-earlier-rule-outranks-a-ts-font-consumer',
+  TS_FONT.violations.length === 0,
+  TS_FONT.violations.length === 0
+    ? 'NONE of the eight was losing: every consumer is the last word on `font-family` for its own subject, so ' +
+      'moving the picker moves all eight rows'
+    : `${TS_FONT.violations.length} row(s) whose \`--ts-font\` LOSES to an earlier more specific literal — the ` +
+      'picker would silently do nothing there');
+assert('l2.c-every-ts-font-fallback-is-the-stack-its-base-declares',
+  TS_FONT.fallbackBad.length === 0
+    && TS_FONT.consumers.every(c => c.fallback === FAMILY_BASE.get(subjectKey(c.selectors[0]))),
+  '8/8 fallbacks equal their row\'s own pre-ITEM-2 stack (`' +
+  TS_FONT_ROWS.map(r => `${r[0]}→${r[1]}`).join('`, `') +
+  '`), so a node carrying no `--ts-font` paints exactly what it painted before');
+
+/* --- THE CONTROLS — the extended sweep must FAIL on the shape it hunts ---- */
+/* The shape the diagram-studio note measures: a (0,3,0) per-shape rule pinning
+   `font-family` on `.node.shape-connector .node-title`, with the (0,1,0)
+   consumer below it. Its subject IS `.node-title`, so the sweep must see it. */
+const FONT_LOSING = `.node.shape-connector .node-title { font-family: var(--mono); }
+.node-title { font-family: var(--ts-font, var(--sans)); }`;
+/* The same sheet with the base stack changed under the consumer: equal
+   specificity, so no violation, but the FALLBACK no longer matches. */
+const FONT_BAD_FALLBACK = `.node-title { font-family: var(--sans); }
+.node-title { font-family: var(--ts-font, var(--mono)); }`;
+/* A more specific rule on a DIFFERENT row must not be counted. */
+const FONT_OTHER_ROW = `.group-node .group-label { font-family: var(--sans); }
+.node-title { font-family: var(--ts-font, var(--sans)); }`;
+const fontLosingSweep = sweepSheet(FONT_LOSING, '--ts-font');
+const fontBadFallbackSweep = sweepSheet(FONT_BAD_FALLBACK, '--ts-font');
+const fontOtherRowSweep = sweepSheet(FONT_OTHER_ROW, '--ts-font');
+console.log(`\n  controls — earlier-more-specific base: ${fontLosingSweep.violations.length} violation(s); ` +
+  `fallback mismatch: ${fontBadFallbackSweep.fallbackBad.length}; different row: ${fontOtherRowSweep.violations.length}`);
+for (const v of fontLosingSweep.violations) {
+  console.log(`    seen: \`${v.theirSel}\` ${v.theirs} beats \`${v.c.sel}\` ${v.ours} on ${v.c.prop}`);
+}
+assert('l2.d-control-the-extended-sweep-fails-on-the-losing-shape',
+  fontLosingSweep.violations.length === 1
+    && fontLosingSweep.violations[0].theirSel === '.node.shape-connector .node-title'
+    && fontLosingSweep.violations[0].c.prop === 'font-family',
+  'a (0,3,0) per-shape rule pinning `font-family` before the (0,1,0) consumer is reported as a LOSS — this is the ' +
+  'check that makes the green assertion above mean something');
+assert('l2.e-control-the-extended-sweep-sees-a-fallback-that-is-not-the-base',
+  fontBadFallbackSweep.violations.length === 0 && fontBadFallbackSweep.fallbackBad.length === 1,
+  'equal specificity, so it WINDS — but the fallback `var(--mono)` is not the base `var(--sans)`, and an untouched ' +
+  'node would change family; the fallback half of the sweep catches what the losing half cannot');
+assert('l2.f-control-the-subject-test-does-not-cross-rows-here-either',
+  fontOtherRowSweep.violations.length === 0,
+  'a more specific earlier rule on `.group-label` is not counted against `.node-title` — the same subject test (l) ' +
+  'relies on, re-exercised on this variable');
 
 /* ===========================================================================
    (m)/(n)/(o) — PACKAGE-P PASS 3, THE FOLD AND ITS PERSISTENCE.
@@ -1541,6 +1666,60 @@ assert('p.every-option-previews-its-own-family',
     && STYLES_RAW.includes('.insp-font-sample'),
   'each option renders its own NAME in its own family — via the `{o.art}` cell the picker already '
   + 'draws on both the trigger and the popover, so no new prop was needed on IconPickerRow');
+
+/* --- (p1b) ROUND W FIX — THE DUPLICATE NAME IN THE POPOVER ----------------
+   MEASURED DEFECT. `IconPickerRow` prints a row as a glyph cell + a label. For
+   the font picker the cell holds the SAMPLE, which already IS the name, so each
+   option rendered `Mono Mono`. The sheet suppressed the duplicate on the
+   TRIGGER only (`#insp-text-font:has(.insp-font-sample) .icon-trigger-name`),
+   and that rule cannot reach the option rows: the popover is the trigger
+   BUTTON's SIBLING inside `.icon-field`, so no selector starting at the font
+   field's id matches a row. The row therefore needs a HOOK of its own, passed
+   by the one caller that wants it. This section asserts the hook exists, that
+   it reaches the row, that it does NOT reach another picker, and that the rule
+   suppresses the plain label while leaving the sample. */
+const ROW_HOOK = 'icon-field-font';
+/* The rule as the sheet must spell it: scoped to the hook, on the option row,
+   and EXCLUDING the sample. Read off the sheet with comments blanked, so the
+   prose above the rule cannot satisfy the probe. */
+const STYLES_BLANK = blankComments(STYLES_RAW);
+const ROW_RULE_RE = /\.icon-field-font\s+\.insp-opt\s+\.insp-opt-label:not\(\.insp-font-sample\)\s*\{\s*display:\s*none\s*;?\s*\}/;
+const ROW_RULE = ROW_RULE_RE.exec(STYLES_BLANK);
+/* Every OTHER picker's `.icon-field` must be hookless: the hook is a prop, and
+   exactly ONE call site passes it. Counting the literal in App.tsx is what
+   makes "the rule cannot reach another picker" measured rather than asserted. */
+const HOOK_CALLS = countOf(APP, `rowClass="${ROW_HOOK}"`);
+const PICKS_TRIGGER_RULE = /#insp-text-font:has\(\.insp-font-sample\)\s+\.icon-trigger-name\s*\{\s*display:\s*none\s*;?\s*\}/.test(blankComments(STYLES_RAW));
+console.log(`  the option-row hook: rowClass="${ROW_HOOK}" ×${HOOK_CALLS} call site(s); option-row rule present: ${ROW_RULE !== null}; `
+  + `trigger rule still present: ${PICKS_TRIGGER_RULE}`);
+assert('p.the-sheet-suppresses-the-option-rows-duplicate-name',
+  ROW_RULE !== null,
+  'the option row hides its plain `.insp-opt-label` — the exact sibling that made every option read `Mono Mono`');
+assert('p.the-suppression-cannot-reach-another-picker',
+  HOOK_CALLS === 1
+    && PICKS.includes('rowClass')
+    && countOf(PICKS, 'icon-field${rowClass') === 1
+    && countOf(PICKS, 'rowClass ?') === 1,
+  `the hook is an OPTIONAL prop on IconPickerRow and exactly ONE call site passes it (App.tsx ×${HOOK_CALLS}) — `
+  + 'the shared picker is byte-identical for the other four, so a bare `.insp-opt-glyph + .insp-opt-label` rule '
+  + 'that would have emptied every other popover was NOT used');
+assert('p.the-sample-is-not-what-is-hidden',
+  ROW_RULE !== null && ROW_RULE[0].includes(':not(.insp-font-sample)'),
+  'the rule names the sample in a `:not()` — the cell that PRINTS the family is untouched, so the row still reads '
+  + 'its name once, in its own family, and the preview the picker exists for survives');
+assert('p.the-trigger-keeps-its-single-name',
+  PICKS_TRIGGER_RULE,
+  'the existing `#insp-text-font:has(.insp-font-sample) .icon-trigger-name` rule is still in the sheet, so the '
+  + 'trigger does not regress to `Viet Viet` and does not lose its name');
+/* NEGATIVE CONTROL — the probe must SEE the shape it warns about, or assert
+   (p) is a tautology. The pre-fix sheet carried no option-row rule at all. */
+const BARE_LABEL_RULE = '.insp-opt .insp-opt-label { display: none; }';
+assert('p.control-the-row-rule-probe-detects-an-unscoped-rule',
+  ROW_RULE_RE.test('.icon-field-font .insp-opt .insp-opt-label:not(.insp-font-sample) { display: none; }')
+    && !ROW_RULE_RE.test(BARE_LABEL_RULE)
+    && /\.insp-opt-label\s*\{\s*display:\s*none/.test(BARE_LABEL_RULE),
+  'the pattern matches the SCOPED rule and does NOT match a bare `.insp-opt-label { display: none }` — the shape '
+  + 'the brief warned would empty every other picker, which the harness can still see when it appears');
 
 /* --- (p2) THE DECLARATIONS AND THE FILES --------------------------------- */
 const FACES = [...STYLES_RAW.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(m => m[1]);
