@@ -1,7 +1,41 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (evening) · **Status:** ✅ PACKAGE-P + ROUND W + X + Y + **ROUND Z** shipped.
+**Last session:** 2026-09-19 (evening) · **Status:** ✅ PACKAGE-P + ROUND W + X + Y + Z + **AA** shipped.
 **Next: Harvey's Mac test, then PACKAGE-N (the palette redesign) — its spec is already written.**
+
+> ## ✅ ROUND AA (2026-09-19) — equal-width rows, a marquee-mode SETTING, the palette typo
+>
+> **1. THE SEGMENTED BUTTONS SIZED TO THEIR TEXT.** Measured before: `Left` 45 / `Center` 58 / `Right` 51px.
+> `.insp-seg` declares `display: grid; grid-auto-columns: 1fr` — which WOULD equalise them — but
+> `.swatches { display: flex }` beats it at equal specificity, later in the sheet. Now
+> `.insp-seg .insp-seg-btn { flex: 1 1 0; min-width: 0 }` + `.swatches.insp-seg { gap: 5px }` (two classes, so
+> the gap is the segmented row's own). **This also fixed a GAP inconsistency it exposed:** `.swatches`'s 7px had
+> been beating `.insp-seg`'s 5px everywhere while `.insp-seg.grid3` won inside its own row — 7px in one row, 5px
+> in the next. Verified live: every row divides its 253px equally with a uniform 5px gap — size 60×4 · weight
+> 124×2 · align 81×3 · vertical 81×3 · font 81×6.
+>
+> **2. THE MARQUEE REQUIRED FULL ENCLOSURE.** Harvey: *"nếu cái vòng bao của chuột ko dính vào góc trái của
+> element thì nó sẽ k đc chọn"*. **ROOT CAUSE:** ReactFlow's default is `selectionMode = SelectionMode.Full`
+> (`@xyflow/system`: `enum SelectionMode { Partial, Full }`), and the Pane selects via
+> `getNodesInside(..., selectionMode === SelectionMode.Partial, ...)`. **This app passed NO `selectionMode`**, so
+> it inherited Full — a marquee clipping any corner left the node unselected. Now a plain LEFT-drag box-selects
+> (no Shift), panning stays on middle/right + scroll, the read-only branch still pans on any button, and the
+> touch pan path is untouched.
+> **THE SETTING Harvey asked for:** `Marquee selection` in the Canvas group — **Touch** (overlap selects) |
+> **Enclose** (must fully surround), key `diagram-studio:marquee`, **default Touch = Partial**, absent value
+> resolves to it, applies with no reload. Verified both directions live.
+> **The setting is now the discoverable surface — do NOT re-add a "Multi-select box" row to `SHORTCUTS_MOUSE`:**
+> that list deliberately dropped it (with Pan and Zoom) as over-information, and its comment says so.
+>
+> **3. `Process` and `Decision` were filed under `Basic`.** Two of the eleven `FLOWCHART_PALETTE` `fc(...)` calls
+> passed `'basic'` while the other nine passed `'flowchart'` — a typo, not a decision (they are ISO 5807's
+> process and decision symbols). Both moved to `flowchart`. Verified live: Basic badge 3 → 1 (only the generic
+> `Text`), Flowchart 8 → 10.
+>
+> **Harness:** new `checks/round-aa-align-marquee-palette.mjs` 30/30; package-p-inspector 153/153; every other
+> harness green. **Process note:** the first dispatch of this round was killed during recon after I mis-read the
+> marquee complaint (I assumed the Shift requirement was the issue); a re-dispatch with the measured root cause
+> then hit the 150-iteration budget but landed all three items, and the orchestrator committed them.
 
 > ## ✅ ROUND Z (2026-09-19) — six font names in a 3+3 grid + vertical align
 >
