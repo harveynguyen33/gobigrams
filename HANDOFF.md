@@ -1,8 +1,43 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (midday) · **Status:** PACKAGE-P **pass 1** shipped (inspector: per-type sections +
-icon pickers) and PACKAGE-Q shipped (panel hotkeys). Pushed as **`8fff88b`**.
-**Next: PACKAGE-P pass 2 (the Text section + typing behaviour), then pass 3 (collapse UI).**
+**Last session:** 2026-09-19 (midday) · **Status:** PACKAGE-P **passes 1 and 2 shipped** (inspector: per-type
+sections + icon pickers; then the Text section) and PACKAGE-Q shipped (panel hotkeys).
+**Next: PACKAGE-P pass 3 — the collapse UI + `diagram-studio:inspector-sections` persistence.**
+
+> **PACKAGE-P pass 2 — the Text section (§E).** `src/textStyle.ts` (NEW, React-free). `text` enters the goblin
+> section list **BETWEEN `content` and `style`** — the omission pass 1 documented in its own header, now
+> resolved. The label branch's 4-row `<textarea>` is **REMOVED**: it was a second writer for the same `text`
+> the in-place editor writes, so the label target now has exactly **ONE** text editor.
+>
+> **`size` is a MULTIPLIER, not a px value** — decision, with reason: one node already paints FOUR sizes
+> (kicker 10.5 / title 14.5 / sub 11.5 / metric 20), so the node's hierarchy IS the ladder. One px value would
+> flatten all four and push the worst-case content (`queue`, 199×131, the number `NODE_MIN_H` derives from) past
+> the resizer floor `round-r` asserts. So the control emits a multiplier, it lands as ONE custom property
+> (`--ts-scale`), and every text rule multiplies its own size: one write, whole block, `var(--ts-scale, 1)`
+> changes nothing when unset. Ladder `0.85 / 1 / 1.15 / 1.3`, `1` = Default = **not written**.
+>
+> **THREE defects found and fixed in this pass — all invisible to the harness as it stood.** 1 (double render,
+> pass 1) and 2/3 below:
+> - **A stored align that was never painted.** `textStyleVars` hard-coded `left` as "the value that renders
+>   anyway", but align's default is **per-target** (`center` for `label-only`). Executed both pure functions
+>   together: `label-only + Left` stored `{"align":"left"}` and returned `vars={}` — saved and dropped.
+> - **The variable losing to a more specific rule.** `.node.label-only .lo-body` (specificity 0,3,0) beat
+>   `.node .lo-body` (0,2,0) and pinned `text-align: center` **plus** `align-items: center`. Both are now the
+>   variables with their old literals as fallbacks, in the ONE rule that owns the element. **No `!important`,
+>   no specificity raise** — the duplicate was removed.
+>
+> Defects 2 and 3 are the **same bug class: one rule with two copies, one right and one guessing.** The harness
+> missed both because it asserted *presence*, not *precedence*. It now carries a cross-check for every
+> `(align default, choice)` pair and a **specificity sweep** over every `--ts-*` consumer that fails on the
+> pre-fix tree. **See `references/verifying-token-driven-styles.md` in the diagram-studio skill** — the three
+> traps, the geometry measurement, and the overlay/CDP probe hygiene that also cost time here.
+>
+> Orchestrator-verified live by clicking the real buttons and measuring where the text **lands** (span offset in
+> its 186px block): untouched `35/35` centred → Left `14/57` hard left → Right `57/14` hard right → Center
+> `35/35` and `--ts-align` returns to unset. Size XL `1.3` → title 18.85px / metric 26px; S `0.85` → 12.325/17;
+> M → unset, 14.5px. Weight Bold → 700; Regular → unset, title back to its own 650 while the metric keeps its
+> own 700. With the in-place editor focused and text typed, clicking size S left the editor **open** and the
+> stored text **uncommitted** while the scale applied (§E.3(b) working).
 
 > **PACKAGE-Q — panel hotkeys.** Group toggle `Cmd+Ctrl+Shift+\` (was `mod+Shift+\`); NEW per-side
 > `Cmd+Ctrl+Shift+[` (left) and `Cmd+Ctrl+Shift+]` (right); both chevrons now show their key as a tooltip with
