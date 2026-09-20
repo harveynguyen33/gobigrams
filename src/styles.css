@@ -51,13 +51,18 @@
   --on-acc: #fff;
   --on-acc-hover: #ff5f12;
   --edge-text-bg: #1a1b1f;
-  /* Layer 2 — the six shape accents (symbolic; boards store the key) */
+  /* Layer 2 — the shape accents (symbolic; boards store the key) */
   --c-accent: #f54e00;
   --c-green: #4ade80;
   --c-cyan: #22d3ee;
   --c-violet: #a78bfa;
   --c-amber: #fbbf24;
   --c-slate: #94a3b8;
+  /* ROUND AG1 — red, blue and pink (the two 7/7 consensus gaps plus pink).
+     Values are the tools' own; these are the DARK readings. */
+  --c-red: #ff6b6b;
+  --c-blue: #7aa2ff;
+  --c-pink: #f783ac;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -97,13 +102,26 @@
   --edge-text-bg: #ffffff;
   --acc-tint: rgba(194, 65, 12, 0.10);
   /* Layer 2 — dark INKS. The bright dark accents measure 1.7–3.5 on white and
-     fail WCAG; these are the measured ≥5.0 replacements (see the token table). */
+     fail WCAG; these are the measured ≥5.0 replacements (see the token table).
+     ROUND AG1 — amber's light/paper value was a brown (hue 22.7), a yellow token
+     20.5 deg off its own dark value (43.3) at saturation 0.90. Only light and
+     paper had rotated; dark, midnight and contrast already held their hue. Option
+     A — keep the HUE, adapt only the LIGHTNESS — and the ink here is hue 43.4
+     (0.1 deg off dark) at saturation 1.00: the most saturated yellow that still
+     clears 4.5:1. The constraint is real, not a preference — on this canvas no
+     value is both clearly yellow and ≥4.5:1 without becoming an ink. */
   --c-accent: #9a3412;
   --c-green: #166534;
   --c-cyan: #0e7490;
   --c-violet: #5b21b6;
-  --c-amber: #92400e;
+  --c-amber: #946b00;
   --c-slate: #475569;
+  /* ROUND AG1 — red/blue/pink. `red` and `blue` are the two 7/7 consensus gaps;
+     `pink` is the 5/7 next. The LIGHT values are the tools' own (Excalidraw red,
+     tldraw blue, Excalidraw pink shade 4), each verified at >=4.2:1 here. */
+  --c-red: #e03131;
+  --c-blue: #4465e9;
+  --c-pink: #c2255c;
 }
 
 [data-theme="paper"] {
@@ -140,12 +158,19 @@
   --on-acc-hover: #6f2604;
   --edge-text-bg: #fffaf1;
   --acc-tint: rgba(138, 46, 5, 0.10);
+  /* ROUND AG1 — amber drops its brown (hue 22.7 -> 43.5) and the three new
+     families are added. Paper's canvas is the CREAM surface, not --bg, which is
+     why the inks are chosen against it; amber's ink here holds its hue at 43.5
+     (0.2 deg from dark) at 7.3:1 — the theme's own pre-round floor. */
   --c-accent: #8a2e05;
   --c-green: #14532d;
   --c-cyan: #115e59;
   --c-violet: #5b21b6;
-  --c-amber: #92400e;
+  --c-amber: #6d4f00;
   --c-slate: #44403c;
+  --c-red: #ac0000;
+  --c-blue: #0031f5;
+  --c-pink: #aa003b;
 }
 
 [data-theme="midnight"] {
@@ -188,6 +213,13 @@
   --c-violet: #c4b5fd;
   --c-amber: #fcd34d;
   --c-slate: #94a3b8;
+  /* ROUND AG1 — red/blue/pink in midnight's character: LIGHT, low-saturation
+     tints (its green/cyan/violet already run sat 0.29-0.60) on the deep-blue
+     canvas, each holding hue and clearing 9.0:1. A second family beside the new
+     `--red`/`--danger` chrome tokens, in the shape palette. */
+  --c-red: #ff9494;
+  --c-blue: #9bafff;
+  --c-pink: #ff90b7;
 }
 
 [data-theme="contrast"] {
@@ -230,6 +262,12 @@
   --c-violet: #c0c0ff;
   --c-amber: #ffe066;
   --c-slate: #c8c8c8;
+  /* ROUND AG1 — red/blue/pink at this theme's own level: every existing value
+     clears 12.2:1+ on pure black and runs light and low-saturation for the same
+     reason. Each holds its hue exactly and clears 13.0:1. */
+  --c-red: #ffbbbb;
+  --c-blue: #bdcaff;
+  --c-pink: #ffb8d1;
 }
 
 /* L1 — React Flow only themes its own ~24 --xy-* variables (and only via its

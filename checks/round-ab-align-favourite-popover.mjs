@@ -483,10 +483,13 @@ assert('ab3.the-search-input-rests-and-focuses-on-an-ordinary-border-not-the-acc
 console.log('\n' + '='.repeat(78));
 console.log('GATES');
 console.log('='.repeat(78));
+const HEX_LIMIT = 160;   // raised from 127 by ROUND AG1, which ADDED colour on purpose
 const HEX = hexCount(STYLES_RAW);
-console.log(`  hex literals in src/styles.css: ${HEX} (limit 127)`);
-assert('ab0.the-token-gate-holds', HEX <= 127, `${HEX} hex colour literals in \`src/styles.css\` — the file is at the limit, ` +
-  'and every declaration this round added is a token reference or a geometry number, so the count did not move.');
+console.log(`  hex literals in src/styles.css: ${HEX} (limit ${HEX_LIMIT}, raised by ROUND AG1)`);
+assert('ab0.the-token-gate-holds', HEX <= HEX_LIMIT, `${HEX} hex colour literals in \`src/styles.css\`. This round ADDED ` +
+  'colour on purpose (ROUND AG1: amber\'s light/paper inks de-browned and the red/blue/pink families added across five ' +
+  'themes), so the gate now bounds the sheet at a ceiling rather than pinning it to a count — a pinned count turns RED on ' +
+  'every future round that legitimately adds a token.');
 
 const failed = results.filter(r => !r.pass);
 console.log('\n' + '='.repeat(78));

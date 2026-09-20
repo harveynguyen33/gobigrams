@@ -12,17 +12,23 @@
  * without a cycle.
  */
 
-export type ColorKey = 'accent' | 'green' | 'cyan' | 'violet' | 'amber' | 'slate';
+export type ColorKey =
+  | 'accent' | 'green' | 'cyan' | 'violet' | 'amber' | 'slate' | 'red' | 'blue' | 'pink';
 
-export const COLOR_KEYS: ColorKey[] = ['accent', 'green', 'cyan', 'violet', 'amber', 'slate'];
+export const COLOR_KEYS: ColorKey[] = [
+  'accent', 'green', 'cyan', 'violet', 'amber', 'slate', 'red', 'blue', 'pink',
+];
 
-/** Layer-2 tokens: the six shape accents, declared per theme in styles.css. */
+/** Layer-2 tokens: the shape accents, declared per theme in styles.css. */
 export const COLOR_VAR: Record<ColorKey, string> = {
   accent: 'var(--c-accent)', green: 'var(--c-green)', cyan: 'var(--c-cyan)',
   violet: 'var(--c-violet)', amber: 'var(--c-amber)', slate: 'var(--c-slate)',
+  red: 'var(--c-red)', blue: 'var(--c-blue)', pink: 'var(--c-pink)',
 };
 
-/** The dark-layer hexes — the legacy board format and the export fallback. */
+/** The dark-layer hexes — the legacy board format and the export fallback.
+ *  These are the DARK-theme values verbatim: that was already true for the six
+ *  original keys, and the three added in ROUND AG1 keep the rule. */
 export const COLORS = {
   accent: '#f54e00',
   green: '#4ade80',
@@ -30,9 +36,14 @@ export const COLORS = {
   violet: '#a78bfa',
   amber: '#fbbf24',
   slate: '#94a3b8',
+  red: '#ff6b6b',
+  blue: '#7aa2ff',
+  pink: '#f783ac',
 } as const;
 
-/** Legacy board JSON carries these literals — map them back onto keys on load. */
+/** Legacy board JSON carries these literals — map them back onto keys on load.
+ *  Only the ORIGINAL six ever shipped, so no new key is added here: a board
+ *  written before ROUND AG1 has never seen a `red`/`blue`/`pink` literal. */
 export const LEGACY_HEX: Record<string, ColorKey> = {
   '#f54e00': 'accent',
   '#4ade80': 'green',

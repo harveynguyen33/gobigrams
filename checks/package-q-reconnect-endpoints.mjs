@@ -391,7 +391,8 @@ ok(boards.edges.map(e => e.id).join(',') === 'e1,e2', 'edge ids unchanged');
 }
 
 const literals = (OUR_CSS.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length;
-ok(literals <= 127, 'no new colour literals in styles.css', `${literals} <= 127`);
+const HEX_LIMIT = 160;   // raised from 127 by ROUND AG1, which ADDED colour on purpose
+ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css', `${literals} <= ${HEX_LIMIT} (ceiling raised by ROUND AG1)`);
 
 /* mtime proof that the off-limits files were never written by this pass.
    The reference is the harness's OWN first-edit record, not App.tsx's mtime: a

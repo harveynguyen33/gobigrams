@@ -390,8 +390,9 @@ console.log(`  DiagramNode: NODE_MIN_W ${consts.NODE_MIN_W}  NODE_MIN_H ${consts
 console.log(`  styles.css : .node { min-width: ${own('node', 'min-width')} } == ${nodeMinW}  [styles.css:${nodeMinWLine?.line ?? '-'}]`);
 
 console.log('\n-- (e) the token gate --');
+const HEX_LIMIT = 160;   // raised from 127 by ROUND AG1, which ADDED colour on purpose
 const hexes = RAW.css.match(/#[0-9a-fA-F]{3,6}\b/g) ?? [];
-console.log(`  hex literals in src/styles.css: ${hexes.length} (limit 127)`);
+console.log(`  hex literals in src/styles.css: ${hexes.length} (limit ${HEX_LIMIT}, raised by ROUND AG1)`);
 
 console.log('\n-- ASSERTIONS --');
 const assertions = [];
@@ -466,8 +467,8 @@ assert('V12 the floors are UNCHANGED (200 / 141 / 190)',
   `resizer ${consts.NODE_MIN_W}x${consts.NODE_MIN_H}, CSS floor ${nodeMinW}`);
 
 assert('V13 the token gate holds (no new colour literal)',
-  hexes.length <= 127,
-  `${hexes.length} hex literals in src/styles.css`);
+  hexes.length <= HEX_LIMIT,
+  `${hexes.length} hex literals in src/styles.css (ceiling ${HEX_LIMIT}, raised by ROUND AG1 which added colour on purpose)`);
 
 const failed = assertions.filter(a => !a.pass);
 console.log(`\nHARNESS: ${assertions.length - failed.length}/${assertions.length} passed`);

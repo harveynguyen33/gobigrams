@@ -116,4 +116,5 @@ export const EXPORT_TOKENS = [
   '--bg', '--surface', '--elevated', '--border', '--border-strong', '--fg', '--dim', '--dim2',
   '--acc', '--acc-soft', '--sel', '--sel-soft', '--green', '--red', '--danger', '--card',
   '--c-accent', '--c-green', '--c-cyan', '--c-violet', '--c-amber', '--c-slate',
+  '--c-red', '--c-blue', '--c-pink',
 ] as const;
