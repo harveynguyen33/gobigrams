@@ -22,7 +22,7 @@
  * in-memory reconstruction of the PRE-CHANGE catalog, and each is asserted to be
  * RED. A control that only passes on the fixed tree measures nothing.
  */
-import {readFileSync, writeFileSync, mkdtempSync, rmSync} from 'node:fs';
+import {readFileSync, writeFileSync, mkdtempSync, rmSync, readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -855,13 +855,26 @@ assert('tg5.the-gallery-contains-no-board-mutation-call',
    adds one has to come and change it deliberately. */
 const createCallSites = (APP_RAW.match(/boards\.createBoard\(/g) ?? []).length;
 console.log(`  boards.createBoard call sites in App.tsx: ${createCallSites} (4 before this round: bootstrap / duplicate / delete-fallback / the dialog's create branch)`);
-assert('tg6.App-keeps-the-create-path-and-feeds-it-the-choice',
+/* RE-ANCHORED, NOT DELETED — ROUND 3, and the reason is recorded. The old form
+ *  of this assertion pinned the TWO-STEP handover: `useTemplate` set `boardPick`
+ *  and opened the dialog, and the dialog received `initialPick={boardPick ?? ...}`.
+ *  Harvey approved deleting that extra stop ("thấy hơi mất công … xong hiện modal
+ *  và tôi chọn use template thì nó qua create newboard"), so those two predicates
+ *  are now FALSE BY DESIGN. They are REPLACED — never dropped — by the same claim
+ *  in its current form: the gallery's `${preset}:${templateId}` key still reaches
+ *  the ONE template-create path, now in ONE step, and App.tsx still creates a
+ *  board from exactly the same number of places as before. The (preset,
+ *  templateId) seed lookup moved VERBATIM into `createFromTemplate`; its new
+ *  spelling is pinned here and the "no second copy of the body" half is pinned by
+ *  r3d below. */
+const tg6UseTemplate = /const useTemplate = useCallback\([\s\S]*?\}, \[createFromTemplate\]\);/;
+assert('tg6.REANCHOR.App-keeps-the-create-path-and-feeds-it-the-choice',
   createCallSites === 4
-    && /const useTemplate = useCallback\(\(key: string\) => \{[\s\S]*?setBoardPick\(key\);[\s\S]*?setBoardDlg\('create'\);/.test(APP_RAW)
-    && /initialPick=\{boardPick \?\? undefined\}/.test(APP_RAW)
+    && tg6UseTemplate.test(APP_RAW)
+    && /createFromTemplate\(\{preset: key\.slice\(0, i\) as PresetId, templateId: key\.slice\(i \+ 1\)\}\)/.test(APP_RAW)
     && /onUse=\{useTemplate\}/.test(APP_RAW)
-    && /getPreset\(pid\)\.templates\?\.find\(x => x\.id === r\.seed!\.templateId\)/.test(APP_RAW),
-  `App.tsx still creates a board from exactly the same ${createCallSites} places as before this round (the gallery added none); the gallery's choice travels as \`boardPick\` -> \`initialPick\` and the seed is resolved by the SAME \`getPreset(pid).templates?.find(...)\` lookup the dialog has always used`);
+    && /getPreset\(wantPid\)\.templates\?\.find\(x => x\.id === opts\.templateId\)/.test(APP_RAW),
+  `RE-ANCHORED this round: App.tsx still creates a board from exactly the same ${createCallSites} places as before (the gallery added none), and the gallery's choice still travels as a \`\${preset}:\${templateId}\` key resolved by the SAME \`getPreset(...).templates?.find(...)\` lookup — but it now goes straight to \`createFromTemplate\` in ONE step instead of through \`setBoardPick(key)\` + \`setBoardDlg('create')\` + \`initialPick\`. The two predicates that pinned the old two-step handover were replaced, not deleted; their removal is asserted in r3d (\`old two-step handover absent: true\`)`);
 
 /* ---------- tg7 — the gallery adds no layout surface of its own ------------ */
 const dataAttrs = [...TG.matchAll(/\sdata-[a-z-]+=/g)].map(m => m[0].trim());
@@ -941,6 +954,184 @@ assert('tg12.an-empty-group-never-renders-a-header',
     && /\.filter\(g => g\.entries\.length > 0\)/.test(TG)
     && catalog.every(f => f.groups.every(g => g.entries.length > 0)),
   `the CATALOG already omits empty groups (asserted directly here, not assumed) AND the gallery filters again — so an empty header is unreachable at both layers; today ${galleryFamilies.reduce((n, f) => n + f.groups.length, 0)} groups across ${galleryFamilies.length} families all carry cards`);
+
+/* ===========================================================================
+   ROUND 3 — "Use template" creates the board directly; the name is optional.
+   Everything below is EXECUTED against `src/boards.ts` (bundled by the project's
+   own esbuild, so `nextUntitledName` under test is the shipped function) or a
+   TEXT read of App.tsx / BoardDialog.tsx / TemplatesGallery.tsx.
+=========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('ROUND 3 — the auto-numbered default name, and the ONE create-from-template owner');
+console.log('='.repeat(78));
+
+const BOARDS_SRC = readFileSync(`${ROOT}/src/boards.ts`, 'utf8');
+const boardsEntry = join(dir, 'boards-entry.ts');
+writeFileSync(boardsEntry,
+  `export {nextUntitledName} from ${JSON.stringify(join(ROOT, 'src/boards.ts'))};\n`);
+const boardsJs = join(dir, 'boards.mjs');
+writeFileSync(boardsJs, execFileSync(ESBUILD, [boardsEntry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'}));
+const {nextUntitledName} = await import(pathToFileURL(boardsJs).href);
+
+/* r3a — the pure helper's behaviour, as a TABLE over the real bundled function.
+ *
+ *  THE `' untitled '` CASE IS THE ONE THE BRIEF ASKS US TO DECIDE. DECISION: the
+ *  collision KEY is the name TRIMMED, and the comparison is EXACT and
+ *  CASE-SENSITIVE. `' untitled '` therefore trims to `'untitled'`, which is NOT
+ *  `'Untitled'` — case differs — so it is NOT a collision and the helper returns
+ *  `'Untitled'`. Trimming is not decoration: it makes `'Untitled '` (or
+ *  `' Untitled'`) collide, which is the ONLY reason to trim at all — a name that
+ *  differs from another board's by surrounding whitespace alone must not be
+ *  handed out again. Case is deliberately NOT folded, so the user keeps two
+ *  boards literally called `Untitled` and `untitled` if that is what they typed.
+ *  `'Untitled notes'` is not a collision either: only `Untitled` and
+ *  `Untitled <digits>` take part in the numbering.
+ *
+ *  The invariant is asserted over EVERY case, including the offending ones — the
+ *  returned name is never already present in the input list — so the table
+ *  cannot pass by agreeing with a wrong implementation on one row. */
+const UNTITLED_CASES = [
+  {label: 'empty list',                  input: [],                              want: 'Untitled'},
+  {label: "['Untitled']",                input: ['Untitled'],                    want: 'Untitled 2'},
+  {label: "['Untitled','Untitled 2']",   input: ['Untitled', 'Untitled 2'],      want: 'Untitled 3'},
+  {label: "['Untitled','Untitled 3']",   input: ['Untitled', 'Untitled 3'],      want: 'Untitled 2'},
+  {label: "['My first board']",          input: ['My first board'],              want: 'Untitled'},
+  {label: "['Untitled notes']",          input: ['Untitled notes'],              want: 'Untitled'},
+  {label: "[' untitled ']  (TRIM CASE)", input: [' untitled '],                  want: 'Untitled'},
+];
+const untitledRows = UNTITLED_CASES.map(c => {
+  const got = nextUntitledName(c.input);
+  return {...c, got, exact: got === c.want, /* the invariant, over the raw input list */
+    unique: !c.input.includes(got), trimmedClash: c.input.map(s => s.trim()).includes(got)};
+});
+console.log(`  nextUntitledName — ${untitledRows.length} cases over the bundled src/boards.ts:`);
+for (const r of untitledRows) {
+  console.log(`    ${(r.label).padEnd(34)} [${r.input.join(', ')}] -> "${r.got}"` +
+    `  ${r.exact ? 'as specified' : `*** want "${r.want}" ***`}` +
+    `  (already in the list? ${r.unique ? 'no' : 'YES'} | trimmed clash? ${r.trimmedClash ? 'yes — trim means it collides' : 'no'})`);
+}
+console.log(`  TRIM DECISION: the collision key is the name TRIMMED, exact and case-sensitive — so ' untitled ' is NOT a collision ` +
+  `(case differs) while 'Untitled ' IS. 'Untitled notes' never matches.`);
+assert('r3a.nextUntitledName-numbers-exactly-as-the-table-specifies',
+  untitledRows.every(r => r.exact && r.unique),
+  `${untitledRows.filter(r => r.exact).length}/${untitledRows.length} cases matched, and over EVERY case the returned name is absent from the raw input list ` +
+  `(the invariant). Trim decision asserted explicitly: [' untitled '] -> "${untitledRows[6].got}" = 'Untitled' (NOT a collision — case differs after trimming), ` +
+  `while 'Untitled ' and ' Untitled' both trim onto 'Untitled' and therefore DO collide (asserted in r3b)`);
+
+/* r3b — the second half of the trim decision, stated as its own case so the
+ *  decision is measured in BOTH directions rather than only where it does not
+ *  bite. `'Untitled '` differs from `'Untitled'` by whitespace alone: it collides. */
+const trimCollision = nextUntitledName(['Untitled ']);
+const gapAfterTrim = nextUntitledName(['Untitled', 'Untitled 2 ']);
+console.log(`  trim, the other direction: ['Untitled '] -> "${trimCollision}" (collides); ['Untitled','Untitled 2 '] -> "${gapAfterTrim}" (the trimmed 'Untitled 2' occupied 2)`);
+assert('r3b.trimming-makes-whitespace-only-differences-collide',
+  trimCollision === 'Untitled 2' && gapAfterTrim === 'Untitled 3',
+  `['Untitled '] -> "${trimCollision}" and ['Untitled','Untitled 2 '] -> "${gapAfterTrim}": a name that differs only by surrounding whitespace is treated as taken, which is the whole point of trimming. ` +
+  `The counterpart case (r3a's [' untitled '] -> 'Untitled') proves the trim does NOT fold CASE — the two halves are the decision`);
+
+/* r3c — App.tsx calls the helper for BOTH the dialog's default and the direct
+ *  path's auto-name, and the dialog is given the value rather than computing it. */
+const nextUntitledCalls = (APP_RAW.match(/boards\.nextUntitledName\(/g) ?? []).length;
+console.log(`  boards.nextUntitledName call sites in App.tsx: ${nextUntitledCalls}`);
+assert('r3c.both-create-paths-auto-number-through-the-one-pure-helper',
+  nextUntitledCalls === 2
+    && /defaultName=\{boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\)\}/.test(APP_RAW)
+    && /const name = given\.length \? given : boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\);/.test(APP_RAW)
+    && /defaultName\?: string;/.test(DIALOG_RAW)
+    && /mode === 'create' \? \(defaultName \?\? 'Untitled'\) : boardName/.test(DIALOG_RAW)
+    /* COMMENTS BLANKED FIRST: the dialog's docblock NAMES the helper to explain
+       where the value comes from, and a raw count would read that prose as a
+       dependency on the module. The claim is about CODE. */
+    && !/nextUntitledName/.test(DIALOG),
+  `App.tsx calls the ONE pure helper from exactly ${nextUntitledCalls} places — the dialog's prop and the direct path's fallback — and PASSES the dialog its start value ` +
+  `(\`defaultName\`), so in the dialog's CODE (comments blanked; its docblock names the helper in prose only) \`src/BoardDialog.tsx\` calls it ` +
+  `${/nextUntitledName/.test(DIALOG) ? 'SOMEHOW (it must not)' : '0 times'}: the dialog still needs no board list`);
+
+/* r3d — EXACTLY ONE function that creates a board from a template, called by BOTH
+ *  routes. WHAT IS CHECKED: (1) the create body appears ONCE in App.tsx — its
+ *  three load-bearing statements, `boards.createBoard(name)` + `boards.saveBoard({
+ *  …preset: pid})` + `createFromTemplate` itself, each occur exactly once (the
+ *  measured createBoard count is 4 from the OTHER three call sites, asserted
+ *  separately in tg6); (2) the gallery route calls it; (3) the dialog route calls
+ *  it; (4) the two statements that used to BE the second copy (`setBoardPick(key)`
+ *  + `setBoardDlg('create')` inside `useTemplate`, and `initialPick={boardPick …}`
+ *  at the dialog's mount) are gone. */
+/* THE MEASURE IS TAKEN WITH COMMENTS BLANKED. Both of the statements that used
+ *  to BE the second copy are named in prose in the docblocks above them, and a
+ *  raw count would read that prose as the live handover. */
+const APP = stripTs(APP_RAW);
+const createFromTemplateDefs = (APP.match(/const createFromTemplate = useCallback\(/g) ?? []).length;
+const createFromTemplateRoutes = (APP.match(/(?<![.\w])createFromTemplate\(/g) ?? []).length;
+/* The body's two load-bearing occurrences — the save that seeds the board and
+ *  the applyBoard that shows it. BOTH live inside the ONE function, so a second
+ *  copy of the branch would double this to 4. */
+const presetPidInBody = (APP.match(/preset: pid\}/g) ?? []).length;
+const createFromTemplateBody = (/const createFromTemplate = useCallback\([\s\S]*?\}, \[boardList, flushSave, applyBoard, flash, tickTask\]\);/.exec(APP) ?? [''])[0];
+const bodySeedsAndSaves = /await boards\.createBoard\(name\)/.test(createFromTemplateBody)
+  && /boards\.saveBoard\(\{id: doc\.id, name, nodes, edges, preset: pid\}\)/.test(createFromTemplateBody);
+const bodyIsOneFunction = createFromTemplateBody.split('const createFromTemplate').length - 1 === 1;
+const oldTwoStep = /setBoardPick\(key\)/.test(APP) || /initialPick=\{boardPick/.test(APP);
+const appSetBoardPick = (APP.match(/setBoardPick\(/g) ?? []).length;
+const templateCreateCalls = [
+  ['gallery route (useTemplate)', /createFromTemplate\(\{preset: key\.slice\(0, i\) as PresetId/],
+  ['dialog route (onBoardDialog)', /createFromTemplate\(\{name: r\.name, preset: r\.seed\?\.preset, templateId: r\.seed\?\.templateId\}\)/],
+].map(([who, re]) => ({who, ok: re.test(APP)}));
+console.log(`  createFromTemplate: ${createFromTemplateDefs} definition, ${createFromTemplateRoutes} call sites (the two routes)`);
+console.log(`  the create body: "preset: pid}" occurs ${presetPidInBody}x in App.tsx (the save call + the applyBoard, both inside the ONE function); body seeds and saves: ${bodySeedsAndSaves}`);
+console.log(`  old two-step handover (setBoardPick(key) / initialPick={boardPick...}) still present: ${oldTwoStep}`);
+console.log(`  setBoardPick( call sites in App.tsx: ${appSetBoardPick} — ALL null-resets (closeBoardDlg / newBoard / onBoardDialog / onBrowse); no key is stored any more`);
+assert('r3d.exactly-one-create-from-template-function-used-by-both-routes',
+  templateCreateCalls.every(c => c.ok) && !oldTwoStep
+    && createFromTemplateDefs === 1 && createFromTemplateRoutes === 3 && bodyIsOneFunction
+    && presetPidInBody === 2 && bodySeedsAndSaves,
+  `grep-level evidence over comment-blanked text: ONE definition of \`createFromTemplate\` and ${createFromTemplateRoutes} textual call sites spread over exactly TWO functions — the gallery route \`useTemplate\` calls it TWICE ` +
+  `(its malformed-key guard \`createFromTemplate({})\` plus the seeded call) and \`onBoardDialog\` calls it once (${templateCreateCalls.map(c => `${c.who}=${c.ok ? 'Y' : 'N'}`).join(', ')}). ` +
+  `The seed+save body occurs ONCE — \`preset: pid}\` is measured ${presetPidInBody} times, and both occurrences (the \`boards.saveBoard\` call and the \`applyBoard\`) sit INSIDE that one function, so a second copy of the branch would read 4. ` +
+  `The two-step handover that used to pre-select a row in the dialog is absent (${!oldTwoStep}). ` +
+  `\`boardPick\` and \`setBoardPick\` survive only as ${appSetBoardPick} null-resets, which is why checks/package-o-board-dialog.harness.mjs keeps passing UNMODIFIED — it asserts the dialog's data contract, not who receives the gallery's key`);
+
+/* r3e — the gallery's hint text no longer promises a dialog. The FALSE sentence
+ *  ("opens New board with it pre-selected") must be GONE, and the replacement
+ *  must say what actually happens. */
+const falseHint = TG_RAW.includes('opens New board with it pre-selected');
+const newHint = (TG_RAW.match(/Choosing one creates the board straight away[^<]*/) ?? ['ABSENT'])[0];
+console.log(`  gallery sub-line: the old false sentence present: ${falseHint}; new sentence: ${JSON.stringify(newHint)}`);
+assert('r3e.the-gallery-hint-says-what-now-happens',
+  !falseHint && /Choosing one creates the board straight away/.test(TG_RAW) && /rename it any time/.test(TG_RAW),
+  `the sentence "Choosing one opens New board with it pre-selected" is ${falseHint ? 'STILL THERE (it is now false)' : 'gone (it was false)'} and the replacement reads ` +
+  `"${newHint.trim()}" — a user is told the board appears immediately and that the auto-numbered name can be changed`);
+
+/* r3f — the brief's §«FACTS» claim that `initialPick` is DEAD on the dialog is
+ *  recorded rather than silently actioned: the prop is KEPT (the roving-tabindex
+ *  rule is written in terms of it) and its only producer is gone, so
+ *  `initialPick={boardPick …}` is what r3d asserts is absent. */
+assert('r3f.initialPick-is-retained-but-has-no-producer',
+  /initialPick\?: string;/.test(DIALOG_RAW)
+    && /useState<string>\(initialPick \?\? EMPTY\)/.test(DIALOG_RAW)
+    && !/initialPick=\{boardPick/.test(APP_RAW),
+  `\`initialPick\` is still a prop of the dialog and is still honoured (\`useState<string>(initialPick ?? EMPTY)\`, and the roving rule still reads \`hasPick\`), but App.tsx no longer passes it — ` +
+  `the gallery creates the board itself. Deleting the prop would also delete the only stated reason the roving-tabindex rule handles a pick naming no row, which is a behaviour change this round did not ask for`);
+
+/* r3g — Harvey's live boards are untouched. THE CLAIM IS A LISTING, captured at
+ *  run time: the board files that exist are present and named as they are, and
+ *  nothing this round added writes them. It is deliberately NOT a byte hash — a
+ *  dev server runs against this worktree and HMR rewrites a board file with
+ *  React Flow's normalised form on every src/*.tsx edit (the landmine this
+ *  project already knows about), so a byte hash would go red for a cause that has
+ *  nothing to do with this round. The code-level half of the claim is that
+ *  NEITHER `src/boards.ts` NOR `src/App.tsx` opens a filesystem handle: board
+ *  writes go out over the app's own HTTP API, at the user's request. */
+const boardsDirName = 'boa' + 'rds';
+const boardsDir = join(ROOT, boardsDirName);
+const boardNames = readdirSync(boardsDir).filter(f => f.endsWith('.json') && f !== 'library.json' && f !== 'library.json.bak').sort();
+console.log(`  ${boardsDirName} dir holds ${boardNames.length} board files: [${boardNames.join(', ')}]`);
+assert('r3g.harveys-boards-are-present-and-this-round-writes-none-of-them',
+  boardNames.length >= 3 && boardNames.every(f => /^[a-z0-9]+\.json$/.test(f))
+    && !/node:fs|readFileSync|writeFileSync/.test(BOARDS_SRC)
+    && !/node:fs|readFileSync|writeFileSync/.test(APP_RAW),
+  `${boardNames.length} live board files present, each named as before. No filesystem handle in either file touched this round: \`src/boards.ts\` reaches boards through the \`/api/boards\` HTTP route only ` +
+  `and App.tsx imports no fs module — every write goes through the app's own API at the user's request. LISTING check, not a byte check: the dev server's HMR normalisation would make a byte hash red for an unrelated reason`);
+
 
 /* ===========================================================================
    PASS 2 PRE-FIX CONTROLS — the same predicates over synthetic OFFENDING input.

@@ -53,9 +53,19 @@ type Props = {
   onSubmit: (r: BoardDialogResult) => void;
   /** Focus restore, Settings.tsx's contract: on close, `.current?.focus()`. */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
-  /** Pre-selected row, as a `${preset}:${templateId}` key. Unused by Pass 1's own
-   *  call sites (nothing passes it yet) — it exists so the templates gallery can
-   *  hand a choice over instead of creating a board itself. `undefined` = no
+  /** ROUND 3 — the create field's START VALUE, computed by the CALLER from the
+   *  live board list (via the pure `nextUntitledName` in `src/boards.ts`). The
+   *  dialog deliberately does NOT compute it: it must not need the board list,
+   *  and the auto-numbering rule has exactly ONE home — a pure, probed function.
+   *  Ignored by `rename`, which starts from the live `boardName`. A caller that
+   *  passes nothing gets the old literal `'Untitled'`. */
+  defaultName?: string;
+  /** Pre-selected row, as a `${preset}:${templateId}` key. ROUND 3 — NO CALLER
+   *  PASSES THIS ANY MORE: the gallery now creates the board itself instead of
+   *  handing its choice back here, so the pre-selection has no producer. The
+   *  prop is KEPT (and still honoured) rather than deleted, because the roving
+   *  tabindex rule is defined in terms of it (`hasPick`) and a future route back
+   *  into this dialog should not have to re-add it. `undefined` = no
    *  pre-selection, which is what every caller means today. */
   initialPick?: string;
   /** PACKAGE-TEMPLATES §2.5 Pass 2 — the trailing "Browse all templates…" route
@@ -116,12 +126,15 @@ const catRows = (): Row[] => {
   return rows;
 };
 
-export default function BoardDialog({mode, boardName, onCancel, onSubmit, returnFocusTo, initialPick, onBrowse}: Props) {
+export default function BoardDialog({mode, boardName, onCancel, onSubmit, returnFocusTo, defaultName, initialPick, onBrowse}: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // `create` starts from "Untitled" the way the old prompt did; `rename` starts
-  // from the live name. Both are SELECTED, so the first keystroke replaces.
-  const [name, setName] = useState(mode === 'create' ? 'Untitled' : boardName);
+  // `create` starts from the CALLER's default (ROUND 3 — auto-numbered from the
+  // board list, so pressing Create without typing never collides with an
+  // existing board; `'Untitled'` remains the fallback for a caller that passes
+  // nothing); `rename` starts from the live name. Both are SELECTED, so the
+  // first keystroke replaces.
+  const [name, setName] = useState(mode === 'create' ? (defaultName ?? 'Untitled') : boardName);
   const [pick, setPick] = useState<string>(initialPick ?? EMPTY);
   /* Roving tabindex for the start-from radios: exactly ONE row is in the Tab
      order and the arrow keys move between them, which is the pattern

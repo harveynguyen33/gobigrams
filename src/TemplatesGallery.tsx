@@ -15,11 +15,13 @@
    node order and counts the remainder as `+N`; the phone tier shows at most
    `PREVIEW_MAX_PHONE` glyphs and its own counter, both in CSS, no state.
 
-   THE GALLERY NEVER CREATES A BOARD. Its action hands a `${preset}:${templateId}`
-   key to the caller, which opens the board dialog pre-selected on it. Board
-   creation therefore stays single-owner (the dialog's caller), and this file
-   contains no persistence call, no history push and no board mutation of any
-   kind. That is asserted as a text scan by checks/package-templates.mjs.
+   THE GALLERY NEVER CREATES A BOARD ITSELF. Its action hands a
+   `${preset}:${templateId}` key to the caller, and the CALLER creates the board
+   from it in one step — no dialog, no name prompt (ROUND 3; before this, the key
+   pre-selected a row in the New-board dialog, which cost an extra click). Board
+   creation therefore stays single-owner (App's `createFromTemplate`), and this
+   file contains no persistence call, no history push and no board mutation of
+   any kind. That is asserted as a text scan by checks/package-templates.mjs.
 
    THE VOCABULARY IS THE APP'S OWN, NOT A NEW ONE: `.sp-overlay` scrim +
    `.sp-card` shell (as BoardDialog does with `.bd-overlay` / `.bd-card`), the
@@ -241,7 +243,7 @@ export default function TemplatesGallery({onCancel, onUse, returnFocusTo}: Props
           <div>
             <h2 className="bd-title" id="tg-title">Templates</h2>
             <p className="bd-sub">
-              Previews are drawn from each template’s own shapes. Choosing one opens New board with it pre-selected.
+              Previews are drawn from each template’s own shapes. Choosing one creates the board straight away, named “Untitled”, “Untitled 2”… — rename it any time.
             </p>
           </div>
           <button type="button" className="bd-x" aria-label="Close" onClick={onCancel}><X size={14} /></button>

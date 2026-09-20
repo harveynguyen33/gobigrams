@@ -78,4 +78,36 @@ export function defaultTemplate(presetId: unknown, templateId?: string): Templat
   return p.templates.find(t => t.id === templateId) ?? p.templates[0];
 }
 
+/* ROUND 3 — THE AUTO-NUMBERED DEFAULT NAME.
+ *
+ * WHY. The name is OPTIONAL now: "Use template" creates the board in one click
+ * and the New-board dialog's field merely starts from the same default, so the
+ * user can accept it and just press Create. The default must therefore be
+ * unique across the boards that already exist, or the second board the user
+ * accepts would share a name with the first.
+ *
+ * TRIM DECISION (checks/package-templates.mjs §5 asserts this). The collision
+ * KEY is the name TRIMMED, and the comparison is exact and case-sensitive:
+ *   - `' untitled '` trims to `'untitled'`, which is NOT `'Untitled'` — case
+ *     differs — so it is NOT a collision and this returns `'Untitled'`.
+ *   - `'Untitled '` DOES collide (both sides trim to `'Untitled'`), which is the
+ *     point of trimming at all: a name that differs only by surrounding
+ *     whitespace would otherwise hand out a duplicate.
+ * A user's own `My first board` never matches. Neither does `Untitled notes`
+ * (the tail must be `<space><digits>`, nothing else), so only `Untitled` and
+ * `Untitled <digits>` take part in the numbering.
+ *
+ * PURE: no React, no DOM, no fetch — a Node probe can bundle and execute it. */
+export function nextUntitledName(existing: readonly string[]): string {
+  const key = (s: string) => s.trim();
+  const taken = new Set(existing.map(key));
+  if (!taken.has('Untitled')) return 'Untitled';
+  /* The SMALLEST unused N ≥ 2 — so deleting `Untitled 2` and creating again
+   * fills the gap instead of counting the survivors and skipping a number. */
+  for (let n = 2; ; n++) {
+    const candidate = `Untitled ${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
 export {asPreset};

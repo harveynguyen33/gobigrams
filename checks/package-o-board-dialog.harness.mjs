@@ -126,10 +126,25 @@ assert('6b.no-template-choice-without-a-resolvable-template',
   'every non-empty key resolves to a real template');
 
 /* ---------- 5. App.tsx performs the same lookup --------------------------- */
-const appHasPairLookup = /r\.seed \? getPreset\(pid\)\.templates\?\.find\(x => x\.id === r\.seed!\.templateId\)/.test(APP_SRC.replace(/\s+/g, ' '));
-console.log(`\nApp.tsx resolves the (preset, templateId) pair: ${appHasPairLookup}`);
-assert('6b.App-resolves-the-pair-within-the-chosen-preset', appHasPairLookup,
-  'getPreset(pid).templates?.find(x => x.id === r.seed.templateId)');
+/* RE-ANCHORED (ROUND 3) — NOT weakened, and the reason is recorded. The pair
+   lookup moved VERBATIM out of `onBoardDialog`'s create branch into
+   `createFromTemplate`, the new single owner of "create a board from a
+   template"; that is why the literal spelling changed from
+   `r.seed ? getPreset(pid).templates?.find(x => x.id === r.seed!.templateId)`
+   to `getPreset(wantPid).templates?.find(x => x.id === opts.templateId)`.
+   The CLAIM is unchanged and is what is asserted: App resolves the
+   (preset, templateId) pair WITHIN the chosen preset, so a C4 template can never
+   land under Mixed. Both spellings are accepted and the one that matched is
+   printed, so a future move shows up here instead of rotting silently. */
+const appPairSpellings = [
+  ['round-3 (inside createFromTemplate)', /getPreset\(wantPid\)\.templates\?\.find\(x => x\.id === opts\.templateId\)/],
+  ['pre-round-3 (inside onBoardDialog)', /r\.seed \? getPreset\(pid\)\.templates\?\.find\(x => x\.id === r\.seed!\.templateId\)/],
+];
+const appPairHit = appPairSpellings.find(([, re]) => re.test(APP_SRC.replace(/\s+/g, ' ')));
+console.log(`\nApp.tsx resolves the (preset, templateId) pair: ${!!appPairHit}  [${appPairHit ? appPairHit[0] : 'NEITHER spelling — the lookup was rewritten without the pair-within-the-preset shape'}]`);
+assert('6b.App-resolves-the-pair-within-the-chosen-preset', !!appPairHit,
+  `getPreset(<chosen preset>).templates?.find(x => x.id === <templateId>) — matched the ${appPairHit ? appPairHit[0] : 'NO'} spelling. ` +
+  'The lookup moved into createFromTemplate this round; the assertion was re-anchored to accept either location, not relaxed: it still requires the template to be found WITHIN the preset that owns it');
 
 /* ---------- 6. DELETE is not gated on a name ----------------------------- */
 assert('6b.delete-is-not-gated-on-a-board-name',

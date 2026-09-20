@@ -1125,20 +1125,75 @@ export default function App() {
    *  instead of through a blocking native browser prompt + confirm chain. */
   const newBoard = useCallback(() => { setBoardPick(null); setBoardDlg('create'); }, []);
 
-  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery's ONE handover.
-   *  `key` is the `${preset}:${templateId}` the user chose. Opening the dialog
-   *  with `initialPick` set is the WHOLE of "use template": the gallery does not
-   *  name a board, does not seed one and does not save one — it hands a choice
-   *  to the create path, which is the single owner of board creation (§2.4/§2.6).
-   *  The dialog is opened (rather than merely re-pointed) so the same handover
-   *  works from both routes: straight off the boards menu, where no dialog is
-   *  open, and from the dialog's own trailing row, where the gallery has already
-   *  closed it. */
+  /** ROUND 3 — THE ONE OWNER OF "CREATE A BOARD FROM A TEMPLATE".
+   *
+   *  BOTH routes call this and NEITHER keeps a copy of the body: the gallery's
+   *  "Use template" (which now creates the board in ONE step, no dialog) and
+   *  `Boards → New board` → Create with a row chosen. Before this round the body
+   *  lived inline in `onBoardDialog`'s create branch; it was lifted here so the
+   *  two paths cannot drift and there is a single owner of the seed + the save.
+   *
+   *  `preset`/`templateId` name the seed; both absent means "start empty", which
+   *  is a real option and not a failure. The name is OPTIONAL: a caller may hand
+   *  one over (the dialog's field) or omit it, in which case it is auto-numbered
+   *  from the CURRENT board list — that is what makes the gallery path zero
+   *  clicks while still producing `Untitled`, `Untitled 2`, `Untitled 3`, …
+   *
+   *  The `preset` string is only ever the SEED's own preset, never `custom`
+   *  unless nothing seeded the board: a C4 template must not land under Mixed's
+   *  edge defaults (the old hard-coded-`custom` defect the dialog fixed).
+   *
+   *  ORDERING MATTERS: this is declared ABOVE `useTemplate` because a
+   *  `useCallback` cannot close over a `const` that has not been initialised
+   *  yet — the same TDZ constraint `onBoardDialog` documents below. */
+  const createFromTemplate = useCallback((opts: {name?: string; preset?: PresetId; templateId?: string} = {}) => {
+    const wantPid: PresetId = opts.preset ?? 'custom';
+    const t = opts.templateId ? getPreset(wantPid).templates?.find(x => x.id === opts.templateId) : undefined;
+    const pid: PresetId = t ? wantPid : 'custom';
+    const given = opts.name?.trim() ?? '';
+    const name = given.length ? given : boards.nextUntitledName(boardList.map(b => b.name));
+    void (async () => {
+      try {
+        await flushSave();
+        const doc = await boards.createBoard(name);
+        const nodes = t ? t.nodes.map(n => ({...n})) : [];
+        const edges = t ? t.edges.map(e => ({...e})) : [];
+        if (t) await boards.saveBoard({id: doc.id, name, nodes, edges, preset: pid});
+        setBoardList(await boards.listBoards());
+        applyBoard({...doc, nodes, edges, preset: pid});
+        tickTask('board');
+        flash(`Created ${getPreset(pid).label} board “${name}”`);
+      } catch (err: any) {
+        flash(`New board failed: ${err?.message ?? 'unknown'}`);
+      }
+    })();
+  }, [boardList, flushSave, applyBoard, flash, tickTask]);
+
+  /** ROUND 3 — "Use template" CREATES THE BOARD, in ONE step.
+   *
+   *  Harvey, verbatim: "thấy hơi mất công khi tôi ấn Templates... xong hiện modal
+   *  và tôi chọn use template thì nó qua create newboard". The old route cost an
+   *  extra stop: gallery → Use template → New board dialog → press Create. Now the
+   *  gallery's `key` (`${preset}:${templateId}`) is RESOLVED here and handed to
+   *  `createFromTemplate`, which is the same function the dialog's create branch
+   *  calls — so there is still exactly ONE owner of "create a board from a
+   *  template", and this route has no name prompt and no dialog.
+   *
+   *  THE NAME IS OPTIONAL BY DESIGN: none is passed, so `createFromTemplate`
+   *  auto-numbers it from the current board list (`Untitled`, `Untitled 2`, …).
+   *  A user who wants a specific name still has the dialog route
+   *  (`Boards → New board`), which carries a name field.
+   *
+   *  `key` is parsed at the FIRST `:` because a template id never contains one;
+   *  a malformed key (no `:`) is left to create an UNSEEDED board rather than
+   *  inventing a preset — `defaultTemplate`-style guessing is what the dialog
+   *  path deliberately avoids. */
   const useTemplate = useCallback((key: string) => {
     setTgOpen(false);
-    setBoardPick(key);
-    setBoardDlg('create');
-  }, []);
+    const i = key.indexOf(':');
+    if (i < 0) { createFromTemplate({}); return; }
+    createFromTemplate({preset: key.slice(0, i) as PresetId, templateId: key.slice(i + 1)});
+  }, [createFromTemplate]);
 
   /** The gallery's own close path. The caret goes back to the Boards button —
    *  which is the one trigger that still exists on either route into the gallery
@@ -1264,7 +1319,12 @@ export default function App() {
    *  the body of the native prompt / confirm it replaces, verbatim apart from
    *  where its inputs now come from. Declared here (below the three workers)
    *  because it calls two of them — a `useCallback` cannot reference a `const`
-   *  that has not been initialised yet, not even inside its dep array. */
+   *  that has not been initialised yet, not even inside its dep array.
+   *
+   *  ROUND 3 — the CREATE branch is now a CALL, not a body: it hands the name and
+   *  the (preset, templateId) seed to `createFromTemplate`, which is the single
+   *  owner of board creation from a template. Both `r.seed` and the name are
+   *  optional there, so this path and the gallery path run the same code. */
   const onBoardDialog = useCallback((r: BoardDialogResult) => {
     setBoardDlg(null);
     setBoardPick(null);
@@ -1276,31 +1336,15 @@ export default function App() {
        defaults, auto-layout, the ERD table node and the C4 legend, so boards
        written before this change keep behaving exactly as they did.
 
-       ITEM 6b — a chosen TEMPLATE decides the preset. The dialog returns a
-       (preset, templateId) PAIR because a template BELONGS to a preset: seeding
-       a C4 template into the `custom` board would give it C4 nodes under Mixed's
-       edge defaults. "Start empty" keeps `custom`. (The old code hard-coded
-       `custom` and then asked about `custom.templates[0]` — which does not
-       exist, so the template question was unreachable and always answered "no".) */
-    const pid: PresetId = r.seed ? r.seed.preset : 'custom';
-    const t = r.seed ? getPreset(pid).templates?.find(x => x.id === r.seed!.templateId) : undefined;
-    const name = r.name;
-    void (async () => {
-      try {
-        await flushSave();
-        const doc = await boards.createBoard(name);
-        const nodes = t ? t.nodes.map(n => ({...n})) : [];
-        const edges = t ? t.edges.map(e => ({...e})) : [];
-        if (t) await boards.saveBoard({id: doc.id, name, nodes, edges, preset: pid});
-        setBoardList(await boards.listBoards());
-        applyBoard({...doc, nodes, edges, preset: pid});
-        tickTask('board');
-        flash(`Created ${getPreset(pid).label} board “${name}”`);
-      } catch (err: any) {
-        flash(`New board failed: ${err?.message ?? 'unknown'}`);
-      }
-    })();
-  }, [flushSave, applyBoard, flash, tickTask, doRenameBoard, doDeleteBoard]);
+       A chosen TEMPLATE decides the preset: the dialog returns a
+       (preset, templateId) PAIR because a template BELONGS to a preset. Seeding
+       a C4 template into a `custom` board would give it C4 nodes under Mixed's
+       edge defaults. "Start empty" carries no seed at all. (The old code
+       hard-coded `custom` and then asked about `custom.templates[0]` — which
+       does not exist, so the template question was unreachable and always
+       answered "no".) */
+    createFromTemplate({name: r.name, preset: r.seed?.preset, templateId: r.seed?.templateId});
+  }, [createFromTemplate, doRenameBoard, doDeleteBoard]);
 
   // Close the boards popover on outside click / Escape.
   const boardsBtnRef = useRef<HTMLDivElement>(null);
@@ -4480,7 +4524,7 @@ export default function App() {
             onCancel={closeBoardDlg}
             onSubmit={onBoardDialog}
             returnFocusTo={boardsMenuBtnRef}
-            initialPick={boardPick ?? undefined}
+            defaultName={boards.nextUntitledName(boardList.map(b => b.name))}
             onBrowse={() => { setBoardDlg(null); setBoardPick(null); setTgOpen(true); }}
           />
         )}
