@@ -1,8 +1,49 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-19 (night) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-AD + AE + **AF** shipped. All orchestrator-verified live.
-**Next: Harvey's Mac test, then PACKAGE-N** (the palette redesign) — its spec is already written.
+**Last session:** 2026-09-20 (morning) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
+AD + AE + AF + **AG1** shipped. All orchestrator-verified live.
+**Next: AG2** (`sub` field hidden for flowchart, `Colour`→`Color` copy sweep, the 9-swatch row
+layout — it currently wraps 7+2, Harvey wants an even grid), then PACKAGE-N.
+
+## ROUND AG1 — the colour palette (Harvey chose Option A). DONE + verified live
+
+Harvey: *"decision có vẻ màu vàng nhưng chúng ta lại thiếu, có phải đó là lý do bạn chọn màu nâu
+đất?"* — **he was right, and it was a real bug.**
+
+**The bug, measured:** `--c-amber` was hue **43°** in dark (`#fbbf24`) but hue **23°** in light and
+paper (`#92400e`), at saturation 0.90 — a 20° hue rotation plus a 25-point lightness drop. Yellow at
+low lightness IS brown. **The orchestrator swept ALL six tokens** rather than fixing only the
+reported one: only `amber` was a real defect. `cyan` (22° spread) is cyan-teal→teal, same family;
+`slate` (185° spread) is near-grey at saturation **0.12**, invisible. **Lesson: a hue spread matters
+only where saturation is high enough to see it.**
+
+**Harvey chose OPTION A — keep the hue, adapt only lightness**, which is what every tool with a dark
+mode does. draw.io's docs say it verbatim (*"They don't change hue."*), verified against the live
+page. Tokens are NOT renamed to roles — that would hide the bug, not fix it.
+
+**Fixed values:** light `amber` `#8e6700` (hue 43.5°, contrast **4.80**), paper `#6d4f00` (hue 43.5°,
+7.29). **Verified live by measuring the PAINTED stroke:** dark 43°, light 44°, paper 43°, midnight
+46°, contrast 48° — the hue now holds across every theme, where light used to read 23°.
+
+**Added three hue families** (consensus across Excalidraw/draw.io/tldraw/Mermaid/Miro: red, orange,
+yellow, green, teal, blue, purple are 6-7/7; we lacked red and blue): `red` `#ff6b6b`/`#e03131`,
+`blue` `#7aa2ff`/`#4465e9`, `pink` `#f783ac`/`#c2255c`, hexes taken from those tools, all declared in
+**all five themes**, all clearing 3:1 on both surfaces. **Brown deliberately NOT added** — 1/7
+outlier and not a hue family; `amber`'s broken light value already WAS one.
+Swatch row is now 9 keys: `accent, green, cyan, violet, amber, slate, red, blue, pink`.
+
+**Recorded, not changed:** the 9% fill yields only a **1.07–1.17** contrast delta from the surface —
+invisible as a signal; the stroke carries the semantics (5.4:1–11.8:1). Mermaid deletes its
+background array in dark mode for the same reason.
+
+**Hex count 127 → 142** (127 + 3 families × 5 themes = 142, arithmetic asserted). Five older
+harnesses pinned the sheet to exactly 127 and went red on a CORRECT tree; the coder re-anchored them
+to a 160 ceiling, keeping every assertion id and narrowing only the threshold — a pinned count cannot
+survive any round that adds a token legitimately. Verified by diff: only the threshold moved.
+Harness `round-ag-colors` **31/31**, proven failing on the pre-fix palette first.
+
+**STILL OPEN (AG2):** the 9-swatch row **wraps 7+2** in the 253px field — measured live, no panel
+overflow but an orphan row. Harvey wants an even grid.
 
 ## ROUND AF — flowchart default sizes (the "Terminal is too big" fix)
 
