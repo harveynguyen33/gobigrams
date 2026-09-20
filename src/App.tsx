@@ -1113,8 +1113,17 @@ export default function App() {
    *  history — no behaviour changed: every write was already a reset to `null`. */
   /** The dialog's close path for all three of its modes. Focus restore is left
    *  to `BoardDialog`'s own unmount contract (`returnFocusTo`), which is what the
-   *  boards-menu route has always used. */
+   *  boards-menu route has always used.
+   *
+   *  ROUND 6, ITEM 3 — this is also where an ABANDONED typed name is dropped:
+   *  every exit that is not a create (Cancel, the ✕, Escape, the scrim, a rename
+   *  or delete submitting) goes through here, and a name the user walked away
+   *  from must not name a board they create later. The two exits that DO carry a
+   *  name — the "Blank" row and "Use template" — do not use this path: the first
+   *  hands the name to `onBoardDialog` and the second stashes it for the
+   *  gallery. */
   const closeBoardDlg = useCallback(() => {
+    pendingBoardName.current = '';
     setBoardDlg(null);
   }, []);
 
@@ -1122,6 +1131,34 @@ export default function App() {
    *  `onBoardDialog`, where the name arrives as data instead of through a
    *  blocking native browser prompt + confirm chain. */
   const newBoard = useCallback(() => { setBoardDlg('create'); }, []);
+
+  /** ROUND 6, ITEM 3 — THE NAME TYPED IN THE DIALOG, CARRIED ACROSS THE HOP.
+   *
+   *  Harvey, verbatim: "khi đổi tên và ấn chọn use template => thì nó lại ra là
+   *  untitled X chứ k phải tên đã ghi trong New board". Type a name, press "Use
+   *  template", and the board came out `Untitled N`.
+   *
+   *  WHY A REF AND NOT STATE. The dialog's `onBrowse` row does two things at once
+   *  — it closes the dialog and opens the gallery — and the name has to survive
+   *  that handover without re-rendering for it. A `useState` would be a render
+   *  for a value nothing PAINTS; a ref is the value's real shape: written once on
+   *  the row press, read once when the gallery's card is chosen, and cleared
+   *  again at every point where it would otherwise go stale.
+   *
+   *  THE STALE-NAME RULE (each clear site, and why it is there):
+   *    - opening the gallery from the BOARDS MENU row (`Create from Templates`)
+   *      starts an EMPTY stash, because that route has no typed name and the
+   *      board must auto-number — without this clear, a name abandoned in an
+   *      earlier dialog would silently name a later, unrelated board;
+   *    - `useTemplate` consumes it and clears it, so a second pick from a
+   *      re-opened gallery cannot reuse the first board's name;
+   *    - cancelling the dialog clears it, so abandoning a typed name is not a
+   *      deferred naming of the next board either.
+   *
+   *  DECLARED ABOVE `createFromTemplate` deliberately: both `useTemplate` and
+   *  `onBoardDialog` are `useCallback`s that close over it, and a `useCallback`
+   *  cannot reference a `const` that has not been initialised yet. */
+  const pendingBoardName = useRef<string>('');
 
   /** ROUND 3 — THE ONE OWNER OF "CREATE A BOARD FROM A TEMPLATE".
    *
@@ -1148,8 +1185,11 @@ export default function App() {
     const wantPid: PresetId = opts.preset ?? 'custom';
     const t = opts.templateId ? getPreset(wantPid).templates?.find(x => x.id === opts.templateId) : undefined;
     const pid: PresetId = t ? wantPid : 'custom';
-    const given = opts.name?.trim() ?? '';
-    const name = given.length ? given : boards.nextUntitledName(boardList.map(b => b.name));
+    /* ROUND 6, ITEM 3 — the name rule is the pure `boards.resolveBoardName`, not
+       an inline ternary: the same decision is asserted by executing the shipped
+       function, and there is one place where "a typed name wins over the
+       auto-numbered default" is spelled. */
+    const name = boards.resolveBoardName(opts.name, boardList.map(b => b.name));
     void (async () => {
       try {
         await flushSave();
@@ -1185,12 +1225,27 @@ export default function App() {
    *  `key` is parsed at the FIRST `:` because a template id never contains one;
    *  a malformed key (no `:`) is left to create an UNSEEDED board rather than
    *  inventing a preset — `defaultTemplate`-style guessing is what the dialog
-   *  path deliberately avoids. */
+   *  path deliberately avoids.
+   *
+   *  ROUND 6, ITEM 3 — `pendingBoardName` is consumed HERE, and consumed means
+   *  CLEARED AT THE SAME INSTANT it is read, before the key is even parsed. That
+   *  is the whole fix: the dialog's "Use template" row stashes the typed name
+   *  before it opens this gallery, and the pick that follows carries it into
+   *  `createFromTemplate`. An EMPTY stash (the boards-menu route) arrives as an
+   *  empty string, which `resolveBoardName` turns into the auto-numbered default
+   *  — the two routes differ by the stash alone, not by two branches.
+   *
+   *  READ-AND-CLEAR IN ONE STEP, NOT `finally`: a malformed key returns from the
+   *  middle of this callback, and a name left behind would silently name whatever
+   *  board the NEXT pick creates. Clearing before the early return makes that
+   *  impossible by construction, so no exit path can leak the value. */
   const useTemplate = useCallback((key: string) => {
     setTgOpen(false);
+    const carried = pendingBoardName.current;
+    pendingBoardName.current = '';
     const i = key.indexOf(':');
-    if (i < 0) { createFromTemplate({}); return; }
-    createFromTemplate({preset: key.slice(0, i) as PresetId, templateId: key.slice(i + 1)});
+    if (i < 0) { createFromTemplate({name: carried}); return; }
+    createFromTemplate({name: carried, preset: key.slice(0, i) as PresetId, templateId: key.slice(i + 1)});
   }, [createFromTemplate]);
 
   /** The gallery's own close path. The caret goes back to the Boards button —
@@ -3957,8 +4012,12 @@ export default function App() {
                       ROUND 4, ITEM 2 — the row reads "Create from Templates"
                       (Harvey, verbatim: "Còn cái Templates... bên ngoài thì đổi
                       thành Create from Templates"). Only the MENU ROW is
-                      renamed: the gallery's own heading is still "Templates". */}
-                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); setTgOpen(true); }}>
+                      renamed: the gallery's own heading is still "Templates".
+                      ROUND 6, ITEM 3 — this route has NO typed name, so it is
+                      the one place that MUST empty the dialog's name stash: a
+                      name abandoned in an earlier dialog would otherwise name
+                      this unrelated board. The gallery then auto-numbers. */}
+                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}>
                     <LayoutTemplate size={14} /> Create from Templates
                   </button>
                   <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
@@ -4542,7 +4601,12 @@ export default function App() {
             onSubmit={onBoardDialog}
             returnFocusTo={boardsMenuBtnRef}
             defaultName={boards.nextUntitledName(boardList.map(b => b.name))}
-            onBrowse={() => { setBoardDlg(null); setTgOpen(true); }}
+            /* ROUND 6, ITEM 3 — the typed name is STASHED here before the gallery
+               opens, and consumed by `useTemplate` when a card is picked. This is
+               the line the defect lived on: it used to be
+               `() => { setBoardDlg(null); setTgOpen(true); }`, which dropped the
+               name on the floor, so `createFromTemplate` auto-numbered. */
+            onBrowse={(name) => { pendingBoardName.current = name; setBoardDlg(null); setTgOpen(true); }}
           />
         )}
 

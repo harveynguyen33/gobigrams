@@ -76,43 +76,50 @@ console.log(`  radiogroups: ${radioGroups}; role="radio" rows: ${radioRoles}; ro
 console.log(`  START_ROWS parsed from the dialog: [${startRows.map(r => `${r.key}="${r.name}"`).join(', ')}]`);
 
 assert('i1a.the-create-body-has-exactly-two-rows',
-  startRows.length === 1 && startRows[0].name === 'Blank'
-    && radioRoles === 1
-    && /<span className="bd-opt-name">Use template<\/span>/.test(DIALOG_RAW),
-  `ONE radio (\`${startRows[0]?.name}\`) plus the \`bd-browse\` action row ("Use template") — Harvey's "chỉ hiển thị 2 options: 1. Blank như đang có ` +
-  `2. Use template => click vào show template popup". The dialog's own data holds ${startRows.length} radio row(s), so a third option would need an edit here.`);
+  startRows.length === 2
+    && startRows[0].key === 'blank' && startRows[0].name === 'Blank'
+    && startRows[1].key === 'browse' && startRows[1].name === 'Use template'
+    && (DIALOG_RAW.match(/className="bd-row"/g) ?? []).length === 1
+    && /<span className="bd-row-name">\{row\.name\}<\/span>/.test(DIALOG_RAW),
+  `the body's own data holds exactly TWO rows — [${startRows.map(r => `"${r.name}"`).join(', ')}] — and BOTH render through the SAME \`.bd-row\` button with the ONE \`.bd-row-name\` span, ` +
+  `so the two-row count Harvey asked for ("chỉ hiển thị 2 options") is unchanged. OLD CLAIM (re-anchored): "ONE radio (Blank) plus the bd-browse action row". NEW CLAIM: two peer ` +
+  `action buttons, neither a radio. REASON: ROUND 6, ITEM 1 made the two rows uniform — Harvey, "cái đầu Blank thì có radio button" — deleting \`.bd-opt\`/\`.bd-browse\`, so an ` +
+  `assertion that one row is a radio is exactly the one that went red.`);
 
-assert('i1b.the-two-rows-keep-ONE-radiogroup-and-the-roving-contract',
-  radioGroups === 1 && radioRoles === 1 && roving
-    && (DIALOG.match(/tabIndex=\{\(on \|\| \(!hasPick && i === 0\)\) \? 0 : -1\}/g) ?? []).length === 1
-    && /const hasPick = opts\.includes\(pick\)/.test(DIALOG)
-    && /const \[pick, setPick\] = useState<string>\(START_ROWS\[0\]\.key\)/.test(DIALOG)
-    && /case 'Home': e\.preventDefault\(\); pickAt\(0\); break;/.test(DIALOG)
-    && /case 'End': e\.preventDefault\(\); pickAt\(last\); break;/.test(DIALOG),
-  'exactly ONE `role="radiogroup"` carrying exactly ONE radio with the roving tabindex, `pick` starting on `Blank`, and Arrow/Home/End all still routed ' +
-  'through `pickAt` — which sets the choice AND focuses the row. With one radio the walk clamps on it; the contract is what is held for the next option added.');
+assert('i1b.NEITHER-row-is-a-radio-and-there-is-no-walk-to-enter',
+  radioGroups === 0 && radioRoles === 0 && !roving
+    && !/\bpickAt\b|\bhasPick\b|\bsetPick\b|\boptRefs\b|\bStartRow\b/.test(DIALOG)
+    && !/onKeyDown=\{onOptKey\}/.test(DIALOG_RAW),
+  'OLD CLAIM: "exactly ONE `role="radiogroup"` carrying exactly ONE radio with the roving tabindex, `pick` starting on `Blank`, and Arrow/Home/End routed through `pickAt`". ' +
+  'NEW CLAIM (re-anchored, and it is the INVERSE): ZERO radiogroups, ZERO radios, no roving-tabindex expression, and none of `pickAt`/`hasPick`/`setPick`/`optRefs`/`StartRow` ' +
+  '— there is no radio walk at all, for a keyboard user or for markup. REASON: ROUND 6, ITEM 1 deleted the model Harvey called out ("cái đầu Blank thì có radio button"); with ' +
+  'no selection state there is nothing to announce and nothing to rove, so the accessibility contract is the plain one: two real buttons, reached by Tab, activated by Enter.');
 
 assert('i1c.Use-template-opens-the-GALLERY-and-creates-nothing-itself',
-  /className="bd-browse" onClick=\{onBrowse\}/.test(DIALOG)
-    && /onBrowse\?: \(\) => void;/.test(DIALOG)
-    && /onBrowse=\{\(\) => \{ setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP)
-    && !/className="bd-browse"[^>]*role=/.test(DIALOG)
-    && !/className="bd-browse"[^>]*tabIndex/.test(DIALOG)
+  /onClick=\{\(\) => \(row\.key === 'browse' \? onBrowse\?\.\(trimmed\) : submit\(\)\)\}/.test(DIALOG_RAW)
+    && /onBrowse\?: \(name: string\) => void;/.test(DIALOG)
+    && /onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP)
     && /submitRef\.current\(\{kind: 'create', name: trimmed, seed: null\}\)/.test(DIALOG),
-  'the row is an ACTION (no `role`, no `tabIndex`), it calls `onBrowse`, and App.tsx wires that to `setBoardDlg(null); setTgOpen(true)` — the gallery. The ' +
-  'dialog still creates only an UNSEEDED board (`seed: null`), so board creation keeps its single owner (`createFromTemplate`). CHOICE RECORDED: an action ' +
-  'row OUTSIDE the radiogroup, because "Use template" has no state — a radio would announce "2 of 2" for a control that leaves the surface.');
+  'the "Use template" row is an ACTION: its press branches on `row.key === \'browse\'` and calls `onBrowse?.(trimmed)` rather than submitting, App.tsx wires that to '
+  + '`setBoardDlg(null); setTgOpen(true)` — the gallery — and the row carries no `role`/`tabIndex` (asserted in i1b). The dialog still creates only an UNSEEDED board '
+  + '(`seed: null`), so board creation keeps its single owner (`createFromTemplate`). '
+  + 'RE-ANCHORED (ROUND 6, ITEM 3): OLD CLAIM "the row calls `onBrowse` with no arguments, and it is an action OUTSIDE the radiogroup". The radiogroup half is gone with the '
+  + 'radiogroup (there are two actions now, not one action and one radio), and the call now carries the TYPED NAME — `onBrowse?.(trimmed)` — which is the defect fix: the name '
+  + 'used to be dropped here, and the board came out `Untitled N`. The claim that survives is the important one and is still asserted: pressing this row OPENS THE GALLERY, '
+  + 'it does not create a board itself.');
 
 assert('i1d.the-dead-template-list-is-GONE-from-dialog-and-stylesheet',
   !/const TEMPLATES/.test(DIALOG) && !/\bPRESETS\b/.test(DIALOG) && !/templateCatalog/.test(DIALOG)
-    && (DIALOG.match(/role="radio"/g) ?? []).length === 1
+    && (DIALOG.match(/role="radio"/g) ?? []).length === 0
     && !/catRows|row\.kind === 'header'|\bbd-hd\b/.test(DIALOG)
     && !/initialPick/.test(DIALOG)
     && (STYLES_RAW.match(/(?:^|\n)\.bd-hd[^{]*\{/g) ?? []).length === 0
-    && /\.bd-list \{/.test(STYLES_RAW) && /\.bd-opt \{/.test(STYLES_RAW) && /\.bd-browse \{/.test(STYLES_RAW),
-  'the whole template-listing machinery is gone — the `TEMPLATES` table, the preset import, the catalog import, the `catRows` header rows, the `bd-hd` markup ' +
-  'AND its stylesheet rule, and the `initialPick` prop. What remains is the row grammar the two options use (`.bd-list` / `.bd-opt` / `.bd-browse`), so the ' +
-  'dialog has no second catalog reader and nothing left to drift.');
+    && /\.bd-list \{/.test(STYLES_RAW) && /\.bd-row \{/.test(STYLES_RAW)
+    && !/\.bd-opt\s*\{|\.bd-browse\s*\{/.test(STYLES_RAW),
+  'the whole template-listing machinery is gone — the `TEMPLATES` table, the preset import, the catalog import, the `catRows` header rows, the `bd-hd` markup AND its '
+  + 'stylesheet rule, and the `initialPick` prop — so the dialog has no second catalog reader and nothing left to drift. '
+  + 'RE-ANCHORED (ROUND 6, ITEM 1): the stylesheet half used to require `.bd-opt` / `.bd-browse`; both rows now carry the ONE `.bd-row` class, so the row grammar is asserted '
+  + 'as `.bd-list` + `.bd-row` and the two OLD selectors are asserted ABSENT (they are deleted, not orphaned). The radio count moved from 1 to 0 with the radio model.');
 
 /* The gallery is now the ONE UI reader of the catalog — asserted so the removal
    above cannot quietly remove the app's only route to a template. */
@@ -134,11 +141,14 @@ console.log(`  boards-menu template row label: ${JSON.stringify(menuRow ? menuRo
 assert('i2.the-menu-row-reads-Create-from-Templates',
   !!menuRow && menuRow[1].trim() === 'Create from Templates'
     && !/Templates…/.test(APP)
-    && /setBoardsOpen\(false\); setTgOpen\(true\); \}\};?/.test(APP)
+    && /setBoardsOpen\(false\); pendingBoardName\.current = ''; setTgOpen\(true\); \}\};?/.test(APP)
     && /<Plus size=\{14\} \/> New board/.test(APP)
     && /id="tg-title">Templates</.test(GALLERY_RAW),
-  'Harvey: "Còn cái Templates... bên ngoài thì đổi thành Create from Templates". The row sits directly beside "New board" and keeps the same handler; the ' +
-  'gallery\'s own heading stays "Templates" (it is the destination, not the verb).');
+  'Harvey: "Còn cái Templates... bên ngoài thì đổi thành Create from Templates". The row sits directly beside "New board" and keeps the same handler; the '
+  + 'gallery\'s own heading stays "Templates" (it is the destination, not the verb). '
+  + 'RE-ANCHORED (ROUND 6, ITEM 3): the handler predicate gained `pendingBoardName.current = \'\'` — this route has NO typed name, so it must CLEAR the dialog\'s stash rather '
+  + 'than carry a stale one into the gallery. The old predicate `setBoardsOpen(false); setTgOpen(true)` is one clause short of the shipped statement, which is why this '
+  + 'assertion was red; the stale-name leak it now guards is the case worth pinning (a name typed once must not attach to a board created later from this menu route).');
 
 /* ===========================================================================
    ITEM 3 — the stuck tooltip. The modality decision is EXECUTED.

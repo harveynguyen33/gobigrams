@@ -34,37 +34,53 @@
  *
  * Harvey, verbatim: "Tôi muốn khi click vào create new board, nó sẽ chỉ hiển thị
  * 2 options: 1. Blank như đang có 2. Use template => click vào show template
- * popup". Until this round the create body rendered every catalog template,
- * grouped by family and level (8 radios + 5 non-focusable group headers). It now
- * renders exactly two rows:
- *   1. `Blank` — the row that used to read "Start empty" (`custom` preset, no
- *      seed). It is the group's radio, selected by default, and its single Tab
- *      stop.
- *   2. `Use template` — an ACTION ROW, which opens the gallery through
- *      `onBrowse` (the prop PACKAGE-TEMPLATES §2.5 added for exactly this route).
+ * popup". The create body renders exactly two rows; the seeded-template listing
+ * the dialog used to carry (8 radios + 5 non-focusable group headers) is gone
+ * from this file and from the catalog: `TemplatesGallery.tsx` is the ONE UI
+ * reader of the catalog.
  *
- * WHY AN ACTION ROW AND NOT A RADIO. A radiogroup is a set of mutually exclusive
- * STATES with a persistent selection; "Use template" has no state. It is a
- * navigation that closes this dialog and opens the gallery, so a radio for it
- * would announce "2 of 2" for a control that leaves the surface, and it would put
- * the roving Tab stop on a row that is about to unmount. This project already
- * ruled on exactly this shape: the `.bd-browse` row is documented as "NOT A RADIO
- * AND MUST NOT BE ONE" (§2.5 Pass 2). This round promotes that row to the second
- * half of the two-row body and renames it "Use template".
+ * ---------------------------------------------------------------------------
+ * ROUND 6, ITEMS 1 + 2 (2026-09-20) — TWO PEER ACTION ROWS, NO RADIO AT ALL.
  *
- * The group therefore keeps ONE `role="radiogroup"`, the roving tabindex
- * (`tabIndex={(on || (!hasPick && i === 0)) ? 0 : -1}`) and the arrow / Home / End
- * walk over `opts`, exactly as before. With a single row the walk is clamped —
- * the contract is what is kept, and a future second starting option is a one-line
- * addition to `START_ROWS`.
+ * Harvey, verbatim: "cả 2 option phải đồng bộ (nên theo Use template) chứ k phải
+ * cái đầu Blank thì có radio button" and "cả 2 nên có khoảng cách thay vì sát
+ * nhau."
  *
- * REMOVED WITH THIS ROUND (genuinely dead, not deferred): the `const TEMPLATES`
- * flattening loops over `PRESETS`, `optKey`, the `Row` union's `header` kind,
- * `catRows`, the `.bd-hd` header markup (and its stylesheet rule), and the
- * `initialPick` prop. The last one had no producer left after ROUND 3 (the
- * gallery creates the board itself), so the prop and App.tsx's `boardPick` state
- * went with it. The dialog no longer imports `templateCatalog` or `PRESETS`:
- * `TemplatesGallery.tsx` is the ONE UI reader of the catalog.
+ * ROUND 4 shipped ONE radio (`Blank`, a tick ring plus a selected border and a
+ * roving tabindex) beside ONE action row (`Use template`, a dashed accent row).
+ * Two rows that do the SAME kind of thing — they each close this dialog and start
+ * a board — were drawn in two visual languages, and only one of them was a
+ * button the user could simply press. This round deletes the radio model
+ * outright: no `role="radiogroup"`, no `role="radio"`, no tick, no selected
+ * state, no roving tabindex, no arrow/Home/End walk. There are two `bd-row`
+ * buttons, the `Use template` treatment on both:
+ *
+ *   1. `Blank`         — creates a blank board IMMEDIATELY, named with what is in
+ *                        the field (an empty field asks for the auto-numbered
+ *                        default; the rule is the pure `resolveBoardName`).
+ *   2. `Use template`  — closes this dialog and opens the gallery, CARRYING the
+ *                        typed name with it (ITEM 3's fix; see the prop's note).
+ *
+ * WHY THERE IS NO THIRD CONTROL TO SUBMIT WITH. Once both rows act on press,
+ * the footer's primary "Create board" button has nothing left to submit in
+ * CREATE mode, so it is not rendered there — Cancel is the whole footer. The
+ * RENAME (`Save name`) and DELETE (`Delete board`) buttons are unchanged: those
+ * bodies really are a field plus a submit.
+ *
+ * ACCESSIBILITY. Both rows are real `<button>`s with a real accessible name, so a
+ * keyboard user Tabs to them and Enter activates them. There is no selection to
+ * announce, which is why there is no `aria-checked` anywhere in this file.
+ *
+ * The hint sub-lines (`blank canvas · mixed notation` / `opens the template
+ * gallery`) are kept deliberately: with two identically-drawn buttons they are
+ * the only thing telling the user what each one does.
+ *
+ * REMOVED WITH THIS ROUND (genuinely dead, not deferred): the `pick` state, the
+ * `opts` array and the `hasPick` predicate the walk indexed, `optRefs`, `pickAt`,
+ * `onOptKey`, and the `StartRow` type. Nothing read any of them once the radio
+ * went. What replaced `START_ROWS` is `CREATE_ROWS` — the two rows' TEXT, still a
+ * single data edit to add a third action, with the per-row behaviour chosen by
+ * its `key`.
  * ---------------------------------------------------------------------------
  */
 import {useEffect, useMemo, useRef, useState} from 'react';
@@ -75,7 +91,7 @@ import {FOCUSABLE} from './Settings';
 export type BoardDialogMode = 'create' | 'rename' | 'delete';
 
 /** What the dialog hands back. `templateId: null` is the explicit
- *  "start empty" choice — a real option, not a fallback. ROUND 4: this dialog can
+ *  "start empty" choice — a real option, not a fallback. ROUND 6: this dialog can
  *  only ever produce `null` (Blank), because it no longer lists templates. The
  *  field is KEPT as part of the result contract — App.tsx's create branch and the
  *  data-contract harness still name it, and the seeded form is the gallery's. */
@@ -100,22 +116,35 @@ type Props = {
    *  Ignored by `rename`, which starts from the live `boardName`. A caller that
    *  passes nothing gets the old literal `'Untitled'`. */
   defaultName?: string;
-  /** PACKAGE-TEMPLATES §2.5 Pass 2, RENAMED BY ROUND 4 — the route into the
-   *  template gallery, rendered as the body's second row. The row is deliberately
-   *  NOT a radio: it carries no `role` and no `tabIndex`, so it never enters
-   *  `opts` and the roving walk can never land on it or count it as a choice. It
-   *  is a second ROUTE to the gallery, never a second board-creation path — the
-   *  gallery resolves the template and creates the board itself (ROUND 3). */
-  onBrowse?: () => void;
+  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the route into the template gallery,
+   *  rendered as the create body's second row.
+   *
+   *  ROUND 4 gave the row no arguments and no state: it was a navigation, not a
+   *  choice. ROUND 6, ITEM 3 makes it carry the TYPED NAME, which is a defect fix:
+   *  Harvey typed a name, pressed this row, and the board came out `Untitled N`
+   *  ("khi đổi tên và ấn chọn use template => thì nó lại ra là untitled X chứ k
+   *  phải tên đã ghi trong New board"). The name leaves the dialog HERE — as an
+   *  argument, so the caller can hold it across the gallery hop — because this
+   *  is the last moment the dialog exists.
+   *
+   *  It is STILL not a board-creation path: the row opens the gallery and the
+   *  gallery's pick creates the board, so board creation keeps its single owner
+   *  (`createFromTemplate`). The name it carries is a value, not a second
+   *  creation route. */
+  onBrowse?: (name: string) => void;
 };
 
-/** ROUND 4 — THE STARTING POINT. ONE radio today (`Blank`), and the walk below is
- *  written over this array rather than against a literal so a second option is a
- *  data edit. The key is what `pick` holds; it is NOT a `${preset}:${templateId}`
- *  pair any more, because this dialog resolves no templates. */
-type StartRow = {key: string; name: string; hint: string};
-const START_ROWS: StartRow[] = [
+/** ROUND 6, ITEM 1 — THE CREATE BODY'S TWO PEER ACTIONS.
+ *
+ *  Kept as DATA, not as two hand-written buttons, so "the body offers exactly two
+ *  actions" is a fact the source states once and a harness can count. Both rows
+ *  render the same `bd-row` markup; `key` is the only thing that differs, and it
+ *  is what `submit` / `onBrowse` branch on. `blank` is FIRST because it is the
+ *  zero-setup route. */
+type CreateRow = {key: 'blank' | 'browse'; name: string; hint: string};
+const CREATE_ROWS: CreateRow[] = [
   {key: 'blank', name: 'Blank', hint: 'blank canvas · mixed notation'},
+  {key: 'browse', name: 'Use template', hint: 'opens the template gallery'},
 ];
 
 export default function BoardDialog({mode, boardName, onCancel, onSubmit, returnFocusTo, defaultName, onBrowse}: Props) {
@@ -127,34 +156,22 @@ export default function BoardDialog({mode, boardName, onCancel, onSubmit, return
   // nothing); `rename` starts from the live name. Both are SELECTED, so the
   // first keystroke replaces.
   const [name, setName] = useState(mode === 'create' ? (defaultName ?? 'Untitled') : boardName);
-  /* ROUND 4 — `Blank` is the selection from the first paint: the dialog's create
-     body has one radio and it is the default starting point, so there is no
-     "nothing chosen yet" state to represent. */
-  const [pick, setPick] = useState<string>(START_ROWS[0].key);
-  /* Roving tabindex for the start-from radios: exactly ONE row is in the Tab
-     order and the arrow keys move between them, which is the pattern
-     `Settings.tsx`'s `Segmented` already establishes for this app. A
-     `role="group"` of radios where every row is tabbable is a half-implemented
-     widget — a screen-reader user is told "radio 1 of N" and then has to Tab
-     through all N. */
-  const optRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  /* The rows are built ONCE: the list is static data, and re-deriving it per
-     keystroke would re-create the keys on every render. `rows` is what is
-     RENDERED; `opts` is only the radio keys, which is what the roving walk
-     indexes. */
-  const rows = useMemo(() => START_ROWS, []);
-  const opts = useMemo(() => rows.map(r => r.key), [rows]);
-  /* Whether the current `pick` names a real row. It is FALSE before any choice —
-     in which case the first row stays the single tab stop instead of the group
-     losing one. */
-  const hasPick = opts.includes(pick);
+  /* ROUND 6, ITEM 1 — the only rows the create body can offer. `browse` needs a
+     destination, so a caller that passes no `onBrowse` gets the `blank` row
+     alone rather than a button that goes nowhere. */
+  const createRows = useMemo(
+    () => (onBrowse ? CREATE_ROWS : CREATE_ROWS.filter(r => r.key === 'blank')),
+    [onBrowse],
+  );
 
   const trimmed = name.trim();
-  /* The NAME only gates the two modes that have one. `delete` carries no name, so
-     gating it on this would make the confirm button silently inert on a board
-     whose name is empty or whitespace. */
-  const needsName = mode !== 'delete';
+  /* ROUND 6, ITEM 1 — only RENAME is still gated on a name, because only rename
+     still has a submit button to gate. CREATE's rows act on press: an empty field
+     there is how the user asks for the auto-numbered default, so gating it would
+     make the Blank row silently inert — the defect this line's old form would
+     have introduced. DELETE carries no name at all. */
+  const needsName = mode === 'rename';
   const canSubmit = !needsName || trimmed.length > 0;
 
   // Keep the latest handlers for the document listener without re-binding it.
@@ -163,33 +180,15 @@ export default function BoardDialog({mode, boardName, onCancel, onSubmit, return
   const submitRef = useRef(onSubmit);
   submitRef.current = onSubmit;
 
-  /* `opts[0]` is the radio, so it is index 0 in the arrow-key order too. */
-  const pickAt = (i: number) => {
-    const k = opts[Math.max(0, Math.min(i, opts.length - 1))];
-    if (k === undefined) return;
-    setPick(k);
-    optRefs.current[opts.indexOf(k)]?.focus();
-  };
-
-  const onOptKey = (e: React.KeyboardEvent, i: number) => {
-    const last = opts.length - 1;
-    switch (e.key) {
-      case 'ArrowDown': case 'ArrowRight': e.preventDefault(); pickAt(i + 1); break;
-      case 'ArrowUp': case 'ArrowLeft': e.preventDefault(); pickAt(i - 1); break;
-      case 'Home': e.preventDefault(); pickAt(0); break;
-      case 'End': e.preventDefault(); pickAt(last); break;
-      default: break;
-    }
-  };
-
   const submit = () => {
     if (!canSubmit) return;
     if (mode === 'create') {
-      /* ROUND 4 — the dialog resolves NO template, so its create result carries
-         an explicit `seed: null` ("Blank"). The lookup that used to live here
-         (`TEMPLATES.find(...)`) left with the template rows: the gallery is the
-         ONE surface that resolves a `${preset}:${templateId}` pair, in ONE step
-         (ROUND 3's `createFromTemplate`). */
+      /* ROUND 6 — the Blank row's action, and the Enter-key equivalent. The
+         dialog resolves NO template, so its create result carries an explicit
+         `seed: null` ("Blank"); the gallery is the ONE surface that resolves a
+         `${preset}:${templateId}` pair. An EMPTY name is passed on as empty
+         rather than substituted here: `resolveBoardName` in `src/boards.ts` is
+         the single owner of "a typed name wins, otherwise auto-number". */
       submitRef.current({kind: 'create', name: trimmed, seed: null});
       return;
     }
@@ -297,75 +296,49 @@ export default function BoardDialog({mode, boardName, onCancel, onSubmit, return
             {mode === 'create' && (
               <>
                 <div className="bd-label bd-label-gap">start from</div>
-                {/* ROUND 4 — ONE radiogroup, ONE radio. `Blank` is the whole
-                    group's radio: the roving Tab stop and the arrow/Home/End
-                    target are its own, so the walk can never land on the action
-                    row below (which is not in `rows`, never in `opts`, and
-                    carries no `role`). */}
-                <div className="bd-list" role="radiogroup" aria-label="Starting point">
-                  {rows.map((row, i) => {
-                    const on = pick === row.key;
-                    return (
-                      <button
-                        key={row.key}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        /* Roving tabindex: the SELECTED row (or the first, before
-                           any choice) is the single tab stop; the arrows move the
-                           choice AND the focus together, as a radiogroup should. */
-                        tabIndex={(on || (!hasPick && i === 0)) ? 0 : -1}
-                        ref={el => { optRefs.current[i] = el; }}
-                        className={`bd-opt${on ? ' on' : ''}`}
-                        onClick={() => setPick(row.key)}
-                        onKeyDown={e => onOptKey(e, i)}
-                      >
-                        <span className="bd-tick" aria-hidden="true" />
-                        <span className="bd-opt-text">
-                          <span className="bd-opt-name">{row.name}</span>
-                          <span className="bd-opt-hint">{row.hint}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
+                {/* ROUND 6, ITEM 1 — TWO PEER ACTION ROWS, ONE CLASS, NO RADIO.
+                    Neither row is a state: pressing either one leaves this
+                    surface (one starts a blank board, the other opens the
+                    gallery), so there is nothing to select, nothing to announce
+                    with `role="radio"` / `aria-checked`, and no arrow-key walk to
+                    run. They are ordinary buttons: Tab reaches them and Enter
+                    presses them. */}
+                <div className="bd-list">
+                  {createRows.map(row => (
+                    <button
+                      key={row.key}
+                      type="button"
+                      className="bd-row"
+                      onClick={() => (row.key === 'browse' ? onBrowse?.(trimmed) : submit())}
+                    >
+                      <span className="bd-row-text">
+                        <span className="bd-row-name">{row.name}</span>
+                        <span className="bd-row-hint">{row.hint}</span>
+                      </span>
+                    </button>
+                  ))}
                 </div>
-                {/* ROUND 4, ITEM 1 — the body's SECOND row, and an ACTION, not a
-                    state: it opens the gallery and creates nothing itself.
-
-                    IT IS NOT A RADIO AND MUST NOT BE ONE. It is rendered HERE,
-                    after the map, literally: it is not a `StartRow`, so it never
-                    enters `rows`, never enters `opts`, and the roving walk —
-                    which indexes `opts` — can therefore never land on it or count
-                    it as one of the group's choices. It carries no `role` and no
-                    `tabIndex`, so it is not an arrow-key target and a screen
-                    reader does not announce it as "one of N". It stays a normal
-                    Tab stop, which is what a keyboard user expects of a route out
-                    of a dialog. */}
-                {onBrowse && (
-                  <button type="button" className="bd-browse" onClick={onBrowse}>
-                    <span className="bd-opt-text">
-                      <span className="bd-opt-name">Use template</span>
-                      <span className="bd-opt-hint">opens the template gallery</span>
-                    </span>
-                  </button>
-                )}
               </>
             )}
           </div>
         )}
 
+        {/* ROUND 6, ITEM 1 — CREATE mode has no submit button: both of its rows
+            act on press, so a primary button would be dead UI. Cancel is the
+            whole footer there. RENAME and DELETE keep theirs unchanged — those
+            bodies really are a field/confirm plus a submit. Cancel stays FIRST in
+            DOM order for every mode, which on the destructive dialog is what
+            keeps the safe choice the one a keyboard user reaches first. */}
         <div className="bd-actions">
-          {/* Cancel is FIRST in DOM order for every mode — on the destructive
-              dialog that is what keeps the safe choice the one a keyboard user
-              reaches first, matching the reading order on screen. */}
           <button type="button" className="bd-btn" onClick={onCancel}>Cancel</button>
-          {mode === 'delete' ? (
+          {mode === 'delete' && (
             <button type="button" className="bd-btn danger" onClick={submit}>
               Delete board
             </button>
-          ) : (
+          )}
+          {mode === 'rename' && (
             <button type="button" className="bd-btn primary" disabled={!canSubmit} onClick={submit}>
-              {mode === 'create' ? 'Create board' : 'Save name'}
+              Save name
             </button>
           )}
         </div>

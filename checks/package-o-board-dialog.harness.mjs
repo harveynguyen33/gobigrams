@@ -86,12 +86,15 @@ assert('6b-REANCHOR.the-dialog-no-longer-offers-templates-and-reads-no-preset-ta
     && !/for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_CODE)
     && !/for \(const t of PRESETS\[id\]\.templates \?\? \[\]\)/.test(DIALOG_CODE)
     && !/\bPRESETS\b/.test(DIALOG_CODE)
-    && /const START_ROWS: StartRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_CODE)
-    && /className="bd-browse" onClick=\{onBrowse\}/.test(DIALOG_CODE),
-  'the `const TEMPLATES` builder and BOTH flattening loops are gone from the dialog, and it no longer names `PRESETS` at all: the create body is ONE radio ' +
-  '(Blank) plus the `bd-browse` action row that opens the gallery. Reason for the inversion: the lifted-block technique needs its subject to exist, and ROUND 4 ' +
-  'deleted the subject by request — the executed-list equivalence is now pinned where the list actually lives (checks/package-templates.mjs tg1 executes ' +
-  "`galleryModel()` and compares it to the catalog).");
+    && /const CREATE_ROWS: CreateRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_CODE)
+    && /className="bd-row"/.test(DIALOG_CODE),
+  'the `const TEMPLATES` builder and BOTH flattening loops are gone from the dialog, and it no longer names `PRESETS` at all: the create body is TWO uniform `bd-row` '
+  + 'actions — `Blank` (rendered from the same `CREATE_ROWS` data array) and `Use template` (which opens the gallery). Reason for the inversion: the lifted-block technique '
+  + 'needs its subject to exist, and ROUND 4 deleted the subject by request — the executed-list equivalence is now pinned where the list actually lives '
+  + '(checks/package-templates.mjs tg1 executes `galleryModel()` and compares it to the catalog). '
+  + 'RE-ANCHORED (ROUND 6, ITEM 1): OLD claims "ONE radio (Blank) plus the `bd-browse` action row" — the radio was deleted this round and BOTH rows now share the ONE `.bd-row` '
+  + 'class, so the two predicates that named `START_ROWS` (a `StartRow[]` of radios) and `bd-browse` are replaced by the uniform-rows ones; the CLAIM (no template data, no '
+  + 'PRESETS, no lifted builder) is unchanged.');
 
 const derived = Object.entries(PRESETS).flatMap(([id, p]) =>
   p.templateIds.map(templateId => ({preset: id, presetLabel: p.label, templateId})));
@@ -176,8 +179,11 @@ assert('6b.App-resolves-the-pair-within-the-chosen-preset', !!appPairHit,
 
 /* ---------- 6. DELETE is not gated on a name ----------------------------- */
 assert('6b.delete-is-not-gated-on-a-board-name',
-  /const needsName = mode !== 'delete';/.test(DIALOG_SRC),
-  'a whitespace-only board name would otherwise make the confirm button silently inert');
+  /const needsName = mode === 'rename';/.test(DIALOG_SRC),
+  'a whitespace-only board name would otherwise make the confirm button silently inert. '
+  + 'RE-ANCHORED (ROUND 6, ITEM 1): the old predicate was `mode !== \'delete\'`, which was TRUE for BOTH create and rename — but ROUND 6 removed create\'s submit button (both of '
+  + 'its rows act on press), so create has no submit left to gate and the shipped rule is the narrower `mode === \'rename\'`. The CLAIM is unchanged and still asserted: DELETE is '
+  + 'never gated on a name.');
 
 const failed = asserts.filter(a => !a.pass);
 console.log('\n' + '='.repeat(78));

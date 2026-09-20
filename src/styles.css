@@ -2143,10 +2143,17 @@ kbd {
 }
 .bd-label-gap { margin-top: 12px; }
 
-/* The start-from list. Same row grammar as `.sp-item` (one bordered row, the
-   selected one tinted + outlined) so the two pickers read as siblings. */
+/* The start-from list. ROUND 6, ITEM 1 removed the last selection state, so the
+   "selected one tinted + outlined" half of `.sp-item`'s grammar no longer applies
+   here: these are two peer ACTIONS, not two rows of a picker.
+   ROUND 6, ITEM 2 — the rows used to sit flush (`gap: 4px`). Harvey: "cả 2 nên có
+   khoảng cách thay vì sát nhau." The gap is now 8px: a clear step up from the
+   flush 4px and inside the 8-10px band the brief names. It is a plain px value,
+   like every other `gap` in this file, so NO hex literal moves (the gate stays
+   142). NOTE: `max-height: 210px` was sized for the old 8-radio list; with two
+   rows it can never bite, and changing it was out of scope for this round. */
 .bd-list {
-  display: flex; flex-direction: column; gap: 4px;
+  display: flex; flex-direction: column; gap: 8px;
   max-height: 210px; overflow-y: auto;
 }
 /* PACKAGE-TEMPLATES §2.5 Pass 1 — the group header between rows.
@@ -2154,13 +2161,20 @@ kbd {
    monospace caption `.bd-label` uses, so the visual ladder is
    `start from` → row, with no new colour and no new widget. */
 
-/* ROUND 4, ITEM 1 — the second row of the create body. Same row grammar as
-   `.bd-opt` (same border, radius, height, and the same two-line text stack) so
-   it reads as the body's sibling row, but it is NOT a radio: no tick, no selected
-   state. The caption colour is `--sel` — the same "this goes somewhere" accent
-   `.tg-tile-cta` and the app's other links use — and every value is an existing
-   token. */
-.bd-browse {
+/* ROUND 6, ITEM 1 — THE CREATE BODY'S TWO PEER ACTION ROWS.
+   Until this round the body drew two rows in TWO visual languages: `Blank` was a
+   radio (tick ring + `.bd-opt.on` selected border + roving tabindex) and `Use
+   template` was this dashed accent action row. Harvey: "cả 2 option phải đồng bộ
+   (nên theo Use template) chứ k phải cái đầu Blank thì có radio button." Both
+   rows now carry this ONE treatment verbatim — one class, one border, one
+   padding, one height, one two-line text stack, one hover, one name colour — and
+   the whole radio vocabulary is gone: there is no tick rule, no selected variant
+   and no state to paint, because pressing either row LEAVES this dialog.
+
+   The colour is `--sel` (the same "this goes somewhere" accent `.tg-tile-cta`
+   uses) and every value is an existing token. The dashed border going solid on
+   hover is the app's existing "about to act" idiom, kept from the old row. */
+.bd-row {
   display: flex; align-items: center; width: 100%;
   background: transparent; color: var(--sel);
   border: 1px dashed var(--border-strong); border-radius: 8px;
@@ -2168,27 +2182,10 @@ kbd {
   font-family: var(--mono); font-size: 11.5px;
   transition: background .12s, border-color .12s;
 }
-.bd-browse:hover { background: var(--elevated); border-style: solid; }
-.bd-opt {
-  display: flex; align-items: center; gap: 9px; width: 100%;
-  background: transparent; color: var(--fg);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 7px 9px; cursor: pointer; text-align: left;
-  font-family: var(--sans); font-size: 12.5px;
-  transition: background .12s, border-color .12s;
-}
-.bd-opt:hover { background: var(--elevated); }
-.bd-opt.on { background: var(--elevated); border-color: var(--sel); }
-/* The radio tick. A ring that fills with the accent when chosen — the same
-   "selected = accent" language `.settings-nav-item.on` and `.sp-item.on` use. */
-.bd-tick {
-  flex: none; width: 13px; height: 13px; border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-}
-.bd-opt.on .bd-tick { border-color: var(--sel); background: var(--sel); box-shadow: inset 0 0 0 2px var(--surface); }
-.bd-opt-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
-.bd-opt-name { font-weight: 600; }
-.bd-opt-hint {
+.bd-row:hover { background: var(--elevated); border-style: solid; }
+.bd-row-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.bd-row-name { font-weight: 600; }
+.bd-row-hint {
   font-family: var(--mono); font-size: 10px; color: var(--dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

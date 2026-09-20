@@ -412,10 +412,10 @@ const HEX = (STYLES_RAW.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 const hexHits = [['src/templateCatalog.ts', CATALOG_RAW], ['src/BoardDialog.tsx', DIALOG_RAW]]
   .map(([name, src]) => ({name, n: (src.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length, rgba: (src.match(/rgba?\(/g) ?? []).length}))
   .filter(r => r.n || r.rgba);
-const bdRowBlocks = (STYLES_RAW.match(/(?:^|\n)\.bd-(?:opt|browse)[^{]*\{[^}]*\}/g) ?? []).join('\n');
+const bdRowBlocks = (STYLES_RAW.match(/(?:^|\n)\.bd-(?:row|list|row-text|row-name|row-hint)[^{]*\{[^}]*\}/g) ?? []).join('\n');
 const bdRowHex = (bdRowBlocks.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 console.log(`  hex literals in src/styles.css: ${HEX} (pre-change ${FIXTURE.hexLiterals}, ceiling 160)`);
-console.log(`  the create body's row rules (.bd-opt/.bd-browse): ${bdRowBlocks ? `${bdRowBlocks.split('\n').length} block(s), ${bdRowHex} hex literal(s)` : 'ABSENT'}`);
+console.log(`  the create body's row rules (.bd-row/.bd-list/...): ${bdRowBlocks ? `${bdRowBlocks.split('\n').length} block(s), ${bdRowHex} hex literal(s)` : 'ABSENT'}`);
 assert('12a.the-hex-count-is-unchanged',
   HEX === FIXTURE.hexLiterals && HEX <= 160,
   `${HEX} hex literals in src/styles.css, identical to the pre-change ${FIXTURE.hexLiterals} — ROUND 4 restyles the create body and removes the group-header rule, so ZERO colour is added`);
@@ -424,20 +424,31 @@ assert('12b.no-colour-literal-in-the-new-module-or-the-dialog',
   hexHits.length === 0
     ? 'src/templateCatalog.ts and src/BoardDialog.tsx contain no #hex and no rgb()/rgba() literal; every rule the body uses is built from tokens'
     : hexHits.map(r => `${r.name}: ${r.n} hex, ${r.rgba} rgb()`).join('; '));
-/* RE-ANCHORED (ROUND 4, ITEM 1) — this assertion named the `.bd-hd` group-header
-   rule and its `--surface` / `--dim` tokens. ROUND 4 deleted the header (and the
-   rule), so the subject is gone and the stylesheet lookup returned 'ABSENT'. The
-   CLAIM — the create body's rows cost no new colour and are built from existing
-   tokens — is asserted against the rows the body actually has: the `Blank` radio
-   (`.bd-opt`) and the `Use template` action row (`.bd-browse`). */
+/* RE-ANCHORED TWICE. It first named the `.bd-hd` group-header rule and its
+   `--surface` / `--dim` tokens. ROUND 4 deleted the header (and the rule), so the
+   subject was re-anchored to the rows the body then had: the `Blank` radio
+   (`.bd-opt`) and the `Use template` action row (`.bd-browse`). ROUND 6, ITEM 1
+   deleted those two rules as well — both rows now carry ONE class, `.bd-row`,
+   with `.bd-list` as its container — so the stylesheet lookup for `.bd-opt` /
+   `.bd-browse` again returned 'ABSENT' and the assertion would have reported "the
+   row grammar itself is missing" about markup that is present and green.
+   The CLAIM — the create body's rows cost no new colour and are built from
+   existing tokens — is unchanged; only the selectors it is measured over moved,
+   from `.bd-opt`/`.bd-browse` to `.bd-row` and the three `.bd-row-*` text spans.
+   The tokens it now requires are the ones those rules actually use: `--sel`
+   (row ink), `--border-strong` (the dashed border), `--mono` (the two-line text
+   stack), `--elevated` (the hover wash) and `--dim` (the hint sub-line). It also
+   requires that no `rgb()/rgba()` literal appears in the block, so the claim is
+   "tokens only", not merely "no hex". */
 assert('12c.the-create-body-rows-reuse-existing-tokens',
-  bdRowBlocks.length > 0 && bdRowHex === 0
-    && /var\(--sel\)/.test(bdRowBlocks) && /var\(--border\)/.test(bdRowBlocks)
-    && /var\(--elevated\)/.test(bdRowBlocks) && /var\(--fg\)/.test(bdRowBlocks),
+  bdRowBlocks.length > 0 && bdRowHex === 0 && !/rgba?\(/.test(bdRowBlocks)
+    && /var\(--sel\)/.test(bdRowBlocks) && /var\(--border-strong\)/.test(bdRowBlocks)
+    && /var\(--elevated\)/.test(bdRowBlocks) && /var\(--mono\)/.test(bdRowBlocks)
+    && /var\(--dim\)/.test(bdRowBlocks),
   bdRowBlocks.length > 0
-    ? "the body's two row rules use ONLY existing tokens (--sel, --border, --elevated, --fg) — the same grammar `.sp-item` uses, no new colour and no new widget. " +
-      "Old subject (re-anchored): a `.bd-hd` group-header rule, deleted this round with the headers it styled."
-    : "neither `.bd-opt` nor `.bd-browse` is declared in src/styles.css — the row grammar itself is missing");
+    ? "the body's row rules (`.bd-row` + `.bd-list` + the three `.bd-row-*` spans) use ONLY existing tokens (--sel, --border-strong, --mono, --elevated, --dim) — the app's own grammar, no new colour, no hex and no rgb()/rgba() literal. " +
+      "Old subjects (re-anchored twice): a `.bd-hd` group-header rule (ROUND 4), then `.bd-opt`/`.bd-browse` (ROUND 6, ITEM 1 folded both rows onto one `.bd-row` class)."
+    : "none of `.bd-row` / `.bd-list` / `.bd-row-text` / `.bd-row-name` / `.bd-row-hint` is declared in src/styles.css — the row grammar itself is missing");
 
 /* ---------- AC 13 — the Shape union does not move -------------------------- */
 console.log('\n' + '='.repeat(78));
@@ -488,37 +499,52 @@ console.log('='.repeat(78));
    is about VALUE dependencies: it must not reach for the catalog module nor for
    the `PRESETS` table itself. */
 const dialogImportsCatalog = /import \{[^}]*templateCatalog/.test(DIALOG) || /\bPRESETS\b/.test(DIALOG);
+/* THE FORMER RADIO CONTRACT, MEASURED SO ITS ABSENCE CAN BE ASSERTED (ROUND 6,
+   ITEM 1). `radioGroups` / `radioRoles` count the roles the round deleted; the
+   `roving` probe is the old tabindex EXPRESSION, not the word `tabIndex`, so the
+   two `bd-row` buttons (which legitimately have neither) cannot be counted as a
+   walk. This block no longer claims any radiogroup EXISTS. */
 const radioGroups = (DIALOG.match(/role="radiogroup"/g) ?? []).length;
-const rovingTabbable = /tabIndex=\{\(on \|\| \(!hasPick && i === 0\)\) \? 0 : -1\}/.test(DIALOG_RAW)
-  && /const hasPick = opts\.includes\(pick\)/.test(DIALOG_RAW);
-console.log(`  role="radiogroup" occurrences: ${radioGroups}; roving tabindex expression present: ${rovingTabbable}`);
+const radioRoles = (DIALOG.match(/role="radio"/g) ?? []).length;
+const roving = /tabIndex=\{\s*\(on \|\|/.test(DIALOG_RAW);
+console.log(`  role="radiogroup" occurrences: ${radioGroups}; role="radio" occurrences: ${radioRoles}; a roving-tabindex expression survives: ${roving}`);
 console.log(`  dialog still imports the catalog/a preset table: ${dialogImportsCatalog}; literal "const TEMPLATES" table: ${/const TEMPLATES/.test(DIALOG)}`);
-assert('16a.the-dialog-no-longer-lists-templates-and-keeps-ONE-radio-walk',
-  radioGroups === 1 && rovingTabbable && !dialogImportsCatalog && !/const TEMPLATES/.test(DIALOG)
+assert('16a.NO-radio-model-remains-and-the-dialog-lists-no-templates',
+  radioGroups === 0 && radioRoles === 0 && !roving && !dialogImportsCatalog && !/const TEMPLATES/.test(DIALOG)
     && !/row\.kind === 'header'/.test(DIALOG)
-    && /const opts = useMemo\(\(\) => rows\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW),
-  'exactly ONE radiogroup; the roving rule is still `tabIndex={(on || (!hasPick && i === 0)) ? 0 : -1}` with ' +
-  '`hasPick = opts.includes(pick)`, and `opts` is now built straight off the static `START_ROWS` — so with ONE row the arrows clamp on that row and can never ' +
-  'reach the action row beside it. The dialog imports NO catalog and carries NO `const TEMPLATES` table: ' +
-  '`TemplatesGallery.tsx` is the ONE UI reader of the catalog since ROUND 4 (ITEM 1).');
-assert('16b.the-create-body-is-TWO-rows-and-the-second-one-is-not-a-radio',
-  /const START_ROWS: StartRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_RAW)
-    && (DIALOG.match(/role="radio"/g) ?? []).length === 1
-    && /className="bd-browse" onClick=\{onBrowse\}/.test(DIALOG_RAW)
-    && /Use template/.test(DIALOG_RAW)
-    && !/className="bd-browse"[^>]*role=/.test(DIALOG_RAW)
-    && !/className="bd-browse"[^>]*tabIndex/.test(DIALOG_RAW)
+    && !/\bpickAt\b|\bhasPick\b|\bsetPick\b|\boptRefs\b|\bStartRow\b/.test(DIALOG),
+  'RE-ANCHORED (the assertion is INVERTED, not deleted): the old claim was "exactly ONE radiogroup with a roving tabindex walk, and no catalog import". '
+  + `ROUND 6, ITEM 1 deleted the radio model outright, so the claim is now its negative and it is measured here: ${radioGroups} radiogroup(s), ${radioRoles} radio(s), `
+  + 'no roving-tabindex expression, and none of `pickAt`/`hasPick`/`setPick`/`optRefs`/`StartRow`. '
+  + 'The half about the CATALOG survives UNCHANGED and is still true: the dialog imports no `templateCatalog` and carries no `const TEMPLATES` table, because '
+  + '`TemplatesGallery.tsx` is the ONE UI reader of the catalog. Reason for the inversion: the subject (a radiogroup to count) no longer exists, so a positive count would be false by design.');
+assert('16b.the-create-body-is-TWO-bd-row-buttons-and-NO-radio',
+  (DIALOG_RAW.match(/className="bd-row"/g) ?? []).length === 1
+    && radioRoles === 0
+    && /const CREATE_ROWS: CreateRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_RAW)
+    && /className="bd-row"/.test(DIALOG_RAW)
+    && /<span className="bd-row-name">\{row\.name\}<\/span>/.test(DIALOG_RAW)
+    && /\{key: 'browse', name: 'Use template'/.test(DIALOG_RAW)
+    && !/className="bd-row"[^>]*role=/.test(DIALOG_RAW)
+    && !/className="bd-row"[^>]*tabIndex/.test(DIALOG_RAW)
+    && !/bd-opt|bd-browse/.test(DIALOG_RAW)
     && !/catRows/.test(DIALOG) && !/bd-hd/.test(DIALOG) && !/\.bd-hd/.test(STYLES_RAW),
-  'the body lists exactly TWO rows: ONE `role="radio"` (`Blank`, from the static `START_ROWS`) and the `bd-browse` action row ("Use template") that opens the ' +
-  'gallery through `onBrowse`. The action row carries no `role` and no `tabIndex`, so it cannot enter the walk. The old family/level machinery is GONE from both ' +
-  'the component (the header-row branch, the catalog rows) and the stylesheet (the group-header rule) — it was genuinely dead, not deferred.');
+  'the create body renders exactly TWO rows, both `className="bd-row"`, drawn from ONE `CREATE_ROWS` data array; `Blank` is first (the zero-setup route) and '
+  + '`Use template` second, each rendered through the SAME `.bd-row-name` span. NEITHER carries a `role` or a `tabIndex`. OLD CLAIM (re-anchored): "ONE `role=\\"radio\\"` '
+  + '(Blank) plus one `bd-browse` action row, so the second row is not a radio". NEW CLAIM: there are ZERO radios and BOTH rows are the SAME kind of button, so the '
+  + 'question "is the second row a radio?" no longer arises. REASON: the round replaced the radio+action pair with two uniform action rows and deleted `.bd-opt`/`.bd-browse`. '
+  + 'The family/level machinery stays gone from both the component and the stylesheet, as before.');
 assert('16c.escape-and-the-focus-restore-contract-are-untouched',
   /if \(e\.key === 'Escape'\)/.test(DIALOG_RAW)
     && /returnFocusTo\?\.current\?\.focus\(\)/.test(DIALOG_RAW)
-    && /case 'End': e\.preventDefault\(\); pickAt\(last\); break;/.test(DIALOG_RAW)
-    && /const canSubmit = !needsName \|\| trimmed\.length > 0;/.test(DIALOG_RAW),
-  'Escape still cancels, Arrow/Home/End still move the choice AND the focus (`pickAt` focuses the picked row), the `returnFocusTo` contract is intact, and the ' +
-  'name field still gates Create the same way. The DOM-level half (real tab order, real focus, real paint) needs a browser and is reported as UNVERIFIED by this file.');
+    && /const canSubmit = !needsName \|\| trimmed\.length > 0;/.test(DIALOG_RAW)
+    && /document\.addEventListener\('keydown', onDocKey, true\)/.test(DIALOG_RAW)
+    && /querySelectorAll<HTMLElement>\(FOCUSABLE\)/.test(DIALOG_RAW),
+  'RE-ANCHORED on ONE predicate; the rest of the claim survives verbatim. The old third predicate pinned the radio walk (`case \'End\': … pickAt(last); break;`), which '
+  + 'ROUND 6, ITEM 1 deleted. Its replacement is the contract that still governs the dialog\'s keys: the Tab FOCUS TRAP (`FOCUSABLE`, captured `keydown`, with '
+  + '`preventDefault` on both ends) — the reason the removed arrow walk is genuinely unnecessary here, since Tab alone reaches both buttons. Escape still cancels, the '
+  + '`returnFocusTo` contract is intact, and the name field still gates rename the same way. '
+  + 'DOM-level half (real tab order, real focus, real paint) needs a browser and is reported as UNVERIFIED by this file.');
 assert('16d.the-dialogs-create-result-can-only-be-the-unseeded-Blank',
   /submitRef\.current\(\{kind: 'create', name: trimmed, seed: null\}\)/.test(DIALOG_RAW)
     && /seed: \{preset: PresetId; templateId: string\} \| null/.test(DIALOG_RAW),
@@ -966,10 +992,12 @@ const tg6UseTemplate = /const useTemplate = useCallback\([\s\S]*?\}, \[createFro
 assert('tg6.REANCHOR.App-keeps-the-create-path-and-feeds-it-the-choice',
   createCallSites === 4
     && tg6UseTemplate.test(APP_RAW)
-    && /createFromTemplate\(\{preset: key\.slice\(0, i\) as PresetId, templateId: key\.slice\(i \+ 1\)\}\)/.test(APP_RAW)
+    && /createFromTemplate\(\{\s*name: carried, preset: key\.slice\(0, i\) as PresetId, templateId: key\.slice\(i \+ 1\)\}\)/.test(APP_RAW)
     && /onUse=\{useTemplate\}/.test(APP_RAW)
     && /getPreset\(wantPid\)\.templates\?\.find\(x => x\.id === opts\.templateId\)/.test(APP_RAW),
-  `RE-ANCHORED this round: App.tsx still creates a board from exactly the same ${createCallSites} places as before (the gallery added none), and the gallery's choice still travels as a \`\${preset}:\${templateId}\` key resolved by the SAME \`getPreset(...).templates?.find(...)\` lookup — but it now goes straight to \`createFromTemplate\` in ONE step instead of through \`setBoardPick(key)\` + \`setBoardDlg('create')\` + \`initialPick\`. The two predicates that pinned the old two-step handover were replaced, not deleted; their removal is asserted in r3d (\`old two-step handover absent: true\`)`);
+  `RE-ANCHORED TWICE, and the reason is recorded. ROUND 3: the gallery's choice stopped taking the two-step handover (\`setBoardPick(key)\` + \`setBoardDlg('create')\` + \`initialPick\`) and went straight to \`createFromTemplate\`; the key's new spelling was pinned. `
+  + `ROUND 6, ITEM 3 then changed that call to carry the TYPED NAME (\`name: carried\`), so the key predicate was re-anchored from \`createFromTemplate({preset: key.slice…\` to \`createFromTemplate({name: carried, preset: key.slice…\`. `
+  + `The CLAIM is unchanged and still asserted: App.tsx creates a board from exactly the same ${createCallSites} places (the gallery added none), the gallery's choice travels as a \`\${preset}:\${templateId}\` key resolved by the SAME \`getPreset(...).templates?.find(...)\` lookup, and the new \`name\` is the fix for the defect Harvey reported ("nó lại ra là untitled X chứ k phải tên đã ghi").`);
 
 /* ---------- tg7 — the gallery adds no layout surface of its own ------------ */
 const dataAttrs = [...TG.matchAll(/\sdata-[a-z-]+=/g)].map(m => m[0].trim());
@@ -1017,39 +1045,56 @@ assert('tg10.the-gallery-reuses-the-modal-vocabulary-and-the-focus-contract',
     && /firstCard\.current\.focus\(\)/.test(TG),
   'the scrim and shell are the app\'s existing `.sp-overlay` / `.sp-card` (not a third modal vocabulary), `FOCUSABLE` is IMPORTED from Settings.tsx rather than re-implemented, Escape is captured with stopPropagation, and the focus contract is the app\'s: the FIRST CARD takes focus on open and `returnFocusTo?.current?.focus()` on close');
 
-/* ---------- the gallery route's row is a route, not a radio ----------------- */
-/* RE-ANCHORED (ROUND 4, ITEM 1) — this block used to pin the trailing "Browse
- *  all templates…" row INSIDE the create list: its presence by that caption, its
- *  absence of `role`/`tabIndex`, and the two predicates that made it impossible to
- *  enter the walk (`opts` filtered from `rows` by `kind === 'opt'`, and the
- *  flattening loop over `PRESETS`). ROUND 4 promoted that row to the SECOND HALF
- *  OF A TWO-ROW BODY and renamed it "Use template"; the `rows`/`kind` machinery and
- *  the catalog loops are gone, so three of those predicates are now FALSE by
- *  design and the caption needle matches nothing. The CLAIM is unchanged and is
- *  asserted against the new markup: the row is NOT a radio, carries no `tabIndex`,
- *  and the walk indexes an `opts` array it is absent from. */
-const browseRow = /className="bd-browse" onClick=\{onBrowse\}/.exec(DIALOG_RAW);
-const browseHasRole = /className="bd-browse"[^>]*role=/.test(DIALOG_RAW);
-const browseHasTabIndex = /className="bd-browse"[^>]*tabIndex/.test(DIALOG_RAW);
+/* ---------- the gallery route's row is an ACTION, not a radio ---------------- */
+/* RE-ANCHORED, ROUND 6, ITEM 1 — this block has now been re-anchored TWICE, and
+ *  the reason for the second move is recorded. It began by pinning the trailing
+ *  "Browse all templates…" row INSIDE the create list: its caption, its absence of
+ *  `role`/`tabIndex`, and the two predicates that kept it out of the radio walk
+ *  (`opts` filtered from `rows` by `kind === 'opt'`, and the flattening loop over
+ *  `PRESETS`). ROUND 4 promoted it to the second half of a TWO-ROW body and
+ *  renamed it "Use template".
+ *
+ *  ROUND 6 deleted the radio model outright, so the old claim's subject is gone at
+ *  BOTH ends: there is no `Blank` radio to contrast the row against, no
+ *  `rows`/`opts`/`StartRow`, no `pick`/`pickAt`/`hasPick`, and therefore no walk
+ *  for the row to be excluded from. The predicate "the walk indexes an `opts`
+ *  array the row is absent from" cannot be stated, because neither the walk nor
+ *  the array exists.
+ *
+ *  The CLAIM is kept in its strongest surviving form, not weakened: NEITHER of the
+ *  two create rows is a radio and NEITHER carries a `tabIndex` — so no create row
+ *  can hold a roving tab stop — and the walk machinery is asserted ABSENT. That is
+ *  a strictly stronger statement than "this one row is not in the walk". */
+const browseRow = /className="bd-row"/.exec(DIALOG_RAW);
+const browseHasRole = /className="bd-row"[^>]*role=/.test(DIALOG_RAW);
+const browseHasTabIndex = /className="bd-row"[^>]*tabIndex/.test(DIALOG_RAW);
 console.log(`  "Use template" action row present: ${!!browseRow}; role= on it: ${browseHasRole}; tabIndex= on it: ${browseHasTabIndex}`);
-assert('16a-REANCHOR.the-gallery-row-cannot-enter-the-radio-walk',
+assert('16a-REANCHOR.NO-create-row-can-enter-a-radio-walk-because-there-is-none',
   !!browseRow && !browseHasRole && !browseHasTabIndex
-    && /const opts = useMemo\(\(\) => rows\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW)
-    && radioGroups === 1
+    && radioRoles === 0 && radioGroups === 0
+    && !/tabIndex=\{\s*\(on \|\|/.test(DIALOG_RAW)
+    && !/\bpickAt\b|\bhasPick\b|\bsetPick\b|\boptRefs\b/.test(DIALOG)
     && !/catRows|row\.kind === 'header'/.test(DIALOG),
-  'the row renders literally AFTER the mapped radios, so it is not a `StartRow` and never reaches `rows`; `opts` is built straight off `rows`, so the ' +
-  'arrow/Home/End walk (which indexes `opts`) still moves ONLY between real radios and cannot count or land on this row. Reason for the re-anchor: ROUND 4 turned ' +
-  'the row into the body\'s second option and renamed it "Use template", and the header/kind machinery it used to be contrasted against no longer exists.');
+  'neither create row carries a `role` or a `tabIndex`, so no row can have a roving tab stop; and there is no walk left to enter — '
+  + `${radioGroups} radiogroup(s), ${radioRoles} radio(s), no roving-tabindex expression, no \`pickAt\`/\`hasPick\`/\`setPick\`/\`optRefs\`. `
+  + 'OLD CLAIM (re-anchored): "the row renders after the mapped radios, so it is not a `StartRow` and the walk indexes `opts` it is absent from". '
+  + 'NEW CLAIM: there is no radio walk at all; the row is one of TWO peer buttons. '
+  + 'REASON: ROUND 6 ITEM 1 deleted the radio model and the header/kind machinery, so `rows`/`opts`/`StartRow` — the subject the old claim contrasted against — no longer exists.');
 assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
-  /setBoardsOpen\(false\); setTgOpen\(true\)/.test(APP_RAW)
+  /setBoardsOpen\(false\); pendingBoardName\.current = ''; setTgOpen\(true\)/.test(APP_RAW)
     && /Create from Templates/.test(APP_RAW)
-    && /onBrowse=\{\(\) => \{ setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+    && /onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
     && /if \(tgOpen\) return;/.test(APP_RAW)
-    && /onBrowse\?: \(\) => void;/.test(DIALOG_RAW)
-    && /onClick=\{onBrowse\}/.test(DIALOG_RAW),
-  'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s action row, which closes the dialog and opens ' +
-  'the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`, below ' +
-  '`boardDlg`), so app shortcuts stay inert behind it. The menu row reads "Create from Templates" since ROUND 4, ITEM 2.');
+    && /onBrowse\?: \(name: string\) => void;/.test(DIALOG_RAW)
+    && /onClick=\{\(\) => \(row\.key === 'browse' \? onBrowse\?\.\(trimmed\) : submit\(\)\)\}/.test(DIALOG_RAW)
+    && /const carried = pendingBoardName\.current;\s*\n\s*pendingBoardName\.current = '';/.test(APP_RAW),
+  'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s "Use template" row, which closes the dialog and opens '
+  + 'the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`), so app '
+  + 'shortcuts stay inert behind it. The menu row reads "Create from Templates". '
+  + 'RE-ANCHORED (ROUND 6, ITEM 3): both route statements and the dialog prop changed from the old no-argument `onBrowse?: () => void` / `onClick={onBrowse}` / '
+  + '`setBoardDlg(null); setTgOpen(true);` to name-carrying forms, because it is THIS hop the typed name was being dropped on. The NEW CLAIM pins the whole handover: the '
+  + 'dialog hands `trimmed` to `onBrowse`, App.tsx stashes it in `pendingBoardName`, and `useTemplate` consumes AND clears it in the same statement — which is the fix for '
+  + 'Harvey\'s "nó lại ra là untitled X chứ k phải tên đã ghi". The boards-menu row, which has NO typed name, clears the stash instead of carrying one.');
 assert('tg12.an-empty-group-never-renders-a-header',
   galleryFamilies.every(f => f.groups.length > 0 && f.groups.every(g => g.cards.length > 0))
     && /\.filter\(g => g\.entries\.length > 0\)/.test(TG)
@@ -1130,23 +1175,46 @@ assert('r3b.trimming-makes-whitespace-only-differences-collide',
   `['Untitled '] -> "${trimCollision}" and ['Untitled','Untitled 2 '] -> "${gapAfterTrim}": a name that differs only by surrounding whitespace is treated as taken, which is the whole point of trimming. ` +
   `The counterpart case (r3a's [' untitled '] -> 'Untitled') proves the trim does NOT fold CASE — the two halves are the decision`);
 
-/* r3c — App.tsx calls the helper for BOTH the dialog's default and the direct
- *  path's auto-name, and the dialog is given the value rather than computing it. */
+/* r3c — the auto-number rule has exactly ONE owner and BOTH create paths reach it
+ *  through a pure function; the dialog is given the value rather than computing it.
+ *
+ *  RE-ANCHORED (ROUND 6, ITEM 3). The measured statement was
+ *  `boards.nextUntitledName(...)`, called from 2 places (the dialog's `defaultName`
+ *  prop and the direct path's fallback). ROUND 6, ITEM 3 introduced a SECOND pure
+ *  helper — `boards.resolveBoardName(given, existing)` — which owns the new
+ *  "a typed name wins, otherwise auto-number" decision and FORWARDS to
+ *  `nextUntitledName` for the empty case. `createFromTemplate` (the shared body of
+ *  the dialog route, the template route AND the fix for the typed-name defect) now
+ *  calls `resolveBoardName`; the dialog's `defaultName` prop still calls
+ *  `nextUntitledName` directly, which is correct and NOT a second rule: it asks for
+ *  the auto-numbered default with no typed name, and `resolveBoardName(undefined, …)`
+ *  is defined to be exactly that. So the count is 1 + 1, not 2 + 0.
+ *
+ *  The CLAIM — one pure owner of the numbering rule, reached by both create paths,
+ *  with the DIALOG computing neither — is asserted positively below, including the
+ *  delegation in `src/boards.ts`. The old count would read `nextUntitledName` once
+ *  and miss that the direct path moved, which is why this assertion was red. */
 const nextUntitledCalls = (APP_RAW.match(/boards\.nextUntitledName\(/g) ?? []).length;
-console.log(`  boards.nextUntitledName call sites in App.tsx: ${nextUntitledCalls}`);
+const resolveNameCalls = (APP_RAW.match(/boards\.resolveBoardName\(/g) ?? []).length;
+console.log(`  boards.nextUntitledName call sites in App.tsx: ${nextUntitledCalls}; boards.resolveBoardName call sites: ${resolveNameCalls}`);
 assert('r3c.both-create-paths-auto-number-through-the-one-pure-helper',
-  nextUntitledCalls === 2
+  nextUntitledCalls === 1 && resolveNameCalls === 1
     && /defaultName=\{boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\)\}/.test(APP_RAW)
-    && /const name = given\.length \? given : boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\);/.test(APP_RAW)
+    && /const name = boards\.resolveBoardName\(opts\.name, boardList\.map\(b => b\.name\)\);/.test(APP_RAW)
+    /* The delegation itself, so "one owner" is not taken on trust: resolveBoardName
+       trims, returns the given name when it survives trimming, and otherwise calls
+       nextUntitledName. */
+    && /export function resolveBoardName\(given: string \| undefined, existing: readonly string\[\]\): string \{\s*const trimmed = given\?\.trim\(\) \?\? '';\s*return trimmed\.length \? trimmed : nextUntitledName\(existing\);/.test(BOARDS_SRC)
     && /defaultName\?: string;/.test(DIALOG_RAW)
     && /mode === 'create' \? \(defaultName \?\? 'Untitled'\) : boardName/.test(DIALOG_RAW)
     /* COMMENTS BLANKED FIRST: the dialog's docblock NAMES the helper to explain
        where the value comes from, and a raw count would read that prose as a
        dependency on the module. The claim is about CODE. */
-    && !/nextUntitledName/.test(DIALOG),
-  `App.tsx calls the ONE pure helper from exactly ${nextUntitledCalls} places — the dialog's prop and the direct path's fallback — and PASSES the dialog its start value ` +
-  `(\`defaultName\`), so in the dialog's CODE (comments blanked; its docblock names the helper in prose only) \`src/BoardDialog.tsx\` calls it ` +
-  `${/nextUntitledName/.test(DIALOG) ? 'SOMEHOW (it must not)' : '0 times'}: the dialog still needs no board list`);
+    && !/nextUntitledName|resolveBoardName/.test(DIALOG),
+  `App.tsx names the pure helpers from exactly ${nextUntitledCalls} + ${resolveNameCalls} places: the dialog's \`defaultName\` prop asks \`nextUntitledName\` for `
+  + `the auto-numbered starting value, and \`createFromTemplate\` routes through \`resolveBoardName\` (which forwards to \`nextUntitledName\` — the delegation is asserted above, in `
+  + `src/boards.ts), so BOTH create paths and the typed-name fix share ONE owner of the rule. It still PASSES the dialog its start value (\`defaultName\`), so in the dialog's `
+  + `CODE (comments blanked; its docblock names the helper in prose only) \`src/BoardDialog.tsx\` calls neither: the dialog still needs no board list`);
 
 /* r3d — EXACTLY ONE function that creates a board from a template, called by BOTH
  *  routes. WHAT IS CHECKED: (1) the create body appears ONCE in App.tsx — its
@@ -1184,7 +1252,7 @@ const oldTwoStep = /setBoardPick\(key\)/.test(APP) || /initialPick=\{boardPick/.
 const appSetBoardPick = (APP.match(/setBoardPick\(/g) ?? []).length;
 const appBoardPickState = /useState<string \| null>\(null\);\s*$/m.test(APP) && /\bboardPick\b/.test(APP);
 const templateCreateCalls = [
-  ['gallery route (useTemplate)', /createFromTemplate\(\{preset: key\.slice\(0, i\) as PresetId/],
+  ['gallery route (useTemplate)', /createFromTemplate\(\{\s*name: carried, preset: key\.slice/],
   ['dialog route (onBoardDialog)', /createFromTemplate\(\{name: r\.name, preset: r\.seed\?\.preset, templateId: r\.seed\?\.templateId\}\)/],
 ].map(([who, re]) => ({who, ok: re.test(APP)}));
 console.log(`  createFromTemplate: ${createFromTemplateDefs} definition, ${createFromTemplateRoutes} call sites (the two routes)`);
@@ -1213,24 +1281,31 @@ assert('r3e.the-gallery-hint-says-what-now-happens',
   `the sentence "Choosing one opens New board with it pre-selected" is ${falseHint ? 'STILL THERE (it is now false)' : 'gone (it was false)'} and the replacement reads ` +
   `"${newHint.trim()}" — a user is told the board appears immediately and that the auto-numbered name can be changed`);
 
-/* r3f — INVERTED (ROUND 4, ITEM 1), NOT DELETED. It asserted the dialog RETAINED
- *  `initialPick` after ROUND 3 had removed its producer. Harvey's brief for this
- *  round asks explicitly: "Keep `initialPick` ONLY if something still passes it —
- *  grep first; if nothing does, remove the prop and its plumbing and say so."
- *  Nothing did, so the prop, its `useState(initialPick ?? EMPTY)`, App.tsx's
- *  `boardPick` state and all four `setBoardPick(null)` resets were removed. That
- *  makes every old predicate FALSE by design; the SAME claim is now asserted in
- *  its negative form, and the reasoning is preserved here rather than in the
- *  component. The roving rule still reads `hasPick` (which is what the old reason
- *  for keeping the prop was about) — it is simply always true now that the only
- *  row is the one `pick` starts on. */
+/* r3f — INVERTED (ROUND 4, ITEM 1), THEN RE-ANCHORED (ROUND 6, ITEM 1).
+ *  It originally asserted the dialog RETAINED `initialPick` after ROUND 3 had
+ *  removed its producer. Harvey's brief for ROUND 4 asked explicitly: "Keep
+ *  `initialPick` ONLY if something still passes it — grep first; if nothing does,
+ *  remove the prop and its plumbing and say so." Nothing did, so the prop, its
+ *  `useState(initialPick ?? EMPTY)`, App.tsx's `boardPick` state and all four
+ *  `setBoardPick(null)` resets were removed; the claim was then asserted in its
+ *  negative form, plus two predicates pinning the ROVING rule that the old reason
+ *  for keeping the prop was about.
+ *
+ *  ROUND 6, ITEM 1 deleted the roving rule and `pick` itself, so those two
+ *  predicates are false by design and are REPLACED (not dropped) by the two facts
+ *  that now stand in their place: the body's rows come from ONE `CREATE_ROWS` data
+ *  array, and the dialog's only piece of state is the name field. The `initialPick`
+ *  / `boardPick` half of the claim is untouched and still asserted — that removal
+ *  was never about the radio and has not been reverted. */
 assert('r3f.initialPick-and-boardPick-are-BOTH-removed',
   !/initialPick/.test(DIALOG) && !/\bboardPick\b/.test(APP)
-    && /const \[pick, setPick\] = useState<string>\(START_ROWS\[0\]\.key\)/.test(DIALOG_RAW)
-    && /const hasPick = opts\.includes\(pick\)/.test(DIALOG_RAW),
-  `\`initialPick\` is gone from the dialog (prop, docs and \`useState\`) and \`boardPick\` is gone from App.tsx — the grep found no producer and no reader, so ` +
-  `ROUND 4 removed the prop and its plumbing as the brief directs. The roving rule is unchanged (\`hasPick = opts.includes(pick)\`), and \`pick\` starts on the ` +
-  `Blank row so the group always has exactly one tab stop. Old claim (re-anchored): "initialPick is retained but has no producer".`);
+    && /const CREATE_ROWS: CreateRow\[\] = \[/.test(DIALOG_RAW)
+    && /const \[name, setName\] = useState\(mode === 'create'/.test(DIALOG_RAW),
+  '`initialPick` is gone from the dialog (prop, docs and `useState`) and `boardPick` is gone from App.tsx — the grep found no producer and no reader, so '
+  + 'ROUND 4 removed the prop and its plumbing as the brief directs. '
+  + 'RE-ANCHORED (ROUND 6, ITEM 1): the two predicates that pinned the roving rule (`pick` starting on the Blank row, `hasPick = opts.includes(pick)`) are replaced by the '
+  + 'state the dialog actually has — the create body\'s rows are DATA (`CREATE_ROWS`) and the only `useState` is the name field (plus the refs). '
+  + 'Old claim (re-anchored twice): "initialPick is retained but has no producer".');
 
 /* r3g — Harvey's live boards are untouched. THE CLAIM IS A LISTING, captured at
  *  run time: the board files that exist are present and named as they are, and

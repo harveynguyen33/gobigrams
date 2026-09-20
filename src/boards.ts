@@ -110,4 +110,27 @@ export function nextUntitledName(existing: readonly string[]): string {
   }
 }
 
+/* ROUND 6, ITEM 3 — WHAT NAME A NEW BOARD GETS, WHEN ONE MAY HAVE BEEN TYPED.
+ *
+ * THE DEFECT THIS EXISTS FOR. The New-board dialog's create body has a name
+ * field, and a board created from the "Use template" row was still coming out
+ * `Untitled N`: the typed value was dropped on the floor at the dialog→gallery
+ * hop, so `createFromTemplate` was handed no name and auto-numbered. This is the
+ * ONE place that decides whether a carried value wins or the auto-numbered
+ * default does, so App.tsx does not have to spell the rule out twice.
+ *
+ * THE RULE: a name that is non-empty AFTER TRIMMING wins, and the TRIMMED form
+ * is what is stored (a name typed with a stray space is not persisted with it).
+ * An absent name, an empty string, or whitespace only falls back to
+ * `nextUntitledName(existing)`: "the field is empty" is a legitimate way to ask
+ * for the default, not an error.
+ *
+ * PURE, like its neighbour: the caller supplies the existing names, so this
+ * module still needs no board list, no React and no fetch — and a Node probe can
+ * bundle and EXECUTE it instead of restating the rule. */
+export function resolveBoardName(given: string | undefined, existing: readonly string[]): string {
+  const trimmed = given?.trim() ?? '';
+  return trimmed.length ? trimmed : nextUntitledName(existing);
+}
+
 export {asPreset};
