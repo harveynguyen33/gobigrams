@@ -2,10 +2,48 @@
 
 **Last session:** 2026-09-20 (afternoon) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
 AD + AE + AF + AG1 + AG2 + AH + AI + **AJ** shipped. All orchestrator-verified live.
-**Vault: ROUNDS S…AH are recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
-`pkm verify.sh` 43 passed / 0 failed).
+**Vault: ROUNDS S…AJ are now recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
+`pkm verify.sh` 43 passed / 0 failed, re-verified by the orchestrator 2026-09-20).
 **ALL 25 HARNESSES GREEN as of ROUND AJ — there is no known-stale harness any more.**
 **Next: PACKAGE-N** (the palette redesign) — its spec is already written.
+**Dev server RUNNING** on `http://192.168.33.200:5200/` for Harvey's real-device test of PACKAGE-N.
+
+## ⚠️ BOARD STATE — read before touching `boards/`
+
+`boards/` is **runtime data, gitignored, and Harvey's to change freely.** He confirmed 2026-09-20:
+*"nếu ko khớp trạng thái mới, có thể xoá ko vấn đề"* — a board that no longer matches the documented
+invariant may simply be DELETED; it is not an artifact to preserve.
+
+**Current state (measured 2026-09-20):** the old board set (`mu01q1ue3a854b81` "Kafka rebalance" had
+drifted to **4 nodes / 2 edges** with a Text label and a bent edge, not the documented 3n/2e; plus
+`mu99xrmwb792cf01` "Untitled" 2n/1e) was **deleted at Harvey's instruction**. Backups sit at
+`/tmp/ds-boards-backup-20260920/` (tmp — do not rely on them surviving). The app **regenerates a clean
+first-run board on its own**: a fresh load with an empty `boards/` produced `mu9iat9i2b1b9bb7` =
+"My first board", **3 nodes / 2 edges** (External System → Queue → Service, positions
+`60,180 · 360,170 · 680,180`), bezier/slate/solid edges, **no `theme` key**, **no `preset` key**.
+
+**Consequence for the old invariant:** the "demo-board invariant" (`mu01q1ue3a854b81` is 3n/2e at
+positions `-53,298 · 324,290 · 704,290` with `preset:"architecture"`) is **SUPERSEDED** — that file no
+longer exists. Do **not** recreate it; do **not** treat its absence as data loss. Assert the *shape* of
+a clean board instead (3 nodes / 2 edges, no `theme` key) against whatever board is current.
+
+**No harness reads `boards/` any more** (verified 2026-09-20): `checks/package-q-reconnect-endpoints.mjs`
+derives its fixture from `src/presets.ts` / `src/DiagramNode.tsx` constants (ROUND AJ removed the live
+coupling) and `checks/round-ag2-copy-sub-swatch.mjs` only *mentions* `boards/` in a report line.
+**All 25/25 harnesses exit 0 with the folder emptied** — re-measured after the deletion.
+
+### Harness tally re-measured 2026-09-20 after the board deletion (orchestrator, current tree)
+
+`npx tsc --noEmit` = **0** · `node ./node_modules/vite/bin/vite.js build` = **0** · hex literals = **142**
+(ceiling 160) · **every one of the 25 files in `checks/*.mjs` exits 0**, and every file that prints a
+verdict is green: `package-p-inspector` 153/153 · `package-q-panel-shortcuts` 50/0 · `package-o-metrics`
+35/35 · `package-o-selection-stack` 12/12 · `package-o-board-dialog.harness` 10/10 ·
+`node-click-distance.harness` 27/27 · `round-aa` 30/30 · `round-ab` 19/19 · `round-ad` 19/19 ·
+`round-ae` 10/10 · `round-af` 21/21 · `round-ag` 31/31 · `round-ag2` 27/27 · `round-ai` 18/18 ·
+`round-r` 26/26 · `round-v` 33/33 · `round-y` 12/12 · `round-z` all passed ·
+`package-p-render-check` all passed · `package-q-reconnect-endpoints` ALL GREEN ·
+`round-aj-table-handles` ALL GREEN · `round-s-edge-bend` ALL GREEN · `boot-no-flash` GREEN ·
+`theme-boot-script` GREEN · `theme-boot-sync` GREEN.
 
 ## ROUND AJ — the two known debts, cleaned
 
@@ -1630,9 +1668,10 @@ revisited for a redesign, the mockup-first rule applies again as normal.
 
 ### Working state (verified at the stop point)
 
-`boards/` contains ONLY `mu01q1ue3a854b81.json` = **3 nodes / 2 edges / preset `architecture` / NO `theme`
-key / positions `-53,298 · 324,290 · 704,290` / both edges `flow: dots`**. `boards/library.json` and its
-`.bak` are **runtime data, not source** — delete them after any test that creates them. Dev server on
+`boards/` is **runtime data** — see the BOARD STATE section at the top of this file; the old
+`mu01q1ue3a854b81` "Kafka rebalance" 3n/2e board was **deleted at Harvey's instruction on 2026-09-20**
+after it drifted to 4n/2e, and its invariant is superseded. `boards/library.json` and its `.bak` are
+also runtime data — delete them after any test that creates them. Dev server on
 `http://192.168.33.200:5200/` (Harvey is on a Mac on the LAN — never hand him `localhost`).
 Mockups: `/home/harvey/diagram-studio-research/mockup-palette-v2.html` (+ the widget copy in `/tmp`).
 Research: `PALETTE-1..4*.md` + `PALETTE-SYNTHESIS.md` in the same dir.
