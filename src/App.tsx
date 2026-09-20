@@ -39,7 +39,7 @@ import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
 import {
-  getInspectorSections, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
+  getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
 import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
@@ -5260,6 +5260,14 @@ export default function App() {
                     CURRENT value, so the collapsed state still says what it
                     controls. Session-scoped open state: §C names ONE new
                     persisted key. */}
+                {/* ROUND AI, ITEM 2 — the row is GATED on `hasBody`, not deleted.
+                    A flowchart node has one centred label, so Harvey asked for
+                    the `card` capability to go from the sixteen flowchart
+                    shapes ("Với flowchart tôi nghĩ k cần dùng card!"). The gate
+                    is the predicate, so there is no second shape list and no new
+                    ad-hoc branch here; the DATA is untouched, so a flowchart node
+                    already carrying `body: 'card'` keeps painting as a card. */}
+                {hasBody(inspTarget) && (
                 <div className="field">
                   <button
                     type="button"
@@ -5284,6 +5292,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
+                )}
                 {/* §A.2: `note` draws no IconGlyph, so the field is absent —
                     not disabled — for exactly that shape. */}
                 {hasIcon(inspTarget) && (

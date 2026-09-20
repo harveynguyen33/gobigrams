@@ -128,6 +128,25 @@ export const NO_SUB_SHAPES: Shape[] = [
 export const hasSub = (t: InspectorTarget) =>
   t.kind === 'goblin' && !NO_SUB_SHAPES.includes(t.shape);
 
+/** ROUND AI, ITEM 2 — `body` (`card` | `label-only`) renders for the nineteen
+ *  non-flowchart goblins only. Harvey: "Với flowchart tôi nghĩ k cần dùng card!"
+ *
+ *  THE DATA IS UNTOUCHED, exactly as `hasSub` leaves `sub` alone. This hides a
+ *  FIELD; it does not remove `body` from the node model or from the painter. A
+ *  flowchart node that already carries `body: 'card'` still paints as a card —
+ *  `src/DiagramNode.tsx`'s two branches are unchanged — asserted in
+ *  `checks/round-ai-body-valign.mjs` (ai2-6) by server-rendering the shipped
+ *  painter, so hiding the control cannot rewrite the value.
+ *
+ *  IT REUSES `NO_SUB_SHAPES` RATHER THAN NAMING THE SIXTEEN AGAIN. The two
+ *  questions have the same answer for the same reason — a flowchart shape has
+ *  one centred label and nothing to sub or to switch — and this project has
+ *  already paid for a second copy of a shape list drifting away from the first.
+ *  `checks/round-ag2-copy-sub-swatch.mjs` keeps `NO_SUB_SHAPES` covering every
+ *  id `FLOWCHART_EXTRA_SHAPES` declares, so this predicate inherits that guard. */
+export const hasBody = (t: InspectorTarget) =>
+  t.kind === 'goblin' && !NO_SUB_SHAPES.includes(t.shape);
+
 /* ---------------------------------------------------------------------------
    §A.3 / §C — which sections START folded.
 

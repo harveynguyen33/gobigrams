@@ -3631,7 +3631,7 @@ kbd {
    trap one level up — against a containing block whose height is `auto` it is
    INDEFINITE and is dropped, so it clips nothing either.
      · `.node-body`: its containing block is `.node`, whose height is `auto`
-       (only `min-height: 100%`) — hence `.node:not(.label-only) { height: 100% }`,
+       (only `min-height: 100%`) — hence `.node { height: 100% }`,
        which makes the chain definite so the cap binds.
      · `.label-text` / `.note-body`: their containing block is their own kind's
        root. `.note-node` already declares `height: 100%`, so the cap binds there
@@ -3643,11 +3643,19 @@ kbd {
    annotation — and there the box keeps sizing to its own content exactly as it
    does today, because `100%` of an automatic height is automatic.
 
-   `:not(.label-only)` IS DELIBERATE, not tidiness. `.node .lo-body` carries
-   `min-height: 100%`. Making that percentage live would pull every flowchart
-   label out of the position its per-shape padding gives it and drop it into the
-   middle of the shape — a pixel change to nodes that are not broken. Excluding
-   the label-only body leaves that percentage inert exactly as it is today.
+   THE `:not(.label-only)` EXCLUSION IS GONE — ROUND AI, ITEM 1. It was there to
+   keep `.node .lo-body`'s `min-height: 100%` INERT, on the reading that a live
+   percentage would "drop every flowchart label into the middle of the shape".
+   That reading was right about the geometry and wrong about the intent: the
+   model's own no-write value for a label-only node is `middle`
+   (`vAlignForBody('label-only')`, src/textStyle.ts), so the panel SHOWED
+   "Middle" while the box, being content-sized, painted top. A control whose
+   stored value is right and whose box has no free space is inert — present,
+   correct and doing nothing, which is the failure Harvey reported. The root now
+   takes a definite height, so the padded box is the node's box, the text has
+   `145 - padding - line` of free space to distribute, and the panel's value is
+   what paints. The per-shape padding is untouched, so alignment still resolves
+   INSIDE an already-padded box and no value can push text into the silhouette.
 
    WHAT IS UNCHANGED, BY CONSTRUCTION. A node whose text FITS is untouched on
    both axes: `height: 100%` equals today's `min-height: 100%` as soon as the
@@ -3668,8 +3676,36 @@ kbd {
 /* The card's text container. `box-sizing: border-box` is global (line 268), so
    `max-height: 100%` includes the padding and the padding stays inside the box. */
 .node-body { overflow: hidden; max-height: 100%; overflow-wrap: anywhere; }
-/* The chain that makes that percentage bind — see the header. */
-.node:not(.label-only) { height: 100%; }
+/* The chain that makes that percentage bind — see the header.
+   ROUND AI, ITEM 1 — THE MECHANISM, AND THE TWO THAT WERE REJECTED. The
+   label-only body was 37px tall inside a 145px node, so `justify-content` had
+   no free space to distribute. Three ways to give it a definite box were
+   evaluated against THIS sheet's constraints:
+     (a) CHOSEN — `height: 100%` on the `.node` root. A percentage height needs a
+         definite containing block, and React Flow's node wrapper carries the
+         stored size in `node.style`, so `100%` resolves to the node's own height
+         — 145px for every flowchart default. It is one declaration, it is the
+         SAME rule the card path already proves (`:not(.label-only)` was excluded
+         from exactly this, nothing else), and it removes the asymmetry instead
+         of adding a second one. When no size is stored the wrapper's height is
+         automatic and `100%` is automatic, i.e. today's behaviour — the demo
+         board's unsized nodes are untouched by construction.
+     (b) REJECTED — `.node { display: flex; flex-direction: column }` +
+         `.lo-body { flex: 1 }`. Correct in the browser, but `.node` is
+         `position: relative` and hosts `.shape-frame`, the four handles and the
+         resizer as children; making it a flex container re-lays-out every
+         absolutely-positioned sibling's parent and would have to be re-verified
+         against `round-v-overflow.mjs` line by line. A bigger blast radius for
+         the same pixels.
+     (c) REJECTED — `align-self: stretch`. It stretches on the CROSS axis, and
+         this box is justified on the MAIN axis of a column flex — so it would
+         set the WIDTH, not the height. It fixes nothing here.
+   `.node .lo-body` keeps its `min-height: 100%`, which `height: 100%` satisfies
+   (the box can never be shorter than the floor), so the padded-box mechanism
+   ROUND Z established is unchanged and no value can push text into the shape's
+   silhouette. The ROUND V cap on `.node-body` / `.note-body` still binds for the
+   same reason it always did. */
+.node { height: 100%; }
 /* `min-width: 0` on the flex ITEM (not the container): the second half of the
    measured-good pair above, and the belt to `anywhere`'s braces. `.node-ico` is
    already `flex: none`, so the text span is the only shrinking item. */
