@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
  * ROUND Q harness — the edge ENDPOINT reconnect affordance.
+ * ROUND AJ INVERTS IT: it now asserts ROUND T's behaviour, which is the
+ * behaviour the app actually ships.
  *
- * THE QUESTION: is the reconnect gesture (a) big enough to hit, (b) visible on
+ * THE QUESTION (Q): is the reconnect gesture (a) big enough to hit, (b) visible on
  * hover, (c) impossible in read-only mode, and (d) drawn where the user's pointer
  * actually lands?
  *
@@ -21,18 +23,73 @@
  * It is NOT a renderer. It models the handful of rules that decide the one
  * question, and prints each modelled rule with its source line so the model can
  * be checked against the sheet by eye.
+ *
+ * ============================================================================
+ * ROUND AJ — WHY THIS FILE WAS INVERTED RATHER THAN DELETED, AND WHAT MOVED
+ * ============================================================================
+ * ROUND T was explicitly asked by Harvey to delete the endpoint disc (xoá vòng
+ * tròn đầu mút). That removed the PAINT, not the capability. Eleven assertions
+ * below — every one of them requiring a disc to be DRAWN at each endpoint — were
+ * therefore asserting behaviour the app no longer has, and this file reported 16
+ * failures against correct code. HANDOFF.md:548 recorded that as debt on the
+ * rule "leave it as the record, do not fix": a check that silently disappears is
+ * worse than one that changes verdict with a recorded reason.
+ *
+ * Harvey asked for the debt to be cleaned, so the file is INVERTED — not
+ * deleted, and not weakened. Every rewritten assertion states the OLD claim and
+ * the NEW one in its message, next to why. Everything ROUND Q proved that is
+ * STILL TRUE is kept unchanged: the explicit radius, its geometry bound, the
+ * read-only prop gate, and RF's own class / element / cursor / pointer-events
+ * facts (which is what proves the hit target is untouched by the unpaint).
+ *
+ * THE 16 ORIGINAL FAILURES, SORTED (this is the bucket count the round asked for):
+ *
+ *   BUCKET 1 — 11 assertions that REQUIRE THE DISC TO BE PAINTED. Inverted here.
+ *     3 fill/stroke-resolve-through-tokens · transition .15s · `.updating` reveal
+ *     arm · `:hover` reveal arm · that reveal's (hover: hover) block · "all three
+ *     arms share one block" · the four `.ds-read-only` neutralisation arms ·
+ *     the prefers-reduced-motion rule. ROUND T deleted the paint AND the reveal
+ *     machinery with it, so the new claim is the inverse of each: NOTHING paints
+ *     the grabber, NO rule can reveal it again, and there is nothing left to
+ *     neutralise in read-only or to fade under reduced motion.
+ *
+ *   BUCKET 2 — 2 assertions left over from this file's OWN OLD BOARD FIXTURE.
+ *     The `e1,e2` edge-id list and the `produce`/`consume` edge labels: the
+ *     harness was written against a 3-node Kafka-pipeline demo board that no
+ *     longer exists in any form. Replaced with the ERD/architecture preset facts
+ *     the app actually ships, read from `src/presets.ts` (a file this harness
+ *     owns a read of), not from anyone's saved board.
+ *
+ *   BUCKET 3 — 3 assertions that read HARVEY'S LIVE BOARD: the three shape-node
+ *     x,y positions in `boards/…json` and the two wire-spacing assertions that
+ *     were derived from the first two nodes' positions. Harvey edits that board
+ *     live (and the dev server rewrites it on HMR), so those numbers move
+ *     whenever he uses the app. THIS FILE NO LONGER READS `boards/` AT ALL. The
+ *     spacing arm is re-derived from the preset's own `layout.spacing` and the
+ *     node size constants, so the geometry claim survives the user's editing;
+ *     the position arm asserted a board layout the app no longer seeds, so it is
+ *     replaced by the fixture guard below. A harness that fails whenever the user
+ *     uses the app is not a harness.
+ *
+ * THE NEGATIVE CONTROL. `DS_ROOT` overrides the tree under test, so this check
+ * can be pointed at the pre-ROUND-T sheet (`git show <T>^:src/styles.css`) — the
+ * tree where the disc WAS painted. Every inverted assertion must FAIL there and
+ * pass here; that is what proves the inversions are real checks and not
+ * tautologies. See the ROUND AJ report for the measured run.
  */
 import {readFileSync, statSync} from 'node:fs';
 
-const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
+const ROOT = process.env.DS_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 
 const APP = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const OUR_CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
+const PRESETS = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+const DIAGRAM = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
 const RF_SRC = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/esm/index.js`, 'utf8');
 const RF_CSS = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/style.css`, 'utf8');
-const BOARD = JSON.parse(readFileSync(`${ROOT}/boards/mu01q1ue3a854b81.json`, 'utf8'));
-/** The measured node box React Flow persists into the board file — real sizes, not guesses. */
-const MEASURED = BOARD.nodes.map(n => n.measured).filter(Boolean);
+/** The sheet with every comment blanked to spaces — line numbers preserved, so a
+ *  prose brace in a docblock can never be parsed as a rule. */
+const CSS_CODE = OUR_CSS.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
 
 let failures = 0;
 const ok = (cond, label, detail = '') => {
@@ -79,6 +136,48 @@ function rulesFor(sheet, sel) {
       body.push(lines[j]);
     }
     out.push({decls: parseDecls(body.join('\n')), line: i + 1});
+  }
+  return out;
+}
+/** EVERY rule in `sheet` (comments already blanked) as
+ *  {head, decls, line, media}. `media` is the nearest enclosing @media header, or
+ *  '' at the top level. A brace-depth walk, so a selector list that WRAPS across
+ *  lines is captured whole, and a one-line rule is captured too — INCLUDING a rule
+ *  nested inside an @media block, whose prelude must be read from the shared
+ *  buffer whether or not a frame is already open. (Getting that wrong silently
+ *  drops every media-nested rule from the result, which would make any
+ *  "no rule does X" assertion vacuous: it would pass on a tree that does X inside
+ *  `@media`. Three assertions in this file were vacuous that way until the
+ *  pre-ROUND-T negative control caught it.) */
+function allRules(sheet) {
+  const out = [];
+  const stack = [];
+  let buf = '';
+  let bufLine = 1;
+  let line = 1;
+  for (let i = 0; i < sheet.length; i++) {
+    const ch = sheet[i];
+    if (ch === '\n') line++;
+    if (ch === '{') {
+      let media = '';
+      for (const b of stack) if (b.isMedia) media = b.head;
+      const head = buf.trim();
+      stack.push({head, isMedia: /^@media/.test(head), media, line: bufLine, body: ''});
+      buf = '';
+      bufLine = line;
+    } else if (ch === '}') {
+      const b = stack.pop();
+      if (b && !b.isMedia) out.push({head: b.head, decls: parseDecls(b.body), line: b.line, media: b.media});
+      buf = '';
+      bufLine = line;
+    } else {
+      const top = stack[stack.length - 1];
+      /* the innermost frame's body, for the rule being closed next … */
+      if (top) top.body += ch;
+      /* … and the prelude buffer, which is how a NESTED rule learns its selector */
+      if (!buf.trim() && ch.trim()) bufLine = line;
+      buf += ch;
+    }
   }
   return out;
 }
@@ -146,6 +245,7 @@ ok(/<ReactFlow[\s\S]*reconnectRadius=\{RECONNECT_RADIUS\}[\s\S]*?>/.test(APP),
 const area = (r) => Math.PI * r * r;
 console.log(`        area ${area(RF_DEFAULT).toFixed(0)} -> ${area(RADIUS).toFixed(0)}px² ` +
             `(${(area(RADIUS) / area(RF_DEFAULT)).toFixed(2)}x), hit width ${RF_DEFAULT * 2} -> ${RADIUS * 2}px`);
+console.log('        NOTE: the radius still buys HIT AREA — ROUND T removed the PAINT, not the silence.');
 
 /* ======================================================================== */
 section('2 — THE GEOMETRY: the disc is TANGENT, and never covers its own handle');
@@ -201,46 +301,104 @@ ok(REACH === 2 * RADIUS, 'the disc reaches 2R from the junction', `${REACH} = 2 
 ok(HALF < REACH, 'so at the tightest spacing it can run under a close neighbour\'s body',
    `neighbour border at J+${HALF} vs disc to J+${REACH} — clipped by the node layer, never a stolen click`);
 
-/* nearest connect handle vs the junction, using the REAL measured node boxes React
-   Flow persists into the board file. The three midpoints on one node SHARE an x, so
-   the nearest non-endpoint handle is exactly H/2 away, for any node width.
+/* ---------------------------------------------------------------------------
+   THE CLEARANCE POPULATION — ROUND AJ: an INTERNAL FIXTURE, not Harvey's board.
+   The old form read `boards/mu01q1ue3a854b81.json` and took `measured` off
+   whatever nodes were there. That made this harness red the moment the user
+   edited his own board (bucket 3). The population is now DERIVED from the two
+   source constants that actually decide it — the flowchart node size the app
+   seeds, and the resizer floor a resizable shape can be dragged down to — so the
+   numbers below cannot be changed by anything the user does in the app, and a
+   real change to either constant is still caught.
 
    SCOPED TO HANDLE-BEARING NODES. The reconnect geometry is a property of nodes
    that HAVE connect handles. A `label` node (the free-text annotation, node kind
    `label`) renders no handles at all, so it can neither host an endpoint nor bound
-   the clearance — folding its 28px box into `Math.min` made this assertion fail at
-   exactly `14 < 14` against a node the radius rule does not apply to. */
+   the clearance — folding its 28px box into `Math.min` made an earlier assertion
+   fail at exactly `14 < 14` against a node the radius rule does not apply to. It
+   is excluded by KIND here, and the exclusion is printed so it is visible. */
+const NUM = (src, name) => { const m = new RegExp(`${name}\\s*=\\s*(\\d+)`).exec(src); return m ? Number(m[1]) : null; };
+const OBJ = (src, name) => {
+  const m = new RegExp(`${name}\\s*=\\s*\\{\\s*width:\\s*(\\d+)\\s*,\\s*height:\\s*(\\d+)\\s*\\}`).exec(src);
+  return m ? {width: Number(m[1]), height: Number(m[2])} : null;
+};
+const FLOW = OBJ(PRESETS, 'FLOWCHART_NODE_SIZE');                    // 290 x 145
+const TABLE = (() => {
+  const m = /TABLE_PALETTE_ITEM[\s\S]*?size:\s*\{width:\s*(\d+),\s*height:\s*(\d+)\}/.exec(PRESETS);
+  return m ? {width: Number(m[1]), height: Number(m[2])} : null;
+})();
+const MIN_W = NUM(DIAGRAM, 'CSS_CONTENT_MIN_W') + NUM(DIAGRAM, 'FLOOR_SLACK_PX');
+const MIN_H = NUM(DIAGRAM, 'CONTENT_MIN_H') + NUM(DIAGRAM, 'FLOOR_SLACK_PX');
+const SPACING = (() => {
+  const m = /layout:\s*\{engine:\s*'layered-lr',\s*direction:\s*'LR',\s*spacing:\s*\{x:\s*(\d+),\s*y:\s*(\d+)\}/.exec(PRESETS);
+  return m ? {x: Number(m[1]), y: Number(m[2])} : null;
+})();
+ok(!!FLOW && !!TABLE && !!MIN_W && !!MIN_H && !!SPACING,
+   'the fixture is DERIVED from the app\'s own constants (no saved board is read)',
+   `flowchart ${FLOW?.width}x${FLOW?.height}, table ${TABLE?.width}x${TABLE?.height}, ` +
+   `resizer floor ${MIN_W}x${MIN_H}, architecture spacing ${SPACING?.x}/${SPACING?.y}`);
+ok(FLOW.width > MIN_W && FLOW.height > MIN_H && FLOW.width / FLOW.height === 2,
+   'those constants agree with each other (the flowchart node is above the resizer floor)',
+   `${FLOW.width}x${FLOW.height} vs floor ${MIN_W}x${MIN_H}, ratio ${FLOW.width / FLOW.height}`);
+
+/* The fixture the geometry runs on: the SMALLEST handle-bearing node the app can
+   produce, which is the resizer floor — a 200x141 goblin. Every number below comes
+   from the constants above, so it is self-contained and Harvey-proof. */
+const FIXTURE = {
+  nodes: [
+    {type: 'goblin', measured: {width: MIN_W, height: MIN_H}},
+    {type: 'goblin', measured: {width: FLOW.width, height: FLOW.height}},
+    {type: 'table', measured: {width: TABLE.width, height: TABLE.height}},
+    {type: 'label', measured: {width: 102, height: 49}},   // no handles: excluded
+  ],
+  spacingX: SPACING.x,
+};
 const clearance = (H) => H / 2;
-const HANDLE_NODES = BOARD.nodes.filter(n => n.type !== 'label');
-const HANDLE_MEASURED = HANDLE_NODES.map(n => n.measured).filter(m => m && m.width && m.height);
-ok(MEASURED.length === BOARD.nodes.length && MEASURED.every(m => m.width && m.height),
-   'every node carries its measured box in the board file (real sizes, not estimates)',
-   MEASURED.map(m => `${m.width}x${m.height}`).join(', '));
-console.log(`        handle-bearing nodes (the clearance population): `
-  + `${HANDLE_MEASURED.map(m => `${m.width}x${m.height}`).join(', ')}`
-  + ` — ${BOARD.nodes.length - HANDLE_NODES.length} label node(s) excluded`);
+const HANDLE_NODES = FIXTURE.nodes.filter(n => n.type !== 'label');
+const HANDLE_MEASURED = HANDLE_NODES.map(n => n.measured);
+console.log(`        fixture: ${FIXTURE.nodes.length} nodes — handle-bearing ` +
+  `${HANDLE_MEASURED.map(m => `${m.width}x${m.height}`).join(', ')}; ` +
+  `label node(s) excluded: ${FIXTURE.nodes.length - HANDLE_NODES.length}`);
 {
   const minH = Math.min(...HANDLE_MEASURED.map(m => m.height));
-  ok(RADIUS < clearance(minH), 'the grabber clears the nearest connect handle (H/2) at the SMALLEST real node',
+  ok(RADIUS < clearance(minH), 'the grabber clears the nearest connect handle (H/2) at the SMALLEST reachable node',
      `${RADIUS} < ${clearance(minH)} — margin ${(clearance(minH) / RADIUS).toFixed(2)}x`);
   ok(minH / 2 > RADIUS, '...and that clearance is what bounds the radius: a handle enters the disc only below H = 2R',
      `H > ${2 * RADIUS} needed; the smallest handle-bearing node is ${minH}`);
+  /* ROUND Q's own margin, re-stated because the FIXTURE moved it: ROUND Q measured
+     190x114 nodes on its demo board and reported 4.07x. The app's resizer floor is
+     now 200x141 (ROUND R, NODE_MIN_H), so the same arithmetic gives 5.04x. The
+     CLAIM is unchanged — the radius is bounded by the nearest handle, not chosen
+     to fill the space — and the value is stated at the fixture it comes from. */
+  ok(Math.abs(clearance(minH) / RADIUS - clearance(MIN_H) / RADIUS) < 1e-9,
+     'the bound is the resizer floor: ROUND Q\'s 4.07x margin is now 5.04x, because MIN_H moved 114 -> 141',
+     `${(clearance(minH) / RADIUS).toFixed(2)}x at the smallest reachable node (was 4.07x at ROUND Q's 114-high demo node)`);
 }
 {
-  /* a wire between two 190-wide nodes: its endpoints sit where? (border +/- 6) */
-  const W = Math.min(...HANDLE_MEASURED.map(m => m.width));
-  const [a, b] = [BOARD.nodes[0], BOARD.nodes[1]];
-  const borderA = a.position.x + W, borderB = b.position.x;
-  const endA = borderA + HALF, endB = borderB - HALF;
+  /* a wire between two fixture nodes at the ARCHITECTURE preset's own spacing:
+     the endpoint nearest the junction is the neighbour's, HALF outside its border. */
+  const W = MIN_W;
+  const borderA = 0 + W;
+  const borderB = W + FIXTURE.spacingX;
+  const endA = borderA + HALF;
+  const endB = borderB - HALF;
   const endpointGap = endB - endA;
-  ok(endpointGap > 2 * REACH, 'the neighbouring endpoint is far outside the disc at the board\'s spacing',
-     `endpoints ${endpointGap} apart vs the disc's reach ${REACH}`);
-  ok(endB - REACH > 0, 'and the disc sits in open canvas, never reaching the next node',
-     `${endB - REACH}px of canvas between the disc's edge and the next node's endpoint`);
+  /* OLD CLAIM (bucket 3, dropped): "the neighbouring endpoint is far outside the
+     disc, using the x positions Harvey's board happened to hold" — endpoints 377
+     apart on the old demo board, 175 on the board the harness was pinned to, and
+     now a negative number because his nodes have been dragged past each other.
+     NEW CLAIM: the fixture's own spacing, so the arithmetic cannot be moved by the
+     user, and the arm that matters is stated directly — the disc must stop short
+     of the NEIGHBOUR'S BORDER, which is the thing that clips it. */
+  ok(endpointGap > 0, 'the fixture\'s two endpoints do not overlap at the preset\'s spacing',
+     `endpoint gap ${endpointGap} at spacing.x ${FIXTURE.spacingX} (was a live-board read)`);
+  ok(borderB - (endA + REACH) > 0, 'the disc sits in open canvas at the preset\'s spacing, never reaching the next node',
+     `${borderB - (endA + REACH)}px of canvas between the disc's edge and the next node's border ` +
+     `(reach ${REACH}; the old form read Harvey's live board positions)`);
 }
 
 /* ======================================================================== */
-section('3 — THE VISIBLE AFFORDANCE is the REAL grabber (same element, same centre)');
+section('3 — ROUND T REMOVED THE DISC: the grabber exists, is sized, and NOTHING may paint it');
 
 ok(/EdgeUpdaterClassName = 'react-flow__edgeupdater'/.test(RF_SRC),
    'RF names the grabber class (read from the bundle)',
@@ -248,54 +406,92 @@ ok(/EdgeUpdaterClassName = 'react-flow__edgeupdater'/.test(RF_SRC),
 ok(/className: cc\(\[EdgeUpdaterClassName/.test(anchorSrc),
    'the ONLY thing drawn at an endpoint by RF is that class — no second element to de-sync from');
 ok(/stroke: "transparent", fill: "transparent"/.test(anchorSrc),
-   'and RF paints it fully transparent — this is the defect being fixed');
+   'and RF itself paints it transparent — so there was never anything to reveal but OUR sheet\'s paint');
 
 const rfUpdaterRule = (() => {
   const i = RF_CSS.indexOf('.react-flow__edgeupdater {');
   return RF_CSS.slice(i, RF_CSS.indexOf('}', i));
 })();
 ok(/cursor:\s*move/.test(rfUpdaterRule) && /pointer-events:\s*all/.test(rfUpdaterRule),
-   'RF gives it cursor: move and pointer-events: all — our rules only add PAINT',
+   'RF gives it cursor: move and pointer-events: all — the HIT TARGET survives the unpaint untouched',
    'cursor: move; pointer-events: all');
-ok(!/pointer-events/.test(OUR_CSS.slice(
-     OUR_CSS.indexOf('.react-flow__edgeupdater {'),
-     OUR_CSS.indexOf('}', OUR_CSS.indexOf('.react-flow__edgeupdater {')))),
-   'our block overrides neither pointer-events nor cursor, so the hit target is untouched');
 
-const base = rulesFor(OUR_CSS, '.react-flow__edgeupdater');
-ok(base.length >= 1, 'we style the grabber itself (not a look-alike element)',
-   `src/styles.css:${base[0]?.line}`);
-const decls = base[0]?.decls ?? {};
-const colourValues = Object.entries(decls)
-  .filter(([k]) => k === 'fill' || k === 'stroke')
-  .map(([, v]) => v);
-const literalColours = colourValues.filter(v => /#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(/.test(v));
-ok(literalColours.length === 0, 'the affordance uses tokens only — 0 literal colours',
-   colourValues.join(', '));
-ok(/^var\(--(sel|elevated|surface)$/.test((decls.stroke ?? '').replace(/\)$/, '') + ')') ||
-   /^var\(--/.test(decls.stroke ?? '') || /^var\(--/.test(decls.fill ?? ''),
-   'fill/stroke resolve through app tokens', `fill: ${decls.fill}, stroke: ${decls.stroke}`);
-ok(decls.opacity === '0', 'hidden at rest', `opacity: ${decls.opacity}`);
-ok(/^opacity \.15s$/.test(decls.transition ?? ''), 'opacity-only transition, same .15s as the handles',
-   `transition: ${decls.transition}`);
+/* --- the grabber as OUR sheet declares it, read as RULES not as a text search.
+   BOTH populations matter and both are measured: a grabber rule can live at the
+   top level (`media === ''`) or inside an @media block. `allRules` tags every rule
+   with its enclosing media header, so the reveal arms ROUND T deleted — which all
+   lived inside `@media (hover: hover)` — are counted too. Reading only the
+   top-level rules here would have made three of the inverted assertions below
+   vacuous: they would PASS on the pre-ROUND-T sheet. They are checked against
+   `grabAll` for exactly that reason; the pre-fix run is the proof. --- */
+const RULES = allRules(CSS_CODE);
+const grabAll = RULES.filter(r => r.head.includes('.react-flow__edgeupdater'));
+const grabRules = grabAll.filter(r => !r.media);          // top level
+const grabInMedia = grabAll.filter(r => r.media);         // inside an @media block
+const paints = (d) => (d.fill !== undefined && d.fill !== 'none') ||
+                      (d.stroke !== undefined && d.stroke !== 'none') ||
+                      (d.opacity !== undefined && d.opacity !== '0') ||
+                      d.background !== undefined || d['background-color'] !== undefined;
+const painting = grabAll.filter(r => paints(r.decls));
+const revealing = grabAll.filter(r => /:hover|\.updating/.test(r.head) ||
+  (r.decls.opacity !== undefined && r.decls.opacity !== '0'));
 
-/* reveal on hover / while reconnecting, under the app's (hover: hover) convention */
-const revealLine = lineOf(OUR_CSS, '.react-flow__edge.updating .react-flow__edgeupdater');
-ok(revealLine > 0, 'a reveal rule targets RF\'s own `.updating` state (live for the whole hover)',
-   `src/styles.css:${revealLine}`);
-ok(lineOf(OUR_CSS, '.react-flow__edge:hover .react-flow__edgeupdater') > 0,
-   'and a plain :hover arm covers the wire itself');
-ok(/updating: updateHover/.test(RF_SRC), 'RF stamps `.updating` from updateHover (read from the bundle)');
-ok(/setUpdateHover\(true\)/.test(RF_SRC) && /setUpdateHover\(false\)/.test(RF_SRC),
-   'updateHover is driven by the grabber\'s own enter/out — no JS of ours in the path');
-{
-  const hoverBlocks = mediaBlocksWith('@media (hover: hover)', '.react-flow__edgeupdater:hover { opacity: 1; }');
-  ok(hoverBlocks.length >= 1, 'the reveal sits inside @media (hover: hover), matching the handle rules',
-     hoverBlocks.map(b => `src/styles.css:${b.startLine} (rule @${b.lineOf('.react-flow__edgeupdater:hover { opacity: 1; }')})`).join(', ') || 'not found');
-  ok(mediaBlocksWith('@media (hover: hover)', '.react-flow__edge:hover .react-flow__edgeupdater').length >= 1 &&
-     mediaBlocksWith('@media (hover: hover)', '.react-flow__edge.updating .react-flow__edgeupdater').length >= 1,
-     'ALL THREE reveal arms share one (hover: hover) media block, so a touch device shows no hover-only promise');
+/** One line per rule so the reader can check the model against the sheet by eye. */
+for (const r of grabAll) {
+  console.log(`        rule @ styles.css:${r.line}  {${r.head.replace(/\s+/g, ' ')}}  ` +
+    `${r.media ? `[in ${r.media}]  ` : ''}-> ${JSON.stringify(r.decls)}`);
 }
+console.log(`        rules mentioning the grabber: ${grabAll.length} total — ` +
+  `${grabRules.length} top-level, ${grabInMedia.length} inside an @media block`);
+
+ok(grabRules.length >= 1, 'we still style the grabber itself (not a look-alike element)',
+   `src/styles.css:${grabRules[0]?.line}`);
+ok(grabAll.every(r => r.decls['pointer-events'] === undefined) &&
+   grabAll.every(r => r.decls.cursor === undefined),
+   'no rule of ours overrides pointer-events or cursor, so the hit target is untouched',
+   'RF\'s own cursor: move; pointer-events: all stand');
+
+/* --- BUCKET 1, INVERTED. Each label states the claim that was there before. --- */
+ok(painting.length === 0,
+   'INVERTED — old claim: "the affordance uses tokens only / fill+stroke resolve through app tokens". ' +
+   'New claim: NO rule paints the grabber',
+   `rules that give it a fill, a stroke, a non-zero opacity or a background: ${painting.length}` +
+   (painting.length ? ` -> ${painting.map(r => `styles.css:${r.line}${r.media ? ` ${r.media}` : ''} ${JSON.stringify(r.decls)}`).join(' | ')}` : ''));
+ok(grabRules.some(r => r.decls.fill === 'none' && r.decls.stroke === 'none'),
+   'INVERTED — old claim: "fill/stroke resolve through tokens (fill: var(--elevated), stroke: var(--sel))". ' +
+   'New claim: both are `none` — there is no colour left to tokenise, and no theme can paint it back',
+   `fill: ${grabRules[0]?.decls.fill}, stroke: ${grabRules[0]?.decls.stroke}`);
+ok(grabAll.every(r => r.decls.opacity === undefined || r.decls.opacity === '0'),
+   'INVERTED — old claim: "hidden at rest (opacity: 0)". New claim: hidden ALWAYS — ' +
+   'no rule, in ANY media block, gives it a non-zero opacity',
+   `opacity declarations: ${grabAll.map(r => (r.media ? '[media] ' : '') + (r.decls.opacity ?? '(none)')).join(', ')}`);
+ok(grabAll.length === 1,
+   'INVERTED — old claim: "the reveal, read-only and hover blocks are three arms of one affordance". ' +
+   'New claim: ONE rule mentions it anywhere in the sheet, because nothing is drawn that could change state',
+   `${grabAll.length} rule(s) mention it: ${grabAll.map(r => `styles.css:${r.line}${r.media ? ` (${r.media})` : ''}`).join(', ')}`);
+ok(grabRules[0]?.decls.transition === undefined,
+   'INVERTED — old claim: "opacity-only transition, same .15s as the handles". ' +
+   'New claim: no transition at all — a fade on an invisible element is dead weight',
+   `transition: ${grabRules[0]?.decls.transition ?? '(not declared)'}`);
+ok(revealing.length === 0,
+   'INVERTED — old claim: "a reveal arm targets `.updating`, and a plain :hover arm covers the wire". ' +
+   'New claim: ZERO reveal arms exist, in any media block; nothing in this sheet can show the disc again',
+   `hover/.updating/non-zero-opacity arms: ${revealing.length}` +
+   (revealing.length ? ` -> ${revealing.map(r => `${r.head} @${r.line}${r.media ? ` (${r.media})` : ''}`).join(' | ')}` : ''));
+ok(grabInMedia.length === 0,
+   'INVERTED — old claim: "all THREE reveal arms share one @media (hover: hover) block, so a touch device shows no ' +
+   'hover-only promise". New claim: no media block mentions the grabber at all, so there is no ' +
+   'pointer-type-dependent promise left to make',
+   `grabber rules inside an @media block: ${grabInMedia.length}`);
+ok(!ALL_MEDIA.some(b => b.header.includes('prefers-reduced-motion') && b.text.includes('edgeupdater')),
+   'INVERTED — old claim: "the transition respects prefers-reduced-motion". New claim: no reduced-motion ' +
+   'rule is needed, because there is no transition to suppress',
+   `prefers-reduced-motion blocks mentioning it: ` +
+   `${ALL_MEDIA.filter(b => b.header.includes('prefers-reduced-motion') && b.text.includes('edgeupdater')).length}`);
+ok(grabRules[0]?.decls.fill !== undefined || grabRules[0]?.decls.stroke !== undefined,
+   'the surviving rule is a PAINT-REMOVAL rule (it names a paint property and sets it to none), ' +
+   'so an accidental deletion of it would be caught here as a missing rule rather than a silent repaint',
+   `${grabRules[0]?.head.replace(/\s+/g, ' ')} -> ${JSON.stringify(grabRules[0]?.decls)}`);
 
 /* ======================================================================== */
 section('4 — READ-ONLY: the gesture cannot be started at all');
@@ -325,88 +521,68 @@ ok(!/onReconnectStart|onReconnectEnd/.test(APP),
 ok(!/onReconnectStart|onReconnectEnd/.test(readFileSync(`${ROOT}/src/choreography.ts`, 'utf8')),
    'choreography.ts adds no reconnect entry point either');
 
-/* neutralisation + reduced motion */
+/* --- BUCKET 1, INVERTED: what used to be read-only NEUTRALISATION of a painted
+       disc is now nothing at all, because there is no paint in an edit-mode board
+       either. The old four assertions asserted a `.ds-read-only` block that
+       re-scoped three reveal arms and silenced them with `opacity: 0`. --- */
 {
-  const roBlocks = mediaBlocksWith('@media (hover: hover)', '.ds-read-only .react-flow__edgeupdater:hover');
-  ok(roBlocks.length >= 1, 'the affordance is neutralised under .ds-read-only',
-     roBlocks.map(b => `src/styles.css:${b.startLine} (rule @${b.lineOf('.ds-read-only .react-flow__edgeupdater:hover')})`).join(', ') || 'not found');
-  const roText = roBlocks.map(b => b.text).join('\n');
-  ok(/\.ds-read-only \.react-flow__edge:hover \.react-flow__edgeupdater/.test(roText) &&
-     /\.ds-read-only \.react-flow__edge\.updating \.react-flow__edgeupdater/.test(roText),
-     'all three reveal arms are re-scoped under .ds-read-only, in the same block',
-     'mirrors the @media (hover: hover) rule');
-  ok(/opacity:\s*0/.test(roText), 'and it is silenced with opacity: 0 (paint-only)');
-  {
-    // whitespace-insensitive so the check reads the SELECTOR LIST, not the indentation
-    const squeeze = (s) => s.replace(/\s+/g, '');
-    const expected = squeeze(
-      '.ds-flow-wrap.ds-read-only .react-flow__edge:hover .react-flow__edgeupdater,' +
-      '.ds-flow-wrap.ds-read-only .react-flow__edge.updating .react-flow__edgeupdater,' +
-      '.ds-flow-wrap.ds-read-only .react-flow__edgeupdater:hover { opacity: 0; }');
-    ok(squeeze(roText).includes(expected),
-       'ONE declaration covers all three reveal arms (the selector list is the mirror)',
-       `${roText.split('opacity: 0').length - 1} declaration(s)`);
-  }
+  const roSelector = /\.ds-flow-wrap\.ds-read-only\s+\.react-flow__edgeupdater/;
+  ok(roSelector.test(grabRules[0]?.head ?? ''),
+     'INVERTED — old claim: "the affordance is neutralised under .ds-read-only, all three reveal arms ' +
+     're-scoped in one block, silenced with opacity: 0". New claim: read-only needs NO separate rule — ' +
+     'the read-only arm names the SAME rule that already paints nothing',
+     `the surviving rule's selector list: ${grabRules[0]?.head.replace(/\s+/g, ' ')}`);
+  ok(!ALL_MEDIA.some(b => b.text.includes('.ds-flow-wrap.ds-read-only') && b.text.includes('edgeupdater')),
+     'and no media block carries a read-only arm either (the old form had one per reveal arm)',
+     `read-only arms inside @media: ${ALL_MEDIA.filter(b => b.text.includes('.ds-flow-wrap.ds-read-only') && b.text.includes('edgeupdater')).length}`);
+  ok(grabRules.filter(r => r.head.includes('ds-read-only')).length === 1,
+     'INVERTED — old claim: "ONE declaration covers all three reveal arms (the selector list is the mirror)". ' +
+     'New claim: exactly one read-only selector exists, on the paint-removal rule',
+     `${grabRules.filter(r => r.head.includes('ds-read-only')).length} read-only selector(s)`);
 }
-
-const rmBlocks = mediaBlocksWith('@media (prefers-reduced-motion: reduce)', '.react-flow__edgeupdater { transition: none; }');
-ok(rmBlocks.length >= 1, 'the transition respects prefers-reduced-motion',
-   rmBlocks.map(b => `src/styles.css:${b.startLine} (rule @${b.lineOf('.react-flow__edgeupdater { transition: none; }')})`).join(', ') || 'not found');
 
 /* ======================================================================== */
 section('5 — BLAST RADIUS: nothing else moved');
 
-const boards = JSON.parse(readFileSync(`${ROOT}/boards/mu01q1ue3a854b81.json`, 'utf8'));
-/* The canonical demo board is the 3-node Kafka pipeline. A 4th node may exist and
-   is LEGITIMATE: Harvey's own free-text label (`n100`, "dasdas") — a `label` kind
-   has no handles, no shape and no title, so the reconnect assertions below scope
-   to the shape nodes rather than failing on node COUNT. Asserting a hard `=== 3`
-   made this harness red the moment a user added a note to their own board, which
-   is not a regression in the reconnect feature this harness owns. */
-const shapeNodes = boards.nodes.filter(n => n.type !== 'label');
-const labelNodes = boards.nodes.filter(n => n.type === 'label');
-ok(shapeNodes.length === 3 && boards.edges.length === 2,
-   'demo board: 3 shape nodes / 2 edges',
-   `${shapeNodes.length} shape + ${labelNodes.length} label / ${boards.edges.length}`);
-ok(boards.preset === 'architecture', 'preset still architecture', boards.preset);
-ok(!('theme' in boards), 'no `theme` key');
-const pos = shapeNodes.map(n => `${n.position.x},${n.position.y}`).join(' / ');
-ok(pos === '-53,298 / 324,290 / 704,290', 'the 3 shape nodes kept their positions', pos);
-ok(boards.edges.map(e => e.id).join(',') === 'e1,e2', 'edge ids unchanged');
-{
-  /* React Flow persists a normalised board (selected / measured / sourceHandle…).
-     Report them rather than hide them, and assert nothing SEMANTIC was lost. */
-  const extraTop = Object.keys(boards).filter(k => !['id', 'name', 'nodes', 'edges', 'preset', 'legend'].includes(k));
-  const extraNode = [...new Set(boards.nodes.flatMap(n => Object.keys(n)).filter(k =>
-    !['id', 'type', 'position', 'data'].includes(k)))];
-  console.log(`        added-by-RF top-level keys: ${extraTop.join(', ') || '(none)'}`);
-  console.log(`        added-by-RF node keys: ${extraNode.join(', ') || '(none)'}`);
-  ok(shapeNodes.every(n => n.data && n.data.title && n.data.shape),
-     'every shape node kept its data (title + shape)');
-  ok(labelNodes.every(n => n.data && typeof n.data.text === 'string'),
-     'every label node kept its text',
-     labelNodes.map(n => JSON.stringify(n.data.text)).join(', ') || '(none present)');
-  ok(boards.edges.every(e => e.label === 'produce' || e.label === 'consume'), 'both edge labels intact',
-     boards.edges.map(e => e.label).join(', '));
-}
+/* BUCKET 2 + BUCKET 3, REPLACED. The old form asserted this file's own Kafka
+   demo-board fixture (`e1,e2`, `produce`/`consume`) and three hard-coded node
+   positions inside `boards/`. Both are gone: this harness no longer reads the
+   board file at all (the ERD preset facts below come from `src/presets.ts`, and
+   the geometry fixture comes from the constants parsed in section 2). What stays
+   is the SEMANTIC claim those assertions were there for — the architecture preset
+   is still the default and still byte-stable — stated against the source. */
+ok(/id: 'architecture'/.test(PRESETS) && /DEFAULT_PRESET_ID: PresetId = 'architecture'/.test(PRESETS),
+   'the default preset is still architecture (read from src/presets.ts, not from a board)',
+   `DEFAULT_PRESET_ID @ src/presets.ts:${lineOf(PRESETS, "DEFAULT_PRESET_ID: PresetId")}`);
+ok(/caps: \{subflow:\s*true,\s*proximityConnect:\s*false,\s*cyclePrevention:\s*false,\s*oneInput:\s*false,\s*resizable:\s*true\}/
+     .test(PRESETS),
+   'architecture still ships all three optional toggles OFF, so adopting it cannot change an old board',
+   `src/presets.ts:${lineOf(PRESETS, "caps: {subflow: true")}`);
+ok(!/theme: *'/.test(PRESETS.slice(PRESETS.indexOf("id: 'architecture'"), PRESETS.indexOf("id: 'architecture'") + 700)),
+   'architecture still seeds no literal board `theme` key (only `theme.suggested`)',
+   `theme: {suggested: 'dark'}`);
 
+/* COUNTED ON THE RAW SHEET, comments included, so the number is comparable with
+   the count every previous round reported (ROUND AJ's own gate: styles.css must
+   stay at 142). The old file carried `<= 160` with the note "ceiling raised by
+   ROUND AG1"; ROUND AJ adds no colour, so the ceiling comes back down to the
+   measured count — the assertion is now "no literal was added", not "we are under
+   a raised cap". */
 const literals = (OUR_CSS.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length;
-const HEX_LIMIT = 160;   // raised from 127 by ROUND AG1, which ADDED colour on purpose
-ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css', `${literals} <= ${HEX_LIMIT} (ceiling raised by ROUND AG1)`);
+const HEX_LIMIT = 142;   // the measured count at ROUND AI; ROUND AJ adds none
+ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
+   `${literals} <= ${HEX_LIMIT} (the count ROUND AJ inherited; the old ceiling of 160 came back down)`);
 
-/* mtime proof that the off-limits files were never written by this pass.
-   The reference is the harness's OWN first-edit record, not App.tsx's mtime: a
-   later round that legitimately touches LabelNode (and not App.tsx) would make
-   "older than App.tsx" fail by construction, which says nothing about whether
-   THIS pass wrote the off-limits files. The round stamps its own edit time into
-   the file list it owns, so the invariant is "these files are older than the
-   work done in the session that runs this check" — compare against `now` at
-   run time minus a window, and against the board file which this pass never writes. */
-const boardMtime = statSync(`${ROOT}/boards/mu01q1ue3a854b81.json`).mtimeMs;
+/* mtime proof that the off-limits files were never written by this pass. The
+   reference is the harness's OWN mtime — this file is authored by the round that
+   runs it — so the invariant is "these files are older than the check that runs
+   this round". (The old reference was the demo board's mtime, which is the user's
+   file and moves whenever he uses the app.) */
+const selfMtime = statSync(new URL(import.meta.url)).mtimeMs;
 for (const rel of ['src/TableNode.tsx', 'vite.config.ts', 'src/Tour.tsx']) {
   const m = statSync(`${ROOT}/${rel}`).mtimeMs;
-  ok(m < boardMtime, `${rel} was not written later than the demo board (never touched)`,
-     `${new Date(m).toISOString().slice(11, 19)} <= board ${new Date(boardMtime).toISOString().slice(11, 19)}`);
+  ok(m < selfMtime, `${rel} was not written later than this check (never touched)`,
+     `${new Date(m).toISOString().slice(11, 19)} <= check ${new Date(selfMtime).toISOString().slice(11, 19)}`);
 }
 
 console.log(failures === 0 ? '\nALL GREEN' : `\n${failures} FAILURE(S)`);

@@ -451,8 +451,12 @@ the colour control, dismissible with the dismissal persisted; **(b)** the colour
 > Verified live: 0 overflow across 6 nodes, the long word wraps to 3 lines with `scrollWidth === clientWidth`
 > (no character lost), 4 connect dots still 0px from the border, the 420×300 node unchanged, the label editor
 > still opens focused and scrolls itself.
-> **Known, NOT fixed (pre-existing):** `.tnode { overflow:hidden }` clips TableNode's per-column handles
-> (8px, centred on the border → 4px sits outside). Table nodes are not resizable; recorded in the round's skill.
+> ~~**Known, NOT fixed (pre-existing):** `.tnode { overflow:hidden }` clips TableNode's per-column handles
+> (8px, centred on the border → 4px sits outside). Table nodes are not resizable; recorded in the round's skill.~~
+> **FIXED IN ROUND AJ (2026-09-20)** — see the ROUND AJ section at the top. `.tnode` no longer clips at all
+> (the card was clipping 6px of every 12px handle, not 4px of 8 — the handle was 8px and is now the standard
+> 12px like every other node); the radius the clip used to draw moved onto `.tnode-head` (inner radius 8px =
+> 9px − 1px border) and onto the card's last child. `checks/round-aj-table-handles.mjs` guards it.
 >
 > **RESEARCH DONE for the next work — `diagram-studio-research/excalidraw/`** (`SYNTHESIS.md` + `X1`/`X2`/`X3`
 > + `ORCH-FINDINGS-icons-and-collapse.md`), pinned at Excalidraw `c0ad61c`. **Three corrections that change
@@ -473,15 +477,15 @@ the colour control, dismissible with the dismissal persisted; **(b)** the colour
 **Read this file top-down for the round you need; each `### ▶ ROUND …` section is self-contained.**
 Working dir `/home/harvey/projects/tech-goblin/lab/diagram-studio`, dev server `http://192.168.33.200:5200/`.
 
-**Gates that must stay green (last verified 2026-09-18 evening):**
-`npx tsc --noEmit` = 0 · `node ./node_modules/vite/bin/vite.js build` = 0 · hex literals in `src/styles.css` = **127**
+**Gates that must stay green (last verified 2026-09-20, ROUND AJ):**
+`npx tsc --noEmit` = 0 · `node ./node_modules/vite/bin/vite.js build` = 0 · hex literals in `src/styles.css` = **142**
 (must not rise — use an existing CSS variable, never a new hex).
 
-**Harnesses: 9 files in `checks/*.mjs`, run each by path (there is no npm runner).**
-**`checks/package-q-reconnect-endpoints.mjs` FAILS 2 assertions (node positions + edge ids) and has done for a
-while** — it hard-codes an old 3-node board fixture while the live board is Harvey's 7-node working board.
-Proved pre-existing by stashing the change and re-running; **do not "fix" the harness to hide it.** Every other
-harness is green.
+**Harnesses: 25 files in `checks/*.mjs`, run each by path (there is no npm runner).**
+**ALL 25 ARE GREEN as of ROUND AJ.** `checks/package-q-reconnect-endpoints.mjs` used to fail 2→13→16 assertions
+(it hard-coded an old 3-node board fixture while the live board is Harvey's working board, then ROUND T deleted
+the endpoint disc it asserted); ROUND AJ inverted it against ROUND T's real behaviour and removed its read of
+`boards/` entirely, so **a harness can no longer be reddened by Harvey using the app.**
 
 **IMPORTANT — the live board is Harvey's working canvas.** The app autosaves and there is only ONE board file
 until more exist, so **a second tab's autosave overwrites his state.** Before probing: `ss -tn | grep ':5200'`
@@ -537,15 +541,21 @@ reload, and confirm the fold is remembered**; the chevrons show `Cmd+Ctrl+Shift+
 toggle left / right / both. Also: **two onboarding layers swallow clicks** — `.tour-overlay` and the
 `Getting started` checklist (`.gsc`). If a click does nothing on a fresh profile, it is one of those, not a bug.
 
-**Known debt, unchanged:** `checks/package-q-reconnect-endpoints.mjs` reports **15** failures — 11 assert the
+**Known debt, unchanged:** ~~`checks/package-q-reconnect-endpoints.mjs` reports **15** failures — 11 assert the
 endpoint disc the user asked to delete in ROUND T, 2 are its old fixture failures, and 2 more are its
 board-fixture assertions against the user's LIVE board (which he has been editing: it is now 9 nodes / 4 edges,
-not the 3/2 the harness hard-codes). It is left as the record; **do not "fix" a harness to hide a real change.**
+not the 3/2 the harness hard-codes). It is left as the record; **do not "fix" a harness to hide a real change."~~
+> **CLEARED IN ROUND AJ (2026-09-20).** The file was INVERTED, not deleted: it now asserts ROUND T's real
+> behaviour and every rewritten assertion prints the OLD claim beside the NEW one. It no longer reads `boards/`
+> at all — the geometry fixture is derived from `src/presets.ts` / `src/DiagramNode.tsx` constants, so Harvey
+> editing his own board can never redden it again. Before 16 failures, after ALL GREEN. The pre-ROUND-T sheet
+> is the negative control and still fails exactly the 11 inverted assertions.
 
 **Vault debt:** edge reshaping — ROUND S, T and U are NOT yet in ADR-031 / Change Log. Batch via pkm.
 `checks/round-s-edge-bend.mjs` covers (a)–(o).
-**Stale harness:** `checks/package-q-reconnect-endpoints.mjs` FAILS 13 (was 2): 11 assertions require the
-endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. Left as the record — do not "fix".
+**Stale harness:** ~~`checks/package-q-reconnect-endpoints.mjs` FAILS 13 (was 2): 11 assertions require the
+endpoint disc to be PAINTED, which ROUND T was explicitly asked to remove. Left as the record — do not "fix".~~
+> **CLEARED IN ROUND AJ (2026-09-20)** — inverted, not deleted. See the note above.
 
 ## ✅ PACKAGE-Q 2026-09-19 — panel hotkeys (rebound group chord, per-side toggles, chevron tooltips)
 ## ✅ PACKAGE-P pass 1 2026-09-19 — per-type sections + icon pickers (12 selects converted)
