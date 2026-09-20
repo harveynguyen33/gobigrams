@@ -31,6 +31,7 @@ import {
 
 import DiagramNode, {type NodeKind} from './DiagramNode';
 import LabelNode, {type LabelKind} from './LabelNode';
+import {newResizeGuard, recordResizeGesture} from './resizeHistory';
 import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNode';
 import {edgeTypes} from './GoblinEdge';
 import IconPicker from './IconPicker';
@@ -2734,10 +2735,23 @@ export default function App() {
     pushHistory();
   }, [pushHistory]);
 
+  /* ROUND 5 — A RESIZE IS ONE UNDOABLE STEP. Same shape as the drag, which
+     pushes once from `onNodeDragStartAll` (below). React Flow's `NodeResizer`
+     emits a `dimensions` change carrying `resizing: true` on every frame of the
+     drag and a final `resizing: false` at the end; `recordResizeGesture` turns
+     that stream into exactly one push and re-arms for the next gesture. The
+     decision itself lives in `src/resizeHistory.ts` so `checks/` can execute it
+     rather than restate it. See that file for why the change-level flag is used
+     instead of `onResizeStart`, and why position changes are NOT recorded here.
+     `guard` is a plain object (not a boolean ref) because the helper needs to
+     write back through it. */
+  const resizeGuard = useRef(newResizeGuard());
+
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     if (changes.some(c => c.type === 'remove')) noteRemove();
+    if (recordResizeGesture(resizeGuard.current, changes)) pushHistory();
     onNodesChange(changes);
-  }, [onNodesChange, noteRemove]);
+  }, [onNodesChange, noteRemove, pushHistory]);
 
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     if (changes.some(c => c.type === 'remove')) noteRemove();
