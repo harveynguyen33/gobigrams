@@ -31,18 +31,43 @@
  * user who has never dismissed it and the first run never writes storage.
  */
 
-/** ONE namespaced key, matching MARQUEE_KEY / ANIMATE_KEY / CATEGORIES_KEY. */
-export const KEY_NOTE_KEY = 'diagram-studio:colour-key-note';
+/** ONE namespaced key, matching MARQUEE_KEY / ANIMATE_KEY / CATEGORIES_KEY.
+ *
+ *  ROUND AH — THE KEY MOVED WITH THE COPY (this is a REVERSAL, recorded here so
+ *  nobody re-derives it). ROUND AG2 renamed the note's visible text to
+ *  `Color = our grouping, not ISO.` and deliberately kept this key BRITISH so a
+ *  dismissal already stored under it would stay honoured. The cost of that: a user
+ *  who dismissed the note BEFORE the rename was never shown the new copy at all —
+ *  persisted state left describing text it no longer matches. Harvey's rule settled
+ *  it ("khi thay đổi, nếu state hiện tại k còn phù hợp, bạn có thể clear để làm lại
+ *  nhé ko nhất thiết phải giữ" — when a change leaves persisted state no longer
+ *  appropriate, clear it rather than preserve it). So the key is American now,
+ *  consistent with BOTH the copy it guards and this module's own name.
+ *
+ *  THE OLD BRITISH KEY IS ABANDONED, NOT MIGRATED. Nothing reads
+ *  `diagram-studio:colour-key-note` any more, so it is simply never consulted; the
+ *  new key is absent, `parseKeyNote` resolves absent to SHOW, and the note appears
+ *  once more for that user, who can dismiss it again under the new key. Migrating
+ *  the old value across would re-hide the note for exactly the people this change
+ *  exists to reach — the fix would cancel itself.
+ *
+ *  FOR THE NEXT CHANGE: if this note's copy ever changes again in a way the user
+ *  should SEE, the key name is the lever — bump the key (e.g. `…-key-note-2`)
+ *  rather than adding a migration.
+ */
+export const KEY_NOTE_KEY = 'diagram-studio:color-key-note';
 
 /** The label's text. Kept here rather than in the JSX so the panel, a test and
  *  the report all read the SAME string.
  *
  *  ROUND AG2, ITEM 2 — "Color", the American spelling, in the VISIBLE TEXT only.
  *  The app mixed `Colour` and `Color`; Harvey chose one ("Chọn 1 (Color) thôi").
- *  The MODULE NAME and every identifier in this file keep the British spelling on
- *  purpose, and `KEY_NOTE_KEY` below MUST: it is a persisted localStorage key, so
- *  renaming it would make an already-dismissed note reappear for every user who
- *  has dismissed it. Only the string a user reads changes.
+ *  The MODULE NAME and every other identifier in this file keep the British
+ *  spelling on purpose. `KEY_NOTE_KEY` above was in that group until ROUND AH
+ *  reversed it: the key now matches this copy exactly, because a user who had
+ *  dismissed the British-era note was never shown the renamed text. (The key is
+ *  the ONE persisted identifier in the file; the functions below read only through
+ *  it, so the reversal cost no other change.)
  *
  *  MEASURED, not guessed: this is 30 characters and 216.0px in the panel's own
  *  mono face at the `.hint` rule's 12px (`scripts/measure-key-note.py`, reading
@@ -57,7 +82,9 @@ export const KEY_NOTE_TEXT = 'Color = our grouping, not ISO.';
 
 /** Tolerant parse: only the two strings this module writes are meaning, and
  *  every other value — including the empty string and a retired name — means
- *  SHOW, so a hand-edited key can never make the note silently absent. */
+ *  SHOW, so a hand-edited key can never make the note silently absent. This is
+ *  also what makes ROUND AH's abandoned British key harmless: it is never read,
+ *  so the new key is simply absent and SHOW is the answer. */
 export function parseKeyNote(raw: string | null): boolean {
   return raw !== '0';
 }

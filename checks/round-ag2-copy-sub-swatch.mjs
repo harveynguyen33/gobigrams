@@ -310,9 +310,9 @@ console.log('\n=== B. ITEM 2 — American spelling in user-visible copy ===');
      · IDENTIFIERS — `resolveColorKey`, `colorKey`, `recolour`;
      · CSS class / module names — `.pal-swatch`, `src/colorKeyNote.ts`;
      · COMMENTS and docblocks — blanked before the probes below;
-     · PERSISTED localStorage keys — `diagram-studio:colour-key-note` (V3 would
-       otherwise catch KEY_NOTE_KEY, so it is excluded BY NAME: a stored key is
-       not a string anybody reads);
+     · PERSISTED localStorage keys — `diagram-studio:color-key-note` (a stored key
+       is not a string anybody reads, so KEY_NOTE_KEY is excluded BY NAME: V3 would
+       otherwise read it as copy if it ever regained a British spelling);
      · ATTRIBUTE and `var()` NAMES — `data-color-key`, `--ts-color`. V2 matches a
        quoted attribute WORD, so a name is not in it at all.
    V1 reads the JSX TEXT of a line as a lexer would — see `jsxTexts()` — so a
@@ -403,16 +403,27 @@ assert('ag2-13.the-three-named-sites-are-fixed-and-none-was-reworded',
   `"and color" (Tour.tsx:${lineOf('edit its text, icon and color', TOUR_RAW)}), and KEY_NOTE_TEXT reads ` +
   `'${(NOTE_RAW.match(/export const KEY_NOTE_TEXT\s*=\s*'([^']*)'/) ?? [])[1]}' (colorKeyNote.ts:${lineOf('export const KEY_NOTE_TEXT', NOTE_RAW)})`);
 
-/* THE TRAP, IN ONE ASSERTION: the localStorage KEY is a persisted identifier, not
-   copy. Renaming it makes an already-dismissed note reappear. */
+/* THE DECISION, IN ONE ASSERTION — ROUND AH INVERTED THIS ONE, ON PURPOSE.
+   ROUND AG2 changed the note's VISIBLE copy from `Colour = …` to `Color = …` and
+   left the localStorage key British so an existing dismissal stayed honoured —
+   which meant a user who had dismissed the old note never saw the new copy: state
+   that no longer fits the content. Harvey's rule ("nếu state hiện tại k còn phù
+   hợp, bạn có thể clear để làm lại") settled it, so the key moved WITH the copy.
+   An old British key is IGNORED rather than migrated: it is never read, so it
+   parses as absent, the note shows ONCE and the user dismisses it again under the
+   new key. A migration would copy the old '0' onto the new key and RE-HIDE the
+   note — the exact defect this round exists to fix. */
 const keyNow = (NOTE_RAW.match(/export const KEY_NOTE_KEY\s*=\s*'([^']*)'/) ?? [])[1];
-assert('ag2-14.the-localStorage-key-and-the-filename-keep-the-British-spelling',
-  keyNow === 'diagram-studio:colour-key-note'
+assert('ag2-14.the-localStorage-key-is-American-with-the-copy-and-the-module-name-matches',
+  keyNow === 'diagram-studio:color-key-note'
     && existsSync(`${ROOT}/src/colorKeyNote.ts`)
     && /export function (loadKeyNote|saveKeyNote|parseKeyNote)/.test(NOTE_RAW),
-  `KEY_NOTE_KEY is still '${keyNow}' and the module is still src/colorKeyNote.ts: that string is the ` +
-  `persisted key, so renaming it un-dismisses the note for every user who has already dismissed it — the ` +
-  `ONE identifier the copy change had to leave alone, asserted here rather than trusted`);
+  `KEY_NOTE_KEY is '${keyNow}' and the module is still src/colorKeyNote.ts — the key name now spells "color" ` +
+  `exactly like the copy it guards and like the file itself. The key moved WITH the copy on purpose: a user ` +
+  `who dismissed the British-era note sees the new text once and can dismiss it again, so the rename is what ` +
+  `makes the change visible instead of invisible. An old 'diagram-studio:colour-key-note' is ABANDONED, not ` +
+  `migrated: nothing reads it, parseKeyNote() returns true for every value but '0', so it resolves to absent ` +
+  `and the note shows — migrating it would re-hide the note, the one thing being fixed`);
 
 /* NEGATIVE CONTROL for the sweep: the SAME enumeration, run over the pre-fix copy.
    The three strings are restored IN MEMORY as a per-file string substitution, and

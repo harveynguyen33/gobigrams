@@ -5310,10 +5310,14 @@ export default function App() {
                       attribute. A hover-only label is invisible on a tablet,
                       and this project ships to touch.
                     · DISMISSIBLE, AND THE DISMISSAL PERSISTS. The × writes
-                      `diagram-studio:colour-key-note` through the established
+                      `diagram-studio:color-key-note` through the established
                       convention (`src/colorKeyNote.ts`, the same shape as
                       MARQUEE_KEY / ANIMATE_KEY / SECTIONS_KEY), so it is gone
-                      for good rather than back on the next selection.
+                      for good rather than back on the next selection. The key is
+                      American (ROUND AH) so it moves WITH this copy: a dismissal
+                      stored under the older British key is ignored rather than
+                      migrated, which is what lets a user who had dismissed the
+                      pre-rename note see this text once and dismiss it again.
                     · ONE SHORT LINE, AND IT DOES NOT STEAL FOCUS. A plain
                       `<span>` with `role="button" tabIndex={0}`, exactly like
                       `.fav-remove` and `.cust-remove`; nothing autofocuses it,
