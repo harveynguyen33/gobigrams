@@ -106,15 +106,16 @@
      ROUND AG1 — amber's light/paper value was a brown (hue 22.7), a yellow token
      20.5 deg off its own dark value (43.3) at saturation 0.90. Only light and
      paper had rotated; dark, midnight and contrast already held their hue. Option
-     A — keep the HUE, adapt only the LIGHTNESS — and the ink here is hue 43.4
-     (0.1 deg off dark) at saturation 1.00: the most saturated yellow that still
-     clears 4.5:1. The constraint is real, not a preference — on this canvas no
-     value is both clearly yellow and ≥4.5:1 without becoming an ink. */
+     A — keep the HUE, adapt only the LIGHTNESS — and the ink here is hue 43.5
+     (0.3 deg off dark) at saturation 1.00: the most saturated yellow that clears
+     4.5:1 on the canvas AND 5.0:1 on the surface. The constraint is real, not a
+     preference — on this canvas no value is both clearly yellow and ≥4.5:1
+     without becoming an ink. */
   --c-accent: #9a3412;
   --c-green: #166534;
   --c-cyan: #0e7490;
   --c-violet: #5b21b6;
-  --c-amber: #946b00;
+  --c-amber: #8e6700;
   --c-slate: #475569;
   /* ROUND AG1 — red/blue/pink. `red` and `blue` are the two 7/7 consensus gaps;
      `pink` is the 5/7 next. The LIGHT values are the tools' own (Excalidraw red,

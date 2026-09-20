@@ -408,6 +408,18 @@ assert('ag7b.the-new-amber-paper-value-holds-hue-AND-clears-its-theme-floor',
   `${f3(hsv(PALETTES.paper['--c-amber']).s)} with a worst-surface contrast of ${f2(worstContrast(PALETTES.paper['--c-amber'], 'paper'))}:1 ` +
   `(its pre-round floor); light --c-amber=${AMBER_LIGHT} sits in '${amberClsLight.key}' at ${f3(amberClsLight.s)} sat`);
 
+/* The light ink must clear a real floor on BOTH surfaces with MARGIN, not land on
+   a boundary. The value first chosen measured 4.4964 on --bg — under 4.5 once
+   rounded — so it was darkened one step to buy margin without moving the hue. */
+const ambBg = contrast(AMBER_LIGHT, themeBg('light').bg);
+const ambSurf = contrast(AMBER_LIGHT, themeBg('light').surface);
+assert('ag7d.the-light-amber-clears-4.5-and-5.0-with-margin-on-both-surfaces',
+  ambBg >= 4.55 && ambSurf >= 5.0,
+  `light --c-amber=${AMBER_LIGHT} measures ${ambBg.toFixed(4)}:1 on --bg ${themeBg('light').bg} and ${ambSurf.toFixed(4)}:1 on ` +
+  `--surface ${themeBg('light').surface} (hue ${f2(hsv(AMBER_LIGHT).h)}, sat ${f3(hsv(AMBER_LIGHT).s)}). The value picked first, ` +
+  `#946b00, measured 4.4964 on --bg — below 4.5 once rounded — so it was darkened a step to #8e6700, which buys margin and ` +
+  `leaves the hue and the full saturation untouched.`);
+
 /* the three new LIGHT values are the tools' own — assert the contrast they
    actually deliver on BOTH surfaces, so "taken from the tools" is not a claim
    about readability. */
@@ -668,7 +680,7 @@ assert('ag23.PRE-FIX-REPLAY-A8-and-A12-were-RED',
     ? `A8 failed with ${preMissing.length} missing declarations and A12 failed with ${preSpecified.length} wrong new hexes`
     : `A8=${preA8} A12=${preA12} on the pre-fix palette — the wiring assertions catch nothing`);
 assert('ag24.PRE-FIX-REPLAY-does-not-disturb-the-fixed-tree',
-  familyCrossers(PALETTES, KEYS, SAT_VISIBLE, NORMAL).length === 0 && (PALETTES.light['--c-amber'] === '#946b00'),
+  familyCrossers(PALETTES, KEYS, SAT_VISIBLE, NORMAL).length === 0 && (PALETTES.light['--c-amber'] === AMBER_LIGHT),
   `after the replay the LIVE palette still reports 0 crossers and light amber is still ${PALETTES.light['--c-amber']} — the replay mutated copies in memory only`);
 
 /* ===========================================================================
