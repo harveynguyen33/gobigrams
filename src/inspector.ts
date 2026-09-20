@@ -72,6 +72,62 @@ export const hasMetric = (t: InspectorTarget) =>
 export const hasIcon = (t: InspectorTarget) =>
   t.kind === 'goblin' && t.shape !== 'note';
 
+/* ROUND AG2, ITEM 1 — `sub` renders for the NON-flowchart goblins only.
+
+   HARVEY'S QUESTION: "flowchart có cần phải có sub label ko hay chỉ cần 1 label
+   là đủ (title)". The answer from the notation is NO, and it is verified rather
+   than assumed. Mermaid's flowchart nodes take ONE label — `id1[This is the text
+   in the box]` — and to get two lines you embed a break inside that SAME label;
+   there is no second-label concept. draw.io's flowchart stencil ships
+   `value=''` with no second-label slot at all (it has `labelPosition` and
+   `verticalLabel`, i.e. position and rotation, never a sub-label). So the field
+   was offering a slot the notation does not have, and the editor's own data
+   agrees: every flowchart entry is created through `fc()` / `flowNode()` in
+   `src/presets.ts`, both of which hard-code `sub: ''` and `body: 'label-only'`
+   (one centred sentence), so a flowchart node has never shipped with a sub.
+
+   IT IS NOT DEAD UI IN GENERAL, WHICH IS WHY THE RULE IS NARROW. The SAME
+   `data.sub` on a Lane ("role"), a C4 container ("technology") or a C4 boundary
+   ("boundary") is real, populated text that paints — measured. Only the
+   flowchart vocabulary is excluded.
+
+   WHY THE RULE KEYS ON THE SHAPE, NOT THE ACTIVE PRESET. Two reasons, either one
+   sufficient: (a) the goblin target this function is handed is
+   `{kind, shape, body}` — it carries no preset id, so a preset-keyed rule could
+   not be expressed without widening `InspectorTarget` for the benefit of one
+   predicate; (b) even with the preset it would be wrong, because `process` and
+   the rest of the flowchart vocabulary are ALSO offered by the Mixed ("custom")
+   palette, so a board on `custom` would keep the field the user asked to remove.
+   The shape is the only key that answers the question for every palette.
+
+   WHY THE LIST IS DECLARED HERE RATHER THAN IMPORTED. `FLOWCHART_EXTRA_SHAPES`
+   lives in `src/shapes.tsx`, which is JSX: a `.ts` module cannot import it under
+   Node's type-stripping, and importing a `.tsx` module from `.ts` needs
+   `allowImportingTsExtensions`, which this project's tsconfig does not set. This
+   module already names its special shapes as literals for exactly this reason
+   (`t.shape !== 'group'`, `t.shape !== 'note'`); the table below is that same
+   convention carried to a set. `checks/round-ag2-copy-sub-swatch.mjs` asserts it
+   still covers every id `FLOWCHART_EXTRA_SHAPES` declares, so the two cannot
+   drift apart in either direction.
+
+   THE DATA IS UNTOUCHED. This hides a FIELD; it does not remove `sub` from the
+   node data model or from the renderer. A board that already carries a `sub` on
+   a flowchart node still paints it (both branches of `src/DiagramNode.tsx`) —
+   asserted by server-rendering the shipped painter in the round's harness. */
+export const NO_SUB_SHAPES: Shape[] = [
+  /* the ten ISO 5807 shapes */
+  'terminator', 'process', 'decision', 'io', 'document', 'subprocess',
+  'manual', 'delay', 'connector', 'preparation',
+  /* ROUND AD's six additions */
+  'offpage', 'manualinput', 'display', 'storeddata', 'looplimit', 'internalstorage',
+];
+
+/** `sub` renders for a non-flowchart goblin: a Lane's `role`, a C4 container's
+ *  `technology`, a C4 boundary's `boundary`. A flowchart node has one label, so
+ *  it does not. */
+export const hasSub = (t: InspectorTarget) =>
+  t.kind === 'goblin' && !NO_SUB_SHAPES.includes(t.shape);
+
 /* ---------------------------------------------------------------------------
    §A.3 / §C — which sections START folded.
 

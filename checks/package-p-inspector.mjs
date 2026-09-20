@@ -645,7 +645,7 @@ assert('g.control-textarea-counter-detects-a-reintroduction',
 assert('g.the-replacement-is-not-empty',
   labelBranch.includes("secBody('text', tsBody)")
     && countOf(APP, "secBody('text', tsBody)") === 2
-    && ['size', 'weight', 'text colour', 'align'].every(l => APP.includes(`<label>${l}</label>`)),
+    && ['size', 'weight', 'text color', 'align'].every(l => APP.includes(`<label>${l}</label>`)),
   `2 registrations of tsBody (goblin + label), one body, and it carries all four §E.1 controls`);
 
 console.log('\n' + '='.repeat(78));

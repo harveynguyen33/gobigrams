@@ -1777,6 +1777,59 @@ body {
 }
 .swatch:hover { transform: scale(1.1); }
 .swatch.on { border-color: var(--sel); }
+/* ===========================================================================
+   ROUND AG2, ITEM 3 — NINE SWATCHES, THREE ROWS OF THREE.
+
+   THE MEASUREMENT HARVEY SAW. The `color` swatch row (and the Text section's
+   `text color` row, the same control) carries NINE keys since ROUND AG1 added
+   red / blue / pink, and it wrapped 7 + 2 — an orphan row of two, which reads as
+   an accident rather than a decision. The arithmetic says exactly that: the panel
+   is 288px at the desktop tier, `.panel-body` pads 12px a side, and the body's
+   own scrollbar rule takes 10px (the `::-webkit-scrollbar` width above), so the
+   field is 254px. At the shared 26px cell with the shared 7px gap, one row holds
+   floor((254 + 7) / (26 + 7)) = 7 — so the eighth and ninth wrap together and
+   the ninth row is 2 wide. The orchestrator measured 253px live; the 1px is the
+   scrollbar's fractional width, and the wrap is [7, 2] either way.
+
+   THE FIX, AND WHY 3 x 3 RATHER THAN A SMALLER SWATCH. Nine in ONE row needs
+   (254 - 8 x 7) / 9 = 22.0px per cell — under the 26px the control has always
+   been, and 22px is a worse tap target than 26px on a project that ships to
+   touch. Three rows of three makes each cell BIGGER instead: (254 - 2 x 7) / 3 =
+   80.0px. Harvey already approved 3 x 3 for the six font buttons and said so in
+   the same words ("3 3 cho đẹp"), so this is the same instinct applied to the
+   swatches, and it is the reading the segmented rows already use.
+
+   THE GEOMETRY IS THE SEGMENTED ROW'S, VERBATIM. `--cell` is
+   `calc((100% - 14px) / 3)` — a zero-basis share of the free space after two
+   7px gaps, the same `calc((100% - <gaps>) / <cols>)` form `.insp-seg.grid3`
+   uses — so it holds at any future field width and no pixel width is hard-coded.
+   `flex: 0 0 var(--cell)` is the item; `min-width: 0` is the belt the segmented
+   cells needed too.
+
+   THE CASCADE, AND WHY THIS MODIFIER IS NOT CALLED `grid3`. The font row's
+   two-rows-of-three modifier is `.insp-seg.grid3`, and `.insp-seg` and
+   `.swatches` are the same element on a segmented row — so a `.swatches.grid3`
+   rule matches the FONT row too and its 7px gap would override that row's 5px,
+   which is exactly the collision ROUND AA fixed once already. `src/InspectorPickers.tsx`
+   reached the same conclusion for its 2+2 modifier ("A second per-line modifier
+   rather than a re-use of `grid3`, because the two describe different rows"), so
+   this one is `swatch3`: it names what the row IS and cannot be reached from any
+   `.insp-seg` row. It re-states the `7px` gap it depends on rather than
+   inheriting a value two rules decide. `.swatches` ITSELF IS UNTOUCHED: it still
+   serves the 5-swatch edge rows (which set their own inline `gap: 6` and do NOT
+   carry this class) and must keep sizing to its 26px swatch.
+
+   THE THREE THINGS THAT MUST SURVIVE, ALL UNTOUCHED HERE:
+     · the 26px cell and its 2px border — `box-sizing` is border-box globally
+       (styles.css:268), so the `.on` ring paints INSIDE the cell and the cell
+       cannot grow past its share;
+     · `.swatch.on`'s `--sel` border, which is why the three rows are still
+       scannable;
+     · the flex the row shares with the segmented controls.
+   No colour is added by this rule, so the sheet's hex-literal count does not
+   move. */
+.swatches.swatch3 { gap: 7px; --cell: calc((100% - 14px) / 3); }
+.swatches.swatch3 .swatch { flex: 0 0 var(--cell); min-width: 0; height: 26px; }
 .empty {
   color: var(--dim); font-size: 12px; font-family: var(--mono);
   text-align: center; padding: 24px 10px; line-height: 1.6;

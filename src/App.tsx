@@ -39,7 +39,7 @@ import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
 import {
-  getInspectorSections, hasIcon, hasKicker, hasMetric, type InspectorTarget, type SectionId,
+  getInspectorSections, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
 import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
@@ -3343,9 +3343,18 @@ export default function App() {
 
   /** L1 — the inspector swatches are COLOUR KEYS, painted with the live
    *  `var(--c-*)` token, so the swatch itself recolours with the theme. Picking
-   *  one stores the key (not a hex), which is what makes light mode work. */
+   *  one stores the key (not a hex), which is what makes light mode work.
+   *
+   *  ROUND AG2, ITEM 3 — `swatch3` lays the NINE keys out three rows of three.
+   *  This is the SHARED control: every one of its call sites renders the same
+   *  nine keys, so the orphan row the ninth key produced is fixed once, here,
+   *  rather than at the two rows that were noticed. The class is `swatch3`, NOT
+   *  `grid3`: that name is the segmented font row's modifier
+   *  (`.insp-seg.grid3`), and `.swatches` and `.insp-seg` are the same element
+   *  there, so sharing the name would move the font row's gap. Measured in the
+   *  `.swatches.swatch3` block in `src/styles.css`. */
   const swatchRow = (current: ColorKey | null, onPick: (k: ColorKey) => void, custom?: string) => (
-    <div className="swatches">
+    <div className="swatches swatch3">
       {COLOR_KEYS.map((k, i) => (
         <div
           key={k}
@@ -3480,7 +3489,7 @@ export default function App() {
         />
       </div>
       <div className="field">
-        <label>text colour</label>
+        <label>text color</label>
         {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k}))}
       </div>
       <div className="field">
@@ -5190,7 +5199,13 @@ export default function App() {
                     />
                   </div>
                 )}
-                {(['title', 'sub'] as const).map(f => (
+                {/* ROUND AG2, ITEM 1 — ONE label is enough for a flowchart node,
+                    the way Mermaid and draw.io model it, so `sub` is gated on the
+                    same §A.2 field-predicate mechanism as the kicker, metric and
+                    icon (`src/inspector.ts` — the ONE place the rule lives). The
+                    predicate hides the FIELD only: a node that already carries a
+                    `sub` still paints it. */}
+                {(['title', 'sub'] as const).filter(f => f !== 'sub' || hasSub(inspTarget)).map(f => (
                   <div className="field" key={f}>
                     <label>{f}</label>
                     <input
@@ -5311,8 +5326,8 @@ export default function App() {
                       className="key-note-x"
                       role="button"
                       tabIndex={0}
-                      aria-label="Dismiss the colour-key note"
-                      title="Dismiss the colour-key note"
+                      aria-label="Dismiss the color-key note"
+                      title="Dismiss the color-key note"
                       onClick={dismissKeyNote}
                       onKeyDown={e => {
                         if (e.key === 'Enter' || e.key === ' ') {

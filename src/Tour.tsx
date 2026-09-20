@@ -37,7 +37,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     sel: '.panel.right',
     title: 'Inspector',
-    body: 'Select a node to edit its text, icon and colour. Select an arrow to edit its label, style and flow animation.',
+    body: 'Select a node to edit its text, icon and color. Select an arrow to edit its label, style and flow animation.',
   },
   {
     sel: '.react-flow__edge',

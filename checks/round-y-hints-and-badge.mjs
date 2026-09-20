@@ -63,7 +63,7 @@ console.log(`  tsBody starts at App.tsx:${at(APP_RAW, 'const tsBody = (')} `
    is proven non-empty AND proven to contain the row the hints sat under. */
 assert('y.the-text-section-slice-is-not-empty',
   TS_BODY.length > 500
-    && TS_BODY.includes('<label>text colour</label>')
+    && TS_BODY.includes('<label>text color</label>')
     && TS_BODY.includes('<label>align</label>'),
   `${TS_BODY.length} chars, and it carries the two rows the deleted hints sat under — so the zeros `
   + 'below are measurements, not a slice that came back empty');
@@ -91,7 +91,7 @@ assert('y.both-deleted-sentences-are-absent-from-the-panel',
 
 /* The four controls are all still there, in order, and each row is a `.field`. */
 assert('y.the-five-rows-survive-in-order',
-  ['size', 'weight', 'font', 'text colour', 'align']
+  ['size', 'weight', 'font', 'text color', 'align']
     .every(l => TS_BODY.includes(`<label>${l}</label>`))
     && countOf(TS_BODY, 'className="field"') === 5,
   `5 .field rows, ${countOf(TS_BODY, 'className="field"')} labelled; the align row has NO hint `

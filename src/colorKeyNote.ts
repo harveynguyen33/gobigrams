@@ -37,15 +37,23 @@ export const KEY_NOTE_KEY = 'diagram-studio:colour-key-note';
 /** The label's text. Kept here rather than in the JSX so the panel, a test and
  *  the report all read the SAME string.
  *
- *  MEASURED, not guessed: this is 31 characters and 223.2px in the panel's own
+ *  ROUND AG2, ITEM 2 — "Color", the American spelling, in the VISIBLE TEXT only.
+ *  The app mixed `Colour` and `Color`; Harvey chose one ("Chọn 1 (Color) thôi").
+ *  The MODULE NAME and every identifier in this file keep the British spelling on
+ *  purpose, and `KEY_NOTE_KEY` below MUST: it is a persisted localStorage key, so
+ *  renaming it would make an already-dismissed note reappear for every user who
+ *  has dismissed it. Only the string a user reads changes.
+ *
+ *  MEASURED, not guessed: this is 30 characters and 216.0px in the panel's own
  *  mono face at the `.hint` rule's 12px (`scripts/measure-key-note.py`, reading
- *  the real `public/fonts/jetbrains-mono-400-latin.woff2`). The panel's content
- *  box is 256px at the desktop tier (`--right-w: 288px`, less 16px of padding a
- *  side), so after the 16px dismiss button and its 6px gap there are 234px — the
- *  string fits on ONE line with 10.8px to spare. Every longer candidate measured
- *  wraps at that width; `This editor's grouping, not ISO.` is 230.4px, which
- *  leaves 3.6px and is the next honest stop. */
-export const KEY_NOTE_TEXT = 'Colour = our grouping, not ISO.';
+ *  the real `public/fonts/jetbrains-mono-400-latin.woff2` — 7.20px per ASCII
+ *  glyph). The panel's content box is 256px at the desktop tier, less the 16px
+ *  dismiss button and its 6px gap, so there are 234px — the string fits on ONE
+ *  line with 18px to spare, four characters shorter than the British form it
+ *  replaces (`Colour = …`, 223.2px), so the rename shortens the note rather than
+ *  moving its wrap. `This editor's grouping, not ISO.` is 230.4px, which leaves
+ *  3.6px and is the next honest stop. */
+export const KEY_NOTE_TEXT = 'Color = our grouping, not ISO.';
 
 /** Tolerant parse: only the two strings this module writes are meaning, and
  *  every other value — including the empty string and a retired name — means
