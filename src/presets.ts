@@ -56,10 +56,29 @@ export type LayoutSpec = {
   cols?: number;
 };
 
+/** Difficulty depth WITHIN a template family, in Harvey's own vocabulary
+ *  (cơ bản / advance / complex). OPTIONAL on purpose: the four templates that
+ *  ship today carry no level and must stay reachable with zero edits. */
+export type TemplateLevel = 'basic' | 'advanced' | 'complex';
+
+/** Display label + one-line meaning, in ONE place, so the dialog and any future
+ *  surface cannot word the levels differently. */
+export const TEMPLATE_LEVELS: Record<TemplateLevel, {label: string; blurb: string}> = {
+  basic:    {label: 'Basic',    blurb: 'everyday flow · common shapes only'},
+  advanced: {label: 'Advanced', blurb: 'more branches · the less common symbols'},
+  complex:  {label: 'Complex',  blurb: 'full notation · every flowchart shape'},
+};
+
 export type TemplateSpec = {
   id: string;
   label: string;
   hint?: string;
+  /** The difficulty level inside this template's family. `family` is NOT a
+   *  field: the preset that owns the template IS the family, so a second
+   *  identity string could drift from `PRESETS`. */
+  level?: TemplateLevel;
+  /** Display order inside the family when levels tie (lower first). */
+  order?: number;
   nodes: Node[];
   edges: Edge[];
 };
@@ -479,6 +498,12 @@ const flowchartApprovalTemplate: TemplateSpec = {
   id: 'approval',
   label: 'Approval request',
   hint: 'two lanes · decision · Yes/No · loop-back',
+  /* §3.4 — a genuine flowchart (lanes, a decision, a loop-back), so leaving it
+     unlevelled would place a stray row AFTER the three levelled ones inside the
+     same family and read as "unclassified". METADATA ONLY: `nodes` and `edges`
+     below are byte-identical to what shipped. */
+  level: 'advanced',
+  order: 2,
   nodes: [
     lane('pool', 'Purchase approval', 'pool · who does what', 0, 0, 1000, 640),
     lane('laneReq', 'Requester', 'lane · role', 30, 70, 940, 230),
@@ -510,6 +535,194 @@ const flowchartApprovalTemplate: TemplateSpec = {
     makeEdge('a9', 'a10', FLOWCHART_EDGES, 'f11'),
     makeEdge('a10', 'a2', FLOWCHART_EDGES, 'f9', {label: 'revise'}),
     makeEdge('a7', 'a8', FLOWCHART_EDGES, 'f10'),
+  ],
+};
+
+/* ===========================================================================
+   PACKAGE-TEMPLATES §4 — THE FLOWCHART TEMPLATE FAMILY.
+
+   ONE DOMAIN (flat-pack furniture assembly, D1) at three depths. The ladder is
+   NOT "3, 8 and 16 shapes picked by feel": it is THREE CONTIGUOUS BANDS of the
+   palette above, which is already ordered by increasing difficulty —
+     basic    = palette rows 0-4   (terminator, process, decision, io, document)
+     advanced = rows 0-9           (+ subprocess, preparation, manual, delay, connector)
+     complex  = rows 0-15          (all 16 ISO 5807 ids)
+   so the difficulty claim IS how far down the curated palette a level goes, and
+   the shape assertions are one-line probes over `palette.slice(0, N)`.
+
+   D3/D4 INVARIANTS (measured, not guessed — do not "improve" on them):
+   no `group`/Lane node anywhere in these three, and no `label` node either.
+   `LAYOUTS['layered-tb']` FREEZES top-level `group` nodes at their authored
+   coordinates while re-placing every other node, and it parks an edge-less
+   annotation node (label OR note) in a trailing ORPHAN row AFTER the last
+   layer. A phase heading is an annotation, so on Auto-arrange it would be
+   flung to the bottom of the board (measured: an isolated `label` authored at
+   x 60, y 40 came out at x -140, y 2150 below a flow ending at y 1935). A
+   footnote below the flow is CORRECT, which is why the single `note` stays and
+   the headings go. Lane usage is deferred to its own future round.
+=========================================================================== */
+
+/** The single footnote node (advanced + complex). Not a flowchart shape: the
+ *  shape-set probes exclude `note`, exactly as they exclude `group`/`label`. */
+const flowNote = (id: string, text: string, x: number, y: number): Node => ({
+  id, type: 'goblin', position: {x, y}, style: {width: 400, height: 200},
+  data: {shape: 'note', kicker: 'note', title: text, sub: '', metric: '', metricUnit: '', icon: 'sticky-note', colorKey: 'slate'},
+});
+
+/* LEVEL 1 — BASIC. 10 flow nodes, 11 edges, 5 shapes, one genuine back-edge
+   (b9 → b7: "tighten and recheck"). Colour keys stay inside the flowchart
+   preset's OWN legend — no new key, no new token. */
+const flowchartBasicTemplate: TemplateSpec = {
+  id: 'flow-basic',
+  label: 'Flat-pack assembly',
+  hint: 'basic · 5 common shapes · one tighten-and-recheck loop',
+  level: 'basic',
+  order: 1,
+  nodes: [
+    flowNode('b1', 'terminator', 'Start — open the flat box', 'green', 380, 60, FLOWCHART_NODE_SIZE),
+    flowNode('b2', 'io', 'Count the parts against the checklist', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
+    flowNode('b3', 'process', 'Lay out the panels and the fittings', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
+    flowNode('b4', 'decision', 'All parts present?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
+    flowNode('b5', 'process', 'Keep the spare fittings in the box', 'cyan', 0, 920, FLOWCHART_NODE_SIZE),
+    flowNode('b6', 'process', 'Fit the dowels and the cam locks', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
+    flowNode('b7', 'document', 'Follow the printed step sheet', 'violet', 380, 1135, FLOWCHART_NODE_SIZE),
+    flowNode('b8', 'decision', 'Frame square and steady?', 'amber', 380, 1350, FLOWCHART_NODE_SIZE),
+    flowNode('b9', 'process', 'Tighten every cam a quarter turn', 'cyan', 0, 1565, FLOWCHART_NODE_SIZE),
+    flowNode('b10', 'terminator', 'End — unit assembled', 'green', 380, 1565, FLOWCHART_NODE_SIZE),
+  ],
+  edges: [
+    makeEdge('b1', 'b2', FLOWCHART_EDGES, 'fb1'),
+    makeEdge('b2', 'b3', FLOWCHART_EDGES, 'fb2'),
+    makeEdge('b3', 'b4', FLOWCHART_EDGES, 'fb3'),
+    makeEdge('b4', 'b6', FLOWCHART_EDGES, 'fb4', {label: 'Yes'}),
+    makeEdge('b4', 'b5', FLOWCHART_EDGES, 'fb5', {label: 'No'}),
+    makeEdge('b5', 'b6', FLOWCHART_EDGES, 'fb6'),
+    makeEdge('b6', 'b7', FLOWCHART_EDGES, 'fb7'),
+    makeEdge('b7', 'b8', FLOWCHART_EDGES, 'fb8'),
+    makeEdge('b8', 'b10', FLOWCHART_EDGES, 'fb9', {label: 'Yes'}),
+    // the genuine back-edge: b8 → b9 → b7 re-enters b7, which is UPSTREAM of
+    // b9, so the engine must remove it from the DAG and never collapse the
+    // loop onto layer 0 (the bug `approval` was kept for).
+    makeEdge('b8', 'b9', FLOWCHART_EDGES, 'fb10', {label: 'No — not square'}),
+    makeEdge('b9', 'b7', FLOWCHART_EDGES, 'fb11', {label: 'tighten and recheck'}),
+  ],
+};
+
+/* LEVEL 2 — ADVANCED. 14 flow nodes + 1 note = 15 nodes, 15 edges, 10 shapes.
+   The connector is a PAIR (c11/c12, "A") so the redo step is an on-page jump
+   rather than a long edge — a second layout-regression case beside `approval`. */
+const flowchartAdvancedTemplate: TemplateSpec = {
+  id: 'flow-advanced',
+  label: 'Flat-pack assembly + glue',
+  hint: 'advanced · adds subprocess, preparation, manual, delay, connector · no lanes',
+  level: 'advanced',
+  order: 1,
+  nodes: [
+    flowNode('c1', 'terminator', 'Start — open the flat box', 'green', 380, 60, FLOWCHART_NODE_SIZE),
+    flowNode('c2', 'io', 'Compare the box contents with the parts checklist', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
+    flowNode('c3', 'preparation', 'Lay out the panels, the fittings and the allen key', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
+    flowNode('c4', 'decision', 'Needs a second pair of hands?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
+    flowNode('c5', 'manual', 'Ask a second person to hold the side panel', 'green', 0, 920, FLOWCHART_NODE_SIZE),
+    flowNode('c6', 'subprocess', 'Build the drawer box (set out on its own sheet)', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
+    flowNode('c7', 'delay', 'Wait 30 minutes for the wood glue to set', 'amber', 380, 1135, FLOWCHART_NODE_SIZE),
+    flowNode('c8', 'process', 'Fit the shelf and tighten the cam locks', 'cyan', 380, 1350, FLOWCHART_NODE_SIZE),
+    flowNode('c9', 'document', 'Check the frame against the printed drawing', 'violet', 380, 1565, FLOWCHART_NODE_SIZE),
+    flowNode('c10', 'decision', 'Frame square and level?', 'amber', 380, 1780, FLOWCHART_NODE_SIZE),
+    flowNode('c11', 'connector', 'A', 'slate', 760, 1780, FLOWCHART_NODE_SIZE),
+    flowNode('c12', 'connector', 'A', 'slate', 760, 1995, FLOWCHART_NODE_SIZE),
+    flowNode('c13', 'process', 'Wipe the unit down and move it into place', 'cyan', 380, 1995, FLOWCHART_NODE_SIZE),
+    flowNode('c14', 'terminator', 'End — unit assembled', 'green', 380, 2210, FLOWCHART_NODE_SIZE),
+    flowNote('cNote', 'The drawer box is a sub-assembly: build it on its own sheet before the shelf goes in.', 760, 60),
+  ],
+  edges: [
+    makeEdge('c1', 'c2', FLOWCHART_EDGES, 'fa1'),
+    makeEdge('c2', 'c3', FLOWCHART_EDGES, 'fa2'),
+    makeEdge('c3', 'c4', FLOWCHART_EDGES, 'fa3'),
+    makeEdge('c4', 'c5', FLOWCHART_EDGES, 'fa4', {label: 'Yes'}),
+    makeEdge('c4', 'c6', FLOWCHART_EDGES, 'fa5', {label: 'No'}),
+    makeEdge('c5', 'c6', FLOWCHART_EDGES, 'fa6'),
+    makeEdge('c6', 'c7', FLOWCHART_EDGES, 'fa7'),
+    makeEdge('c7', 'c8', FLOWCHART_EDGES, 'fa8'),
+    makeEdge('c8', 'c9', FLOWCHART_EDGES, 'fa9'),
+    makeEdge('c9', 'c10', FLOWCHART_EDGES, 'fa10'),
+    makeEdge('c10', 'c13', FLOWCHART_EDGES, 'fa11', {label: 'Yes'}),
+    // the connector pair: c12 → c8 re-enters c8 (several layers upstream of
+    // c11), so this is a genuine back-edge through an on-page jump.
+    makeEdge('c10', 'c11', FLOWCHART_EDGES, 'fa12', {label: 'No — not square'}),
+    makeEdge('c11', 'c12', FLOWCHART_EDGES, 'fa13'),
+    makeEdge('c12', 'c8', FLOWCHART_EDGES, 'fa14', {label: 'wrong hole — back to the fittings'}),
+    makeEdge('c13', 'c14', FLOWCHART_EDGES, 'fa15'),
+  ],
+};
+
+/* LEVEL 3 — COMPLEX. 24 flow nodes + 1 note = 25 nodes, 27 edges, ALL 16
+   flowchart shape ids, three genuine back-edges (d13→d12, d18→d11 through the
+   connector pair, d23→d22) plus the d20→d21 page hand-off. Every symbol has an
+   honest job in the process — no node exists only to carry a shape. */
+const flowchartComplexTemplate: TemplateSpec = {
+  id: 'flow-complex',
+  label: 'Flat-pack assembly — full notation',
+  hint: 'complex · all 16 flowchart shapes · two pages',
+  level: 'complex',
+  order: 1,
+  nodes: [
+    flowNode('d1', 'terminator', 'Start — flat box on the floor', 'green', 380, 70, FLOWCHART_NODE_SIZE),
+    flowNode('d2', 'io', 'Compare the box contents with the parts checklist', 'violet', 380, 285, FLOWCHART_NODE_SIZE),
+    flowNode('d3', 'document', 'Read the printed instruction sheet', 'violet', 380, 500, FLOWCHART_NODE_SIZE),
+    flowNode('d4', 'manualinput', 'Write the unit number on the box label by hand', 'green', 380, 715, FLOWCHART_NODE_SIZE),
+    flowNode('d5', 'preparation', 'Lay out the panels, the fittings and the allen key', 'cyan', 380, 930, FLOWCHART_NODE_SIZE),
+    flowNode('d6', 'decision', 'Needs a second pair of hands?', 'amber', 380, 1145, FLOWCHART_NODE_SIZE),
+    flowNode('d7', 'manual', 'Ask a second person to hold the side panel', 'green', 0, 1360, FLOWCHART_NODE_SIZE),
+    flowNode('d8', 'subprocess', 'Build the drawer box (set out on its own sheet)', 'cyan', 760, 1360, FLOWCHART_NODE_SIZE),
+    flowNode('d9', 'display', 'Step diagram — the page you keep re-reading', 'violet', 380, 1575, FLOWCHART_NODE_SIZE),
+    flowNode('d10', 'internalstorage', 'Loose fittings held in the box during the job', 'violet', 380, 1790, FLOWCHART_NODE_SIZE),
+    flowNode('d11', 'looplimit', 'Loop: for each of the 8 cam locks', 'amber', 380, 2005, FLOWCHART_NODE_SIZE),
+    flowNode('d12', 'process', 'Push the next cam lock home', 'cyan', 380, 2220, FLOWCHART_NODE_SIZE),
+    flowNode('d13', 'decision', 'Cam locks left to fit?', 'amber', 380, 2435, FLOWCHART_NODE_SIZE),
+    flowNode('d14', 'delay', 'Wait 30 minutes for the wood glue to set', 'amber', 380, 2650, FLOWCHART_NODE_SIZE),
+    flowNode('d15', 'process', 'Fit the shelf and the drawer box', 'cyan', 380, 2865, FLOWCHART_NODE_SIZE),
+    flowNode('d16', 'decision', 'Frame square and level?', 'amber', 380, 3080, FLOWCHART_NODE_SIZE),
+    flowNode('d17', 'connector', 'A', 'slate', 760, 3080, FLOWCHART_NODE_SIZE),
+    flowNode('d18', 'connector', 'A', 'slate', 1140, 3080, FLOWCHART_NODE_SIZE),
+    flowNode('d19', 'storeddata', 'Leftover screws — kept in the box', 'violet', 380, 3295, FLOWCHART_NODE_SIZE),
+    flowNode('d20', 'offpage', 'To page 2 — fix the unit to the wall', 'slate', 380, 3510, FLOWCHART_NODE_SIZE),
+    flowNode('d21', 'offpage', 'From page 1 — unit assembled', 'slate', 380, 3725, FLOWCHART_NODE_SIZE),
+    flowNode('d22', 'process', 'Lift the unit into place', 'cyan', 380, 3940, FLOWCHART_NODE_SIZE),
+    flowNode('d23', 'decision', 'Sits flush against the wall?', 'amber', 380, 4155, FLOWCHART_NODE_SIZE),
+    flowNode('d24', 'terminator', 'End — unit assembled and in place', 'green', 380, 4370, FLOWCHART_NODE_SIZE),
+    flowNote('dNote', 'Two pages: page 1 assembles the frame, page 2 fixes the unit to the wall. The off-page connectors mark the page break.', 760, 70),
+  ],
+  edges: [
+    makeEdge('d1', 'd2', FLOWCHART_EDGES, 'fx1'),
+    makeEdge('d2', 'd3', FLOWCHART_EDGES, 'fx2'),
+    makeEdge('d3', 'd4', FLOWCHART_EDGES, 'fx3'),
+    makeEdge('d4', 'd5', FLOWCHART_EDGES, 'fx4'),
+    makeEdge('d5', 'd6', FLOWCHART_EDGES, 'fx5'),
+    makeEdge('d6', 'd7', FLOWCHART_EDGES, 'fx6', {label: 'Yes'}),
+    makeEdge('d6', 'd8', FLOWCHART_EDGES, 'fx7', {label: 'No'}),
+    makeEdge('d7', 'd9', FLOWCHART_EDGES, 'fx8'),
+    makeEdge('d8', 'd9', FLOWCHART_EDGES, 'fx9'),
+    makeEdge('d9', 'd10', FLOWCHART_EDGES, 'fx10'),
+    makeEdge('d10', 'd11', FLOWCHART_EDGES, 'fx11'),
+    makeEdge('d11', 'd12', FLOWCHART_EDGES, 'fx12'),
+    makeEdge('d12', 'd13', FLOWCHART_EDGES, 'fx13'),
+    // back-edge 1 — the cam-lock loop runs into its OWN loop-limit marker
+    makeEdge('d13', 'd12', FLOWCHART_EDGES, 'fx14', {label: 'Yes — next lock'}),
+    makeEdge('d13', 'd14', FLOWCHART_EDGES, 'fx15', {label: 'No — all fitted'}),
+    makeEdge('d14', 'd15', FLOWCHART_EDGES, 'fx16'),
+    makeEdge('d15', 'd16', FLOWCHART_EDGES, 'fx17'),
+    makeEdge('d16', 'd17', FLOWCHART_EDGES, 'fx18', {label: 'No — not square'}),
+    makeEdge('d17', 'd18', FLOWCHART_EDGES, 'fx19'),
+    // back-edge 2 — through the connector pair, back to the fittings
+    makeEdge('d18', 'd11', FLOWCHART_EDGES, 'fx20', {label: 'wrong hole — back to the fittings'}),
+    makeEdge('d16', 'd19', FLOWCHART_EDGES, 'fx21', {label: 'Yes'}),
+    makeEdge('d19', 'd20', FLOWCHART_EDGES, 'fx22'),
+    makeEdge('d20', 'd21', FLOWCHART_EDGES, 'fx23', {label: 'page 2'}),
+    makeEdge('d21', 'd22', FLOWCHART_EDGES, 'fx24'),
+    makeEdge('d22', 'd23', FLOWCHART_EDGES, 'fx25'),
+    makeEdge('d23', 'd24', FLOWCHART_EDGES, 'fx26', {label: 'Yes'}),
+    // back-edge 3 — "not flush" sends the unit back to be lifted again
+    makeEdge('d23', 'd22', FLOWCHART_EDGES, 'fx27', {label: 'No — not flush'}),
   ],
 };
 
@@ -724,7 +937,9 @@ export const FLOWCHART_PRESET: DiagramPreset = {
   },
   // a flowchart legitimately loops back, so cycle prevention stays off here
   caps: {subflow: true, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
-  templates: [flowchartApprovalTemplate],
+  // PACKAGE-TEMPLATES — order follows the catalog's own render order inside the
+  // family (basic → advanced group, whose members sort by `order ?? 0` then id).
+  templates: [flowchartBasicTemplate, flowchartAdvancedTemplate, flowchartApprovalTemplate, flowchartComplexTemplate],
   note: 'Handles are vertical (top-in / bottom-out) and cycles are allowed — a flowchart legitimately loops back.',
   legend: [
     {colorKey: 'green', label: 'Terminal (start / end)'},

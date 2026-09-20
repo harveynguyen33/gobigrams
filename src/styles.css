@@ -2149,6 +2149,20 @@ kbd {
   display: flex; flex-direction: column; gap: 4px;
   max-height: 210px; overflow-y: auto;
 }
+/* PACKAGE-TEMPLATES §2.5 Pass 1 — the group header between rows.
+   NOT a row: no border, no background, no tab stop. It is the same uppercase
+   monospace caption `.bd-label` uses, so the visual ladder is
+   `start from` → group → row, with no new colour and no new widget. It is
+   `position: sticky` because `.bd-list` scrolls: a header that scrolls away
+   stops labelling anything, and the stickiness costs nothing. */
+.bd-hd {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface);
+  margin: 6px 0 1px; padding: 4px 2px 3px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim);
+}
+.bd-hd:first-child { margin-top: 0; }
 .bd-opt {
   display: flex; align-items: center; gap: 9px; width: 100%;
   background: transparent; color: var(--fg);
