@@ -1,10 +1,33 @@
 # HANDOFF — Diagram Studio
 
 **Last session:** 2026-09-20 (afternoon) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-AD + AE + AF + AG1 + AG2 + AH + **AI** shipped. All orchestrator-verified live.
+AD + AE + AF + AG1 + AG2 + AH + AI + **AJ** shipped. All orchestrator-verified live.
 **Vault: ROUNDS S…AH are recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
 `pkm verify.sh` 43 passed / 0 failed).
+**ALL 25 HARNESSES GREEN as of ROUND AJ — there is no known-stale harness any more.**
 **Next: PACKAGE-N** (the palette redesign) — its spec is already written.
+
+## ROUND AJ — the two known debts, cleaned
+
+**ITEM 1 — `package-q-reconnect-endpoints.mjs` is no longer stale.** It had reported 15/16 failures
+because 11 of its assertions required the endpoint DISC to be painted — the disc Harvey asked ROUND T to
+remove. It was left as the record at the time ("do not fix a harness to hide a real change"), and Harvey
+then asked for the debt to be cleaned. **The file was INVERTED, not deleted** (a check that silently
+disappears is worse than one that changes verdict with a recorded reason — the same rule AG2/AH
+followed). Its live-board coupling was removed rather than freezing Harvey's current board into it: a
+harness that fails whenever the user edits his board is not a harness. Now `ALL GREEN`.
+
+**ITEM 2 — the ERD table's connection handles were CLIPPED.** Measured before: `.tnode` carried
+`overflow: hidden`, the six handles are its children, the left handle protruded 4px and was cut, so a
+table handle painted **7×7px against every other node's 11×11px**. Fixed by moving the radius clip to
+where it is actually needed (the header, which now carries its own `8px 8px 0 0`) instead of clipping
+the whole node box. **Verified live: the table handle now measures 11.1×11.1px — identical to a goblin
+node — protruding 5.5px with nothing clipped, and the table's silhouette, radius (9px), header bar and
+columns are unchanged.**
+
+**Worth keeping:** the coder's own negative control caught a parser bug in its NEW harness (nested rules
+lost their selector), which had made three inverted assertions vacuous — they passed on the pre-fix tree.
+Fixed and re-proved. That is exactly why an inverted assertion must be shown RED before the fix.
 
 ## ROUND AI — vAlign finally paints, and the body control is flowchart-free
 
@@ -541,10 +564,11 @@ reload, and confirm the fold is remembered**; the chevrons show `Cmd+Ctrl+Shift+
 toggle left / right / both. Also: **two onboarding layers swallow clicks** — `.tour-overlay` and the
 `Getting started` checklist (`.gsc`). If a click does nothing on a fresh profile, it is one of those, not a bug.
 
-**Known debt, unchanged:** ~~`checks/package-q-reconnect-endpoints.mjs` reports **15** failures — 11 assert the
-endpoint disc the user asked to delete in ROUND T, 2 are its old fixture failures, and 2 more are its
-board-fixture assertions against the user's LIVE board (which he has been editing: it is now 9 nodes / 4 edges,
-not the 3/2 the harness hard-codes). It is left as the record; **do not "fix" a harness to hide a real change."~~
+**Known debt: NONE as of ROUND AJ.** `checks/package-q-reconnect-endpoints.mjs` used to report 15/16
+failures (11 asserting the endpoint disc ROUND T deliberately removed, 2 old fixture failures, 2 against
+the user's LIVE board). ROUND AJ **inverted** those assertions instead of deleting the file and removed the
+live-board coupling, so it is now `ALL GREEN`. **All 25 harnesses are green — there is no known-stale
+harness any more.**
 > **CLEARED IN ROUND AJ (2026-09-20).** The file was INVERTED, not deleted: it now asserts ROUND T's real
 > behaviour and every rewritten assertion prints the OLD claim beside the NEW one. It no longer reads `boards/`
 > at all — the geometry fixture is derived from `src/presets.ts` / `src/DiagramNode.tsx` constants, so Harvey
