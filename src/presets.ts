@@ -653,7 +653,7 @@ const flowchartAdvancedTemplate: TemplateSpec = {
     // c11), so this is a genuine back-edge through an on-page jump.
     makeEdge('c10', 'c11', FLOWCHART_EDGES, 'fa12', {label: 'No — mismatch'}),
     makeEdge('c11', 'c12', FLOWCHART_EDGES, 'fa13'),
-    makeEdge('c12', 'c8', FLOWCHART_EDGES, 'fa14', {label: 'repack — back to the sealing step'}),
+    makeEdge('c12', 'c8', FLOWCHART_EDGES, 'fa14', {label: 'repack'}),
     makeEdge('c13', 'c14', FLOWCHART_EDGES, 'fa15'),
   ],
 };
@@ -717,7 +717,7 @@ const flowchartComplexTemplate: TemplateSpec = {
     makeEdge('d16', 'd17', FLOWCHART_EDGES, 'fx18', {label: 'No — mismatch'}),
     makeEdge('d17', 'd18', FLOWCHART_EDGES, 'fx19'),
     // back-edge 2 — through the connector pair, back to the packing loop
-    makeEdge('d18', 'd11', FLOWCHART_EDGES, 'fx20', {label: 'wrong item — back to the packing loop'}),
+    makeEdge('d18', 'd11', FLOWCHART_EDGES, 'fx20', {label: 'wrong item'}),
     makeEdge('d16', 'd19', FLOWCHART_EDGES, 'fx21', {label: 'Yes'}),
     makeEdge('d19', 'd20', FLOWCHART_EDGES, 'fx22'),
     makeEdge('d20', 'd21', FLOWCHART_EDGES, 'fx23', {label: 'page 2'}),

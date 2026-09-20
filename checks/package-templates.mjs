@@ -534,6 +534,32 @@ assert('21.every-node-text-obeys-its-symbols-grammar',
       ? `all ${grammarRows.reduce((n, r) => n + r.flow, 0)} flow nodes across the three templates obey §4.0: every decision ends in "?", no ACTION ends in "?", and no DATA/MARKER text opens with one of the ${IMPERATIVES.length} measured action verbs (${IMPERATIVES.join(', ')})`
       : `${grammarRows.reduce((n, r) => n + r.bad.length, 0)} offender(s) printed above as {template, id, shape, text}`);
 
+/* ---------- AC 22 — every edge label fits the preset's own maxLabelChars ---- */
+console.log('\n' + '='.repeat(78));
+console.log('AC 22 — every edge label respects FLOWCHART_PRESET.guidance.maxLabelChars');
+console.log('='.repeat(78));
+/* The limit is READ from the preset, never typed here: if the preset's guidance
+   changes, this assertion follows it. Harvey's call (2026-09-20) shortened two
+   labels the round-1 coder had correctly flagged rather than silently trimming:
+   'repack' (was 33 chars) and 'wrong item' (was 37). */
+const MAXLABEL = FLOWCHART_PRESET.guidance?.maxLabelChars ?? Infinity;
+const labelRows = [basic, advanced, complex].filter(Boolean).map(t => ({
+  template: t.id,
+  bad: (t.edges ?? []).filter(e => e.label && String(e.label).length > MAXLABEL)
+    .map(e => ({id: e.id, label: e.label, len: String(e.label).length})),
+  longest: (t.edges ?? []).filter(e => e.label)
+    .reduce((m, e) => Math.max(m, String(e.label).length), 0),
+}));
+for (const r of labelRows) {
+  console.log(`  ${r.template.padEnd(14)} longest labelled edge = ${r.longest} chars (limit ${MAXLABEL})`);
+  for (const b of r.bad) console.log(`      OVER  {template: ${r.template}, edge: ${b.id}, label: ${JSON.stringify(b.label)}, length: ${b.len}}`);
+}
+assert('22.every-edge-label-within-the-presets-own-limit',
+  labelRows.length === 3 && labelRows.every(r => r.bad.length === 0),
+  labelRows.length === 3 && labelRows.every(r => r.bad.length === 0)
+    ? `all labelled edges across the three templates are <= ${MAXLABEL} chars (longest: ${Math.max(...labelRows.map(r => r.longest))}) — the limit is read from the preset's own guidance`
+    : `${labelRows.reduce((n, r) => n + r.bad.length, 0)} label(s) exceed the preset's maxLabelChars (${MAXLABEL}); offenders printed above`);
+
 /* ===========================================================================
    PRE-FIX REPLAY — each new assertion red before the change
    ===========================================================================
@@ -662,6 +688,24 @@ assert('pre5.REPLAY-AC21s-reach-is-the-imperative-opener-subset-and-that-is-reco
   d6SymbolChoice.map(r => `${r.shape} (${r.why})`).join('; ') +
   `. §4.0 states this boundary itself — "the five violations above were not wording problems, they were five symbols sitting on the wrong step". ` +
   `AC 21 is therefore a wording probe over the 16 symbols, not a full audit of §4.0's table.`);
+
+/* pre6 — AC 22's predicate is not vacuous: the two labels the round-1 coder
+   flagged ARE over the preset's own limit, and Harvey's shortened forms are
+   under it. The pairs are the real strings, not paraphrases. */
+const LABEL_OVER = ['repack — back to the sealing step', 'wrong item — back to the packing loop'];
+const LABEL_FIXED = ['repack', 'wrong item'];
+const labelReplay = LABEL_OVER.map((held, i) => ({
+  held, fixed: LABEL_FIXED[i],
+  heldLen: held.length, fixedLen: LABEL_FIXED[i].length,
+}));
+for (const r of labelReplay) {
+  console.log(`  ${String(r.heldLen).padStart(2)} chars → ${r.heldLen > MAXLABEL ? 'RED' : 'green'}  |  ${String(r.fixedLen).padStart(2)} chars → ${r.fixedLen > MAXLABEL ? 'RED' : 'green'}  ${JSON.stringify(r.fixed)}`);
+}
+assert('pre6.REPLAY-AC22-is-RED-on-both-flagged-labels-and-green-on-the-fix',
+  labelReplay.every(r => r.heldLen > MAXLABEL) && labelReplay.every(r => r.fixedLen <= MAXLABEL),
+  labelReplay.every(r => r.heldLen > MAXLABEL)
+    ? `both flagged labels are over the preset's own limit (${labelReplay.map(r => r.heldLen).join(', ')} > ${MAXLABEL}) and both shortened forms are under it (${labelReplay.map(r => r.fixedLen).join(', ')} <= ${MAXLABEL}) — the assertion has a live target`
+    : 'the flagged labels are NOT over the preset limit, so AC 22 would have been green on the tree that carried them — it would catch nothing');
 
 /* ---------- the untouched-invariants gate --------------------------------- */
 console.log('\n' + '='.repeat(78));

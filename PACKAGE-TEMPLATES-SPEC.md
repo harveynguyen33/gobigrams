@@ -583,7 +583,7 @@ Edges (15):
 | 11 | `c10 → c13` | `Yes` |
 | 12 | `c10 → c11` | `No — mismatch` |
 | 13 | `c11 → c12` | — |
-| 14 | `c12 → c8` | `repack — back to the sealing step` |
+| 14 | `c12 → c8` | `repack` |
 | 15 | `c13 → c14` | — |
 
 **Target counts:** 14 flow nodes + 1 note = **15 nodes / 15 edges**, **10 distinct flow
@@ -640,7 +640,7 @@ first reading suggests: `d14` is a `delay` — a WAIT — so its text is a MARKE
 | `looplimit` | `d11` "For each of 8 items" | MARKER | the loop's own start marker, with a back-edge running into it |
 | `process` | `d12` "Pack the next cart item", `d15` "Seal and label the parcel", `d22` "Load the parcel on the van" | ACTION | the three real actions |
 | `delay` | `d14` "Wait for the courier pickup" | MARKER | a real wait — the parcel cannot move until the courier arrives |
-| `connector` | `d17`/`d18` (pair "A") | MARKER | an on-page jump: "wrong item — back to the packing loop" returns to `d11`, several layers up |
+| `connector` | `d17`/`d18` (pair "A") | MARKER | an on-page jump: `wrong item` returns to `d11`, several layers up |
 | `storeddata` | `d19` "Order history log" | DATA | a store read and written AND persisting between sessions: every delivered order is recorded |
 | `offpage` | `d20` "To page 2: deliver the parcel", `d21` "From page 1: order packed" | MARKER | the order genuinely has two legs; the pair marks the page break between packing and delivery |
 
@@ -697,7 +697,7 @@ Edges (27):
 | 17 | `d15 → d16` | — |
 | 18 | `d16 → d17` | `No — mismatch` |
 | 19 | `d17 → d18` | — |
-| 20 | `d18 → d11` | `wrong item — back to the packing loop` |
+| 20 | `d18 → d11` | `wrong item` |
 | 21 | `d16 → d19` | `Yes` |
 | 22 | `d19 → d20` | — |
 | 23 | `d20 → d21` | `page 2` |
@@ -896,7 +896,19 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
     demo-board invariant was superseded). *Probe:* the new harness never references the `boards/` path.
 20. **Docs/state honesty:** the harness prints, for each of the three templates, `nodes`, `edges`, distinct
     shape count and the level — so a future reader sees the measured numbers rather than a claim.
-21. **D6 — every node's text satisfies the grammar of its symbol.** For each node of all three templates, the
+21. **Every edge label respects the preset's own `guidance.maxLabelChars` (30).** Measured against
+    `FLOWCHART_PRESET.guidance.maxLabelChars` — not a number typed here. When this was first written, TWO
+    labels exceeded it (`repack — back to the sealing step` at 33 chars, `wrong item — back to the packing
+    loop` at 37) and the round-1 coder correctly flagged them rather than silently shortening a spec-verbatim
+    string; Harvey's call was to shorten both to `repack` / `wrong item`. The edge's label is not its only
+    documentation: the back-edge's meaning is carried by the flow it returns to, and the node texts already
+    say what is being redone, so a 33/37-char sentence on the edge is repetition the app would have to
+    ellipsise. *Probe:* `checks/package-templates.mjs` — for each of the three templates, assert
+    `[...edges].filter(e => e.label).every(e => e.label.length <= FLOWCHART_PRESET.guidance.maxLabelChars)`,
+    printing any offending `{template, edge id, label, length}`.
+    (AC numbering note: the D6 grammar criterion is AC 22.)
+
+22. **D6 — every node's text satisfies the grammar of its symbol.** For each node of all three templates, the
     probe asserts the shape→kind mapping of §4.0 holds:
     * **Process / Preparation / Manual / Subprocess** (`process`, `preparation`, `manual`, `subprocess`) →
       **imperative**: the text does not end with `?` and its first word is not a determiner/noun-phrase
