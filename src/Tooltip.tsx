@@ -15,6 +15,66 @@ type TooltipProps = {
 
 type Side = NonNullable<TooltipProps['side']>;
 
+/* ===========================================================================
+   ROUND 4, ITEM 3 (2026-09-20) — INPUT MODALITY, and why a programmatic focus
+   must not open a tooltip.
+
+   Harvey, verbatim: "khi tôi create template, hay tôi remove a board, nó đều tự
+   nhiên show tooltip như hình. Cần phải click somewhere để nó ẩn."
+
+   MEASURED CAUSE (orchestrator, reproduced live): after a create or a delete the
+   app restores focus to the Boards menu button with `.focus()`. The pointer is
+   nowhere near that button, so nothing is hovering it; the trigger's `onFocus`
+   fired, the tooltip opened, and NO `mouseleave` could ever arrive to close it —
+   it stayed until the user clicked elsewhere. A bare `.focus()` on a clean state
+   reproduced it.
+
+   THE JUDGEMENT. A tooltip answers "what is this control?" asked by the person
+   pointing at it. Focus moving PROGRAMMATICALLY is not a question, so it must not
+   be answered. The fix therefore tracks the last input modality document-wide —
+   `keydown` means the caret moves because a person is at the keyboard, a pointer
+   event means the caret moves because a person is at the mouse — and `onFocus`
+   opens the popover ONLY in keyboard mode. Tab-to-the-button still gets its
+   tooltip (accessibility preserved); a programmatic `.focus()` after a click does
+   not. Hover and mouse-leave are untouched: hovering still shows, leaving still
+   hides, Escape still hides.
+
+   WHY THE CLASS AND NOT THE INSTANCE. The narrower fix (hide on every board /
+   dialog action close) would silence the two reported flows and leave every OTHER
+   programmatic-focus call in the app — the gallery's own restore, the dialog's
+   `returnFocusTo`, the focus trap's wrap-around — with the same noise. The
+   modality tracker lives HERE, so all ~20 call sites benefit and no call site had
+   to change. `App.tsx` gained no state.
+
+   The default is `pointer`: on a fresh document nothing has been typed yet, so a
+   focus that arrives before any input is not evidence of a keyboard user. (One
+   known nuance, recorded rather than special-cased: an Escape press counts as
+   `keydown`, so a programmatic focus landing immediately after an Escape is
+   treated as keyboard-driven and may show one tooltip. The next pointer move
+   clears it, and the reported flows never take that path.)
+   =========================================================================== */
+type Modality = 'keyboard' | 'pointer';
+let lastModality: Modality = 'pointer';
+
+/** Record that the last input was the keyboard. Exported for the probe. */
+export function markKeyboard() { lastModality = 'keyboard'; }
+/** Record that the last input was a pointer. Exported for the probe. */
+export function markPointer() { lastModality = 'pointer'; }
+/** THE DECISION a focus event asks for: show only when the keyboard caused it. */
+export function showsOnFocus(): boolean { return lastModality === 'keyboard'; }
+
+/* ONE document-wide pair of listeners, NOT one per Tooltip instance. Capture
+   phase so a handler that stops propagation cannot hide the input from us. */
+if (typeof window !== 'undefined') {
+  const onKey = () => markKeyboard();
+  const onPointer = () => markPointer();
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('mousedown', onPointer, true);
+  window.addEventListener('pointerdown', onPointer, true);
+  window.addEventListener('mousemove', onPointer, true);
+  window.addEventListener('touchstart', onPointer, true);
+}
+
 /** Compute the fixed-page position for the popover given trigger rect + side.
  * I3: after placing on the preferred side, measure the popover and clamp it
  * into the viewport, flipping to the opposite side when the preferred side
@@ -59,10 +119,11 @@ function place(r: DOMRect, side: Side, size: {w: number; h: number}) {
 }
 
 /**
- * Custom tooltip wrapper: small dark popover on hover AND keyboard focus,
- * after a short delay, positioned with position:fixed so it is never clipped
- * by overflow:hidden containers (the toolbar, panels). Dismisses on mouse
- * leave, blur and Escape. No animation, so prefers-reduced-motion is respected.
+ * Custom tooltip wrapper: small dark popover on hover, and on focus only when
+ * the keyboard caused that focus (ROUND 4, above), after a short delay,
+ * positioned with position:fixed so it is never clipped by overflow:hidden
+ * containers (the toolbar, panels). Dismisses on mouse leave, blur and Escape.
+ * No animation, so prefers-reduced-motion is respected.
  */
 export default function Tooltip({label, side = 'bottom', delay = 350, children}: TooltipProps) {
   const [pos, setPos] = useState<{top: number; left: number; transform: string} | null>(null);
@@ -116,7 +177,11 @@ export default function Tooltip({label, side = 'bottom', delay = 350, children}:
       (child.props as any).onMouseLeave?.(e);
     },
     onFocus: (e: React.FocusEvent) => {
-      show();
+      /* ROUND 4, ITEM 3 — the guard. A focus the KEYBOARD caused is a person
+         asking what the control is; a focus that arrived from `.focus()` is
+         usually the app tidying up after a dialog, and answering it leaves a
+         tooltip with no `mouseleave` coming to close it. */
+      if (showsOnFocus()) show();
       (child.props as any).onFocus?.(e);
     },
     onBlur: (e: React.FocusEvent) => {

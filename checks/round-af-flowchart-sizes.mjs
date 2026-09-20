@@ -56,7 +56,7 @@ console.log('='.repeat(78));
 
 const ENTRY = join(ROOT, '.af-entry.ts');
 const OUT = join(ROOT, '.af-out.mjs');
-writeFileSync(ENTRY, `export {LIBRARY, FLOWCHART_PRESET, flowchartApprovalTemplate} from './src/presets';\n`);
+writeFileSync(ENTRY, `export {LIBRARY, FLOWCHART_PRESET} from './src/presets';\n`);
 writeFileSync(OUT, execFileSync(join(ROOT, 'node_modules/.bin/esbuild'),
   [ENTRY, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
     '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],
@@ -217,48 +217,60 @@ assert('af3.every-flowchart-item-resolves-to-the-one-size-at-the-INSERT-path',
   `${SIZED[0].size.width}x${SIZED[0].size.height}. The palette data alone would not prove this — a null here is the sliver bug.`);
 
 /* ===========================================================================
-   3 — THE TEMPLATE SEED AGREES WITH THE PALETTE.
-   A chart seeded from the Approval template is the same shape a user drags out
+   3 — THE TEMPLATE SEEDS AGREE WITH THE PALETTE.
+   A chart seeded from any flowchart template is the same shape a user drags out
    of the panel, so the two defaults must be one number.
+
+   RE-ANCHORED (ROUND 4, ITEM 4) — NOT WEAKENED, and the reason is recorded. This
+   probe used to read ONE template block, `flowchartApprovalTemplate`, which
+   ROUND 4 deleted (Harvey: "à ngoài ra xoá flowchart template Approve nhé"). Its
+   predicates were then true over an EMPTY list — "all 0 flowchart seeds route
+   through the constant" is the vacuous pass the whole file exists to avoid. The
+   claim is unchanged; the SOURCE is now every `flowchart*Template` block the
+   family ships, so the sweep covers all three templates and the liveness floor
+   is the family's real seed count (measured: 48).
 =========================================================================== */
 console.log('\n' + '='.repeat(78));
 console.log('AF-4 — seed-from-template == drag-from-panel');
 console.log('='.repeat(78));
 
-const APPROVAL = (PRESETS.match(/const flowchartApprovalTemplate: TemplateSpec = \{[\s\S]*?\n\};/) ?? [''])[0];
-const SEED_NODES = [...APPROVAL.matchAll(/flowNode\('([^']+)',\s*'([^']+)'[^\n]*/g)]
-  .map(m => ({id: m[1], line: m[0].replace(/\s+/g, ' ')}));
-console.log(`  flowNode seeds in the Approval template: ${SEED_NODES.length}`);
+const TEMPLATE_BLOCKS = [...PRESETS.matchAll(/const flowchart\w*Template: TemplateSpec = \{[\s\S]*?\n\};/g)].map(m => m[0]);
+const SEED_NODES = TEMPLATE_BLOCKS.flatMap(block =>
+  [...block.matchAll(/flowNode\('([^']+)',\s*'([^']+)'[^\n]*/g)].map(m => ({id: m[1], line: m[0].replace(/\s+/g, ' ')})));
+console.log(`  flowchart template blocks: ${TEMPLATE_BLOCKS.length}; flowNode seeds across them: ${SEED_NODES.length}`);
 const seedSizes = SEED_NODES.map(n => {
   if (/FLOWCHART_NODE_SIZE/.test(n.line)) return {id: n.id, via: 'constant'};
   const m = /\{width:\s*(\d+),\s*height:\s*(\d+)\}/.exec(n.line);
   return {id: n.id, via: m ? `${m[1]}x${m[2]}` : 'NO SIZE'};
 });
-for (const s of seedSizes) console.log(`    ${s.id.padEnd(5)} ${s.via}`);
+const offConstant = seedSizes.filter(s => s.via !== 'constant');
+console.log(`  seeds NOT routed through the constant: ${offConstant.length}${offConstant.length ? ` [${offConstant.map(s => `${s.id}=${s.via}`).join(', ')}]` : ''}`);
 
 const seededTerminators = SEED_NODES.filter(n => n.line.includes("'terminator'"));
-console.log(`  terminator seeds: ${seededTerminators.length}`);
+console.log(`  terminator seeds: ${seededTerminators.length} across ${TEMPLATE_BLOCKS.length} templates`);
 
 assert('af4.every-flowchart-seed-in-the-template-carries-the-shared-constant',
-  seedSizes.length >= 10 && seedSizes.every(s => s.via === 'constant'),
-  `all ${seedSizes.length} flowchart seeds route through FLOWCHART_NODE_SIZE rather than a literal, so a seeded chart cannot ` +
-  'drift from a dragged one — the two terminators used to carry 270x180 and the two connectors 84x84 while the palette said the same.');
+  TEMPLATE_BLOCKS.length === 3 && seedSizes.length >= 48 && seedSizes.every(s => s.via === 'constant'),
+  `all ${seedSizes.length} flowchart seeds across the ${TEMPLATE_BLOCKS.length} shipped templates route through FLOWCHART_NODE_SIZE rather than a literal, ` +
+  'so a seeded chart cannot drift from a dragged one — the two terminators used to carry 270x180 and the two connectors 84x84 while the palette said the same. ' +
+  'Re-anchored this round: the probe used to read the deleted `approval` block alone, where it passed over an empty list.');
 
 assert('af4.the-template-s-terminators-agree-with-the-palette-default',
-  seededTerminators.length === 2
+  seededTerminators.length >= 6
     && seededTerminators.every(n => /FLOWCHART_NODE_SIZE/.test(n.line)),
-  `${seededTerminators.length} terminator seeds, both via the shared constant, whose value is the palette default ` +
+  `${seededTerminators.length} terminator seeds (2 per template x ${TEMPLATE_BLOCKS.length}), each via the shared constant, whose value is the palette default ` +
   `${SIZED[0].size.width}x${SIZED[0].size.height} — a seeded flowchart and a dragged one now agree.`);
 
 /* The constant must be DECLARED ONCE and be the palette's value, or the two
    sides can be "in agreement" by both being wrong. */
 const CONST_DECLS = [...(PRESETS.match(/FLOWCHART_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
 const CONST_USE = [...PRESETS.matchAll(/FLOWCHART_NODE_SIZE/g)].length;
-console.log(`  FLOWCHART_NODE_SIZE: ${CONST_DECLS.length} declaration(s), ${CONST_USE} references total`);
+console.log(`  FLOWCHART_NODE_SIZE: ${CONST_DECLS.length} declaration(s), ${CONST_USE} references total (16 palette rows + ${SEED_NODES.length} template seeds + the declaration)`);
 assert('af4.the-shared-size-is-declared-once-and-used-by-every-row',
-  CONST_DECLS.length === 1 && CONST_USE >= 27,
-  `one declaration (\`${CONST_DECLS[0]?.replace(/\s+/g, ' ')}\`) and ${CONST_USE} references — 16 palette rows + 10 template seeds + the ` +
-  'declaration itself. One number, so the palette, the template and a future addition cannot disagree.');
+  CONST_DECLS.length === 1 && CONST_USE === 16 + SEED_NODES.length + 1,
+  `one declaration (\`${CONST_DECLS[0]?.replace(/\s+/g, ' ')}\`) and ${CONST_USE} references — the 16 palette rows, the ${SEED_NODES.length} template seeds and ` +
+  'the declaration itself. Pinned to the measured number with its parts named (it read 27 when only the deleted 10-seed template was counted), so a template ' +
+  'that stops using the constant has to change this deliberately. One number, so the palette, the templates and a future addition cannot disagree.');
 
 /* ===========================================================================
    4 — THE FLOOR IS UNCHANGED, AND THE CHOSEN SIZE CLEARS IT.

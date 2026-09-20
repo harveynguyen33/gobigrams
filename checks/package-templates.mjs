@@ -183,23 +183,46 @@ assert('2.entry-counts-match-and-no-pair-is-invented',
   `${catalogPairs.length} entries === ${declaredPairs.length} declared; missing=[${missing.join(', ')}] invented=[${invented.join(', ')}]; ` +
   `${new Set(catalogPairs).size} distinct (so the pair set cannot hide a duplicate)`);
 
-/* ---------- AC 4 — the legacy templates are still reachable ---------------- */
+/* ---------- AC 4 — the remaining legacy templates are still reachable -------- */
 console.log('\n' + '='.repeat(78));
-console.log('AC 4 — the four legacy templates resolve the way App.tsx resolves them');
+console.log('AC 4 — the legacy templates still resolve the way App.tsx resolves them');
 console.log('='.repeat(78));
 /* The SAME lookup App.tsx performs: getPreset(pid).templates?.find(x => x.id === id) */
 const appResolve = (preset, templateId) => (PRESETS[preset].templates ?? []).find(x => x.id === templateId);
-const LEGACY = [['flowchart', 'approval'], ['c4', 'c4-context'], ['c4', 'c4-container'], ['erd', 'commerce']];
+/* RE-ANCHORED (ROUND 4, ITEM 4) — NOT WEAKENED, and the reason is recorded.
+   The list held FOUR entries and three of them are still here: `c4/c4-context`,
+   `c4/c4-container` and `erd/commerce` are untouched. The fourth,
+   `['flowchart', 'approval']`, was the SUBJECT of a deletion this round (Harvey:
+   "à ngoài ra xoá flowchart template Approve nhé"), so asserting it "still
+   resolves" is asserting a fact the round deliberately falsified — the old
+   predicate ended with `&& !!byPair.get('flowchart:approval')`, which is now
+   FALSE by design, and the assertion read 3/4. It is NOT deleted: the removal is
+   turned into a POSITIVE assertion of its own (`4b` below), so the file still
+   records that `approval` was in the catalog and is not any more. */
+const LEGACY = [['c4', 'c4-context'], ['c4', 'c4-container'], ['erd', 'commerce']];
 const legacyRows = LEGACY.map(([p, t]) => {
   const inCatalog = byPair.get(`${p}:${t}`);
   const resolved = appResolve(p, t);
   return {p, t, inCatalog: !!inCatalog, resolves: !!resolved, label: resolved?.label};
 });
 for (const r of legacyRows) console.log(`  ${`${r.p} / ${r.t}`.padEnd(26)} catalog=${r.inCatalog ? 'Y' : 'N'} App-resolves=${r.resolves ? 'Y' : 'N'}  "${r.label}"`);
-assert('4.the-four-legacy-templates-are-in-the-catalog-and-still-resolve',
-  legacyRows.every(r => r.inCatalog && r.resolves) && !!byPair.get('flowchart:approval'),
-  `${legacyRows.filter(r => r.inCatalog && r.resolves).length}/4 resolve through the exact App lookup ` +
-  `\`(PRESETS[pid].templates ?? []).find(x => x.id === templateId)\``);
+assert('4.the-remaining-legacy-templates-are-in-the-catalog-and-still-resolve',
+  legacyRows.every(r => r.inCatalog && r.resolves),
+  `${legacyRows.filter(r => r.inCatalog && r.resolves).length}/${LEGACY.length} still in the catalog and resolvable through the exact App lookup ` +
+  `\`(PRESETS[pid].templates ?? []).find(x => x.id === templateId)\`. This list held four rows before ROUND 4; the ` +
+  `fourth was the deleted \`flowchart:approval\`, asserted absent in 4b instead of asserted present here.`);
+/* The deletion, as its OWN assertion: the pair is gone from BOTH the catalog and
+   the preset's own `templates` array, and the flowchart family ships exactly the
+   three levelled templates. A pair that is merely missing from the catalog would
+   still be seedable through `appResolve`. */
+const flowchartIds = (PRESETS.flowchart.templates ?? []).map(t => t.id);
+console.log(`  flowchart family now ships: [${flowchartIds.join(', ')}] (catalog: [${(catalog.find(f => f.preset === 'flowchart')?.groups ?? []).flatMap(g => g.entries.map(e => e.t.id)).join(', ')}])`);
+assert('4b.approval-is-gone-from-both-the-catalog-and-the-preset',
+  !flowchartIds.includes('approval') && !byPair.get('flowchart:approval') && !appResolve('flowchart', 'approval')
+    && JSON.stringify(flowchartIds) === JSON.stringify(['flow-basic', 'flow-advanced', 'flow-complex']),
+  `the deleted template is absent from \`PRESETS.flowchart.templates\` (${flowchartIds.length} ids: [${flowchartIds.join(', ')}]), absent from the catalog, ` +
+  `and no longer resolvable by the App lookup — so no route can seed it. Reason for the re-anchor: ROUND 4 deleted it at Harvey's request, and the old AC 4 ` +
+  `asserted the opposite; an assertion whose subject no longer exists cannot pass, so it was replaced by this positive check rather than dropped.`);
 
 /* ---------- AC 5/6/7/8 — the shape ladder --------------------------------- */
 console.log('\n' + '='.repeat(78));
@@ -300,7 +323,13 @@ const countRows = Object.entries(EXPECT).map(([id, want]) => {
   return {id, want, got: t ? {nodes: t.nodes.length, edges: t.edges.length, shapes: shapeSet(t).size} : null, badSize};
 });
 for (const r of countRows) console.log(`  ${r.id.padEnd(14)} nodes ${r.got ? r.got.nodes : '-'}/${r.want.nodes}  edges ${r.got ? r.got.edges : '-'}/${r.want.edges}  shapes ${r.got ? r.got.shapes : '-'}/${r.want.shapes}`);
-const levels = [['flow-basic', 'basic'], ['flow-advanced', 'advanced'], ['flow-complex', 'complex'], ['approval', 'advanced']];
+/* RE-ANCHORED (ROUND 4, ITEM 4) — `['approval', 'advanced']` was a row of this
+   table and its SUBJECT is deleted, so the row went with it; the table is now the
+   three templates the family actually ships. `tpl('approval')` would be
+   `undefined`, `?.level` `undefined`, and the row would report the deletion as a
+   missing level rather than as a deletion. c3 asserts the family's level tags.
+   The deletion itself is asserted separately in 4b. */
+const levels = [['flow-basic', 'basic'], ['flow-advanced', 'advanced'], ['flow-complex', 'complex']];
 const badLevel = levels.filter(([id, lvl]) => tpl(id)?.level !== lvl);
 assert('c1.node-edge-and-shape-counts-are-the-spec-numbers',
   countRows.every(r => r.got && r.got.nodes === r.want.nodes && r.got.edges === r.want.edges && r.got.shapes === r.want.shapes),
@@ -311,29 +340,42 @@ assert('c2.every-flow-node-carries-FLOWCHART_NODE_SIZE-and-tb-handles',
   ` — seed-from-template and drag-from-panel agree on one ${FLOWCHART_NODE_SIZE.width}x${FLOWCHART_NODE_SIZE.height} default`);
 assert('c3.the-levels-are-tagged-as-specified',
   badLevel.length === 0,
-  levels.map(([id, lvl]) => `${id}=${tpl(id)?.level ?? 'none'}`).join(' ') + ' — §3.4 tags `approval` advanced and leaves the c4/erd templates unlevelled');
+  levels.map(([id, lvl]) => `${id}=${tpl(id)?.level ?? 'none'}`).join(' ') + ' — §3.4 tagged the flowchart ladder; the c4/erd templates are unlevelled. ' +
+  'Re-anchored: the table used to carry a fourth row (`approval`=advanced) whose template ROUND 4 deleted — see 4b.');
 const unlevelled = allEntries.filter(e => e.level === null).map(pairOf);
 assert('c4.the-three-single-member-families-stay-unlevelled',
   ['c4:c4-context', 'c4:c4-container', 'erd:commerce'].every(k => unlevelled.includes(k)) && unlevelled.length === 3,
   `unlevelled rows: [${unlevelled.join(', ')}] — a level chip in a one-member family would be noise`);
 
-/* ---------- AC 10 — approval is untouched where it matters ---------------- */
+/* ---------- AC 10 — the deleted template is gone where it mattered --------- */
 console.log('\n' + '='.repeat(78));
-console.log('AC 10 — the approval template is metadata-only changed');
+console.log('AC 10 — the `approval` template is DELETED, and no trace of it survives');
 console.log('='.repeat(78));
+/* INVERTED (ROUND 4, ITEM 4) — NOT DELETED, and the reason is recorded. AC 10
+   used to assert `approval` was UNTOUCHED: it re-derived the template's node and
+   edge arrays from the live catalog and compared their sha256 against a stored
+   pre-change capture, plus a length comparison — "only `level` was added". ROUND
+   4 deletes the template at Harvey's request, so EVERY one of those predicates is
+   FALSE by design (there is no `appr` to hash), and the file died with a
+   `TypeError: Cannot read properties of undefined (reading 'nodes')` instead of a
+   FAIL line. The subject no longer exists, so the assertion could not pass.
+
+   The FIXTURE is kept: it is still the only independent record of what the
+   deleted template contained, so the inverted assertion below can say what was
+   removed rather than only that something is missing. The claim inverted is the
+   same claim in its new form: this template is not in the shipped data, and the
+   pre-change capture is no longer reproducible from the tree. */
 const appr = tpl('approval');
-const aNj = JSON.stringify(appr.nodes), aEj = JSON.stringify(appr.edges);
-const aHashes = {nodes: sha(aNj), edges: sha(aEj)};
-console.log(`  approval nodes: ${appr.nodes.length} (pre-change ${FIXTURE.approvalNodes}), JSON ${aNj.length} chars (pre-change ${FIXTURE.approvalNodesLen})`);
-console.log(`  approval edges: ${appr.edges.length} (pre-change ${FIXTURE.approvalEdges}), JSON ${aEj.length} chars (pre-change ${FIXTURE.approvalEdgesLen})`);
-console.log(`  sha256 nodes ${aHashes.nodes}`);
-console.log(`  sha256 edges ${aHashes.edges}`);
-assert('10.approval-nodes-and-edges-are-byte-identical',
-  aHashes.nodes === FIXTURE.approvalNodesSha && aHashes.edges === FIXTURE.approvalEdgesSha
-    && appr.nodes.length === FIXTURE.approvalNodes && appr.edges.length === FIXTURE.approvalEdges,
-  aHashes.nodes === FIXTURE.approvalNodesSha && aHashes.edges === FIXTURE.approvalEdgesSha
-    ? `both arrays still hash to the PRE-CHANGE capture (nodes ${aHashes.nodes.slice(0, 12)}…, edges ${aHashes.edges.slice(0, 12)}…) — only \`level\` was added`
-    : `nodes ${aHashes.nodes === FIXTURE.approvalNodesSha ? 'ok' : 'CHANGED'} edges ${aHashes.edges === FIXTURE.approvalEdgesSha ? 'ok' : 'CHANGED'}`);
+const deletedWhere = [['catalog', !!byPair.get('flowchart:approval')], ['flowchart preset', (PRESETS.flowchart.templates ?? []).some(t => t.id === 'approval')]];
+console.log(`  tpl('approval') = ${appr === undefined ? 'undefined (deleted)' : 'STILL PRESENT'}`);
+console.log(`  pre-change fixture (kept as the record of what was deleted): ${FIXTURE.approvalNodes} nodes / ${FIXTURE.approvalEdges} edges, ` +
+  `nodes sha ${FIXTURE.approvalNodesSha.slice(0, 12)}…, edges sha ${FIXTURE.approvalEdgesSha.slice(0, 12)}…`);
+for (const [where, present] of deletedWhere) console.log(`  ${where.padEnd(18)} present=${present ? 'Y' : 'N'}`);
+assert('10.approval-is-absent-everywhere-the-old-capture-required-it-present',
+  appr === undefined && deletedWhere.every(([, present]) => present === false),
+  `the deleted template is ABSENT from the ${deletedWhere.length} places the old capture required it: [${deletedWhere.map(([w]) => w).join(', ')}]. ` +
+  `Old claim (re-anchored): "nodes and edges still hash to the PRE-CHANGE capture (nodes ${FIXTURE.approvalNodes}, edges ${FIXTURE.approvalEdges})". ` +
+  `New claim: nothing to hash — the fixture above is retained ONLY as the record of the deletion. This asserts a removal, not a regression.`);
 
 /* ---------- AC 11 — the three new templates are generic ------------------- */
 console.log('\n' + '='.repeat(78));
@@ -370,23 +412,32 @@ const HEX = (STYLES_RAW.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 const hexHits = [['src/templateCatalog.ts', CATALOG_RAW], ['src/BoardDialog.tsx', DIALOG_RAW]]
   .map(([name, src]) => ({name, n: (src.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length, rgba: (src.match(/rgba?\(/g) ?? []).length}))
   .filter(r => r.n || r.rgba);
-const bdHdBlock = (STYLES_RAW.match(/(?:^|\n)\.bd-hd[^{]*\{[^}]*\}/g) ?? []).join('\n');
-const bdHdHex = (bdHdBlock.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
+const bdRowBlocks = (STYLES_RAW.match(/(?:^|\n)\.bd-(?:opt|browse)[^{]*\{[^}]*\}/g) ?? []).join('\n');
+const bdRowHex = (bdRowBlocks.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 console.log(`  hex literals in src/styles.css: ${HEX} (pre-change ${FIXTURE.hexLiterals}, ceiling 160)`);
-console.log(`  .bd-hd rule(s): ${bdHdBlock ? `${bdHdBlock.split('\n').length} block(s), ${bdHdHex} hex literal(s)` : 'ABSENT'}`);
+console.log(`  the create body's row rules (.bd-opt/.bd-browse): ${bdRowBlocks ? `${bdRowBlocks.split('\n').length} block(s), ${bdRowHex} hex literal(s)` : 'ABSENT'}`);
 assert('12a.the-hex-count-is-unchanged',
   HEX === FIXTURE.hexLiterals && HEX <= 160,
-  `${HEX} hex literals in src/styles.css, identical to the pre-change ${FIXTURE.hexLiterals} — this round adds a level header and grouping, ZERO colour`);
+  `${HEX} hex literals in src/styles.css, identical to the pre-change ${FIXTURE.hexLiterals} — ROUND 4 restyles the create body and removes the group-header rule, so ZERO colour is added`);
 assert('12b.no-colour-literal-in-the-new-module-or-the-dialog',
   hexHits.length === 0,
   hexHits.length === 0
-    ? 'src/templateCatalog.ts and src/BoardDialog.tsx contain no #hex and no rgb()/rgba() literal; the .bd-hd rule is built from --surface / --dim only'
+    ? 'src/templateCatalog.ts and src/BoardDialog.tsx contain no #hex and no rgb()/rgba() literal; every rule the body uses is built from tokens'
     : hexHits.map(r => `${r.name}: ${r.n} hex, ${r.rgba} rgb()`).join('; '));
-assert('12c.the-group-header-reuses-existing-tokens',
-  bdHdBlock.length > 0 && bdHdHex === 0 && /var\(--dim\)/.test(bdHdBlock) && /var\(--surface\)/.test(bdHdBlock),
-  bdHdBlock.length > 0
-    ? '.bd-hd uses var(--surface) and var(--dim) — the .bd-label caption grammar, no new colour and no new widget'
-    : '.bd-hd is not declared in src/styles.css');
+/* RE-ANCHORED (ROUND 4, ITEM 1) — this assertion named the `.bd-hd` group-header
+   rule and its `--surface` / `--dim` tokens. ROUND 4 deleted the header (and the
+   rule), so the subject is gone and the stylesheet lookup returned 'ABSENT'. The
+   CLAIM — the create body's rows cost no new colour and are built from existing
+   tokens — is asserted against the rows the body actually has: the `Blank` radio
+   (`.bd-opt`) and the `Use template` action row (`.bd-browse`). */
+assert('12c.the-create-body-rows-reuse-existing-tokens',
+  bdRowBlocks.length > 0 && bdRowHex === 0
+    && /var\(--sel\)/.test(bdRowBlocks) && /var\(--border\)/.test(bdRowBlocks)
+    && /var\(--elevated\)/.test(bdRowBlocks) && /var\(--fg\)/.test(bdRowBlocks),
+  bdRowBlocks.length > 0
+    ? "the body's two row rules use ONLY existing tokens (--sel, --border, --elevated, --fg) — the same grammar `.sp-item` uses, no new colour and no new widget. " +
+      "Old subject (re-anchored): a `.bd-hd` group-header rule, deleted this round with the headers it styled."
+    : "neither `.bd-opt` nor `.bd-browse` is declared in src/styles.css — the row grammar itself is missing");
 
 /* ---------- AC 13 — the Shape union does not move -------------------------- */
 console.log('\n' + '='.repeat(78));
@@ -405,48 +456,74 @@ assert('13.the-Shape-union-is-unchanged',
 
 /* ---------- AC 3 / 16 — BoardDialog source contract ----------------------- */
 console.log('\n' + '='.repeat(78));
-console.log('AC 3 / 16 — the dialog still builds its list from PRESETS, and the keyboard contract holds');
+console.log('AC 3 / 16 — ROUND 4: the dialog lists NO templates, one radio, one action row');
 console.log('='.repeat(78));
-const loopMatch = /const TEMPLATES[\s\S]*?\n\}\n/.exec(DIALOG_RAW);
-console.log(`  /const TEMPLATES[\\s\\S]*?\\n}\\n/ lifts a block: ${!!loopMatch}${loopMatch ? ` (${loopMatch[0].split('\n').length} lines)` : ''}`);
-assert('3a.the-two-flattening-loops-and-the-liftable-TEMPLATES-block-survive',
-  /for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_RAW)
-    && /for \(const t of PRESETS\[id\]\.templates \?\? \[\]\)/.test(DIALOG_RAW)
-    && !!loopMatch,
-  'both `for` loops and the `const TEMPLATES` block are still literally present, so package-o-board-dialog.harness.mjs can still lift and execute them');
-if (loopMatch) {
-  const loopEntry = join(dir, 'loop-entry.ts');
-  writeFileSync(loopEntry, `import {PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n${loopMatch[0]}\nexport {TEMPLATES};\n`);
-  const loopJs = join(dir, 'loop.mjs');
-  writeFileSync(loopJs, execFileSync(ESBUILD, [loopEntry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'}));
-  const lifted = (await import(pathToFileURL(loopJs).href)).TEMPLATES;
-  console.log(`  the lifted block builds ${lifted.length} rows: [${lifted.map(t => `${t.preset}:${t.t.id}`).join(', ')}]`);
-  assert('3b.the-lifted-block-builds-every-template',
-    lifted.length === declaredPairs.length && lifted.map(t => `${t.preset}:${t.t.id}`).join(',') === declaredPairs.join(','),
-    `${lifted.length} rows from the executed builder === ${declaredPairs.length} declared, in the same order`);
-}
+/* RE-ANCHORED (ROUND 4, ITEM 1) — the whole block below asserted a contract this
+   round deliberately DELETED: `const TEMPLATES` (lifted out of the dialog's
+   SOURCE TEXT and executed), the two flattening `for` loops over `PRESETS`, and
+   the family/level header rows (`.bd-hd`, `catRows`, the `Row` union's `header`
+   kind). Harvey's brief replaced the create body with TWO rows — `Blank` (the old
+   "start empty") and `Use template` (which OPENS THE GALLERY via `onBrowse`) — so
+   none of those constructs exist any more and each assertion's SUBJECT is gone.
+
+   The file did not merely go red: it threw. `package-o-board-dialog.harness.mjs`
+   lifts that block by regex and THROWS when the lift finds nothing, and
+   `3b` executed the lift. Both harnesses were re-anchored to the post-round
+   contract, which is the contract the UI now has: NO template listing inside the
+   dialog (the gallery is the ONE UI reader of the catalog), ONE `role="radiogroup"`
+   with ONE radio and a roving tabindex, and `onBrowse` — never a `role="radio"` —
+   as the route into the gallery.
+
+   What is asserted POSITIVELY below (the claim survives in its new form):
+   - the dialog does NOT import `templateCatalog` or `PRESETS` any more, so there
+     is no second catalog reader and no `TEMPLATES` table to drift;
+   - the create body renders exactly TWO rows: one `role="radio"` (Blank) and one
+     `className="bd-browse"` action row (Use template) that opens the gallery;
+   - the `bd-browse` row carries NO `role` and NO `tabIndex`, so the arrow/Home/End
+     walk — which indexes `opts`, now built straight off `START_ROWS` — can never
+     land on it or count it;
+   - the roving expression, the Escape path and the `returnFocusTo` contract are
+     unchanged. */
+/* The dialog keeps ONLY a type import from `presets.ts` (`PresetId`), so the probe
+   is about VALUE dependencies: it must not reach for the catalog module nor for
+   the `PRESETS` table itself. */
+const dialogImportsCatalog = /import \{[^}]*templateCatalog/.test(DIALOG) || /\bPRESETS\b/.test(DIALOG);
 const radioGroups = (DIALOG.match(/role="radiogroup"/g) ?? []).length;
 const rovingTabbable = /tabIndex=\{\(on \|\| \(!hasPick && i === 0\)\) \? 0 : -1\}/.test(DIALOG_RAW)
   && /const hasPick = opts\.includes\(pick\)/.test(DIALOG_RAW);
 console.log(`  role="radiogroup" occurrences: ${radioGroups}; roving tabindex expression present: ${rovingTabbable}`);
-assert('16a.one-radiogroup-and-one-roving-tab-stop',
-  radioGroups === 1 && rovingTabbable && /const opts = useMemo\(\(\) => rows\.filter\(r => r\.kind === 'opt'\)\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW),
-  'exactly ONE radiogroup; the roving rule is still `tabIndex={(on || (!hasPick && i === 0)) ? 0 : -1}` — where ' +
-  "`hasPick = opts.includes(pick)`, so an `initialPick` naming a row that no longer exists leaves the FIRST row as the single tab stop instead of the group losing one — " +
-  "and the walk indexes `opts`, which is DERIVED from `rows` by filtering to `kind === 'opt'`, so a header row is not in the array and cannot become a tab stop or an arrow-key target");
-assert('16b.header-rows-are-not-focusable-and-not-radios',
-  /row\.kind === 'header'/.test(DIALOG_RAW)
-    && /<div key=\{row\.key\} className="bd-hd" aria-hidden="true">\{row\.label\}<\/div>/.test(DIALOG_RAW)
-    && !/className="bd-hd"[^>]*tabIndex/.test(DIALOG_RAW)
-    && !/className="bd-hd"[^>]*role="radio"/.test(DIALOG_RAW),
-  'the header renders as a plain `div.bd-hd` — no `tabIndex`, no `role="radio"` — and it is never pushed into `opts`');
-assert('16c.the-start-empty-row-stays-first-and-escape-focus-restore-are-untouched',
-  /const rows: Row\[\] = \[\{kind: 'opt', key: EMPTY, entry: null\}\]/.test(DIALOG_RAW)
-    && /if \(e\.key === 'Escape'\)/.test(DIALOG_RAW)
+console.log(`  dialog still imports the catalog/a preset table: ${dialogImportsCatalog}; literal "const TEMPLATES" table: ${/const TEMPLATES/.test(DIALOG)}`);
+assert('16a.the-dialog-no-longer-lists-templates-and-keeps-ONE-radio-walk',
+  radioGroups === 1 && rovingTabbable && !dialogImportsCatalog && !/const TEMPLATES/.test(DIALOG)
+    && !/row\.kind === 'header'/.test(DIALOG)
+    && /const opts = useMemo\(\(\) => rows\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW),
+  'exactly ONE radiogroup; the roving rule is still `tabIndex={(on || (!hasPick && i === 0)) ? 0 : -1}` with ' +
+  '`hasPick = opts.includes(pick)`, and `opts` is now built straight off the static `START_ROWS` — so with ONE row the arrows clamp on that row and can never ' +
+  'reach the action row beside it. The dialog imports NO catalog and carries NO `const TEMPLATES` table: ' +
+  '`TemplatesGallery.tsx` is the ONE UI reader of the catalog since ROUND 4 (ITEM 1).');
+assert('16b.the-create-body-is-TWO-rows-and-the-second-one-is-not-a-radio',
+  /const START_ROWS: StartRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_RAW)
+    && (DIALOG.match(/role="radio"/g) ?? []).length === 1
+    && /className="bd-browse" onClick=\{onBrowse\}/.test(DIALOG_RAW)
+    && /Use template/.test(DIALOG_RAW)
+    && !/className="bd-browse"[^>]*role=/.test(DIALOG_RAW)
+    && !/className="bd-browse"[^>]*tabIndex/.test(DIALOG_RAW)
+    && !/catRows/.test(DIALOG) && !/bd-hd/.test(DIALOG) && !/\.bd-hd/.test(STYLES_RAW),
+  'the body lists exactly TWO rows: ONE `role="radio"` (`Blank`, from the static `START_ROWS`) and the `bd-browse` action row ("Use template") that opens the ' +
+  'gallery through `onBrowse`. The action row carries no `role` and no `tabIndex`, so it cannot enter the walk. The old family/level machinery is GONE from both ' +
+  'the component (the header-row branch, the catalog rows) and the stylesheet (the group-header rule) — it was genuinely dead, not deferred.');
+assert('16c.escape-and-the-focus-restore-contract-are-untouched',
+  /if \(e\.key === 'Escape'\)/.test(DIALOG_RAW)
     && /returnFocusTo\?\.current\?\.focus\(\)/.test(DIALOG_RAW)
-    && /case 'End': e\.preventDefault\(\); pickAt\(last\); break;/.test(DIALOG_RAW),
-  '"start empty" is still pushed first, Escape still cancels, Arrow/Home/End still move the choice AND the focus (`pickAt` focuses the picked row), and the returnFocusTo contract is intact. ' +
-  'The DOM-level half of AC 16 (real tab order, real focus, real paint) needs a browser and is reported as UNVERIFIED by this file.');
+    && /case 'End': e\.preventDefault\(\); pickAt\(last\); break;/.test(DIALOG_RAW)
+    && /const canSubmit = !needsName \|\| trimmed\.length > 0;/.test(DIALOG_RAW),
+  'Escape still cancels, Arrow/Home/End still move the choice AND the focus (`pickAt` focuses the picked row), the `returnFocusTo` contract is intact, and the ' +
+  'name field still gates Create the same way. The DOM-level half (real tab order, real focus, real paint) needs a browser and is reported as UNVERIFIED by this file.');
+assert('16d.the-dialogs-create-result-can-only-be-the-unseeded-Blank',
+  /submitRef\.current\(\{kind: 'create', name: trimmed, seed: null\}\)/.test(DIALOG_RAW)
+    && /seed: \{preset: PresetId; templateId: string\} \| null/.test(DIALOG_RAW),
+  'the create branch returns an EXPLICIT `seed: null` — the Blank choice — and the result TYPE still carries the seeded form, which is what the gallery\'s route ' +
+  '(`createFromTemplate`) produces. The dialog performs no template lookup: the `TEMPLATES.find(...)` that used to resolve a row key is gone with the rows.');
 
 /* ---------- AC 20 — docs/state honesty ------------------------------------ */
 console.log('\n' + '='.repeat(78));
@@ -459,11 +536,11 @@ for (const t of [basic, advanced, complex].filter(Boolean)) {
   console.log(`  ${' '.repeat(14)} nodes=${t.nodes.length} edges=${t.edges.length} distinct flow shapes=${shapeSet(t).size} back-edges=${t.edges.filter(e => pos.get(e.source)?.y > pos.get(e.target)?.y).length}`);
   console.log(`  ${' '.repeat(14)} shape set = ${[...shapeSet(t)].sort().join(', ')}`);
 }
-console.log(`  ${'approval'.padEnd(14)} level=${String(appr?.level).padEnd(9)} label="${appr?.label}" (metadata-only change; arrays byte-identical)`);
+console.log(`  ${'approval'.padEnd(14)} DELETED by ROUND 4 — not in the catalog (fixture kept as the record of the removal)`);
 assert('20.the-three-templates-print-their-measured-numbers',
   present && [basic, advanced, complex].every(t => t && t.nodes.length && t.edges.length && shapeSet(t).size),
   present
-    ? `the three templates print nodes / edges / distinct shape count / level above; approval's level is reported too`
+    ? `the three templates print nodes / edges / distinct shape count / level above; the deleted \`approval\` is reported as deleted above`
     : 'one or more of the three ids is MISSING from the flowchart family — the numbers above are empty');
 
 /* ---------- AC 21 — D6, the per-symbol node-text grammar (§4.0) ------------ */
@@ -564,9 +641,9 @@ assert('22.every-edge-label-within-the-presets-own-limit',
    PRE-FIX REPLAY — each new assertion red before the change
    ===========================================================================
    The pre-change catalog is reconstructed IN MEMORY from the live one (no file
-   is written, no git operation): the three new templates are removed, `approval`
-   loses its level, and the three new TEMPLATES are removed from the preset copy
-   the shape/layout probes run over. The SAME predicates are then re-run. A
+   is written, no git operation): the three new templates are removed and the
+   pre-change flowchart family (which was `approval` ALONE, unlevelled) is
+   rebuilt from the AC 10 fixture below. The SAME predicates are then re-run. A
    control that also passes on the pre-fix tree would prove the assertion catches
    nothing.
 
@@ -574,17 +651,29 @@ assert('22.every-edge-label-within-the-presets-own-limit',
    reads ONLY from that copy — so the replay cannot silently measure the live
    tree again (the trap the first draft of this file fell into: it re-derived the
    pre-fix counts from the live catalog and reported "4 (now 4)").
+
+   ROUND 4, ITEM 4 — THE PRE-CHANGE CATALOG NOW HAS TO BE BUILT, NOT COPIED.
+   `approval` was the pre-change flowchart family, and this round DELETED it, so
+   `tpl('approval')` no longer yields the pre-change object. Reading it from the
+   live tree made the replay throw (`Cannot destructure property 'level' of
+   undefined`) and, worse, would have made the replay measure an EMPTY pre-change
+   catalog — the vacuous pass this section exists to prevent. The pre-change
+   `approval` therefore comes from the AC 10 FIXTURE (node/edge count plus the
+   sha of each array, captured off the pre-change tree), which is the only
+   independent record of it. The fixture's arrays cannot be reconstructed
+   byte-for-byte here, and they do not need to be: every probe below reads the
+   template's IDENTITY and its LEVEL, not its geometry.
 =========================================================================== */
 console.log('\n' + '='.repeat(78));
 console.log('PRE-FIX REPLAY — the probes must be RED on the pre-change catalog');
 console.log('='.repeat(78));
 
-const preFlowTemplates = [flowchartApprovalTemplateLike()];
-function flowchartApprovalTemplateLike() {
-  /* the pre-change `approval`: same arrays, no `level` */
-  const {level, ...rest} = tpl('approval');
-  return rest;
-}
+/** The pre-change `approval`, from the AC 10 fixture, with NO `level` (it was
+ *  unlevelled until PACKAGE-TEMPLATES tagged it advanced). */
+const PRE_APPROVAL = {id: 'approval', label: 'Approval request', hint: 'two lanes · decision · Yes/No · loop-back',
+  nodes: Array.from({length: FIXTURE.approvalNodes}, (_, i) => ({id: `a${i + 1}`})),
+  edges: Array.from({length: FIXTURE.approvalEdges}, (_, i) => ({id: `f${i + 1}`}))};
+const preFlowTemplates = [PRE_APPROVAL];
 const prePresets = JSON.parse(JSON.stringify({
   flowchart: {...FLOWCHART_PRESET, templates: preFlowTemplates},
   c4: PRESETS.c4,
@@ -623,7 +712,6 @@ const preNewIds = ['flow-basic', 'flow-advanced', 'flow-complex'].filter(id => p
 const preBasic = prePresets.flowchart.templates.find(t => t.id === 'flow-basic');
 const preBasicShapes = preBasic ? shapeSet(preBasic).size : 0;
 const preApprovalLevel = preFlowTemplates[0].level;
-
 console.log(`  pre-change families          : [${PRE_KEYS.join(', ')}]`);
 console.log(`  pre-change entries           : ${preEntries.length} (live: ${allEntries.length}; declared then: ${preDeclaredPairs.length})`);
 console.log(`  pre-change AC1 grouping ok   : ${preA1}`);
@@ -645,8 +733,12 @@ assert('pre2.REPLAY-AC4-and-the-level-tag-were-RED',
 assert('pre3.REPLAY-does-not-disturb-the-live-tree',
   allEntries.length === declaredPairs.length
     && !!complex && eq(shapeSet(complex), new Set(PALETTE_AT(16)))
-    && tpl('approval')?.level === 'advanced',
-  `after the replay the LIVE catalog still reports ${allEntries.length} entries, |L3|=${complex ? L3.size : 'n/a'}, approval.level=${tpl('approval')?.level ?? 'none'} — the replay mutated a deep copy in memory only`);
+    && tpl('approval') === undefined
+    && !!tpl('flow-advanced') && !!tpl('flow-complex'),
+  `after the replay the LIVE catalog still reports ${allEntries.length} entries, |L3|=${complex ? L3.size : 'n/a'}, ` +
+  `tpl('approval')=${tpl('approval') === undefined ? 'undefined (still deleted)' : 'PRESENT'} — the replay mutated a deep copy in memory only. ` +
+  `RE-ANCHORED: this probe used to end \`&& tpl('approval')?.level === 'advanced'\`, which ROUND 4's deletion made FALSE by design; it now pins the ` +
+  `POST-round truth (the template is gone, the two it ships beside are not) so the live tree is still proven un-mutated.`);
 
 /* AC 21's control. The D6 grammar probe is only worth running if it is RED on
    content that violates it. §4.0's table lists FIVE held violations, but only
@@ -770,14 +862,17 @@ assert('tg1.the-gallery-card-model-is-the-catalog-family-level-listing',
  *
  *  WHAT "DERIVED" MEANS HERE, PRECISELY. The strict reading of the brief is
  *  "the shape set is a subset of that template's own node shapes". That strict
- *  reading is applied below to `flow-basic`; it CANNOT be applied to `approval`
- *  or `commerce`, because a LANE or a NOTE has no `ShapePreview` art and
- *  `previewGlyphs` therefore falls back to a real, drawable shape for it (to
- *  render nothing at all would leave a whole family with an empty strip). So for
- *  those two the assertion is weaker and says so: every glyph must come from
- *  the template's own nodes ∪ the shape its own node KIND maps to. A hard-coded
- *  list would fail BOTH forms: `flow-basic`'s strip is exactly its own five
- *  shapes with nothing substituted. */
+ *  reading is applied below to `flow-basic`, and it holds for its two levelled
+ *  siblings as well; it CANNOT be applied to a template carrying an ANNOTATION
+ *  (the ERD `commerce` template's `note`), because a LANE or a NOTE has no
+ *  `ShapePreview` art and `previewGlyphs` therefore falls back to a real,
+ *  drawable shape for it (to render nothing at all would leave a whole family
+ *  with an empty strip). For such a card the assertion is weaker and says so:
+ *  every glyph must come from the template's own nodes ∪ the shape its own node
+ *  KIND maps to. A hard-coded list would fail BOTH forms: `flow-basic`'s strip is
+ *  exactly its own five shapes with nothing substituted.
+ *  (ROUND 4, ITEM 4 removed the `approval` template, whose three `group` lanes
+ *  were the second example of this carve-out; `commerce` is the remaining one.) */
 const HARDCODED_SHAPE_LIST_NEEDLE = 'flow' + 'chartShapes' + ' =';
 /* The one shape id `previewGlyphs` falls back to, read out of the component's
  *  own text rather than typed here, so the exemption follows the code. */
@@ -922,33 +1017,39 @@ assert('tg10.the-gallery-reuses-the-modal-vocabulary-and-the-focus-contract',
     && /firstCard\.current\.focus\(\)/.test(TG),
   'the scrim and shell are the app\'s existing `.sp-overlay` / `.sp-card` (not a third modal vocabulary), `FOCUSABLE` is IMPORTED from Settings.tsx rather than re-implemented, Escape is captured with stopPropagation, and the focus contract is the app\'s: the FIRST CARD takes focus on open and `returnFocusTo?.current?.focus()` on close');
 
-/* ---------- tg11 — the "Browse all templates…" row is a route, not a radio -- */
-/* RE-ANCHORED, NOT DELETED, and the reason is recorded: this round adds a row
- *  INSIDE `.bd-list`, which is exactly the kind of change that can turn a
- *  "one radiogroup" claim into a lie. AC 16a above is still GREEN and is NOT
- *  weakened — the new row carries no `role`, so the radiogroup count is
- *  unchanged — but nothing in the old assertion would have noticed if it had
- *  carried one. This assertion pins the new row's non-radio status explicitly,
- *  and pins that the roving walk still indexes `opts`, which the row is absent
- *  from. */
-const browseRow = /className="bd-browse"[\s\S]{0,160}?Browse all templates…/.exec(DIALOG_RAW);
+/* ---------- the gallery route's row is a route, not a radio ----------------- */
+/* RE-ANCHORED (ROUND 4, ITEM 1) — this block used to pin the trailing "Browse
+ *  all templates…" row INSIDE the create list: its presence by that caption, its
+ *  absence of `role`/`tabIndex`, and the two predicates that made it impossible to
+ *  enter the walk (`opts` filtered from `rows` by `kind === 'opt'`, and the
+ *  flattening loop over `PRESETS`). ROUND 4 promoted that row to the SECOND HALF
+ *  OF A TWO-ROW BODY and renamed it "Use template"; the `rows`/`kind` machinery and
+ *  the catalog loops are gone, so three of those predicates are now FALSE by
+ *  design and the caption needle matches nothing. The CLAIM is unchanged and is
+ *  asserted against the new markup: the row is NOT a radio, carries no `tabIndex`,
+ *  and the walk indexes an `opts` array it is absent from. */
+const browseRow = /className="bd-browse" onClick=\{onBrowse\}/.exec(DIALOG_RAW);
 const browseHasRole = /className="bd-browse"[^>]*role=/.test(DIALOG_RAW);
 const browseHasTabIndex = /className="bd-browse"[^>]*tabIndex/.test(DIALOG_RAW);
-console.log(`  "Browse all templates…" row present: ${!!browseRow}; role= on it: ${browseHasRole}; tabIndex= on it: ${browseHasTabIndex}`);
-assert('16a-REANCHOR.the-browse-row-cannot-enter-the-radio-walk',
+console.log(`  "Use template" action row present: ${!!browseRow}; role= on it: ${browseHasRole}; tabIndex= on it: ${browseHasTabIndex}`);
+assert('16a-REANCHOR.the-gallery-row-cannot-enter-the-radio-walk',
   !!browseRow && !browseHasRole && !browseHasTabIndex
-    && /const opts = useMemo\(\(\) => rows\.filter\(r => r\.kind === 'opt'\)\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW)
+    && /const opts = useMemo\(\(\) => rows\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW)
     && radioGroups === 1
-    && /for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_RAW),
-  'the row renders literally AFTER the mapped rows, so it is not a `Row` and never reaches `rows`; `opts` is still `rows.filter(r => r.kind === \'opt\')`, so the arrow/Home/End walk (which indexes `opts`) still moves ONLY between real radios and cannot count or land on this row. Reason for the re-anchor: the row is new to `.bd-list` this round, and AC 16a as written would not have noticed a `role="radio"` on it');
+    && !/catRows|row\.kind === 'header'/.test(DIALOG),
+  'the row renders literally AFTER the mapped radios, so it is not a `StartRow` and never reaches `rows`; `opts` is built straight off `rows`, so the ' +
+  'arrow/Home/End walk (which indexes `opts`) still moves ONLY between real radios and cannot count or land on this row. Reason for the re-anchor: ROUND 4 turned ' +
+  'the row into the body\'s second option and renamed it "Use template", and the header/kind machinery it used to be contrasted against no longer exists.');
 assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
   /setBoardsOpen\(false\); setTgOpen\(true\)/.test(APP_RAW)
-    && /Templates…/.test(APP_RAW)
-    && /onBrowse=\{\(\) => \{ setBoardDlg\(null\); setBoardPick\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+    && /Create from Templates/.test(APP_RAW)
+    && /onBrowse=\{\(\) => \{ setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
     && /if \(tgOpen\) return;/.test(APP_RAW)
     && /onBrowse\?: \(\) => void;/.test(DIALOG_RAW)
     && /onClick=\{onBrowse\}/.test(DIALOG_RAW),
-  'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s trailing row, which closes the dialog and opens the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`, below `boardDlg`), so app shortcuts stay inert behind it');
+  'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s action row, which closes the dialog and opens ' +
+  'the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`, below ' +
+  '`boardDlg`), so app shortcuts stay inert behind it. The menu row reads "Create from Templates" since ROUND 4, ITEM 2.');
 assert('tg12.an-empty-group-never-renders-a-header',
   galleryFamilies.every(f => f.groups.length > 0 && f.groups.every(g => g.cards.length > 0))
     && /\.filter\(g => g\.entries\.length > 0\)/.test(TG)
@@ -1055,7 +1156,16 @@ assert('r3c.both-create-paths-auto-number-through-the-one-pure-helper',
  *  separately in tg6); (2) the gallery route calls it; (3) the dialog route calls
  *  it; (4) the two statements that used to BE the second copy (`setBoardPick(key)`
  *  + `setBoardDlg('create')` inside `useTemplate`, and `initialPick={boardPick …}`
- *  at the dialog's mount) are gone. */
+ *  at the dialog's mount) are gone.
+ *
+ *  RE-ANCHORED (ROUND 4, ITEM 1) on ONE predicate, with the reason recorded: the
+ *  line reporting `setBoardPick(` call sites said "ALL null-resets
+ *  (closeBoardDlg / newBoard / onBoardDialog / onBrowse)", and ROUND 4 deleted the
+ *  `boardPick` state outright along with the dialog's `initialPick` (see r3f), so
+ *  that count is now legitimately 0 and the sentence is FALSE. The predicate was
+ *  `appSetBoardPick` in a detail string only — the assertion's condition never
+ *  read it — so the claim is unchanged and is asserted positively: the state and
+ *  its setter are GONE. */
 /* THE MEASURE IS TAKEN WITH COMMENTS BLANKED. Both of the statements that used
  *  to BE the second copy are named in prose in the docblocks above them, and a
  *  raw count would read that prose as the live handover. */
@@ -1072,6 +1182,7 @@ const bodySeedsAndSaves = /await boards\.createBoard\(name\)/.test(createFromTem
 const bodyIsOneFunction = createFromTemplateBody.split('const createFromTemplate').length - 1 === 1;
 const oldTwoStep = /setBoardPick\(key\)/.test(APP) || /initialPick=\{boardPick/.test(APP);
 const appSetBoardPick = (APP.match(/setBoardPick\(/g) ?? []).length;
+const appBoardPickState = /useState<string \| null>\(null\);\s*$/m.test(APP) && /\bboardPick\b/.test(APP);
 const templateCreateCalls = [
   ['gallery route (useTemplate)', /createFromTemplate\(\{preset: key\.slice\(0, i\) as PresetId/],
   ['dialog route (onBoardDialog)', /createFromTemplate\(\{name: r\.name, preset: r\.seed\?\.preset, templateId: r\.seed\?\.templateId\}\)/],
@@ -1079,16 +1190,17 @@ const templateCreateCalls = [
 console.log(`  createFromTemplate: ${createFromTemplateDefs} definition, ${createFromTemplateRoutes} call sites (the two routes)`);
 console.log(`  the create body: "preset: pid}" occurs ${presetPidInBody}x in App.tsx (the save call + the applyBoard, both inside the ONE function); body seeds and saves: ${bodySeedsAndSaves}`);
 console.log(`  old two-step handover (setBoardPick(key) / initialPick={boardPick...}) still present: ${oldTwoStep}`);
-console.log(`  setBoardPick( call sites in App.tsx: ${appSetBoardPick} — ALL null-resets (closeBoardDlg / newBoard / onBoardDialog / onBrowse); no key is stored any more`);
+console.log(`  setBoardPick( call sites in App.tsx: ${appSetBoardPick} (ROUND 4 deleted the state, so this reads 0 by design); boardPick still referenced: ${appBoardPickState}`);
 assert('r3d.exactly-one-create-from-template-function-used-by-both-routes',
   templateCreateCalls.every(c => c.ok) && !oldTwoStep
     && createFromTemplateDefs === 1 && createFromTemplateRoutes === 3 && bodyIsOneFunction
-    && presetPidInBody === 2 && bodySeedsAndSaves,
+    && presetPidInBody === 2 && bodySeedsAndSaves
+    && appSetBoardPick === 0 && !appBoardPickState,
   `grep-level evidence over comment-blanked text: ONE definition of \`createFromTemplate\` and ${createFromTemplateRoutes} textual call sites spread over exactly TWO functions — the gallery route \`useTemplate\` calls it TWICE ` +
   `(its malformed-key guard \`createFromTemplate({})\` plus the seeded call) and \`onBoardDialog\` calls it once (${templateCreateCalls.map(c => `${c.who}=${c.ok ? 'Y' : 'N'}`).join(', ')}). ` +
   `The seed+save body occurs ONCE — \`preset: pid}\` is measured ${presetPidInBody} times, and both occurrences (the \`boards.saveBoard\` call and the \`applyBoard\`) sit INSIDE that one function, so a second copy of the branch would read 4. ` +
-  `The two-step handover that used to pre-select a row in the dialog is absent (${!oldTwoStep}). ` +
-  `\`boardPick\` and \`setBoardPick\` survive only as ${appSetBoardPick} null-resets, which is why checks/package-o-board-dialog.harness.mjs keeps passing UNMODIFIED — it asserts the dialog's data contract, not who receives the gallery's key`);
+  `The two-step handover that used to pre-select a row in the dialog is absent (${!oldTwoStep}), and ROUND 4 removed its last remainder: \`boardPick\`/\`setBoardPick\` read ${appSetBoardPick} occurrences in App.tsx (0 by design — the ` +
+  `dialog's \`initialPick\` went with the template rows, so the state had no reader left). Re-anchored, not weakened: the old detail line described those sites as null-resets; the positive claim now is that neither name exists.`);
 
 /* r3e — the gallery's hint text no longer promises a dialog. The FALSE sentence
  *  ("opens New board with it pre-selected") must be GONE, and the replacement
@@ -1101,16 +1213,24 @@ assert('r3e.the-gallery-hint-says-what-now-happens',
   `the sentence "Choosing one opens New board with it pre-selected" is ${falseHint ? 'STILL THERE (it is now false)' : 'gone (it was false)'} and the replacement reads ` +
   `"${newHint.trim()}" — a user is told the board appears immediately and that the auto-numbered name can be changed`);
 
-/* r3f — the brief's §«FACTS» claim that `initialPick` is DEAD on the dialog is
- *  recorded rather than silently actioned: the prop is KEPT (the roving-tabindex
- *  rule is written in terms of it) and its only producer is gone, so
- *  `initialPick={boardPick …}` is what r3d asserts is absent. */
-assert('r3f.initialPick-is-retained-but-has-no-producer',
-  /initialPick\?: string;/.test(DIALOG_RAW)
-    && /useState<string>\(initialPick \?\? EMPTY\)/.test(DIALOG_RAW)
-    && !/initialPick=\{boardPick/.test(APP_RAW),
-  `\`initialPick\` is still a prop of the dialog and is still honoured (\`useState<string>(initialPick ?? EMPTY)\`, and the roving rule still reads \`hasPick\`), but App.tsx no longer passes it — ` +
-  `the gallery creates the board itself. Deleting the prop would also delete the only stated reason the roving-tabindex rule handles a pick naming no row, which is a behaviour change this round did not ask for`);
+/* r3f — INVERTED (ROUND 4, ITEM 1), NOT DELETED. It asserted the dialog RETAINED
+ *  `initialPick` after ROUND 3 had removed its producer. Harvey's brief for this
+ *  round asks explicitly: "Keep `initialPick` ONLY if something still passes it —
+ *  grep first; if nothing does, remove the prop and its plumbing and say so."
+ *  Nothing did, so the prop, its `useState(initialPick ?? EMPTY)`, App.tsx's
+ *  `boardPick` state and all four `setBoardPick(null)` resets were removed. That
+ *  makes every old predicate FALSE by design; the SAME claim is now asserted in
+ *  its negative form, and the reasoning is preserved here rather than in the
+ *  component. The roving rule still reads `hasPick` (which is what the old reason
+ *  for keeping the prop was about) — it is simply always true now that the only
+ *  row is the one `pick` starts on. */
+assert('r3f.initialPick-and-boardPick-are-BOTH-removed',
+  !/initialPick/.test(DIALOG) && !/\bboardPick\b/.test(APP)
+    && /const \[pick, setPick\] = useState<string>\(START_ROWS\[0\]\.key\)/.test(DIALOG_RAW)
+    && /const hasPick = opts\.includes\(pick\)/.test(DIALOG_RAW),
+  `\`initialPick\` is gone from the dialog (prop, docs and \`useState\`) and \`boardPick\` is gone from App.tsx — the grep found no producer and no reader, so ` +
+  `ROUND 4 removed the prop and its plumbing as the brief directs. The roving rule is unchanged (\`hasPick = opts.includes(pick)\`), and \`pick\` starts on the ` +
+  `Blank row so the group always has exactly one tab stop. Old claim (re-anchored): "initialPick is retained but has no producer".`);
 
 /* r3g — Harvey's live boards are untouched. THE CLAIM IS A LISTING, captured at
  *  run time: the board files that exist are present and named as they are, and

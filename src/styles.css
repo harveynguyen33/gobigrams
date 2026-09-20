@@ -2152,22 +2152,14 @@ kbd {
 /* PACKAGE-TEMPLATES §2.5 Pass 1 — the group header between rows.
    NOT a row: no border, no background, no tab stop. It is the same uppercase
    monospace caption `.bd-label` uses, so the visual ladder is
-   `start from` → group → row, with no new colour and no new widget. It is
-   `position: sticky` because `.bd-list` scrolls: a header that scrolls away
-   stops labelling anything, and the stickiness costs nothing. */
-.bd-hd {
-  position: sticky; top: 0; z-index: 1;
-  background: var(--surface);
-  margin: 6px 0 1px; padding: 4px 2px 3px;
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--dim);
-}
-.bd-hd:first-child { margin-top: 0; }
-/* PACKAGE-TEMPLATES §2.5 Pass 2 — the "Browse all templates…" route. It reuses
-   the `.bd-opt` row grammar (same border, radius, height) so it reads as the
-   list's last row, but it is NOT one: no radio, no tick, no selected state. The
-   caption colour is `--sel` — the same "this goes somewhere" accent `.tg-tile-cta`
-   and the app's other links use — and every value is an existing token. */
+   `start from` → row, with no new colour and no new widget. */
+
+/* ROUND 4, ITEM 1 — the second row of the create body. Same row grammar as
+   `.bd-opt` (same border, radius, height, and the same two-line text stack) so
+   it reads as the body's sibling row, but it is NOT a radio: no tick, no selected
+   state. The caption colour is `--sel` — the same "this goes somewhere" accent
+   `.tg-tile-cta` and the app's other links use — and every value is an existing
+   token. */
 .bd-browse {
   display: flex; align-items: center; width: 100%;
   background: transparent; color: var(--sel);

@@ -53,10 +53,11 @@ export type PreviewGlyph = {shape: Shape; color: string};
 /** The glyph strip for ONE node list: the first `max` DISTINCT shapes in NODE
  *  ORDER, de-duplicated, each carrying the colour its own node declares.
  *
- *  THE SHAPE SET IS NOT FILTERED, AND THAT IS DELIBERATE. `flow-basic` and its
- *  siblings carry no annotation at all, but the legacy `approval` carries three
- *  `group` lanes and the ERD template carries a `note` — and each of those is a
- *  real symbol the template really draws, with a real preview in `ShapePreview`.
+ *  THE SHAPE SET IS NOT FILTERED, AND THAT IS DELIBERATE. The three flowchart
+ *  templates carry no annotation at all, but a template in another family can:
+ *  the ERD one carries a `note` (the old `approval` template carried three `group`
+ *  lanes until ROUND 4, ITEM 4 deleted it) — and each of those is a real symbol
+ *  the template really draws, with a real preview in `ShapePreview`.
  *  Excluding them here (as the SHAPE-SET acceptance probes do, for the different
  *  question "how many ISO 5807 ids does this level use") would make a whole
  *  family preview as an EMPTY strip.

@@ -476,15 +476,6 @@ const FLOWCHART_PALETTE: PaletteItem[] = [
   NOTE_ITEM,
 ];
 
-/* "Approval request" — pools + 2 lanes, a decision with Yes/No, a connector pair
-   and a deliberate loop-back. The lanes are FROZEN BANDS (bandGroups), the flow
-   nodes are top-level, so Auto-arrange lays the flow out and the loop-back is a
-   real regression test rather than a no-op. */
-const lane = (id: string, title: string, sub: string, x: number, y: number, w: number, h: number): Node => ({
-  id, type: 'goblin', position: {x, y}, style: {width: w, height: h},
-  data: {shape: 'group', kicker: '', title, sub, metric: '', metricUnit: '', icon: '', colorKey: 'slate'},
-});
-
 const flowNode = (
   id: string, shape: Shape, title: string, colorKey: ColorKey, x: number, y: number,
   size?: {width: number; height: number},
@@ -494,49 +485,27 @@ const flowNode = (
   data: {shape, kicker: '', title, sub: '', metric: '', metricUnit: '', icon: '', colorKey, body: 'label-only', handles: 'tb'},
 });
 
-const flowchartApprovalTemplate: TemplateSpec = {
-  id: 'approval',
-  label: 'Approval request',
-  hint: 'two lanes · decision · Yes/No · loop-back',
-  /* §3.4 — a genuine flowchart (lanes, a decision, a loop-back), so leaving it
-     unlevelled would place a stray row AFTER the three levelled ones inside the
-     same family and read as "unclassified". METADATA ONLY: `nodes` and `edges`
-     below are byte-identical to what shipped. */
-  level: 'advanced',
-  order: 2,
-  nodes: [
-    lane('pool', 'Purchase approval', 'pool · who does what', 0, 0, 1000, 640),
-    lane('laneReq', 'Requester', 'lane · role', 30, 70, 940, 230),
-    lane('laneFin', 'Finance', 'lane · role', 30, 320, 940, 230),
+/* ROUND 4, ITEM 4 (2026-09-20) — THE `approval` TEMPLATE IS DELETED.
 
-    flowNode('a1', 'terminator', 'Start', 'green', 200, 130, FLOWCHART_NODE_SIZE),
-    flowNode('a2', 'process', 'Submit purchase request', 'cyan', 180, 220, FLOWCHART_NODE_SIZE),
-    flowNode('a3', 'io', 'Attach quote', 'violet', 430, 220, FLOWCHART_NODE_SIZE),
-    flowNode('a4', 'decision', 'Amount > 1,000?', 'amber', 660, 200, FLOWCHART_NODE_SIZE),
-    flowNode('a5', 'manual', 'Finance review', 'green', 660, 380, FLOWCHART_NODE_SIZE),
-    flowNode('a6', 'decision', 'Approved?', 'amber', 420, 360, FLOWCHART_NODE_SIZE),
-    flowNode('a7', 'document', 'Issue purchase order', 'violet', 180, 470, FLOWCHART_NODE_SIZE),
-    flowNode('a8', 'terminator', 'End — approved', 'green', 430, 480, FLOWCHART_NODE_SIZE),
-    flowNode('a9', 'connector', 'A', 'slate', 300, 380, FLOWCHART_NODE_SIZE),
-    flowNode('a10', 'connector', 'A', 'slate', 300, 175, FLOWCHART_NODE_SIZE),
-    {id: 'a11', type: 'label', position: {x: 120, y: 590}, data: {text: 'Rejections must state a reason.'}},
-  ],
-  edges: [
-    makeEdge('a1', 'a2', FLOWCHART_EDGES, 'f1'),
-    makeEdge('a2', 'a3', FLOWCHART_EDGES, 'f2'),
-    makeEdge('a3', 'a4', FLOWCHART_EDGES, 'f3'),
-    makeEdge('a4', 'a5', FLOWCHART_EDGES, 'f4', {label: 'Yes'}),
-    makeEdge('a4', 'a6', FLOWCHART_EDGES, 'f5', {label: 'No'}),
-    makeEdge('a6', 'a7', FLOWCHART_EDGES, 'f7', {label: 'Yes'}),
-    makeEdge('a6', 'a9', FLOWCHART_EDGES, 'f8', {label: 'No'}),
-    // the connector pair: a9 → a10 is the genuine back-edge (a10 → a2 is
-    // upstream of a9), which is what makes this template a layout regression
-    // test — the old engine collapsed everything inside the loop onto layer 0.
-    makeEdge('a9', 'a10', FLOWCHART_EDGES, 'f11'),
-    makeEdge('a10', 'a2', FLOWCHART_EDGES, 'f9', {label: 'revise'}),
-    makeEdge('a7', 'a8', FLOWCHART_EDGES, 'f10'),
-  ],
-};
+   Harvey, verbatim: "à ngoài ra xoá flowchart template Approve nhé".
+
+   Removed here: `flowchartApprovalTemplate` (id `approval`, label "Approval
+   request", "two lanes · decision · Yes/No · loop-back"), its entry in the
+   flowchart preset's `templates` array, the `lane()` helper that built its three
+   FROZEN BAND (`group`) nodes and existed for that template alone, and the
+   layout-regression comments that named it. The flowchart family now ships
+   `flow-basic`, `flow-advanced`, `flow-complex`.
+
+   WHAT THIS COSTS, RECORDED (not hidden): `approval` was the only shipped
+   template that exercised `LayoutSpec.bandGroups` — top-level `group` nodes
+   frozen at their authored coordinates while the rest is re-placed — and the
+   only one whose connector PAIR (`a9 → a10 → a2`) made a genuine back-edge the
+   layout engine had to remove as a feedback arc. §8 Q2's lane work is a future
+   round by design (D3: the three new templates use NO Lane nodes), so no
+   shipped template covers that path after this deletion. Nothing else in `src/`
+   reads `lane`, and no board on disk stores a template id, so there is nothing
+   to migrate. Its replacement regression case is `flow-advanced`'s connector
+   pair (`c11`/`c12`), which covers the back-edge half only. */
 
 /* ===========================================================================
    PACKAGE-TEMPLATES §4 — THE FLOWCHART TEMPLATE FAMILY.
@@ -613,7 +582,8 @@ const flowchartBasicTemplate: TemplateSpec = {
 
 /* LEVEL 2 — ADVANCED. 14 flow nodes + 1 note = 15 nodes, 15 edges, 10 shapes.
    The connector is a PAIR (c11/c12, "A") so the redo step is an on-page jump
-   rather than a long edge — a second layout-regression case beside `approval`. */
+   rather than a long edge — the family's layout-regression case for a genuine
+   back-edge now that the `approval` template is gone (ROUND 4, ITEM 4). */
 const flowchartAdvancedTemplate: TemplateSpec = {
   id: 'flow-advanced',
   label: 'Order — stock to packing',
@@ -942,7 +912,7 @@ export const FLOWCHART_PRESET: DiagramPreset = {
   caps: {subflow: true, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
   // PACKAGE-TEMPLATES — order follows the catalog's own render order inside the
   // family (basic → advanced group, whose members sort by `order ?? 0` then id).
-  templates: [flowchartBasicTemplate, flowchartAdvancedTemplate, flowchartApprovalTemplate, flowchartComplexTemplate],
+  templates: [flowchartBasicTemplate, flowchartAdvancedTemplate, flowchartComplexTemplate],
   note: 'Handles are vertical (top-in / bottom-out) and cycles are allowed — a flowchart legitimately loops back.',
   legend: [
     {colorKey: 'green', label: 'Terminal (start / end)'},

@@ -105,15 +105,27 @@ assert('ad1.the-ratio-is-exactly-2.0-the-frames-own-ratio',
     : 'the Terminal row declares NO size, so there is no ratio to check — see the assertion above.');
 
 /* THE TEMPLATE PATH CREATES TERMINALS TOO, so it must not disagree with the
-   palette: a board seeded from the Approval template is the same shape a user
-   drags out of the panel. */
-const TEMPLATE_TERMINALS = [...PRESETS.matchAll(/flowNode\('((?:a1|a8))',\s*'terminator'[^\n]*/g)].map(m => m[0]);
-const templateSizes = TEMPLATE_TERMINALS.map(s => sizeOf(s.replace(/^[^\n]*?flowNode/, '')));
-console.log(`  template terminator nodes: ${TEMPLATE_TERMINALS.length}  sizes=[${templateSizes.map(s => s ? `${s.width}x${s.height}` : 'none').join(', ')}]`);
+   palette: a board seeded from ANY flowchart template is the same shape a user
+   drags out of the panel.
+
+   RE-ANCHORED (ROUND 4, ITEM 4) — NOT WEAKENED, and the reason is recorded. The
+   old form named the DELETED `approval` template's two nodes by id — the pattern
+   was the `flowNode` call for id `a1` or `a8` with shape `terminator`. ROUND 4
+   removed that template (Harvey: "à ngoài ra xoá flowchart template Approve nhé"),
+   so that pattern matched NOTHING and the assertion reported "0 `terminator`
+   nodes in the Approval template" — an assertion whose subject no longer exists,
+   which is not a passing assertion. The CLAIM is unchanged — a seeded Terminal
+   carries the same default the panel declares — and it is now enumerated over
+   every `terminator` seed the source ships, so a template added (or deleted)
+   later changes the count without an edit here. Measured now: 6 seeds (2 per
+   template x the 3 templates the family ships). */
+const TERMINATOR_SEEDS = [...PRESETS.matchAll(/flowNode\('[^']+',\s*'terminator'[^\n]*/g)].map(m => m[0]);
+const templateSizes = TERMINATOR_SEEDS.map(s => sizeOf(s.replace(/^[^\n]*?flowNode/, '')));
+console.log(`  flowchart terminator seeds across the templates: ${TERMINATOR_SEEDS.length}  sizes=[${templateSizes.map(s => s ? `${s.width}x${s.height}` : 'none').join(', ')}]`);
 assert('ad1.the-template-s-Terminal-nodes-carry-the-same-default-size',
-  TEMPLATE_TERMINALS.length === 2
+  TERMINATOR_SEEDS.length >= 6
     && templateSizes.every(s => s?.width === SIZE_CONST?.width && s?.height === SIZE_CONST?.height),
-  `${TEMPLATE_TERMINALS.length} \`terminator\` nodes in the Approval template, each ` +
+  `${TERMINATOR_SEEDS.length} \`terminator\` nodes across the flowchart templates, each ` +
   `${templateSizes.map(s => s ? `${s.width}x${s.height}` : 'unsized').join(' / ')} — so seed-from-template and drag-from-panel agree on one default.`);
 
 /* THE GEOMETRIC CATCH, AS ARITHMETIC ON THE SOURCE. The frame is a 200x100

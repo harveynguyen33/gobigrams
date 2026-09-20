@@ -3,16 +3,20 @@
  * PACKAGE-O ITEM 6b — BEHAVIOURAL harness for the board dialog's DATA CONTRACT.
  *
  * WHY. The metrics harness checks the SOURCE SHAPE (a role is present, the
- * native API is gone). That cannot tell you whether choosing "C4 Context" in the
- * dialog actually results in a board that IS a C4 board. This file runs the real
- * `TEMPLATES` table and the real preset data through the same resolution the
- * dialog and `App.tsx` perform, and asserts the RESULT.
+ * native API is gone). That cannot tell you whether a chosen template resolves to
+ * a board that IS that template. This file runs the real preset data through the
+ * same resolution the app performs, and asserts the RESULT.
  *
- * HOW. `BoardDialog.tsx` imports React, so it cannot be `import`ed here. Instead
- * esbuild (the bundler Vite already ships) transpiles the FILE to plain JS, and
- * this script reads the `TEMPLATES` / `optKey` / `EMPTY` declarations out of the
- * transpiled output — the same technique the metrics harness uses for CSS, and it
- * means the list under test is the list the component really builds.
+ * HOW, AND WHAT ROUND 4 CHANGED. Until ROUND 4 the dialog built its own
+ * `TEMPLATES` table, so this file LIFTED that block out of `BoardDialog.tsx`'s
+ * source text and EXECUTED it with the real `PRESETS` injected — the list under
+ * test was the list the component built. ROUND 4 replaced the create body with
+ * TWO rows (Blank + Use template, where "Use template" opens the gallery), which
+ * deleted the block: the lift found nothing and this file THREW. The lifted-block
+ * technique needs its subject to exist, so the dialog-side claim is now asserted
+ * as its NEGATIVE (section 2) and the resolution contract below runs over a
+ * `derived` list built directly from the shipped `PRESETS` table — the same data
+ * the gallery's card model is executed against in checks/package-templates.mjs.
  *
  * WHAT IT DOES NOT COVER: no DOM, so it proves nothing about layout, focus or
  * painting. Those are reported as unverifiable without a browser.
@@ -35,6 +39,16 @@ const assert = (id, pass, detail) => {
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${id}${detail ? '  — ' + detail : ''}`);
 };
 
+/* COMMENTS ARE BLANKED BEFORE EVERY "must be absent" PROBE. This repo's docblocks
+   quote the constructs they describe — the dialog's own header names the
+   `const TEMPLATES` table and the `PRESETS` import it USED to have, to explain why
+   they are gone — so a raw-text probe reads that prose as the construct itself.
+   Blanking (rather than stripping) keeps every byte offset and line number true. */
+const blankComments = s => s
+  .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+  .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+const DIALOG_CODE = blankComments(DIALOG_SRC);
+
 /* ---------- 1. Bundle presets.ts so the real PRESETS table can be read ------ */
 const dir = mkdtempSync(join(tmpdir(), 'ds-o2-'));
 const presetEntry = join(dir, 'presets-entry.ts');
@@ -44,35 +58,45 @@ const presetsJs = join(dir, 'presets.mjs');
 writeFileSync(presetsJs, presetOut);
 const PRESETS = JSON.parse(execFileSync('node', [presetsJs], {encoding: 'utf8'}).trim());
 
-/* ---------- 2. RUN the dialog's own TEMPLATES builder ---------------------- */
-/* The list is BUILT by a loop over PRESETS inside the component. Rather than
-   transcribe that loop here (which would only test the transcription), the loop
-   is lifted out of the component's source text and EXECUTED with the real
-   `PRESETS` injected — so the list under test is the list the component builds. */
-const loopMatch = /const TEMPLATES[\s\S]*?\n\}\n/.exec(DIALOG_SRC);
-if (!loopMatch) throw new Error('could not lift the TEMPLATES builder out of BoardDialog.tsx');
-/* The snippet carries TypeScript annotations and references `PRESETS`, so it is
-   written into a tiny entry module that imports the REAL `presets.ts` and is
-   bundled by esbuild (the bundler Vite already ships). The builder therefore
-   runs against the app's own preset data — the list under test IS the list the
-   component builds, not a transcription of it. */
-const loopEntry = join(dir, 'loop-entry.ts');
-writeFileSync(loopEntry, `import {PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n${loopMatch[0]}\nexport {TEMPLATES};\n`);
-const loopJs = join(dir, 'loop.mjs');
-writeFileSync(loopJs, execFileSync(ESBUILD, [loopEntry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'}));
-const TEMPLATES = (await import(pathToFileURL(loopJs).href)).TEMPLATES;
-const derived = TEMPLATES.map(t => ({preset: t.preset, presetLabel: t.presetLabel, templateId: t.t.id}));
+/* ---------- 2. THE DIALOG NO LONGER BUILDS A TEMPLATE LIST (ROUND 4) ------- */
+/* INVERTED (ROUND 4, ITEM 1) — NOT DELETED, and the reason is recorded. This
+   section used to LIFT a `const TEMPLATES` block out of BoardDialog.tsx by
+   regex and EXECUTE it, so the list under test was the list the component built.
+   ROUND 4 removed that block: Harvey's brief replaced the create body's template
+   list with exactly TWO rows (Blank + Use template), where "Use template" opens
+   the gallery instead of picking a template inline. The lift therefore found
+   nothing and this file THREW (`could not lift the TEMPLATES builder`), which is
+   why the old assertion could not simply go red.
 
-console.log('DIALOG DATA CONTRACT (item 6b)');
+   The old claim — "the dialog's offered list is derived from PRESETS, not a
+   transcription" — has no subject left, so it is replaced by its negative, which
+   IS the round's requirement: the dialog offers NO template, reads NO preset
+   table, and the catalog has exactly ONE UI reader (the gallery, whose model is
+   executed and compared against the catalog in checks/package-templates.mjs tg1).
+   The `derived` list below is then built HERE, from the shipped `PRESETS` table,
+   so the resolution contract in sections 3-4 still runs over the real data. */
+const loopMatch = /const TEMPLATES[\s\S]*?\n\}\n/.exec(DIALOG_CODE);
+console.log('DIALOG DATA CONTRACT (item 6b, re-anchored ROUND 4)');
 console.log('='.repeat(78));
+console.log(`the dialog's old TEMPLATES builder is liftable: ${!!loopMatch} (expected false — ROUND 4 deleted it)`);
 console.log(`presets: ${Object.entries(PRESETS).map(([k, p]) => `${k}(${p.templateIds.length} templates)`).join(' ')}`);
-console.log(`templates the component actually offers: ${derived.length}`);
-for (const d of derived) console.log(`  ${d.preset.padEnd(12)} ${d.templateId.padEnd(14)} ${d.presetLabel}`);
 
-assert('6b.dialog-builds-its-list-from-PRESETS-not-a-transcription',
-  /for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_SRC)
-    && /for \(const t of PRESETS\[id\]\.templates \?\? \[\]\)/.test(DIALOG_SRC),
-  'the TEMPLATES table is derived, so a new preset template appears with no edit here');
+assert('6b-REANCHOR.the-dialog-no-longer-offers-templates-and-reads-no-preset-table',
+  !loopMatch
+    && !/for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_CODE)
+    && !/for \(const t of PRESETS\[id\]\.templates \?\? \[\]\)/.test(DIALOG_CODE)
+    && !/\bPRESETS\b/.test(DIALOG_CODE)
+    && /const START_ROWS: StartRow\[\] = \[\s*\{key: 'blank', name: 'Blank'/.test(DIALOG_CODE)
+    && /className="bd-browse" onClick=\{onBrowse\}/.test(DIALOG_CODE),
+  'the `const TEMPLATES` builder and BOTH flattening loops are gone from the dialog, and it no longer names `PRESETS` at all: the create body is ONE radio ' +
+  '(Blank) plus the `bd-browse` action row that opens the gallery. Reason for the inversion: the lifted-block technique needs its subject to exist, and ROUND 4 ' +
+  'deleted the subject by request — the executed-list equivalence is now pinned where the list actually lives (checks/package-templates.mjs tg1 executes ' +
+  "`galleryModel()` and compares it to the catalog).");
+
+const derived = Object.entries(PRESETS).flatMap(([id, p]) =>
+  p.templateIds.map(templateId => ({preset: id, presetLabel: p.label, templateId})));
+console.log(`\ntemplates the CATALOG offers (built here from the shipped PRESETS): ${derived.length}`);
+for (const d of derived) console.log(`  ${d.preset.padEnd(12)} ${d.templateId.padEnd(14)} ${d.presetLabel}`);
 
 /* The dialog is the ONLY place that can offer a template now. Before this pass,
    `custom` was hard-coded and `custom.templates` is undefined — the question was
@@ -83,11 +107,11 @@ assert('6b.the-old-hardcoded-path-could-never-offer-a-template',
   customTemplates === 0,
   `custom ships ${customTemplates} templates — which is exactly why hard-coding 'custom' made the old template confirm dead code`);
 
-/* ---------- 3. Every key the dialog can return resolves to a real template -- */
+/* ---------- 3. Every key the catalog can offer resolves to a real template -- */
 const EMPTY = '';
 const optKey = (preset, tid) => `${preset}:${tid}`;
 const KEYS = [EMPTY, ...derived.map(d => optKey(d.preset, d.templateId))];
-console.log(`\noption keys the dialog renders: ${KEYS.length} (1 "start empty" + ${KEYS.length - 1} templates)`);
+console.log(`\noption keys the catalog offers: ${KEYS.length} (1 "start empty" + ${KEYS.length - 1} templates)`);
 for (const k of KEYS) console.log(`  ${k === EMPTY ? '(start empty)' : k}`);
 assert('6b.start-empty-key-cannot-collide-with-a-template',
   EMPTY === '' && derived.every(d => optKey(d.preset, d.templateId).includes(':')),
@@ -95,10 +119,14 @@ assert('6b.start-empty-key-cannot-collide-with-a-template',
 assert('6b.every-option-key-is-unique', new Set(KEYS).size === KEYS.length,
   `${new Set(KEYS).size} distinct of ${KEYS.length}`);
 
-/* ---------- 4. Resolve each choice the way App.tsx does -------------------- */
-/* This mirrors `onBoardDialog`'s create branch exactly: pid from the key, then
-   the template looked up WITHIN that preset. The point is that a chosen template
-   never lands under the wrong preset (the C4-under-Mixed defect). */
+/* ---------- 4. Resolve each choice the way the app does -------------------- */
+/* This mirrors the app's template resolution exactly: pid from the key, then the
+   template looked up WITHIN that preset. The point is that a chosen template
+   never lands under the wrong preset (the C4-under-Mixed defect).
+   RE-ANCHORED (ROUND 4, ITEM 1): the keys now come from the CATALOG rather than
+   from the dialog's row list, because the dialog no longer offers rows at all —
+   the gallery's cards are what carry a `${preset}:${templateId}` key today. The
+   predicate is unchanged: every key must resolve inside its own preset. */
 function resolveCreate(key, name = 'Board') {
   const hit = derived.find(d => optKey(d.preset, d.templateId) === key);
   const pid = hit ? hit.preset : 'custom';

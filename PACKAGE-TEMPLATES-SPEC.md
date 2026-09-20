@@ -783,6 +783,20 @@ copy-out and no persisted document references a template. Nothing to migrate, no
 Harvey's standing rule, if a future template change ever makes persisted state inappropriate, it is CLEARED,
 not migrated.
 
+> **ROUND 4, ITEM 4 — 2026-09-20: `flowchart/approval` is REMOVED.** Harvey, verbatim: *"à ngoài ra xoá
+> flowchart template Approve nhé"*. This note is ADDED rather than folded into the table above, so the spec's
+> own history stays readable: the table records what shipped when it was written, and this records what
+> changed after. Deleted with it: the template object (`flowchartApprovalTemplate`), its entry in the
+> flowchart preset's `templates` array, and the `lane()` helper that existed only to build its three frozen
+> `group` bands. The flowchart family now ships **`flow-basic`, `flow-advanced`, `flow-complex`** — the three
+> levelled templates. Its level row (`approval` = advanced, §3.4) and its AC 10 byte-identity assertion have
+> been re-anchored in `checks/package-templates.mjs` to assert the DELETION instead of asserting the
+> template's continued presence, and §5.3's claim above that it was to be kept is superseded by this note.
+> What is lost with it, recorded: `approval` was the only shipped template that exercised `bandGroups` (a
+> frozen lane band) and the only one with a connector pair forming a genuine back-edge for the layout engine.
+> §8 Q2's lane work remains a future round by design (D3), so no template covers the band path for now.
+> Nothing else in `src/` referenced it and no board stores a template id, so there is nothing to migrate.
+
 ### 5.4 Files touched
 
 **Modified:**

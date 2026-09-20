@@ -1103,27 +1103,24 @@ export default function App() {
    *  was doing when they went browsing. `boardDlg` answers "is a board dialog
    *  open, and in which mode"; `tgOpen` answers "is the gallery open". */
   const [tgOpen, setTgOpen] = useState(false);
-  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the `${preset}:${templateId}` key the board
-   *  dialog opens PRE-SELECTED on, or `null` for the plain "New board" path.
-   *
-   *  It is the ONLY thing that crosses from the gallery into the dialog: the
-   *  gallery never creates a board, it reports a choice, and this key is handed
-   *  to `BoardDialog`'s `initialPick` — which is why the gallery contains no
-   *  persistence call and no history push. Cleared on every close, so a stale
-   *  pick can never pre-select the NEXT board's dialog. */
-  const [boardPick, setBoardPick] = useState<string | null>(null);
+  /** ROUND 4, ITEM 1 — `boardPick` and its `setBoardPick` are GONE, with the
+   *  dialog's `initialPick` prop they existed to feed. ROUND 3 had already
+   *  removed their only non-null writer (the gallery creates the board itself),
+   *  leaving four `setBoardPick(null)` resets guarding a value nothing could
+   *  set; ROUND 4 removed the last reader (the dialog's row-matching), so the
+   *  state was carrying nothing at all. Deleting it is the honest end of that
+   *  history — no behaviour changed: every write was already a reset to `null`. */
   /** The dialog's close path for all three of its modes. Focus restore is left
    *  to `BoardDialog`'s own unmount contract (`returnFocusTo`), which is what the
    *  boards-menu route has always used. */
   const closeBoardDlg = useCallback(() => {
     setBoardDlg(null);
-    setBoardPick(null);
   }, []);
 
   /** L2 — New board. Opens the designed dialog (item 6b); the work moved to
-   *  `onBoardDialog`, where the name and the template choice arrive as data
-   *  instead of through a blocking native browser prompt + confirm chain. */
-  const newBoard = useCallback(() => { setBoardPick(null); setBoardDlg('create'); }, []);
+   *  `onBoardDialog`, where the name arrives as data instead of through a
+   *  blocking native browser prompt + confirm chain. */
+  const newBoard = useCallback(() => { setBoardDlg('create'); }, []);
 
   /** ROUND 3 — THE ONE OWNER OF "CREATE A BOARD FROM A TEMPLATE".
    *
@@ -1324,10 +1321,13 @@ export default function App() {
    *  ROUND 3 — the CREATE branch is now a CALL, not a body: it hands the name and
    *  the (preset, templateId) seed to `createFromTemplate`, which is the single
    *  owner of board creation from a template. Both `r.seed` and the name are
-   *  optional there, so this path and the gallery path run the same code. */
+   *  optional there, so this path and the gallery path run the same code.
+   *
+   *  ROUND 4 — this branch can ONLY be reached from the dialog's "Blank" row, so
+   *  `r.seed` is always `null` in practice and the board comes out `custom`. The
+   *  seeded form is what the gallery's route passes. */
   const onBoardDialog = useCallback((r: BoardDialogResult) => {
     setBoardDlg(null);
-    setBoardPick(null);
     if (r.kind === 'rename') { void doRenameBoard(r.name); return; }
     if (r.kind === 'delete') { void doDeleteBoard(true); return; }
 
@@ -1336,13 +1336,12 @@ export default function App() {
        defaults, auto-layout, the ERD table node and the C4 legend, so boards
        written before this change keep behaving exactly as they did.
 
-       A chosen TEMPLATE decides the preset: the dialog returns a
+       A chosen TEMPLATE decides the preset: the result carries a
        (preset, templateId) PAIR because a template BELONGS to a preset. Seeding
        a C4 template into a `custom` board would give it C4 nodes under Mixed's
-       edge defaults. "Start empty" carries no seed at all. (The old code
-       hard-coded `custom` and then asked about `custom.templates[0]` — which
-       does not exist, so the template question was unreachable and always
-       answered "no".) */
+       edge defaults. "Blank" carries no seed at all. (The old code hard-coded
+       `custom` and then asked about `custom.templates[0]` — which does not exist,
+       so the template question was unreachable and always answered "no".) */
     createFromTemplate({name: r.name, preset: r.seed?.preset, templateId: r.seed?.templateId});
   }, [createFromTemplate, doRenameBoard, doDeleteBoard]);
 
@@ -3940,9 +3939,13 @@ export default function App() {
                       point (D2: boards menu only; a toolbar chip is a recorded
                       deferral, not an omission to fix here). It sits beside
                       "New board" because it is the same intent — start a board —
-                      with a catalog in front of it. */}
+                      with a catalog in front of it.
+                      ROUND 4, ITEM 2 — the row reads "Create from Templates"
+                      (Harvey, verbatim: "Còn cái Templates... bên ngoài thì đổi
+                      thành Create from Templates"). Only the MENU ROW is
+                      renamed: the gallery's own heading is still "Templates". */}
                   <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); setTgOpen(true); }}>
-                    <LayoutTemplate size={14} /> Templates…
+                    <LayoutTemplate size={14} /> Create from Templates
                   </button>
                   <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
                     <Pencil size={14} /> Rename
@@ -4525,7 +4528,7 @@ export default function App() {
             onSubmit={onBoardDialog}
             returnFocusTo={boardsMenuBtnRef}
             defaultName={boards.nextUntitledName(boardList.map(b => b.name))}
-            onBrowse={() => { setBoardDlg(null); setBoardPick(null); setTgOpen(true); }}
+            onBrowse={() => { setBoardDlg(null); setTgOpen(true); }}
           />
         )}
 
