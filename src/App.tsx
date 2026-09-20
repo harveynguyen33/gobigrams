@@ -11,6 +11,7 @@ import {
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
   LayoutGrid, Plus, Pencil, Save, Waypoints, AlignCenter,
   PanelLeftClose, PanelRightClose, Eye,
+  LayoutTemplate,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -76,6 +77,7 @@ import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
 import Settings from './Settings';
+import TemplatesGallery from './TemplatesGallery';
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
 import {layoutDiagram} from './layout';
@@ -1090,10 +1092,60 @@ export default function App() {
    *  boards API. */
   const [boardDlg, setBoardDlg] = useState<BoardDialogResult['kind'] | null>(null);
 
+  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the Templates gallery. `false` = closed.
+   *
+   *  TWO SEPARATE PIECES OF STATE, ON PURPOSE, and they can be TRUE AT THE SAME
+   *  TIME: the "Browse all templates…" row lives INSIDE the board dialog, so
+   *  opening the gallery from there leaves that dialog mounted underneath (the
+   *  gallery's scrim is above it — see `.tg-overlay`'s z-index). The alternative —
+   *  one enum, `'create' | 'rename' | 'delete' | 'gallery'` — would UNMOUNT the
+   *  dialog and lose the half-typed board name, which is exactly the work the user
+   *  was doing when they went browsing. `boardDlg` answers "is a board dialog
+   *  open, and in which mode"; `tgOpen` answers "is the gallery open". */
+  const [tgOpen, setTgOpen] = useState(false);
+  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the `${preset}:${templateId}` key the board
+   *  dialog opens PRE-SELECTED on, or `null` for the plain "New board" path.
+   *
+   *  It is the ONLY thing that crosses from the gallery into the dialog: the
+   *  gallery never creates a board, it reports a choice, and this key is handed
+   *  to `BoardDialog`'s `initialPick` — which is why the gallery contains no
+   *  persistence call and no history push. Cleared on every close, so a stale
+   *  pick can never pre-select the NEXT board's dialog. */
+  const [boardPick, setBoardPick] = useState<string | null>(null);
+  /** The dialog's close path for all three of its modes. Focus restore is left
+   *  to `BoardDialog`'s own unmount contract (`returnFocusTo`), which is what the
+   *  boards-menu route has always used. */
+  const closeBoardDlg = useCallback(() => {
+    setBoardDlg(null);
+    setBoardPick(null);
+  }, []);
+
   /** L2 — New board. Opens the designed dialog (item 6b); the work moved to
    *  `onBoardDialog`, where the name and the template choice arrive as data
    *  instead of through a blocking native browser prompt + confirm chain. */
-  const newBoard = useCallback(() => { setBoardDlg('create'); }, []);
+  const newBoard = useCallback(() => { setBoardPick(null); setBoardDlg('create'); }, []);
+
+  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery's ONE handover.
+   *  `key` is the `${preset}:${templateId}` the user chose. Opening the dialog
+   *  with `initialPick` set is the WHOLE of "use template": the gallery does not
+   *  name a board, does not seed one and does not save one — it hands a choice
+   *  to the create path, which is the single owner of board creation (§2.4/§2.6).
+   *  The dialog is opened (rather than merely re-pointed) so the same handover
+   *  works from both routes: straight off the boards menu, where no dialog is
+   *  open, and from the dialog's own trailing row, where the gallery has already
+   *  closed it. */
+  const useTemplate = useCallback((key: string) => {
+    setTgOpen(false);
+    setBoardPick(key);
+    setBoardDlg('create');
+  }, []);
+
+  /** The gallery's own close path. The caret goes back to the Boards button —
+   *  which is the one trigger that still exists on either route into the gallery
+   *  (the boards-menu row unmounts with the menu; the dialog's "Browse all
+   *  templates…" row unmounts with the dialog, since opening the gallery closes
+   *  it — §2.3). Focusing a null ref is a no-op, so the two rules cannot fight. */
+  const closeGallery = useCallback(() => { setTgOpen(false); }, []);
   /** ITEM 6b — the dialog's focus-restore target. The Boards menu button is the
    *  one trigger that still exists when the dialog closes: the menu row that was
    *  actually pressed lives inside the popup, which unmounts the moment the row
@@ -1215,6 +1267,7 @@ export default function App() {
    *  that has not been initialised yet, not even inside its dep array. */
   const onBoardDialog = useCallback((r: BoardDialogResult) => {
     setBoardDlg(null);
+    setBoardPick(null);
     if (r.kind === 'rename') { void doRenameBoard(r.name); return; }
     if (r.kind === 'delete') { void doDeleteBoard(true); return; }
 
@@ -2756,6 +2809,14 @@ export default function App() {
       // `isEditable(e.target)` above covers the name field, so typing is never
       // swallowed; this line only stops the app's shortcuts landing behind it.
       if (boardDlg) return;
+      /* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery owns the keyboard while it is
+         up, in the SAME guard as every other overlay and for the same reason.
+         It sits directly BELOW `boardDlg`: the two are independent, so with both
+         open (the gallery opened from the dialog's trailing row) the app is inert
+         behind them. The gallery's own capture listener owns Escape, so Escape
+         never reaches the branch below and cannot deselect the canvas behind two
+         scrims. */
+      if (tgOpen) return;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
       // D3: Escape clears node + edge selection and closes any open popovers.
@@ -2925,7 +2986,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, rf, searchPos, help, boardsOpen, settingsOpen,
-      setPanelsVisible, tourOpen, readOnly, toggleReadOnly, boardDlg]);
+      setPanelsVisible, tourOpen, readOnly, toggleReadOnly, boardDlg, tgOpen]);
 
   // ---- C5: live zoom level for the zoom pill ----
   const ZoomPill = () => {
@@ -3831,6 +3892,14 @@ export default function App() {
                   <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); newBoard(); }}>
                     <Plus size={14} /> New board
                   </button>
+                  {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery's ONLY entry
+                      point (D2: boards menu only; a toolbar chip is a recorded
+                      deferral, not an omission to fix here). It sits beside
+                      "New board" because it is the same intent — start a board —
+                      with a catalog in front of it. */}
+                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); setTgOpen(true); }}>
+                    <LayoutTemplate size={14} /> Templates…
+                  </button>
                   <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
                     <Pencil size={14} /> Rename
                   </button>
@@ -4408,8 +4477,26 @@ export default function App() {
           <BoardDialog
             mode={boardDlg}
             boardName={curBoard?.name ?? ''}
-            onCancel={() => setBoardDlg(null)}
+            onCancel={closeBoardDlg}
             onSubmit={onBoardDialog}
+            returnFocusTo={boardsMenuBtnRef}
+            initialPick={boardPick ?? undefined}
+            onBrowse={() => { setBoardDlg(null); setBoardPick(null); setTgOpen(true); }}
+          />
+        )}
+
+        {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery. Inside `.canvas-wrap`
+            beside the board dialog and Settings, so its scrim covers the canvas
+            column and the two docked panels stay legible. Mounted AFTER the
+            dialog, and above it via `.tg-overlay`'s z-index: the dialog is never
+            visible through the gallery — the open gallery's scrim covers it —
+            and the dialog is unmounted (not hidden) whenever the gallery is
+            opened from the boards menu, so exactly one of the two creates the
+            board and the other cannot be clicked behind a scrim. */}
+        {tgOpen && (
+          <TemplatesGallery
+            onCancel={closeGallery}
+            onUse={useTemplate}
             returnFocusTo={boardsMenuBtnRef}
           />
         )}

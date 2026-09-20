@@ -707,6 +707,289 @@ assert('pre6.REPLAY-AC22-is-RED-on-both-flagged-labels-and-green-on-the-fix',
     ? `both flagged labels are over the preset's own limit (${labelReplay.map(r => r.heldLen).join(', ')} > ${MAXLABEL}) and both shortened forms are under it (${labelReplay.map(r => r.fixedLen).join(', ')} <= ${MAXLABEL}) — the assertion has a live target`
     : 'the flagged labels are NOT over the preset limit, so AC 22 would have been green on the tree that carried them — it would catch nothing');
 
+/* ===========================================================================
+   PASS 2 — THE TEMPLATES GALLERY (§2.5 / §2.6). Everything below reads the REAL
+   `src/TemplatesGallery.tsx`: its card model is EXECUTED (esbuild bundles the
+   component with `--jsx=automatic`, which pulls React and lucide in — the
+   component's own code is what runs), and its source text is read with comments
+   blanked. The tier rules are read out of the `.tg-*` block of `src/styles.css`.
+=========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('PASS 2 — the gallery derives its cards, its previews and its tiers');
+console.log('='.repeat(78));
+
+const TG_RAW = readFileSync(`${ROOT}/src/TemplatesGallery.tsx`, 'utf8');
+const TG = stripTs(TG_RAW);
+const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+const UEI_RAW = readFileSync(`${ROOT}/src/useEditorInterface.ts`, 'utf8');
+
+/* The component is EXECUTED, not transcribed. `--jsx=automatic` lets esbuild
+ *  compile the TSX; React and lucide come along inside the bundle, which is why
+ *  `galleryModel` and `previewGlyphs` below are the component's own functions. */
+const tgEntry = join(dir, 'tg-entry.ts');
+writeFileSync(tgEntry,
+  `export {galleryModel, previewGlyphs, PREVIEW_MAX, PREVIEW_MAX_PHONE} from ${JSON.stringify(join(ROOT, 'src/TemplatesGallery.tsx'))};\n`);
+const tgJs = join(dir, 'tg.mjs');
+writeFileSync(tgJs, execFileSync(ESBUILD, [tgEntry, '--bundle', '--platform=node', '--format=esm', '--jsx=automatic', '--log-level=error'], {encoding: 'utf8'}));
+const TG_MOD = await import(pathToFileURL(tgJs).href);
+const {galleryModel, previewGlyphs, PREVIEW_MAX, PREVIEW_MAX_PHONE} = TG_MOD;
+
+const galleryFamilies = galleryModel();
+const galleryCards = galleryFamilies.flatMap(f => f.groups.flatMap(g => g.cards));
+const galleryKeys = galleryCards.map(c => c.key);
+
+console.log(`  gallery families : [${galleryFamilies.map(f => f.preset).join(', ')}]  (catalog: [${families.join(', ')}])`);
+for (const f of galleryFamilies) {
+  for (const g of f.groups) {
+    console.log(`    ${f.preset.padEnd(12)} ${String(g.level).padEnd(9)} "${g.label}"`);
+    for (const c of g.cards) {
+      console.log(`        ${c.key.padEnd(24)} "${c.label}"`);
+      console.log(`        ${' '.repeat(24)} nodes=${c.nodes} edges=${c.edges} glyphs=[${c.glyphs.map(x => x.shape).join(', ')}] +${c.extraWide} (phone +${c.extraPhone}) of ${c.distinctShapes} distinct`);
+    }
+  }
+}
+
+/* ---------- tg1 — the card list IS the catalog ---------------------------- */
+const modelKeys = galleryFamilies.flatMap(f => f.groups.flatMap(g => g.cards.map(c => `${c.preset}:${c.templateId}`)));
+const declaredKeys = allEntries.map(pairOf);
+console.log(`  catalog entries ${declaredKeys.length} -> cards ${modelKeys.length}`);
+assert('tg1.the-gallery-card-model-is-the-catalog-family-level-listing',
+  modelKeys.length === declaredKeys.length
+    && modelKeys.every(k => declaredKeys.includes(k))
+    && declaredKeys.every(k => modelKeys.includes(k))
+    && JSON.stringify(modelKeys) === JSON.stringify(declaredKeys)
+    && JSON.stringify(galleryFamilies.map(f => f.preset)) === JSON.stringify(families),
+  `every catalog entry has a card and vice versa (${modelKeys.length} = ${declaredKeys.length}), the family order is the catalog's own ` +
+  `[${galleryFamilies.map(f => f.preset).join(', ')}], and the card order inside a family never re-sorts — so a new template appears in the gallery with no gallery edit`);
+
+/* ---------- tg2 — the preview is DERIVED, never enumerated ---------------- */
+/* The needle for "there is no hard-coded shape list here" is built by
+ *  CONCATENATION so that spelling it in this comment cannot make the assertion
+ *  match its own source text — the same technique the `boards` gate below uses,
+ *  and for the same reason.
+ *
+ *  WHAT "DERIVED" MEANS HERE, PRECISELY. The strict reading of the brief is
+ *  "the shape set is a subset of that template's own node shapes". That strict
+ *  reading is applied below to `flow-basic`; it CANNOT be applied to `approval`
+ *  or `commerce`, because a LANE or a NOTE has no `ShapePreview` art and
+ *  `previewGlyphs` therefore falls back to a real, drawable shape for it (to
+ *  render nothing at all would leave a whole family with an empty strip). So for
+ *  those two the assertion is weaker and says so: every glyph must come from
+ *  the template's own nodes ∪ the shape its own node KIND maps to. A hard-coded
+ *  list would fail BOTH forms: `flow-basic`'s strip is exactly its own five
+ *  shapes with nothing substituted. */
+const HARDCODED_SHAPE_LIST_NEEDLE = 'flow' + 'chartShapes' + ' =';
+/* The one shape id `previewGlyphs` falls back to, read out of the component's
+ *  own text rather than typed here, so the exemption follows the code. */
+const FALLBACK_SHAPE = (/return typeof v === 'string'[\s\S]{0,120}?: '([a-z]+)';/.exec(readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8')) ?? [])[1] ?? 'ABSENT';
+const perCard = galleryCards.map(c => {
+  const entry = byPair.get(c.key);
+  const nodes = entry ? entry.t.nodes : [];
+  const own = nodes.map(n => n.data?.shape).filter(s => typeof s === 'string');
+  /* A node whose shape has no preview art resolves to the fallback; that single
+   *  substitution is the ONLY thing the strict subset test permits beyond the
+   *  template's own ids. */
+  const allowed = new Set([...own, FALLBACK_SHAPE]);
+  const strict = new Set(nodes.filter(isFlowShape).map(n => n.data.shape));
+  const extra = c.glyphs.map(x => x.shape).filter(s => !allowed.has(s));
+  return {
+    key: c.key,
+    ownDistinct: strict.size,
+    nodeShapes: own.length,
+    shown: c.glyphs.length,
+    extra,
+    strictOk: c.glyphs.every(x => strict.has(x.shape)),
+    declared: c.distinctShapes,
+  };
+});
+const strayGlyphs = perCard.filter(r => r.extra.length);
+const badCount = perCard.filter(r => r.distinctShapes < r.shown);
+for (const r of perCard) {
+  console.log(`  ${r.key.padEnd(24)} own node shapes=${r.ownDistinct} distinct-nodes=${r.nodeShapes} shown=${r.shown} declared=${r.declared} ` +
+    `strict-subset=${r.strictOk ? 'Y' : 'N (annotation has no preview art)'} outside-nodes∪fallback=[${r.extra.join(', ')}]`);
+}
+assert('tg2.every-preview-glyph-is-one-of-that-templates-own-node-shapes',
+  perCard.length > 0 && strayGlyphs.length === 0 && badCount.length === 0
+    && perCard.find(r => r.key === 'flowchart:flow-basic')?.strictOk === true
+    && galleryCards.every(c => c.glyphs.every(g => typeof g.color === 'string' && g.color.startsWith('var(--c-'))),
+  strayGlyphs.length === 0 && badCount.length === 0
+    ? `${perCard.length}/${perCard.length} strips draw only from their own template's nodes (∪ the single documented fallback, ${JSON.stringify(FALLBACK_SHAPE)}, which ${perCard.filter(r => !r.strictOk).map(r => r.key).join(', ') || 'no card'} needs for a node with no preview art); flow-basic is a STRICT subset of its own five shapes; every glyph's colour is a \`var(--c-*)\` token resolved from that node's own colour key`
+    : `${strayGlyphs.length} strip(s) draw a shape neither the template nor its own node kinds declare; ${badCount.length} understate their own shape count`);
+assert('tg3.the-preview-source-carries-no-hard-coded-shape-list',
+  !TG.includes(HARDCODED_SHAPE_LIST_NEEDLE) && /c\.glyphs|\{glyphs\}/.test(TG)
+    && !/\[(\s*'(service|terminator|process|decision)'\s*,)+/.test(TG),
+  `the component maps over the card's own \`glyphs\`; it contains no ${JSON.stringify(HARDCODED_SHAPE_LIST_NEEDLE)} table and no literal shape-id array — a template that adds a shape previews correctly with NO edit to this file`);
+
+/* ---------- tg4 — the counter accounts for exactly what was not drawn ------ */
+const cutRows = galleryCards.map(c => ({key: c.key, distinct: c.distinctShapes, wide: c.extraWide, phone: c.extraPhone}));
+const badCut = cutRows.filter(r => r.wide !== Math.max(0, r.distinct - PREVIEW_MAX) || r.phone !== Math.max(0, r.distinct - PREVIEW_MAX_PHONE));
+const phoneRule = /\.app\[data-form-factor="phone"\] \.tg-glyph:nth-child\(n \+ (\d+)\) \{ display: none; \}/.exec(STYLES_RAW);
+const phoneRuleCut = phoneRule ? Number(phoneRule[1]) - 1 : null;
+console.log(`  wide cut PREVIEW_MAX=${PREVIEW_MAX}, phone cut PREVIEW_MAX_PHONE=${PREVIEW_MAX_PHONE}; the phone rule hides from glyph ${phoneRule ? phoneRule[1] : 'ABSENT'} (i.e. keeps ${phoneRuleCut})`);
+for (const r of cutRows) console.log(`  ${r.key.padEnd(24)} distinct=${r.distinct} +${r.wide} wide / +${r.phone} phone`);
+assert('tg4.the-plus-N-counter-matches-the-glyphs-that-tier-did-not-draw',
+  badCut.length === 0 && phoneRuleCut === PREVIEW_MAX_PHONE,
+  badCut.length === 0 && phoneRuleCut === PREVIEW_MAX_PHONE
+    ? `every card's "+N" is its own distinct-shape count minus its tier's cut (wide ${PREVIEW_MAX}, phone ${PREVIEW_MAX_PHONE}), and the CSS glyph cut keeps exactly ${phoneRuleCut} glyphs — the component and the stylesheet state the SAME cut, so a user never reads a "+N" that disagrees with the glyphs on screen`
+    : `${badCut.length} card(s) miscount; the phone cut in styles.css keeps ${phoneRuleCut} glyphs against the component's ${PREVIEW_MAX_PHONE}`);
+
+/* ---------- tg5 — the gallery creates nothing ----------------------------- */
+/* The four blocked identifiers are built by CONCATENATION: this file must not
+ *  spell them as bare words, because a future reader would then be unable to
+ *  tell an assertion from a violation. The claim itself is stronger than a
+ *  comment-stripped read — it is checked against the RAW source, comments and
+ *  all, so even mentioning one of these calls in prose would fail it. */
+const MUTATORS = ['create' + 'Board', 'save' + 'Board', 'flush' + 'Save', 'push' + 'History'];
+const mutatorHits = MUTATORS.filter(n => TG_RAW.includes(n));
+console.log(`  forbidden calls in the gallery's RAW source: [${mutatorHits.join(', ')}] (${MUTATORS.length} checked)`);
+assert('tg5.the-gallery-contains-no-board-mutation-call',
+  mutatorHits.length === 0 && /onUse\(c\.key\)/.test(TG) && /onUse: \(pick: string\) => void|onUse: \(pick: string\)/.test(TG),
+  mutatorHits.length === 0
+    ? `the gallery hands a \`\${preset}:\${templateId}\` key to \`onUse\` and nothing else — the four board-mutation calls are absent from the raw source, so the create path stays the single owner of board creation`
+    : `the gallery's source references ${mutatorHits.join(', ')}`);
+/* THE COUNT IS MEASURED, NOT GUESSED AT. App.tsx has FOUR `boards.createBoard`
+   call sites and had exactly four BEFORE this round (bootstrap's first-run
+   board, duplicate, delete's replace-with-Untitled fallback, and the dialog's
+   create branch). The claim this assertion can honestly make is that the
+   gallery added NO FIFTH — and the number is pinned here so a future round that
+   adds one has to come and change it deliberately. */
+const createCallSites = (APP_RAW.match(/boards\.createBoard\(/g) ?? []).length;
+console.log(`  boards.createBoard call sites in App.tsx: ${createCallSites} (4 before this round: bootstrap / duplicate / delete-fallback / the dialog's create branch)`);
+assert('tg6.App-keeps-the-create-path-and-feeds-it-the-choice',
+  createCallSites === 4
+    && /const useTemplate = useCallback\(\(key: string\) => \{[\s\S]*?setBoardPick\(key\);[\s\S]*?setBoardDlg\('create'\);/.test(APP_RAW)
+    && /initialPick=\{boardPick \?\? undefined\}/.test(APP_RAW)
+    && /onUse=\{useTemplate\}/.test(APP_RAW)
+    && /getPreset\(pid\)\.templates\?\.find\(x => x\.id === r\.seed!\.templateId\)/.test(APP_RAW),
+  `App.tsx still creates a board from exactly the same ${createCallSites} places as before this round (the gallery added none); the gallery's choice travels as \`boardPick\` -> \`initialPick\` and the seed is resolved by the SAME \`getPreset(pid).templates?.find(...)\` lookup the dialog has always used`);
+
+/* ---------- tg7 — the gallery adds no layout surface of its own ------------ */
+const dataAttrs = [...TG.matchAll(/\sdata-[a-z-]+=/g)].map(m => m[0].trim());
+const mediaQueries = (TG.match(/@media/g) ?? []).length;
+const layoutProps = (TG.match(/prop-for-layout/g) ?? []).length;
+const tgStyles = STYLES_RAW.slice(STYLES_RAW.indexOf('PACKAGE-TEMPLATES §2.5 Pass 2'));
+const tgBlocks = (tgStyles.match(/(?:^|\n)\.(?:tg|bd-browse)[^{]*\{[^}]*\}/g) ?? []).join('\n');
+const tgHex = (tgBlocks.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
+const tgRgb = (tgBlocks.match(/rgba?\(/g) ?? []).length;
+const tgBreakpoints = (STYLES_RAW.match(/@media[^{]*\b(1229|768|1024|1279|1280|1023|767)\b/g) ?? []).length;
+console.log(`  data-* attributes in the gallery: [${dataAttrs.join(', ')}]`);
+console.log(`  @media in the gallery component: ${mediaQueries}; numbers of the form a-viewport-width inside @media in styles.css: ${tgBreakpoints}`);
+console.log(`  the .tg-*/.bd-browse block: ${tgBlocks.split('\n').length} rule(s), ${tgHex} hex, ${tgRgb} rgb()`);
+assert('tg7.the-gallery-adds-no-layout-attribute-no-media-query-and-no-colour',
+  dataAttrs.length === 1 && dataAttrs[0] === 'data-templates-gallery=' && mediaQueries === 0
+    && tgHex === 0 && tgRgb === 0 && HEX === FIXTURE.hexLiterals,
+  `the ONE data attribute is the test marker "data-templates-gallery" (not a layout hook), there is no @media query and no viewport number anywhere in the component, and the new CSS block carries ${tgHex} hex / ${tgRgb} rgb() literals against a stylesheet still at ${HEX} — tier behaviour is scoped ENTIRELY on the existing [data-form-factor] / [data-orientation] attributes`);
+assert('tg8.tier-rules-use-the-existing-attributes-only',
+  /\.app\[data-form-factor="tablet"\] \.tg-rail\b/.test(STYLES_RAW)
+    && /\.app\[data-form-factor="phone"\] \.tg-card\b/.test(STYLES_RAW)
+    && /\.app\[data-form-factor="tablet"\] \.tg-rail \{[\s\S]*?flex-direction: row;[\s\S]*?overflow-x: auto;[\s\S]*?min-width: 0;/.test(STYLES_RAW)
+    && /grid-template-columns: repeat\(auto-fill, minmax\(240px, 1fr\)\)/.test(STYLES_RAW)
+    && !/\.app\[data-form-factor[^\]]*="(?:small|medium|large|xs|sm|lg|xl)"/.test(STYLES_RAW),
+  'desktop = rail + an auto-fill minmax(240px) card grid; tablet and phone reuse the `.settings-nav-list` strip pattern (row + overflow-x: auto + min-width: 0); the phone card is the full-bleed sheet. Every rule is scoped on an EXISTING attribute — no new tier value is invented');
+
+/* ---------- tg9 — 1229 is still the ONE breakpoint number ----------------- */
+const ueiStripped = stripTs(UEI_RAW);
+const ueiRaw1229 = (UEI_RAW.match(/1229/g) ?? []).length;
+const ueiStripped1229 = (ueiStripped.match(/1229/g) ?? []).length;
+const inGallery = (TG.match(/1229/g) ?? []).length;
+console.log(`  1229 in src/useEditorInterface.ts: ${ueiRaw1229} raw / ${ueiStripped1229} with comments blanked; in the gallery component: ${inGallery}`);
+assert('tg9.the-one-breakpoint-number-is-untouched-and-unmoved',
+  ueiStripped1229 === 1 && inGallery === 0 && /export const dockedSidebarBreakpoint = 1229;/.test(UEI_RAW),
+  `the raw file spells 1229 ${ueiRaw1229} times (once in a comment that documents the value, once in \`export const dockedSidebarBreakpoint = 1229;\`), so exactly ${ueiStripped1229} CODE occurrence remains — one number, one runtime, and the gallery names it ${inGallery} times, i.e. it does not introduce or re-spell a breakpoint`);
+
+/* ---------- tg10 — the modal vocabulary and the focus contract ------------- */
+assert('tg10.the-gallery-reuses-the-modal-vocabulary-and-the-focus-contract',
+  /className="sp-overlay tg-overlay"/.test(TG)
+    && /className="sp-card tg-card"/.test(TG)
+    && /role="dialog"/.test(TG) && /aria-modal="true"/.test(TG)
+    && /import \{FOCUSABLE\} from '\.\/Settings'/.test(TG_RAW)
+    && /document\.addEventListener\('keydown', onDocKey, true\)/.test(TG)
+    && /e\.stopPropagation\(\)/.test(TG)
+    && /returnFocusTo\?\.current\?\.focus\(\)/.test(TG)
+    && /firstCard\.current\.focus\(\)/.test(TG),
+  'the scrim and shell are the app\'s existing `.sp-overlay` / `.sp-card` (not a third modal vocabulary), `FOCUSABLE` is IMPORTED from Settings.tsx rather than re-implemented, Escape is captured with stopPropagation, and the focus contract is the app\'s: the FIRST CARD takes focus on open and `returnFocusTo?.current?.focus()` on close');
+
+/* ---------- tg11 — the "Browse all templates…" row is a route, not a radio -- */
+/* RE-ANCHORED, NOT DELETED, and the reason is recorded: this round adds a row
+ *  INSIDE `.bd-list`, which is exactly the kind of change that can turn a
+ *  "one radiogroup" claim into a lie. AC 16a above is still GREEN and is NOT
+ *  weakened — the new row carries no `role`, so the radiogroup count is
+ *  unchanged — but nothing in the old assertion would have noticed if it had
+ *  carried one. This assertion pins the new row's non-radio status explicitly,
+ *  and pins that the roving walk still indexes `opts`, which the row is absent
+ *  from. */
+const browseRow = /className="bd-browse"[\s\S]{0,160}?Browse all templates…/.exec(DIALOG_RAW);
+const browseHasRole = /className="bd-browse"[^>]*role=/.test(DIALOG_RAW);
+const browseHasTabIndex = /className="bd-browse"[^>]*tabIndex/.test(DIALOG_RAW);
+console.log(`  "Browse all templates…" row present: ${!!browseRow}; role= on it: ${browseHasRole}; tabIndex= on it: ${browseHasTabIndex}`);
+assert('16a-REANCHOR.the-browse-row-cannot-enter-the-radio-walk',
+  !!browseRow && !browseHasRole && !browseHasTabIndex
+    && /const opts = useMemo\(\(\) => rows\.filter\(r => r\.kind === 'opt'\)\.map\(r => r\.key\), \[rows\]\)/.test(DIALOG_RAW)
+    && radioGroups === 1
+    && /for \(const id of Object\.keys\(PRESETS\) as PresetId\[\]\)/.test(DIALOG_RAW),
+  'the row renders literally AFTER the mapped rows, so it is not a `Row` and never reaches `rows`; `opts` is still `rows.filter(r => r.kind === \'opt\')`, so the arrow/Home/End walk (which indexes `opts`) still moves ONLY between real radios and cannot count or land on this row. Reason for the re-anchor: the row is new to `.bd-list` this round, and AC 16a as written would not have noticed a `role="radio"` on it');
+assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
+  /setBoardsOpen\(false\); setTgOpen\(true\)/.test(APP_RAW)
+    && /Templates…/.test(APP_RAW)
+    && /onBrowse=\{\(\) => \{ setBoardDlg\(null\); setBoardPick\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+    && /if \(tgOpen\) return;/.test(APP_RAW)
+    && /onBrowse\?: \(\) => void;/.test(DIALOG_RAW)
+    && /onClick=\{onBrowse\}/.test(DIALOG_RAW),
+  'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s trailing row, which closes the dialog and opens the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`, below `boardDlg`), so app shortcuts stay inert behind it');
+assert('tg12.an-empty-group-never-renders-a-header',
+  galleryFamilies.every(f => f.groups.length > 0 && f.groups.every(g => g.cards.length > 0))
+    && /\.filter\(g => g\.entries\.length > 0\)/.test(TG)
+    && catalog.every(f => f.groups.every(g => g.entries.length > 0)),
+  `the CATALOG already omits empty groups (asserted directly here, not assumed) AND the gallery filters again — so an empty header is unreachable at both layers; today ${galleryFamilies.reduce((n, f) => n + f.groups.length, 0)} groups across ${galleryFamilies.length} families all carry cards`);
+
+/* ===========================================================================
+   PASS 2 PRE-FIX CONTROLS — the same predicates over synthetic OFFENDING input.
+   The convention this file already established for Pass 1: a control that also
+   passes on the pre-fix tree proves nothing. The Pass 2 predicates are text
+   predicates and a card-model predicate, so the controls below run them against
+   a hand-built violation and assert they go RED. Nothing here writes a file.
+=========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('PASS 2 CONTROLS — the gallery predicates must be RED on a violating input');
+console.log('='.repeat(78));
+
+/* pre7 — the "no breakpoint / no layout attribute" predicates, over a synthetic
+ *  component that DOES add both. Constructed as a string: no file is written and
+ *  the real tree is not touched. */
+const OFFENDING_TG_SRC = [
+  'export default function Bad() {',
+  '  return <div className="sp-overlay" data-form-factor="compact" data-tg-pane="wide">',
+  '    <style>{`.tg-card { width: 100%; } @media (max-width: 900px) { .tg-rail { display: none } }`}</style>',
+  '  </div>;',
+  '}',
+].join('\n');
+const offendingAttrs = [...OFFENDING_TG_SRC.matchAll(/\sdata-[a-z-]+=/g)].map(m => m[0].trim());
+const offendingMedia = (OFFENDING_TG_SRC.match(/@media/g) ?? []).length;
+const realAttrs = [...TG.matchAll(/\sdata-[a-z-]+=/g)].map(m => m[0].trim());
+const realMedia = (TG.match(/@media/g) ?? []).length;
+console.log(`  offending sample: ${offendingAttrs.length} data-* attribute(s) [${offendingAttrs.join(', ')}], ${offendingMedia} @media; the real gallery: ${realAttrs.length}, ${realMedia}`);
+assert('pre7.REPLAY-the-tier-probe-is-RED-on-a-component-that-adds-a-breakpoint',
+  offendingAttrs.length > 1 && offendingMedia > 0 && realAttrs.length === 1 && realMedia === 0,
+  `the predicate (exactly ONE data-* attribute, no @media) is RED on a component carrying ${offendingAttrs.length} data-* attributes and ${offendingMedia} @media query and GREEN on the real gallery (${realAttrs.length}, ${realMedia}) — so tg7 has a live target rather than passing vacuously`);
+
+/* pre8 — the "every glyph is one of that template's own shapes" predicate, over
+ *  a strip built the way a hard-coded list WOULD build it: five flowchart shape
+ *  ids regardless of the template's own nodes. */
+const HARDCODED_STRIP = ['terminator', 'process', 'decision', 'io', 'document'];
+const fakeTemplate = {nodes: [{data: {shape: 'database', colorKey: 'cyan'}}], edges: []};
+const fakeOwn = new Set(fakeTemplate.nodes.map(n => n.data.shape));
+const fakeStrays = HARDCODED_STRIP.filter(s => !fakeOwn.has(s));
+const realStrips = galleryCards.map(c => {
+  const entry = byPair.get(c.key);
+  const own = new Set((entry?.t.nodes ?? []).map(n => n.data?.shape).filter(Boolean));
+  own.add(FALLBACK_SHAPE);
+  return c.glyphs.map(x => x.shape).filter(s => !own.has(s));
+});
+console.log(`  a hard-coded strip on a one-node template: ${fakeStrays.length}/5 shapes outside that template's own nodes [${fakeStrays.join(', ')}]; the real strips: ${realStrips.reduce((n, s) => n + s.length, 0)} strays`);
+assert('pre8.REPLAY-the-derived-preview-probe-is-RED-on-a-hard-coded-strip',
+  fakeStrays.length === 5 && realStrips.every(s => s.length === 0),
+  `a strip enumerated from a fixed shape list puts ${fakeStrays.length}/5 ids outside a template that contains none of them (RED), while every one of the ${galleryCards.length} real strips is inside its own template's nodes ∪ the documented fallback (GREEN) — the subset predicate can fail, which is what makes tg2 a measurement rather than a tautology`);
+
 /* ---------- the untouched-invariants gate --------------------------------- */
 console.log('\n' + '='.repeat(78));
 console.log('GATES — invariants this round must not move');

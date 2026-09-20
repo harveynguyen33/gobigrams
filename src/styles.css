@@ -2163,6 +2163,20 @@ kbd {
   text-transform: uppercase; color: var(--dim);
 }
 .bd-hd:first-child { margin-top: 0; }
+/* PACKAGE-TEMPLATES §2.5 Pass 2 — the "Browse all templates…" route. It reuses
+   the `.bd-opt` row grammar (same border, radius, height) so it reads as the
+   list's last row, but it is NOT one: no radio, no tick, no selected state. The
+   caption colour is `--sel` — the same "this goes somewhere" accent `.tg-tile-cta`
+   and the app's other links use — and every value is an existing token. */
+.bd-browse {
+  display: flex; align-items: center; width: 100%;
+  background: transparent; color: var(--sel);
+  border: 1px dashed var(--border-strong); border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; text-align: left;
+  font-family: var(--mono); font-size: 11.5px;
+  transition: background .12s, border-color .12s;
+}
+.bd-browse:hover { background: var(--elevated); border-style: solid; }
 .bd-opt {
   display: flex; align-items: center; gap: 9px; width: 100%;
   background: transparent; color: var(--fg);
@@ -4221,3 +4235,184 @@ kbd {
    whose only effect is to mislead is the defect this sheet keeps a sweep for, so
    it is absent by construction and the harness exempts this ONE property by name
    (see `p.the-flex-keyword-is-read-by-every-text-box-with-that-boxs-own-fallback`). */
+
+/* ---------- PACKAGE-TEMPLATES §2.5 Pass 2: the Templates gallery ------------
+   A BROWSE surface over the ONE catalog (`src/templateCatalog.ts`). It reuses
+   the app's existing modal vocabulary verbatim — `.sp-overlay` scrim, `.sp-card`
+   shell, the `.bd-head` / `.bd-title` / `.bd-sub` / `.bd-x` head row — so the
+   gallery and the board dialog read as siblings, and adds only the `.tg-*` names
+   below.
+
+   TOKENS ONLY: --surface / --elevated / --border / --border-strong / --sel /
+   --dim / --fg / --shadow-pop (from `.sp-card`) and the `--c-*` shape accents the
+   previews inherit. No literal colour appears in this block.
+
+   NO NEW BREAKPOINT AND NO `@media` QUERY. Every tier rule below is scoped on
+   the `data-form-factor` / `data-orientation` attributes
+   `src/useEditorInterface.ts` already writes, so the gallery introduces no
+   second threshold and no layout prop. The numbers that do appear are CSS
+   lengths inside a card and the preview-glyph cut (see the `nth-child` rule and
+   its comment) — no viewport width. */
+.tg-overlay {
+  /* Above the board dialog (45): the gallery can be opened from the dialog's
+     own trailing row, so it must outrank it. Still below Settings and the tour,
+     exactly as `.bd-overlay` is. */
+  z-index: 46;
+  /* FLEX, not the inherited `display:grid` + `place-items:center`.
+     `.sp-overlay` centres with a grid whose implicit auto track is sized by the
+     CARD's own `width`, so the card's `max-width: calc(100% - 48px)` resolved
+     AGAINST THAT TRACK (~920px), not against the overlay — the cyclic
+     percentage-in-auto-track trap this project already hit once in the Settings
+     modal. Measured at tablet 1024×768: the card came out 872px wide at x=224
+     and overflowed the viewport by 72px with no scroll container able to reveal
+     it. A flex container has a DEFINITE size (`inset: 0`), so a percentage on
+     the item resolves against the real overlay. */
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.tg-card {
+  /* Fill the space the overlay actually has, up to the design width. */
+  width: 100%; max-width: 920px;
+  height: 100%; max-height: 640px;
+  min-width: 0; min-height: 0;
+  padding: 14px 16px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  overflow: hidden;
+}
+.tg-body {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 190px minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* ---- the family rail (left pane at the desktop tier) ---- */
+.tg-rail {
+  display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto; min-width: 0;
+  border-right: 1px solid var(--border);
+  padding-right: 10px;
+}
+.tg-rail-fam { display: flex; flex-direction: column; gap: 2px; }
+.tg-rail-fam-label {
+  margin: 0 0 2px 2px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim);
+}
+/* Navigation, NOT a filter: §3.5 settled level as a label + grouping header, so
+   a rail item scrolls its section into view and carries no selected state. */
+.tg-rail-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: transparent; color: var(--dim); text-align: left;
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 7px 10px; cursor: pointer;
+  font-family: var(--sans); font-size: 12.5px; transition: all .12s;
+}
+.tg-rail-item:hover { background: var(--surface); color: var(--fg); }
+.tg-rail-n { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+/* ---- the card grid (right pane at the desktop tier) ---- */
+.tg-grid { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.tg-sec { display: flex; flex-direction: column; gap: 7px; scroll-margin-top: 2px; }
+.tg-sec-hd {
+  margin: 0;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim);
+}
+.tg-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.tg-tile {
+  display: flex; flex-direction: column; gap: 6px; width: 100%;
+  background: var(--surface); color: var(--fg); text-align: left;
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 10px 11px; cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.tg-tile:hover { background: var(--elevated); border-color: var(--border-strong); }
+/* The first card takes focus on open, so the focus indicator must be visible
+   and token-built rather than left to the user agent. */
+.tg-tile:focus-visible { outline: 2px solid var(--sel); outline-offset: 1px; }
+.tg-tile-top { display: flex; align-items: center; gap: 8px; }
+.tg-tile-name { font-weight: 600; font-size: 12.5px; }
+.tg-chip {
+  margin-left: auto; flex: none;
+  border: 1px solid var(--border-strong); background: var(--elevated);
+  color: var(--dim); border-radius: 999px; padding: 1px 7px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+}
+.tg-preview { display: flex; align-items: center; gap: 4px; min-height: 18px; }
+.tg-glyphs { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; min-width: 0; }
+.tg-glyph { display: grid; place-items: center; }
+.tg-more { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+/* The phone counter is the component's own `PREVIEW_MAX_PHONE` remainder; only
+   ONE of the two counters is visible per tier, so the "+N" a user reads always
+   accounts for the glyphs that tier did not draw. */
+.tg-more-phone { display: none; }
+.tg-tile-hint { font-family: var(--mono); font-size: 10px; color: var(--dim); line-height: 1.45; }
+.tg-tile-meta { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+.tg-tile-cta {
+  margin-top: 2px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--sel);
+}
+
+/* ---- tablet: the rail becomes a horizontal, scrolling strip ABOVE the grid.
+   The pattern `.settings-nav-list` already proved — `row`, `overflow-x: auto`,
+   `min-width: 0`, the shrinking half — reused rather than reinvented. Portrait
+   and landscape share it: the tier attributes already encode orientation, so a
+   variant is a future edit and not a second rule written now. ---- */
+.app[data-form-factor="tablet"] .tg-body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.app[data-form-factor="tablet"] .tg-rail {
+  flex-direction: row; align-items: center; gap: 10px;
+  overflow-x: auto; overflow-y: visible; min-width: 0;
+  border-right: none; border-bottom: 1px solid var(--border);
+  padding-right: 0; padding-bottom: 8px;
+}
+.app[data-form-factor="tablet"] .tg-rail-fam { flex-direction: row; align-items: center; gap: 4px; }
+.app[data-form-factor="tablet"] .tg-rail-fam-label { margin: 0 2px 0 0; white-space: nowrap; }
+.app[data-form-factor="tablet"] .tg-rail-item { width: auto; white-space: nowrap; }
+
+.app[data-form-factor="tablet"] .tg-overlay {
+  /* The overlay already pads 24px; the compact tiers give the card the room they
+     have rather than a second padding value. */
+  padding: 18px;
+}
+.app[data-form-factor="tablet"] .tg-card {
+  /* `height:100%` inside a flex overlay that is `align-items:center` would
+     shrink-wrap against an indefinite cross size. Give the card a definite
+     height at this tier and let `max-height` cap it, so the grid inside keeps
+     `min-height:0` semantics and scrolls rather than overflowing. */
+  height: auto; max-height: 100%;
+}
+
+/* ---- phone (either orientation): a full-bleed sheet, ONE column, the rail as
+   a scrolling strip, and previews capped at four glyphs plus "+N". The cap is
+   the SAME cut as the component's `PREVIEW_MAX_PHONE`, stated once per runtime:
+   the rule below hides every glyph from the fifth on, i.e. `PREVIEW_MAX_PHONE`
+   + 1, and `checks/package-templates.mjs` asserts the two agree. ---- */
+.app[data-form-factor="phone"] .tg-overlay { display: flex; padding: 0; }
+.app[data-form-factor="phone"] .tg-card {
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  border-radius: 0; border: none;
+  /* The overlay is a flex row at `align-items:center`; at the phone tier the
+     sheet must FILL it, so stretch the cross axis back to its default. */
+  align-self: stretch;
+}
+.app[data-form-factor="phone"] .tg-body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.app[data-form-factor="phone"] .tg-rail {
+  flex-direction: row; align-items: center; gap: 10px;
+  overflow-x: auto; overflow-y: visible; min-width: 0;
+  border-right: none; border-bottom: 1px solid var(--border);
+  padding-right: 0; padding-bottom: 8px;
+}
+.app[data-form-factor="phone"] .tg-rail-fam { flex-direction: row; align-items: center; gap: 4px; }
+.app[data-form-factor="phone"] .tg-rail-fam-label { margin: 0 2px 0 0; white-space: nowrap; }
+.app[data-form-factor="phone"] .tg-rail-item { width: auto; white-space: nowrap; }
+.app[data-form-factor="phone"] .tg-tiles { grid-template-columns: minmax(0, 1fr); }
+.app[data-form-factor="phone"] .tg-glyph:nth-child(n + 5) { display: none; }
+.app[data-form-factor="phone"] .tg-more-wide { display: none; }
+.app[data-form-factor="phone"] .tg-more-phone { display: inline; }

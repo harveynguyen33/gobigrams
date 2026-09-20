@@ -58,6 +58,13 @@ type Props = {
    *  hand a choice over instead of creating a board itself. `undefined` = no
    *  pre-selection, which is what every caller means today. */
   initialPick?: string;
+  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the trailing "Browse all templates…" route
+   *  into the gallery. The row is deliberately NOT a `Row`: it is rendered
+   *  literally after the mapped rows, so it never enters `rows`, never enters
+   *  `opts`, and the roving-tabindex walk therefore cannot land on it or count
+   *  it. It is a second ROUTE to the same catalog, not a second board-creation
+   *  path — the gallery hands its choice back to THIS dialog via `initialPick`. */
+  onBrowse?: () => void;
 };
 
 /* Every template the app ships, flattened with the preset that owns it. Read from
@@ -109,7 +116,7 @@ const catRows = (): Row[] => {
   return rows;
 };
 
-export default function BoardDialog({mode, boardName, onCancel, onSubmit, returnFocusTo, initialPick}: Props) {
+export default function BoardDialog({mode, boardName, onCancel, onSubmit, returnFocusTo, initialPick, onBrowse}: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // `create` starts from "Untitled" the way the old prompt did; `rename` starts
@@ -329,6 +336,29 @@ export default function BoardDialog({mode, boardName, onCancel, onSubmit, return
                       </button>
                     );
                   })}
+                  {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the trailing "Browse all
+                      templates…" route into the gallery.
+
+                      IT IS NOT A RADIO AND MUST NOT BE ONE. It is rendered
+                      HERE, after the map, literally: it is not a `Row`, so it
+                      never enters `rows`, never enters `opts` (which is
+                      `rows.filter(r => r.kind === 'opt')`), and the roving
+                      walk — which indexes `opts` — can therefore never land on
+                      it or count it as one of the group's choices. It carries no
+                      `role` and no `tabIndex`, so it is not an arrow-key target
+                      and a screen reader does not announce it as "one of N". It
+                      stays a normal Tab stop, which is what a keyboard user
+                      expects of a link out of a dialog.
+
+                      It does NOT create a board either: it asks the caller to
+                      open the gallery, and the gallery hands its choice back to
+                      THIS dialog through `initialPick`. Board creation keeps its
+                      single owner. */}
+                  {onBrowse && (
+                    <button type="button" className="bd-browse" onClick={onBrowse}>
+                      Browse all templates…
+                    </button>
+                  )}
                 </div>
               </>
             )}
