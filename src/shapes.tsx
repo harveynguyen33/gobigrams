@@ -196,8 +196,16 @@ export function ShapeFrame({shape}: {shape: Shape}) {
       // Trapezoid, wide base on top — a step performed by a person.
       return wrap(<path d="M2 2 H198 L164 98 H36 Z" {...p} />, 'manual');
     case 'delay':
-      // D-shape — a waiting period. The only asymmetric shape, so its ports read.
-      return wrap(<path d="M2 2 H100 A 48 48 0 0 1 100 98 H2 Z" {...p} />, 'delay');
+      /* D-shape — a waiting period. The only asymmetric shape, so its ports read.
+         FIX (2026-09-20): the arc used to be `M2 2 H100 A 48 48 …` — r=48 from
+         x=100 puts the rightmost point at x=148 in a 200-wide viewBox, leaving a
+         52-unit (26%) empty strip that the selection box, the alignment guides
+         and the auto-layout all treated as part of the node. A user reported it
+         as "the grip box contains it but it sinks in, not flush". The flat run now
+         ends at x=122 so a 78-radius arc lands EXACTLY on 200, the same
+         construction `display` below already used. The bulge is identical; only
+         the flat part is longer, which is also the truer D-shape. */
+      return wrap(<path d="M2 2 H122 A 78 48 0 0 1 122 98 H2 Z" {...p} />, 'delay');
     case 'connector':
       // Small circle — an on-page jump (label it A / B / 1 / 2).
       return wrap(<circle cx="100" cy="50" r="48" {...p} />, 'connector');
@@ -309,7 +317,10 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
     case 'manual':
       return wrap(<path d="M1 4 H25 L21 14 H5 Z" {...s} />, 'manual');
     case 'delay':
-      return wrap(<path d="M1 3 H13 A 6 6 0 0 1 13 15 H1 Z" {...s} />, 'delay');
+      /* The mini glyph must match ShapeFrame's own fix: the arc has to land on
+         the right edge of the 26×18 viewBox, not stop short of it (see the
+         ShapeFrame `delay` case for the measurement). */
+      return wrap(<path d="M1 3 H18 A 6 6 0 0 1 18 15 H1 Z" {...s} />, 'delay');
     case 'connector':
       return wrap(<circle cx="13" cy="9" r="5.6" {...s} />, 'connector');
 
