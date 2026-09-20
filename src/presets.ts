@@ -541,7 +541,7 @@ const flowchartApprovalTemplate: TemplateSpec = {
 /* ===========================================================================
    PACKAGE-TEMPLATES §4 — THE FLOWCHART TEMPLATE FAMILY.
 
-   ONE DOMAIN (flat-pack furniture assembly, D1) at three depths. The ladder is
+   ONE DOMAIN (online ordering and delivery, D5) at three depths. The ladder is
    NOT "3, 8 and 16 shapes picked by feel": it is THREE CONTIGUOUS BANDS of the
    palette above, which is already ordered by increasing difficulty —
      basic    = palette rows 0-4   (terminator, process, decision, io, document)
@@ -570,25 +570,28 @@ const flowNote = (id: string, text: string, x: number, y: number): Node => ({
 });
 
 /* LEVEL 1 — BASIC. 10 flow nodes, 11 edges, 5 shapes, one genuine back-edge
-   (b9 → b7: "tighten and recheck"). Colour keys stay inside the flowchart
-   preset's OWN legend — no new key, no new token. */
+   (b9 → b8: "retry"). Colour keys stay inside the flowchart preset's OWN legend
+   — no new key, no new token. Node text obeys the per-symbol grammar (§4.0, D6):
+   process = ACTION (an imperative), decision = QUESTION (ends in "?"),
+   io / document = DATA (a noun phrase naming the thing), terminator = MARKER
+   (a state). The five violations §4.0 measured are exactly the cases this fixes. */
 const flowchartBasicTemplate: TemplateSpec = {
   id: 'flow-basic',
-  label: 'Flat-pack assembly',
-  hint: 'basic · 5 common shapes · one tighten-and-recheck loop',
+  label: 'Place an online order',
+  hint: 'basic · 5 common shapes · one retry-the-payment loop',
   level: 'basic',
   order: 1,
   nodes: [
-    flowNode('b1', 'terminator', 'Start — open the flat box', 'green', 380, 60, FLOWCHART_NODE_SIZE),
-    flowNode('b2', 'io', 'Count the parts against the checklist', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
-    flowNode('b3', 'process', 'Lay out the panels and the fittings', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
-    flowNode('b4', 'decision', 'All parts present?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
-    flowNode('b5', 'process', 'Keep the spare fittings in the box', 'cyan', 0, 920, FLOWCHART_NODE_SIZE),
-    flowNode('b6', 'process', 'Fit the dowels and the cam locks', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
-    flowNode('b7', 'document', 'Follow the printed step sheet', 'violet', 380, 1135, FLOWCHART_NODE_SIZE),
-    flowNode('b8', 'decision', 'Frame square and steady?', 'amber', 380, 1350, FLOWCHART_NODE_SIZE),
-    flowNode('b9', 'process', 'Tighten every cam a quarter turn', 'cyan', 0, 1565, FLOWCHART_NODE_SIZE),
-    flowNode('b10', 'terminator', 'End — unit assembled', 'green', 380, 1565, FLOWCHART_NODE_SIZE),
+    flowNode('b1', 'terminator', 'Order started', 'green', 380, 60, FLOWCHART_NODE_SIZE),
+    flowNode('b2', 'io', 'Cart items and prices', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
+    flowNode('b3', 'process', 'Check stock for each item', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
+    flowNode('b4', 'decision', 'All items in stock?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
+    flowNode('b5', 'process', 'Email the customer about missing items', 'cyan', 0, 920, FLOWCHART_NODE_SIZE),
+    flowNode('b6', 'process', 'Reserve the items', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
+    flowNode('b7', 'document', 'Order confirmation', 'violet', 380, 1135, FLOWCHART_NODE_SIZE),
+    flowNode('b8', 'decision', 'Payment cleared?', 'amber', 380, 1350, FLOWCHART_NODE_SIZE),
+    flowNode('b9', 'process', 'Retry the payment', 'cyan', 0, 1565, FLOWCHART_NODE_SIZE),
+    flowNode('b10', 'terminator', 'Order confirmed', 'green', 380, 1565, FLOWCHART_NODE_SIZE),
   ],
   edges: [
     makeEdge('b1', 'b2', FLOWCHART_EDGES, 'fb1'),
@@ -600,11 +603,11 @@ const flowchartBasicTemplate: TemplateSpec = {
     makeEdge('b6', 'b7', FLOWCHART_EDGES, 'fb7'),
     makeEdge('b7', 'b8', FLOWCHART_EDGES, 'fb8'),
     makeEdge('b8', 'b10', FLOWCHART_EDGES, 'fb9', {label: 'Yes'}),
-    // the genuine back-edge: b8 → b9 → b7 re-enters b7, which is UPSTREAM of
-    // b9, so the engine must remove it from the DAG and never collapse the
-    // loop onto layer 0 (the bug `approval` was kept for).
-    makeEdge('b8', 'b9', FLOWCHART_EDGES, 'fb10', {label: 'No — not square'}),
-    makeEdge('b9', 'b7', FLOWCHART_EDGES, 'fb11', {label: 'tighten and recheck'}),
+    // the genuine back-edge: b9 → b8 re-enters the decision that produced it,
+    // so the engine must remove it from the DAG (it is the ONLY feedback arc
+    // here) and never collapse the loop onto layer 0.
+    makeEdge('b8', 'b9', FLOWCHART_EDGES, 'fb10', {label: 'No'}),
+    makeEdge('b9', 'b8', FLOWCHART_EDGES, 'fb11', {label: 'retry'}),
   ],
 };
 
@@ -613,26 +616,26 @@ const flowchartBasicTemplate: TemplateSpec = {
    rather than a long edge — a second layout-regression case beside `approval`. */
 const flowchartAdvancedTemplate: TemplateSpec = {
   id: 'flow-advanced',
-  label: 'Flat-pack assembly + glue',
+  label: 'Order — stock to packing',
   hint: 'advanced · adds subprocess, preparation, manual, delay, connector · no lanes',
   level: 'advanced',
   order: 1,
   nodes: [
-    flowNode('c1', 'terminator', 'Start — open the flat box', 'green', 380, 60, FLOWCHART_NODE_SIZE),
-    flowNode('c2', 'io', 'Compare the box contents with the parts checklist', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
-    flowNode('c3', 'preparation', 'Lay out the panels, the fittings and the allen key', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
-    flowNode('c4', 'decision', 'Needs a second pair of hands?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
-    flowNode('c5', 'manual', 'Ask a second person to hold the side panel', 'green', 0, 920, FLOWCHART_NODE_SIZE),
-    flowNode('c6', 'subprocess', 'Build the drawer box (set out on its own sheet)', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
-    flowNode('c7', 'delay', 'Wait 30 minutes for the wood glue to set', 'amber', 380, 1135, FLOWCHART_NODE_SIZE),
-    flowNode('c8', 'process', 'Fit the shelf and tighten the cam locks', 'cyan', 380, 1350, FLOWCHART_NODE_SIZE),
-    flowNode('c9', 'document', 'Check the frame against the printed drawing', 'violet', 380, 1565, FLOWCHART_NODE_SIZE),
-    flowNode('c10', 'decision', 'Frame square and level?', 'amber', 380, 1780, FLOWCHART_NODE_SIZE),
+    flowNode('c1', 'terminator', 'Packing started', 'green', 380, 60, FLOWCHART_NODE_SIZE),
+    flowNode('c2', 'io', 'Stock reserved for the order', 'violet', 380, 275, FLOWCHART_NODE_SIZE),
+    flowNode('c3', 'preparation', 'Set up the packing station', 'cyan', 380, 490, FLOWCHART_NODE_SIZE),
+    flowNode('c4', 'decision', 'Any item marked fragile?', 'amber', 380, 705, FLOWCHART_NODE_SIZE),
+    flowNode('c5', 'manual', 'Wrap the fragile item by hand', 'green', 0, 920, FLOWCHART_NODE_SIZE),
+    flowNode('c6', 'subprocess', 'Run the packing procedure (set out on its own sheet)', 'cyan', 380, 920, FLOWCHART_NODE_SIZE),
+    flowNode('c7', 'delay', 'Waiting for the courier pickup', 'amber', 380, 1135, FLOWCHART_NODE_SIZE),
+    flowNode('c8', 'process', 'Seal and label the parcel', 'cyan', 380, 1350, FLOWCHART_NODE_SIZE),
+    flowNode('c9', 'document', 'Packing slip', 'violet', 380, 1565, FLOWCHART_NODE_SIZE),
+    flowNode('c10', 'decision', 'Parcel matches the packing slip?', 'amber', 380, 1780, FLOWCHART_NODE_SIZE),
     flowNode('c11', 'connector', 'A', 'slate', 760, 1780, FLOWCHART_NODE_SIZE),
     flowNode('c12', 'connector', 'A', 'slate', 760, 1995, FLOWCHART_NODE_SIZE),
-    flowNode('c13', 'process', 'Wipe the unit down and move it into place', 'cyan', 380, 1995, FLOWCHART_NODE_SIZE),
-    flowNode('c14', 'terminator', 'End — unit assembled', 'green', 380, 2210, FLOWCHART_NODE_SIZE),
-    flowNote('cNote', 'The drawer box is a sub-assembly: build it on its own sheet before the shelf goes in.', 760, 60),
+    flowNode('c13', 'process', 'Hand the parcel to the courier', 'cyan', 380, 1995, FLOWCHART_NODE_SIZE),
+    flowNode('c14', 'terminator', 'Packing done', 'green', 380, 2210, FLOWCHART_NODE_SIZE),
+    flowNote('cNote', 'Packing runs on its own sheet: it is a sub-assembly of the order, not a step of it.', 760, 60),
   ],
   edges: [
     makeEdge('c1', 'c2', FLOWCHART_EDGES, 'fa1'),
@@ -648,9 +651,9 @@ const flowchartAdvancedTemplate: TemplateSpec = {
     makeEdge('c10', 'c13', FLOWCHART_EDGES, 'fa11', {label: 'Yes'}),
     // the connector pair: c12 → c8 re-enters c8 (several layers upstream of
     // c11), so this is a genuine back-edge through an on-page jump.
-    makeEdge('c10', 'c11', FLOWCHART_EDGES, 'fa12', {label: 'No — not square'}),
+    makeEdge('c10', 'c11', FLOWCHART_EDGES, 'fa12', {label: 'No — mismatch'}),
     makeEdge('c11', 'c12', FLOWCHART_EDGES, 'fa13'),
-    makeEdge('c12', 'c8', FLOWCHART_EDGES, 'fa14', {label: 'wrong hole — back to the fittings'}),
+    makeEdge('c12', 'c8', FLOWCHART_EDGES, 'fa14', {label: 'repack — back to the sealing step'}),
     makeEdge('c13', 'c14', FLOWCHART_EDGES, 'fa15'),
   ],
 };
@@ -661,36 +664,36 @@ const flowchartAdvancedTemplate: TemplateSpec = {
    honest job in the process — no node exists only to carry a shape. */
 const flowchartComplexTemplate: TemplateSpec = {
   id: 'flow-complex',
-  label: 'Flat-pack assembly — full notation',
+  label: 'Online order — full notation',
   hint: 'complex · all 16 flowchart shapes · two pages',
   level: 'complex',
   order: 1,
   nodes: [
-    flowNode('d1', 'terminator', 'Start — flat box on the floor', 'green', 380, 70, FLOWCHART_NODE_SIZE),
-    flowNode('d2', 'io', 'Compare the box contents with the parts checklist', 'violet', 380, 285, FLOWCHART_NODE_SIZE),
-    flowNode('d3', 'document', 'Read the printed instruction sheet', 'violet', 380, 500, FLOWCHART_NODE_SIZE),
-    flowNode('d4', 'manualinput', 'Write the unit number on the box label by hand', 'green', 380, 715, FLOWCHART_NODE_SIZE),
-    flowNode('d5', 'preparation', 'Lay out the panels, the fittings and the allen key', 'cyan', 380, 930, FLOWCHART_NODE_SIZE),
-    flowNode('d6', 'decision', 'Needs a second pair of hands?', 'amber', 380, 1145, FLOWCHART_NODE_SIZE),
-    flowNode('d7', 'manual', 'Ask a second person to hold the side panel', 'green', 0, 1360, FLOWCHART_NODE_SIZE),
-    flowNode('d8', 'subprocess', 'Build the drawer box (set out on its own sheet)', 'cyan', 760, 1360, FLOWCHART_NODE_SIZE),
-    flowNode('d9', 'display', 'Step diagram — the page you keep re-reading', 'violet', 380, 1575, FLOWCHART_NODE_SIZE),
-    flowNode('d10', 'internalstorage', 'Loose fittings held in the box during the job', 'violet', 380, 1790, FLOWCHART_NODE_SIZE),
-    flowNode('d11', 'looplimit', 'Loop: for each of the 8 cam locks', 'amber', 380, 2005, FLOWCHART_NODE_SIZE),
-    flowNode('d12', 'process', 'Push the next cam lock home', 'cyan', 380, 2220, FLOWCHART_NODE_SIZE),
-    flowNode('d13', 'decision', 'Cam locks left to fit?', 'amber', 380, 2435, FLOWCHART_NODE_SIZE),
-    flowNode('d14', 'delay', 'Wait 30 minutes for the wood glue to set', 'amber', 380, 2650, FLOWCHART_NODE_SIZE),
-    flowNode('d15', 'process', 'Fit the shelf and the drawer box', 'cyan', 380, 2865, FLOWCHART_NODE_SIZE),
-    flowNode('d16', 'decision', 'Frame square and level?', 'amber', 380, 3080, FLOWCHART_NODE_SIZE),
+    flowNode('d1', 'terminator', 'Order placed', 'green', 380, 70, FLOWCHART_NODE_SIZE),
+    flowNode('d2', 'io', 'Order accepted — items and prices', 'violet', 380, 285, FLOWCHART_NODE_SIZE),
+    flowNode('d3', 'document', 'Order confirmation', 'violet', 380, 500, FLOWCHART_NODE_SIZE),
+    flowNode('d4', 'manualinput', 'Recipient phone number', 'green', 380, 715, FLOWCHART_NODE_SIZE),
+    flowNode('d5', 'preparation', 'Set up the packing station', 'cyan', 380, 930, FLOWCHART_NODE_SIZE),
+    flowNode('d6', 'decision', 'Any item marked fragile?', 'amber', 380, 1145, FLOWCHART_NODE_SIZE),
+    flowNode('d7', 'manual', 'Wrap the fragile item by hand', 'green', 0, 1360, FLOWCHART_NODE_SIZE),
+    flowNode('d8', 'subprocess', 'Run the packing procedure (set out on its own sheet)', 'cyan', 760, 1360, FLOWCHART_NODE_SIZE),
+    flowNode('d9', 'display', 'Order total and shipping fee', 'violet', 380, 1575, FLOWCHART_NODE_SIZE),
+    flowNode('d10', 'internalstorage', 'Cart items, kept until the session closes', 'violet', 380, 1790, FLOWCHART_NODE_SIZE),
+    flowNode('d11', 'looplimit', 'For each of 8 items', 'amber', 380, 2005, FLOWCHART_NODE_SIZE),
+    flowNode('d12', 'process', 'Pack the next cart item', 'cyan', 380, 2220, FLOWCHART_NODE_SIZE),
+    flowNode('d13', 'decision', 'Items left to pack?', 'amber', 380, 2435, FLOWCHART_NODE_SIZE),
+    flowNode('d14', 'delay', 'Waiting for the courier pickup', 'amber', 380, 2650, FLOWCHART_NODE_SIZE),
+    flowNode('d15', 'process', 'Seal and label the parcel', 'cyan', 380, 2865, FLOWCHART_NODE_SIZE),
+    flowNode('d16', 'decision', 'Parcel matches the packing slip?', 'amber', 380, 3080, FLOWCHART_NODE_SIZE),
     flowNode('d17', 'connector', 'A', 'slate', 760, 3080, FLOWCHART_NODE_SIZE),
     flowNode('d18', 'connector', 'A', 'slate', 1140, 3080, FLOWCHART_NODE_SIZE),
-    flowNode('d19', 'storeddata', 'Leftover screws — kept in the box', 'violet', 380, 3295, FLOWCHART_NODE_SIZE),
-    flowNode('d20', 'offpage', 'To page 2 — fix the unit to the wall', 'slate', 380, 3510, FLOWCHART_NODE_SIZE),
-    flowNode('d21', 'offpage', 'From page 1 — unit assembled', 'slate', 380, 3725, FLOWCHART_NODE_SIZE),
-    flowNode('d22', 'process', 'Lift the unit into place', 'cyan', 380, 3940, FLOWCHART_NODE_SIZE),
-    flowNode('d23', 'decision', 'Sits flush against the wall?', 'amber', 380, 4155, FLOWCHART_NODE_SIZE),
-    flowNode('d24', 'terminator', 'End — unit assembled and in place', 'green', 380, 4370, FLOWCHART_NODE_SIZE),
-    flowNote('dNote', 'Two pages: page 1 assembles the frame, page 2 fixes the unit to the wall. The off-page connectors mark the page break.', 760, 70),
+    flowNode('d19', 'storeddata', 'Order history log', 'violet', 380, 3295, FLOWCHART_NODE_SIZE),
+    flowNode('d20', 'offpage', 'To page 2: deliver the parcel', 'slate', 380, 3510, FLOWCHART_NODE_SIZE),
+    flowNode('d21', 'offpage', 'From page 1: order packed', 'slate', 380, 3725, FLOWCHART_NODE_SIZE),
+    flowNode('d22', 'process', 'Load the parcel on the van', 'cyan', 380, 3940, FLOWCHART_NODE_SIZE),
+    flowNode('d23', 'decision', 'Address found by the courier?', 'amber', 380, 4155, FLOWCHART_NODE_SIZE),
+    flowNode('d24', 'terminator', 'Order delivered', 'green', 380, 4370, FLOWCHART_NODE_SIZE),
+    flowNote('dNote', 'Two pages: page 1 takes the order to a sealed parcel, page 2 delivers it. The off-page connectors mark the page break.', 760, 70),
   ],
   edges: [
     makeEdge('d1', 'd2', FLOWCHART_EDGES, 'fx1'),
@@ -706,23 +709,23 @@ const flowchartComplexTemplate: TemplateSpec = {
     makeEdge('d10', 'd11', FLOWCHART_EDGES, 'fx11'),
     makeEdge('d11', 'd12', FLOWCHART_EDGES, 'fx12'),
     makeEdge('d12', 'd13', FLOWCHART_EDGES, 'fx13'),
-    // back-edge 1 — the cam-lock loop runs into its OWN loop-limit marker
-    makeEdge('d13', 'd12', FLOWCHART_EDGES, 'fx14', {label: 'Yes — next lock'}),
-    makeEdge('d13', 'd14', FLOWCHART_EDGES, 'fx15', {label: 'No — all fitted'}),
+    // back-edge 1 — the packing loop runs back into its own loop-limit marker
+    makeEdge('d13', 'd12', FLOWCHART_EDGES, 'fx14', {label: 'Yes — next item'}),
+    makeEdge('d13', 'd14', FLOWCHART_EDGES, 'fx15', {label: 'No — all packed'}),
     makeEdge('d14', 'd15', FLOWCHART_EDGES, 'fx16'),
     makeEdge('d15', 'd16', FLOWCHART_EDGES, 'fx17'),
-    makeEdge('d16', 'd17', FLOWCHART_EDGES, 'fx18', {label: 'No — not square'}),
+    makeEdge('d16', 'd17', FLOWCHART_EDGES, 'fx18', {label: 'No — mismatch'}),
     makeEdge('d17', 'd18', FLOWCHART_EDGES, 'fx19'),
-    // back-edge 2 — through the connector pair, back to the fittings
-    makeEdge('d18', 'd11', FLOWCHART_EDGES, 'fx20', {label: 'wrong hole — back to the fittings'}),
+    // back-edge 2 — through the connector pair, back to the packing loop
+    makeEdge('d18', 'd11', FLOWCHART_EDGES, 'fx20', {label: 'wrong item — back to the packing loop'}),
     makeEdge('d16', 'd19', FLOWCHART_EDGES, 'fx21', {label: 'Yes'}),
     makeEdge('d19', 'd20', FLOWCHART_EDGES, 'fx22'),
     makeEdge('d20', 'd21', FLOWCHART_EDGES, 'fx23', {label: 'page 2'}),
     makeEdge('d21', 'd22', FLOWCHART_EDGES, 'fx24'),
     makeEdge('d22', 'd23', FLOWCHART_EDGES, 'fx25'),
     makeEdge('d23', 'd24', FLOWCHART_EDGES, 'fx26', {label: 'Yes'}),
-    // back-edge 3 — "not flush" sends the unit back to be lifted again
-    makeEdge('d23', 'd22', FLOWCHART_EDGES, 'fx27', {label: 'No — not flush'}),
+    // back-edge 3 — "not found" sends the parcel back out on the van
+    makeEdge('d23', 'd22', FLOWCHART_EDGES, 'fx27', {label: 'No — address not found'}),
   ],
 };
 

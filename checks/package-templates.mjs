@@ -359,7 +359,7 @@ for (const r of scanRows) console.log(`  ${r.id.padEnd(14)} ${r.strings} strings
 assert('11.the-new-templates-carry-no-identifying-string',
   scanRows.every(r => r.hits.length === 0),
   scanRows.every(r => r.hits.length === 0)
-    ? `${scanRows.reduce((n, r) => n + r.strings, 0)} strings scanned across the three templates: no email, no URL, no brand/person word — flat-pack furniture reads the same to every user`
+    ? `${scanRows.reduce((n, r) => n + r.strings, 0)} strings scanned across the three templates: no email, no URL, no brand/person word — an online order reads the same to every user`
     : scanRows.flatMap(r => r.hits).join('; '));
 
 /* ---------- AC 12 — tokens only ------------------------------------------- */
@@ -457,6 +457,7 @@ for (const t of [basic, advanced, complex].filter(Boolean)) {
   console.log(`  ${t.id.padEnd(14)} level=${String(t.level).padEnd(9)} label="${t.label}"`);
   console.log(`  ${' '.repeat(14)} hint="${t.hint}"`);
   console.log(`  ${' '.repeat(14)} nodes=${t.nodes.length} edges=${t.edges.length} distinct flow shapes=${shapeSet(t).size} back-edges=${t.edges.filter(e => pos.get(e.source)?.y > pos.get(e.target)?.y).length}`);
+  console.log(`  ${' '.repeat(14)} shape set = ${[...shapeSet(t)].sort().join(', ')}`);
 }
 console.log(`  ${'approval'.padEnd(14)} level=${String(appr?.level).padEnd(9)} label="${appr?.label}" (metadata-only change; arrays byte-identical)`);
 assert('20.the-three-templates-print-their-measured-numbers',
@@ -464,6 +465,74 @@ assert('20.the-three-templates-print-their-measured-numbers',
   present
     ? `the three templates print nodes / edges / distinct shape count / level above; approval's level is reported too`
     : 'one or more of the three ids is MISSING from the flowchart family — the numbers above are empty');
+
+/* ---------- AC 21 — D6, the per-symbol node-text grammar (§4.0) ------------ */
+console.log('\n' + '='.repeat(78));
+console.log('AC 21 — D6: every node text obeys the grammar of its OWN symbol (§4.0)');
+console.log('='.repeat(78));
+/* The four content kinds of §4.0. The mapping is per-SYMBOL, not per-template, so
+ *  the SAME predicate reads all three levels — a user who learns it at Basic can
+ *  read Complex. Every text is read from the BUNDLED module, never transcribed. */
+const KIND_OF = {
+  action:   ['process', 'preparation', 'manual', 'subprocess'],
+  question: ['decision'],
+  data:     ['io', 'manualinput', 'display', 'storeddata', 'internalstorage', 'document'],
+  marker:   ['connector', 'offpage', 'looplimit', 'terminator', 'delay'],
+};
+/* The small imperative denylist the §4.0 violations actually used: `Check`,
+ *  `Follow`, `Write` on DATA symbols, plus `Wait` on a MARKER (`delay`) — a
+ *  `delay` node opening with `Wait…` is the exact defect the marker rule forbids. */
+const IMPERATIVES = ['Check', 'Follow', 'Write', 'Read', 'Fit', 'Push', 'Wait'];
+const isQuestion = s => String(s).trim().endsWith('?');
+const firstWord = s => String(s).trim().split(/\s+/)[0] ?? '';
+/** null = the text obeys its symbol's grammar; otherwise a one-line reason. */
+function grammarViolation(shape, text) {
+  const t = String(text ?? '').trim();
+  if (!t) return 'empty text';
+  if (KIND_OF.question.includes(shape)) return isQuestion(t) ? null : 'a QUESTION must end with "?"';
+  if (KIND_OF.action.includes(shape)) return isQuestion(t) ? 'an ACTION must not end with "?"' : null;
+  if (KIND_OF.data.includes(shape)) {
+    if (isQuestion(t)) return 'a DATA text must not end with "?"';
+    const w = firstWord(t);
+    return IMPERATIVES.includes(w) ? `a DATA text must not open with the imperative ${JSON.stringify(w)}` : null;
+  }
+  if (KIND_OF.marker.includes(shape)) {
+    const w = firstWord(t);
+    return IMPERATIVES.includes(w) ? `a MARKER text must not open with the imperative ${JSON.stringify(w)}` : null;
+  }
+  return null; /* `note` is an annotation, not a flowchart symbol — excluded (§4.0) */
+}
+const KINDED_SHAPES = new Set([...KIND_OF.action, ...KIND_OF.question, ...KIND_OF.data, ...KIND_OF.marker]);
+/* The union MUST be the 16 palette shapes: a shape the mapping forgets would
+ *  escape the probe entirely, which is how a grammar rule rots silently. */
+const uncoveredShapes = PALETTE_SHAPES.filter(s => !KINDED_SHAPES.has(s));
+console.log(`  kind mapping covers ${KINDED_SHAPES.size}/16 palette shapes; uncovered = [${uncoveredShapes.join(', ')}]`);
+const grammarRows = [basic, advanced, complex].filter(Boolean).map(t => {
+  const flow = t.nodes.filter(n => n.type !== 'label' && n.data?.shape !== 'note' && n.data?.shape !== 'group');
+  const byKind = {action: 0, question: 0, data: 0, marker: 0};
+  for (const n of flow) for (const [k, list] of Object.entries(KIND_OF)) if (list.includes(n.data.shape)) byKind[k]++;
+  const bad = flow
+    .map(n => ({template: t.id, id: n.id, shape: n.data.shape, text: String(n.data?.title ?? '')}))
+    .filter(o => grammarViolation(o.shape, o.text) !== null)
+    .map(o => ({...o, why: grammarViolation(o.shape, o.text)}));
+  return {id: t.id, flow: flow.length, byKind, bad, excluded: t.nodes.length - flow.length};
+});
+for (const r of grammarRows) {
+  console.log(`  ${r.id.padEnd(14)} ${r.flow} flow nodes  ACTION=${r.byKind.action} QUESTION=${r.byKind.question} ` +
+    `DATA=${r.byKind.data} MARKER=${r.byKind.marker}  excluded(annotation)=${r.excluded}  offenders=${r.bad.length}`);
+}
+for (const r of grammarRows) {
+  for (const o of r.bad) {
+    console.log(`      OFFENDER  {template: ${o.template}, id: ${o.id}, shape: ${o.shape}, text: ${JSON.stringify(o.text)}} — ${o.why}`);
+  }
+}
+assert('21.every-node-text-obeys-its-symbols-grammar',
+  grammarRows.length === 3 && uncoveredShapes.length === 0 && grammarRows.every(r => r.bad.length === 0),
+  uncoveredShapes.length
+    ? `the §4.0 kind mapping leaves ${uncoveredShapes.length} palette shape(s) uncovered (${uncoveredShapes.join(', ')}) — a node of that shape would escape the probe`
+    : grammarRows.every(r => r.bad.length === 0)
+      ? `all ${grammarRows.reduce((n, r) => n + r.flow, 0)} flow nodes across the three templates obey §4.0: every decision ends in "?", no ACTION ends in "?", and no DATA/MARKER text opens with one of the ${IMPERATIVES.length} measured action verbs (${IMPERATIVES.join(', ')})`
+      : `${grammarRows.reduce((n, r) => n + r.bad.length, 0)} offender(s) printed above as {template, id, shape, text}`);
 
 /* ===========================================================================
    PRE-FIX REPLAY — each new assertion red before the change
@@ -552,6 +621,47 @@ assert('pre3.REPLAY-does-not-disturb-the-live-tree',
     && !!complex && eq(shapeSet(complex), new Set(PALETTE_AT(16)))
     && tpl('approval')?.level === 'advanced',
   `after the replay the LIVE catalog still reports ${allEntries.length} entries, |L3|=${complex ? L3.size : 'n/a'}, approval.level=${tpl('approval')?.level ?? 'none'} — the replay mutated a deep copy in memory only`);
+
+/* AC 21's control. The D6 grammar probe is only worth running if it is RED on
+   content that violates it. §4.0's table lists FIVE held violations, but only
+   TWO of them are IMPERATIVE-OPENER defects — `Follow` on a `document`,
+   `Write` on a `manualinput` — which is the only shape of defect AC 21's
+   wording predicate tests. The other three are symbol-choice defects that
+   §4.0 itself describes as NOT wording problems: the `io` text opens with
+   `Count` (not in the spec's denylist), the `looplimit` text restates the loop,
+   and the `storeddata` text DESCRIBES the store instead of naming it. So the
+   control asserts two things and states the boundary rather than over-claiming:
+     pre4 — every violation AC 21's predicate CAN catch is RED, and its §4.0
+            correction is green; plus the MARKER half of the rule (`Wait` on a
+            `delay`) is RED, which is the rule's other stated case.
+     pre5 — the boundary, recorded: the three non-imperative §4.0 violations are
+            NOT caught by a first-word wording predicate, by §4.0's own account.
+   The pairs are quoted from §4.0's table; nothing is transcribed from the tree. */
+const D6_WORDING_VIOLATIONS = [
+  {shape: 'document', held: 'Follow the printed step sheet', fixed: 'Order confirmation', why: 'an ACTION in a DOCUMENT symbol'},
+  {shape: 'manualinput', held: 'Write the unit number on the box label by hand', fixed: 'Recipient phone number', why: 'an ACTION in a MANUALLY-ENTERED-DATA symbol'},
+  {shape: 'delay', held: 'Wait 30 minutes for the wood glue to set', fixed: 'Waiting for the courier pickup', why: 'an imperative opening a MARKER symbol (the rule applied to `delay`)'},
+];
+const D6_SYMBOL_CHOICE_VIOLATIONS = [
+  {shape: 'io', held: 'Count the parts against the checklist', fixed: 'Cart items and prices', why: 'an ACTION in a DATA symbol, opening with a verb outside the spec denylist'},
+  {shape: 'looplimit', held: 'Loop: for each of the 8 cam locks', fixed: 'For each of 8 items', why: 'restates the loop the symbol already says — not a first-word defect'},
+  {shape: 'storeddata', held: 'Leftover screws — kept in the box', fixed: 'Order history log', why: 'DESCRIBES the store instead of naming it — not a first-word defect'},
+];
+const d6Wording = D6_WORDING_VIOLATIONS.map(v => ({...v, held: grammarViolation(v.shape, v.held), fixed: grammarViolation(v.shape, v.fixed)}));
+for (const r of d6Wording) console.log(`  ${r.shape.padEnd(13)} held → ${r.held ? 'RED' : 'green'} [${r.why}]  |  §4.0 correction → ${r.fixed ? 'RED' : 'green'}`);
+const d6SymbolChoice = D6_SYMBOL_CHOICE_VIOLATIONS.map(v => ({...v, held: grammarViolation(v.shape, v.held), fixed: grammarViolation(v.shape, v.fixed)}));
+for (const r of d6SymbolChoice) console.log(`  ${r.shape.padEnd(13)} held → ${r.held ? 'RED' : 'green (outside the wording predicate)'} [${r.why}]`);
+assert('pre4.REPLAY-AC21-is-RED-on-every-violation-its-predicate-can-catch',
+  d6Wording.every(r => r.held !== null) && d6Wording.every(r => r.fixed === null),
+  d6Wording.every(r => r.held !== null)
+    ? `${d6Wording.length}/${d6Wording.length} catchable forms are RED (${d6Wording.map(r => r.shape).join(', ')}) and all ${d6Wording.length} of their §4.0 corrections are green — the wording rule is not vacuous`
+    : `only ${d6Wording.filter(r => r.held !== null).length}/${d6Wording.length} held forms are red — the predicate would let an ACTION through a DATA/MARKER symbol`);
+assert('pre5.REPLAY-AC21s-reach-is-the-imperative-opener-subset-and-that-is-recorded',
+  d6SymbolChoice.every(r => r.held === null) && d6SymbolChoice.every(r => r.fixed === null),
+  `${d6SymbolChoice.length} of §4.0's five measured violations are NOT caught by AC 21's first-word predicate and cannot be: ` +
+  d6SymbolChoice.map(r => `${r.shape} (${r.why})`).join('; ') +
+  `. §4.0 states this boundary itself — "the five violations above were not wording problems, they were five symbols sitting on the wrong step". ` +
+  `AC 21 is therefore a wording probe over the 16 symbols, not a full audit of §4.0's table.`);
 
 /* ---------- the untouched-invariants gate --------------------------------- */
 console.log('\n' + '='.repeat(78));

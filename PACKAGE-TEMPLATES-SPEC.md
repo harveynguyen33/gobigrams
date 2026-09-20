@@ -315,45 +315,123 @@ existing tokens only, no new hex (§6 AC 12).
 
 ## 4. The three Flowchart templates
 
+### 4.0 The node-text grammar (D6)
+
+**This section exists because Harvey could not read the first draft.** His words (round 1): *"content khó hiểu
+quá khó mà kiểu biết được đó là process, đó là input"* — reading a node's text, you cannot tell what KIND of
+step it is. The answer is a **rule about text**, not nicer-sounding words: **every node's text must obey the
+grammar of its symbol**, so a reader can infer the symbol from the sentence alone. This grammar is the fix;
+§4.3–§4.5 must demonstrate it.
+
+**The grammar is per-SYMBOL, not per-template.** All three levels obey the same rule, so a user who learns it at
+Basic can read Complex. There are four content kinds:
+
+| kind | symbols | the sentence must be | example |
+|---|---|---|---|
+| **ACTION** | Process, Preparation, Manual operation, **Subprocess** | an imperative verb phrase | "Reserve the items" · "Wrap the fragile item by hand" |
+| **QUESTION** | Decision | a question, ending in `?` | "All items in stock?" |
+| **DATA / THING** | Input-Output, Manual input, Display, Stored data, Internal storage, **Document** | a NOUN phrase naming the data or the store — NEVER the act of producing it | "Cart items and prices" · "Order history log" |
+| **MARKER** | Terminal, Loop limit, On-page connector, Off-page connector, **Delay** | a state, a noun phrase or a jump label — never an action | "Order started" · "For each of 8 items" · "A" · "To page 2: deliver" |
+
+**Three symbols the kinds table has to be read into, stated rather than assumed.** The brief's kind table
+lists four symbol groups and leaves three of the 16 out; all are placed here by the grammar's own logic, and
+all are listed in bold above so the placement is auditable rather than silent:
+
+* **`subprocess` is an ACTION symbol.** The palette calls it "a procedure defined elsewhere" — it is still a
+  step the process performs, so its grammar is an imperative naming the procedure ("Run the packing
+  procedure…"). (The alternative reading — a noun phrase, "the packing procedure" — would make a step that
+  the flow actually performs read as a piece of data, which is the §4.0 defect in the other direction; the
+  ACTION reading is taken, and recorded here so the choice is visible.)
+* **`document` is a DATA / THING symbol.** The brief's violation list treats it that way in so many words
+  ("an ACTION ("follow") in a symbol that means a DOCUMENT"), so its grammar is a noun phrase naming the
+  artifact — "Order confirmation" — never the act of reading it.
+* **`delay` is a MARKER symbol.** A delay is a WAIT: the process is not doing anything, it is waiting for an
+  external event, so its grammar is a state, not an imperative — "Waiting for the courier pickup". (This is
+  why the probe's denylist of imperative openers includes `Wait`: a `delay` node opening with "Wait…" is the
+  exact defect the marker rule forbids.)
+
+**THE DEFECT THIS FIXES, WITH ITS MEASURED EVIDENCE.** Before D6, the flat-pack content of §4.3–§4.5 (the
+superseded D5 content) contained **5 nodes that violate the grammar** — measured by the orchestrator by walking
+every node of the three templates and applying the mapping above:
+
+| # | symbol | held (violation) | why it is wrong | corrected form (this round) |
+|---|---|---|---|---|
+| 1 | `io` | *"Count the parts against the checklist"* | an **ACTION** in a symbol that means **DATA** — the reader sees a parallelogram and reads a verb | *"Cart items and prices"* (a noun phrase naming the data) |
+| 2 | `document` | *"Follow the printed step sheet"* | an **ACTION** ("follow") in a symbol that means a **DOCUMENT** — the symbol names the artifact, not what you do with it | *"Order confirmation"* (the document itself) |
+| 3 | `looplimit` | *"Loop: for each of the 8 cam locks"* | restates the loop and spends characters on the word `Loop:`, which the symbol **already says** — a marker, not a description | *"For each of 8 items"* (a marker) |
+| 4 | `manualinput` | *"Write the unit number on the box label by hand"* | an **ACTION** ("write") in a symbol that means **MANUALLY-ENTERED DATA** — the verb belongs to the human, the node names the value | *"Recipient phone number"* (the data entered) |
+| 5 | `storeddata` | *"Leftover screws — kept in the box"* | a **description** instead of the **NAME of the store** — the reader cannot tell whether the node stores, holds or discards | *"Order history log"* (the store's name) |
+
+**THE RULE:** **a node whose text cannot be written in its symbol's grammar means the symbol is wrong for that
+step — move the step, do not bend the sentence.** If a step is genuinely an action, it belongs in an ACTION
+symbol; renaming it into a noun phrase to satisfy this section would hide a wrong symbol behind a tidy label,
+which is the opposite of the point. The grammar is therefore a **symbol-choice probe disguised as a wording
+rule**: the five violations above were not wording problems, they were five symbols sitting on the wrong step.
+
+**Auditability:** every node table in §4.3–§4.4–§4.5 carries a `kind` column, so the grammar is checked by
+reading the table. §6 AC 21 makes it a runnable probe over the bundled module.
+
 ### 4.1 The domain: how the candidates were weighed
 
 Harvey's constraints: one easy-to-understand domain, split into three depths, universally understandable,
-no domain training, generic for a shared tool, and **not a purchase/approval workflow** (`approval`
-already covers that). The domain below is a **settled decision** (§8.1, D1) — the table is kept as the
-record of how it was reached, not as an open choice.
+no domain training, generic for a shared tool, and **not a purchase/approval workflow** (`approval` already
+covers that). The domain is a **settled decision** (§8.1, **D5**) — the table below is kept as the record of
+how it was reached, not as an open choice.
 
-| Candidate | Case for | Case against |
-|---|---|---|
-| **A. A load of laundry / wash day** | daily, understood by anyone (no training), long enough to have a genuine multi-phase process, and **every one of the 16 ISO 5807 symbols has an honest home in it** | **the previous pick, set aside by Harvey after the mockup (D1)** — its `offpage`, `display` and both storage symbols need a reading, and its lanes had to be phases rather than roles. Kept on record as the RUNNER-UP: it is a genuinely viable domain and the only reason it lost is that B is funnier and fits the symbols more directly |
-| **B. Flat-pack furniture assembly** — self-assembly furniture from a flat box | daily, understood by anyone (no training, no domain vocabulary), long enough for a genuine multi-phase process, and **all 16 ISO 5807 symbols have an honest home in it** — and for the three symbols A only reaches by convention, an OBJECT rather than a metaphor: `offpage` is page 2 of the printed instruction sheet, `storeddata` is the bag of leftover screws kept forever, `internalstorage` is the loose parts held in the box during the job | none material. It is a household chore like A, so no brand, company, person or locale is needed (and none is used) |
-| **C. Cat into carrier** | short, universal, funny | **rejected:** it FAKES three symbols — `storeddata` and `internalstorage` have no honest object in a two-minute procedure, and `offpage` would be borrowed for a one-page flow |
-| **D. Out-the-door-on-time** | universal, genuinely multi-phase | **rejected:** it FAKES two symbols — `offpage` (again a one-page flow) and `storeddata` (nothing in it persists between sessions) |
+**(2026-09-20, second review round — corrected in place, D5.)** The first draft of this section weighed
+*wash day / flat-pack furniture / cat into carrier / out-the-door-on-time* and committed to flat-pack
+furniture (D1). Harvey re-opened the domain, so it was re-decided on a MEASURED criterion.
 
-**COMMITTED DOMAIN: B — "flat-pack furniture assembly" (self-assembly furniture from a flat box).**
-Harvey's call (verbatim: *"với tôi B rất ok"*), and it is the honest one: it beats A because the three
-symbols A only reaches by convention get a concrete object instead — **page 2 of the printed instruction
-sheet** (`offpage`, the literally correct use of the home plate, not a convention borrowed for the
-occasion), **the bag of leftover screws kept forever** (`storeddata`, a store that persists between
-sessions and is both read and written), and **the loose parts held in the box during assembly**
-(`internalstorage` — held only during the job, gone when it ends, which is the honest contrast pair with
-`storeddata`). `display` is the **step diagram you keep re-reading**, a readout of data back to the
-operator; `delay` is **waiting for the wood glue to set**; `manual` is **the step that needs a second
-person**; `manualinput` is **a value written onto the box or label by hand**; `subprocess` is a
-**pre-built sub-assembly** ("build the drawer box — a procedure defined elsewhere"); `looplimit` is the
-loop's own start marker ("for each of the 8 cam locks"); `connector` is an **on-page jump back to an
-earlier step** ("wrong hole — back to step 3"); `preparation` is **laying out the parts and the allen key
-before starting**; `decision` is real branches (does this step need two people? are there screws left
-over? is it square?); `document` is **the printed instruction page itself**; `io` is the **parts checklist
-compared against the box contents**; `terminator` is start / done. It contains no purchase, no approval,
-no company, no brand, no person, no locale, no URL and no email — flat-pack furniture reads the same to
-every user.
+Harvey, verbatim (round 2): *"Ý là có thể đổi sang 1 domain để vẽ flowchart tốt hơn k. nội dung hiện tại
+hơi khó hiểu"* — the **domain** is the problem, not the wording. He had said the same about the content one
+level down in round 1: *"content khó hiểu quá khó mà kiểu biết được đó là process, đó là input"*.
 
-**The one convention-dependent symbol stays `offpage`** (as in the set-aside candidate): even here it is a
-**page-break convention** — a reader has to accept that a printed sheet has two sides/pages — rather than
-an object with a shape in the room. It is the *most* honest use of the symbol of any candidate (the
-procedure really does continue on page 2 of the sheet, and the board really is a two-page board), but it
-is still a reading, so §4.5 keeps the **pre-written 3-line fallback** for it and C3 lists it as a live
-conflict.
+The criterion is the one the previous swap used, and it is a **count**: how many of the 16 ISO 5807 symbols
+the domain hosts with an honest job. A domain loses a symbol when its only honest job would be a metaphor or a
+convention the reader has to decode — which is exactly the decoding cost Harvey rejected — or when the
+process has no such step at all.
+
+| domain | symbols hosted honestly |
+|---|---|
+| **A. Online ordering and delivery — CHOSEN** | **16/16** |
+| B. Sending a parcel at a post office | 12/16 |
+| C. ATM cash withdrawal | 11/16 |
+| D. Login + OTP | 9/16 |
+
+**COMMITTED DOMAIN: A — "online ordering and delivery"** (`order placed → cart → stock → payment →
+packing → delivery → done`). Harvey's call, and it is the honest one: it is the **only** candidate that hosts
+all 16 symbols with an honest job (table above), which is the same hard criterion that decided the previous
+swap. Its domain vocabulary is the vocabulary of every online shop, so nothing needs decoding: a reader knows
+what a cart is, what stock is, what a courier is. The honest jobs for the hard symbols, each reused verbatim in
+§4.3–§4.5:
+
+* `internalstorage` = **the temporary cart, gone when the session closes** — held only while the order runs.
+* `storeddata` = **the order-history log, kept and read between sessions** — the honest contrast pair with
+  `internalstorage` (persistence, not "memory").
+* `manual` = **hand-wrapping a fragile item** — a step done by hand, not by the system.
+* `offpage` = **page 2 (the delivery leg)** — the order's own two-stage structure.
+* `display` = **the order total + shipping fee shown back to the user** — a readout of data to the user.
+* `manualinput` = **the recipient phone number typed in** — a value a person enters by hand.
+* `subprocess` = **the packing procedure, set out on its own sheet** — defined elsewhere.
+* `looplimit` = **the loop over the items in the cart** — the loop's own start marker.
+* `delay` = **waiting for the courier pickup** — a real wait the process cannot skip.
+* `preparation` = **setting up the packing station** — the setup before the action.
+* `connector` = **an on-page jump back to an earlier step** — "back to the payment step".
+
+**FLAT-PACK FURNITURE ASSEMBLY IS THE RUNNER-UP, kept on record (D5, §8.1).** It remains a genuinely viable
+domain and its own mapping is preserved in the superseded D1 note in §8.1: it hosts 16/16 on paper, but its
+hard symbols (`cam lock`, `dowel`, `allen key`, `printed step sheet`) carry trade vocabulary a reader has to
+decode — which is precisely the cost Harvey rejected — and its `document`/`io` jobs invite the ACTION-in-a-
+DATA-symbol mistakes catalogued in §4.0. It is not deleted, so a future round can return to it without
+re-deriving anything: it is not an alternative implementation, it is the second choice.
+
+**The one convention-dependent symbol stays `offpage`** — even here it is a **page-break convention**: the
+order genuinely has two legs (payment/confirmation and delivery), and the board really is a two-page board,
+but a reader still has to accept that a process drawing may be split across pages rather than finding the
+break in the object itself. It is the *most* honest use of the symbol of any candidate (the delivery leg
+really does continue on page 2, and the board really does carry the pair), but it is still a reading, so §4.5
+keeps the **pre-written 3-line fallback** for it and C3 lists it as a live conflict. This is the ONE symbol
+the domain swap did not make self-evident, and it is stated rather than hidden.
 
 ### 4.2 The level ladder is the palette's own order (the measurable rule)
 
@@ -369,9 +447,11 @@ flowchart palette, which Harvey already curated in increasing difficulty** — t
 
 This makes §6's shape ACs one-line probes (`palette.slice(0,5).map(p => p.shape)`) and makes the difficulty
 claim honest: a level's difficulty IS how far down the curated palette it goes. **The ladder is independent
-of the domain** — it is a rule over the palette's own row order, so swapping the domain (D1: wash day →
-flat-pack furniture) changed *no* shape set and therefore **costs no acceptance criterion**: AC 5/6/7/8
-still measure exactly the same three sets, sizes 5/10/16, strictly nested. `Lane` and `Note` sit outside
+of the domain** — it is a rule over the palette's own row order, so swapping the domain changed *no* shape set
+and therefore **costs no acceptance criterion**: AC 5/6/7/8 still measure exactly the same three sets, sizes
+5/10/16, strictly nested. (**D5, 2026-09-20:** the ladder has now survived two domain swaps unchanged — the
+first from wash day to flat-pack furniture (D1), the second from flat-pack furniture to online ordering and
+delivery — which is the evidence that it is domain-free by construction.) `Lane` and `Note` sit outside
 the 16 (they are `group`/`note` shapes); this round adds `Note` once at Advanced and once at Complex, and
 **no `Lane` at any level** (D3, §8.1) — `Lane` usage is deferred to a separate future round.
 
@@ -383,27 +463,35 @@ in it. `subprocess/preparation/manual/delay/connector` are genuinely rarer: each
 below the fold, and each one answers a question a beginner rarely asks (defined elsewhere / setup / by hand
 / wait / jump).
 
-### 4.3 LEVEL 1 — BASIC (`flow-basic`, label "Flat-pack assembly", hint "basic · 5 common shapes · one tighten-and-recheck loop")
+### 4.3 LEVEL 1 — BASIC (`flow-basic`, label "Place an online order", hint "basic · 5 common shapes · one retry-the-payment loop")
 
 Shapes used: **`terminator, process, decision, io, document`** (5 of 16). **No** Lane, **no** Note, **no
 annotation nodes of any kind** — per D3 (§8.1) this board carries no `group`/Lane bands, and per D4
 (§8.1) it carries NO phase-heading annotation either. The point of Basic is that nothing needs explaining.
 
-Nodes (10, all flow; size `FLOWCHART_NODE_SIZE` 290×145 on every node; `handles:'tb'`,
-`body:'label-only'` via `flowNode`):
+*(2026-09-20, D5: the label was "Flat-pack assembly" and the hint "basic · 5 common shapes · one
+tighten-and-recheck loop"; the DOMAIN changed, the shape set, counts and structure did not.)*
 
-| id | kind / shape | title / text | colorKey | x | y | size |
-|---|---|---|---|---|---|---|
-| `b1` | `terminator` | Start — open the flat box | green | 380 | 60 | 290×145 |
-| `b2` | `io` | Count the parts against the checklist | violet | 380 | 275 | 290×145 |
-| `b3` | `process` | Lay out the panels and the fittings | cyan | 380 | 490 | 290×145 |
-| `b4` | `decision` | All parts present? | amber | 380 | 705 | 290×145 |
-| `b5` | `process` | Keep the spare fittings in the box | cyan | 0 | 920 | 290×145 |
-| `b6` | `process` | Fit the dowels and the cam locks | cyan | 380 | 920 | 290×145 |
-| `b7` | `document` | Follow the printed step sheet | violet | 380 | 1135 | 290×145 |
-| `b8` | `decision` | Frame square and steady? | amber | 380 | 1350 | 290×145 |
-| `b9` | `process` | Tighten every cam a quarter turn | cyan | 0 | 1565 | 290×145 |
-| `b10` | `terminator` | End — unit assembled | green | 380 | 1565 | 290×145 |
+Domain: **online ordering and delivery** — the order's first leg, from the cart to a cleared payment.
+
+Nodes (10, all flow; size `FLOWCHART_NODE_SIZE` 290×145 on every node; `handles:'tb'`,
+`body:'label-only'` via `flowNode`). The `kind` column is the D6 grammar audit (§4.0):
+
+| id | shape | kind | title / text | colorKey | x | y | size |
+|---|---|---|---|---|---|---|---|
+| `b1` | `terminator` | MARKER | Order started | green | 380 | 60 | 290×145 |
+| `b2` | `io` | DATA | Cart items and prices | violet | 380 | 275 | 290×145 |
+| `b3` | `process` | ACTION | Check stock for each item | cyan | 380 | 490 | 290×145 |
+| `b4` | `decision` | QUESTION | All items in stock? | amber | 380 | 705 | 290×145 |
+| `b5` | `process` | ACTION | Email the customer about missing items | cyan | 0 | 920 | 290×145 |
+| `b6` | `process` | ACTION | Reserve the items | cyan | 380 | 920 | 290×145 |
+| `b7` | `document` | DATA | Order confirmation | violet | 380 | 1135 | 290×145 |
+| `b8` | `decision` | QUESTION | Payment cleared? | amber | 380 | 1350 | 290×145 |
+| `b9` | `process` | ACTION | Retry the payment | cyan | 0 | 1565 | 290×145 |
+| `b10` | `terminator` | MARKER | Order confirmed | green | 380 | 1565 | 290×145 |
+
+`b5` (the "No" branch) sits at `x = 0`, left of the spine, exactly as the superseded L1 did; `b9` (the
+retry branch) keeps the same left-hand slot its predecessor used. Colour keys are unchanged.
 
 Edges (11, all `makeEdge(..., FLOWCHART_EDGES, ...)`):
 
@@ -418,26 +506,30 @@ Edges (11, all `makeEdge(..., FLOWCHART_EDGES, ...)`):
 | 7 | `b6 → b7` | — |
 | 8 | `b7 → b8` | — |
 | 9 | `b8 → b10` | `Yes` |
-| 10 | `b8 → b9` | `No — not square` |
-| 11 | `b9 → b7` | `tighten and recheck` |
+| 10 | `b8 → b9` | `No` |
+| 11 | `b9 → b8` | `retry` |
 
 Colour keys stay inside the flowchart preset's own legend (green terminal, cyan process, amber decision,
 violet document/io, slate connector/lane) — **no new key, no new token**.
 
-**Target counts:** 10 nodes (all flow), 11 edges, 5 distinct flow shapes, 1 genuine back-edge
-(`b9 → b7`).
+**Target counts:** 10 nodes (all flow), 11 edges, 5 distinct flow shapes, **exactly ONE genuine back-edge
+(`b9 → b8`)**. It is genuine because `b9` is downstream of `b8` and the edge re-enters the decision that
+produced it — a real retry, not a cosmetic loop; the DFS feedback-arc pass must remove exactly this one edge
+and no other.
 
 **Auto-layout (`layered-tb`, bandGroups true, x90/y70, no `group` nodes → nothing frozen, no annotation
 nodes → no orphan row):** feedback arc
-`b9→b7` is removed (it is the only *genuine* back-edge — `b8→b9→b7` re-enters `b7`, which is upstream of
-`b9`), then the DAG layers `b1`=0, `b2`=1, `b3`=2, `b4`=3, {`b5`,`b6`}=4, `b7`=5, `b8`=6, `b9`=7,
-`b10`=8 → **9 flow layers**, laid top-to-bottom with 145 px node heights and 70 px layer gaps (≈1.2k px
-tall), each layer centred on the vertical axis. Every node is edge-connected, so the engine's orphan path
-is never reached and all 10 participants land in the flow. Expected result: a clean single-column
-spine with the "keep the spare fittings" branch hanging to the left and the recheck back-edge drawn upward
-from `b9` to `b7` — i.e. the engine must NOT collapse the loop onto layer 0.
+`b9→b8` is removed (it is the only *genuine* back-edge), then the DAG layers `b1`=0, `b2`=1, `b3`=2, `b4`=3,
+{`b5`,`b6`}=4, `b7`=5, `b8`=6, {`b9`,`b10`}=7 → **8 flow layers**, laid top-to-bottom with 145 px node
+heights and 70 px layer gaps (≈1.0k px tall), each layer centred on the vertical axis. Every node is
+edge-connected, so the engine's orphan path is never reached and all 10 participants land in the flow.
+Expected result: a clean single-column spine with the "email the customer" branch hanging to the left and the
+retry back-edge drawn upward from `b9` to `b8` — i.e. the engine must NOT collapse the loop onto layer 0.
 
-### 4.4 LEVEL 2 — ADVANCED (`flow-advanced`, label "Flat-pack assembly + glue", hint "advanced · adds subprocess, preparation, manual, delay, connector · no lanes")
+### 4.4 LEVEL 2 — ADVANCED (`flow-advanced`, label "Order — stock to packing", hint "advanced · adds subprocess, preparation, manual, delay, connector · no lanes")
+
+*(2026-09-20, D5: the label was "Flat-pack assembly + glue" and the hint named the same five added shapes;
+the DOMAIN changed, the shape set, counts and structure did not.)*
 
 Shapes used: **the Basic five + `subprocess, preparation, manual, delay, connector`** (10 of 16). The
 connector is present as a **pair** (`c11`/`c12`, "A") so the redo step is an on-page jump rather than a
@@ -446,25 +538,33 @@ layout engine freezes them at their authored coordinates while re-placing every 
 (§8.1) no phase-heading annotation either: an isolated annotation node is treated as an ORPHAN and parked
 after the last layer, which would fling a heading to the bottom of the board.
 
-Nodes (15 = 14 flow + 1 note; every flow node 290×145):
+Domain: the order's fulfilment leg — stock reserved, the fragile part packed by hand, the parcel packed and
+picked up. The five added symbols get their honest jobs from §4.1: `preparation` = setting up the packing
+station; `manual` = hand-wrapping a fragile item; `subprocess` = the packing procedure, set out on its own
+sheet; `delay` = waiting for the courier pickup; `connector` = an on-page jump back to an earlier step.
 
-| id | kind / shape | title / text | colorKey | x | y | size |
-|---|---|---|---|---|---|---|
-| `c1` | `terminator` | Start — open the flat box | green | 380 | 60 | 290×145 |
-| `c2` | `io` | Compare the box contents with the parts checklist | violet | 380 | 275 | 290×145 |
-| `c3` | `preparation` | Lay out the panels, the fittings and the allen key | cyan | 380 | 490 | 290×145 |
-| `c4` | `decision` | Needs a second pair of hands? | amber | 380 | 705 | 290×145 |
-| `c5` | `manual` | Ask a second person to hold the side panel | green | 0 | 920 | 290×145 |
-| `c6` | `subprocess` | Build the drawer box (set out on its own sheet) | cyan | 380 | 920 | 290×145 |
-| `c7` | `delay` | Wait 30 minutes for the wood glue to set | amber | 380 | 1135 | 290×145 |
-| `c8` | `process` | Fit the shelf and tighten the cam locks | cyan | 380 | 1350 | 290×145 |
-| `c9` | `document` | Check the frame against the printed drawing | violet | 380 | 1565 | 290×145 |
-| `c10` | `decision` | Frame square and level? | amber | 380 | 1780 | 290×145 |
-| `c11` | `connector` | A | slate | 760 | 1780 | 290×145 |
-| `c12` | `connector` | A | slate | 760 | 1995 | 290×145 |
-| `c13` | `process` | Wipe the unit down and move it into place | cyan | 380 | 1995 | 290×145 |
-| `c14` | `terminator` | End — unit assembled | green | 380 | 2210 | 290×145 |
-| `cNote` | `note` | The drawer box is a sub-assembly: build it on its own sheet before the shelf goes in. | slate | 760 | 60 | 400×200 |
+Nodes (15 = 14 flow + 1 note; every flow node 290×145; `kind` column per D6, §4.0):
+
+| id | shape | kind | title / text | colorKey | x | y | size |
+|---|---|---|---|---|---|---|---|
+| `c1` | `terminator` | MARKER | Packing started | green | 380 | 60 | 290×145 |
+| `c2` | `io` | DATA | Stock reserved for the order | violet | 380 | 275 | 290×145 |
+| `c3` | `preparation` | ACTION | Set up the packing station | cyan | 380 | 490 | 290×145 |
+| `c4` | `decision` | QUESTION | Any item marked fragile? | amber | 380 | 705 | 290×145 |
+| `c5` | `manual` | ACTION | Wrap the fragile item by hand | green | 0 | 920 | 290×145 |
+| `c6` | `subprocess` | ACTION | Run the packing procedure (set out on its own sheet) | cyan | 380 | 920 | 290×145 |
+| `c7` | `delay` | MARKER | Waiting for the courier pickup | amber | 380 | 1135 | 290×145 |
+| `c8` | `process` | ACTION | Seal and label the parcel | cyan | 380 | 1350 | 290×145 |
+| `c9` | `document` | DATA | Packing slip | violet | 380 | 1565 | 290×145 |
+| `c10` | `decision` | QUESTION | Parcel matches the packing slip? | amber | 380 | 1780 | 290×145 |
+| `c11` | `connector` | MARKER | A | slate | 760 | 1780 | 290×145 |
+| `c12` | `connector` | MARKER | A | slate | 760 | 1995 | 290×145 |
+| `c13` | `process` | ACTION | Hand the parcel to the courier | cyan | 380 | 1995 | 290×145 |
+| `c14` | `terminator` | MARKER | Packing done | green | 380 | 2210 | 290×145 |
+| `cNote` | `note` | — | Packing runs on its own sheet: it is a sub-assembly of the order, not a step of it. | slate | 760 | 60 | 400×200 |
+
+*(`c7` is a `delay` — a WAIT — so its text is a MARKER form, not an imperative; `c5` is a `manual` operation,
+which is an ACTION symbol, so its text is imperative. The mapping is §4.0's, applied per symbol.)*
 
 Edges (15):
 
@@ -481,16 +581,16 @@ Edges (15):
 | 9 | `c8 → c9` | — |
 | 10 | `c9 → c10` | — |
 | 11 | `c10 → c13` | `Yes` |
-| 12 | `c10 → c11` | `No — not square` |
+| 12 | `c10 → c11` | `No — mismatch` |
 | 13 | `c11 → c12` | — |
-| 14 | `c12 → c8` | `wrong hole — back to the fittings` |
+| 14 | `c12 → c8` | `repack — back to the sealing step` |
 | 15 | `c13 → c14` | — |
 
 **Target counts:** 14 flow nodes + 1 note = **15 nodes / 15 edges**, **10 distinct flow
 shapes**, and a **genuine back-edge through a connector pair** (`c11 → c12 → c8`, where `c12` is upstream
 of `c11` and re-enters `c8`, which is several layers above it) — this template therefore joins `approval`
 as a second layout-regression case rather than adding a third regression that only the old code would
-have failed.
+have failed. The connector pair is the *only* back-edge here, exactly as before the domain swap.
 
 **Auto-layout:** with no `group` nodes nothing is frozen and every EDGE-CONNECTED node lands in the flow.
 Feedback arc `c12→c8` removed → layers `c1`=0, `c2`=1, `c3`=2, `c4`=3, {`c5`,`c6`}=4, `c7`=5, `c8`=6,
@@ -510,63 +610,69 @@ y 1935). Removing the phase headings entirely (D4) removes the problem: the boar
 one footnote, and the footnote's trailing row is where it belongs. Lane usage moves to a separate future
 round (§8 Q2).
 
-### 4.5 LEVEL 3 — COMPLEX (`flow-complex`, label "Flat-pack assembly — full notation", hint "complex · all 16 flowchart shapes · two pages")
+### 4.5 LEVEL 3 — COMPLEX (`flow-complex`, label "Online order — full notation", hint "complex · all 16 flowchart shapes · two pages")
+
+*(2026-09-20, D5: the label was "Flat-pack assembly — full notation"; the DOMAIN changed, the shape set,
+counts and structure did not.)*
 
 **HARD ACCEPTANCE CRITERION, MET:** the level-3 flow uses **all 16 flowchart shape ids** — `terminator,
 process, decision, io, document, subprocess, preparation, manual, delay, connector, offpage, manualinput,
 display, storeddata, looplimit, internalstorage` — and each has an honest job in the process. Per D3 (§8.1) and
 D4 (§8.1) this board uses **NO `group`/Lane bands and NO phase-heading annotations at all** — only flow
 nodes plus the single explanatory `Note`. Coverage
-table:
+table. Every ACTIVE job is an ACTION or a QUESTION, and every passive one is a DATA or MARKER node — the
+`kind` column below is the per-symbol audit (§4.0). Note the two symbols whose text kind is NOT the one a
+first reading suggests: `d14` is a `delay` — a WAIT — so its text is a MARKER form, not an imperative, and
+`d7` is a `manual` operation, which is an ACTION symbol, so its text IS an imperative.
 
-| shape id | node(s) | why it is the RIGHT symbol, not a bolted-on one |
-|---|---|---|
-| `terminator` | `d1` Start, `d24` End | the job has one start (open the box) and one end (unit in place) |
-| `io` | `d2` | data comes in: the box contents checked against the printed parts checklist |
-| `document` | `d3` "Read the printed instruction sheet" | a printed document is read (`hint: in or out`) |
-| `manualinput` | `d4` "Write the unit number on the box label by hand" | a value a person writes on the box by hand, not typed |
-| `preparation` | `d5` "Lay out the panels, the fittings and the allen key" | the setup the palette's hexagon means: parts laid out before the action |
-| `decision` | `d6` needs a second pair?, `d13` cam locks left?, `d16` square and level?, `d23` flush against the wall? | four real branches, each with a genuine Yes/No |
-| `manual` | `d7` "Ask a second person to hold the side panel" | the step that needs an extra pair of hands |
-| `subprocess` | `d8` "Build the drawer box (set out on its own sheet)" | a procedure defined elsewhere — the instruction sheet says "see sheet 2" |
-| `display` | `d9` "Step diagram — the page you keep re-reading" | a readout of data back to the operator: the diagram the assembler keeps looking at |
-| `internalstorage` | `d10` "Loose fittings held in the box during the job" | work in progress held only for the duration of the job, gone when it ends (the honest contrast with `storeddata`) |
-| `looplimit` | `d11` "Loop: for each of the 8 cam locks" | the loop's own start marker, with a back-edge running into it |
-| `process` | `d12` push the next cam lock home, `d15` fit the shelf and the drawer box, `d22` lift the unit into place | the three real actions |
-| `delay` | `d14` "Wait 30 minutes for the wood glue to set" | a real wait — the glue must cure before the fitting is loaded |
-| `connector` | `d17`/`d18` (pair "A") | an on-page jump: "wrong hole — back to the fittings" returns to `d11`, several layers up |
-| `storeddata` | `d19` "Leftover screws — kept in the box" | a store that is read and written AND persists between sessions: the bag of spare screws everyone keeps |
-| `offpage` | `d20` "To page 2 — fix the unit to the wall", `d21` "From page 1 — unit assembled" | the procedure genuinely continues on page 2 of the instruction sheet; the pair marks the page break |
+| shape id | node(s) | kind (D6, §4.0) | why it is the RIGHT symbol, not a bolted-on one |
+|---|---|---|---|
+| `terminator` | `d1` Order placed, `d24` Order delivered | MARKER | the order has one start (order placed) and one end (delivered) |
+| `io` | `d2` "Order accepted — items and prices" | DATA | data comes in: the order as accepted, with its priced line items |
+| `document` | `d3` "Order confirmation" | DATA | the artifact produced and sent: the confirmation the customer keeps |
+| `manualinput` | `d4` "Recipient phone number" | DATA | a value a person enters by hand — the data, not the act of typing it |
+| `preparation` | `d5` "Set up the packing station" | ACTION | the setup the palette's hexagon means: the station is readied before work starts |
+| `decision` | `d6` fragile item?, `d13` items left to pack?, `d16` parcel correct?, `d23` address found by the courier? | QUESTION | four real branches, each with a genuine Yes/No |
+| `manual` | `d7` "Wrap the fragile item by hand" | ACTION | the step done by hand rather than by the system |
+| `subprocess` | `d8` "Run the packing procedure (set out on its own sheet)" | ACTION | a procedure defined elsewhere — the order flow says "see the packing sheet" |
+| `display` | `d9` "Order total and shipping fee" | DATA | a readout of data back to the user: the money due, shown on screen |
+| `internalstorage` | `d10` "Cart items, kept until the session closes" | DATA | held only while the order runs, gone when the session ends (the honest contrast with `storeddata`) |
+| `looplimit` | `d11` "For each of 8 items" | MARKER | the loop's own start marker, with a back-edge running into it |
+| `process` | `d12` "Pack the next cart item", `d15` "Seal and label the parcel", `d22` "Load the parcel on the van" | ACTION | the three real actions |
+| `delay` | `d14` "Wait for the courier pickup" | MARKER | a real wait — the parcel cannot move until the courier arrives |
+| `connector` | `d17`/`d18` (pair "A") | MARKER | an on-page jump: "wrong item — back to the packing loop" returns to `d11`, several layers up |
+| `storeddata` | `d19` "Order history log" | DATA | a store read and written AND persisting between sessions: every delivered order is recorded |
+| `offpage` | `d20` "To page 2: deliver the parcel", `d21` "From page 1: order packed" | MARKER | the order genuinely has two legs; the pair marks the page break between packing and delivery |
 
 Nodes (25 = 24 flow + 1 note; every flow node 290×145; no `group` nodes and no `label` nodes at all):
 
-| id | kind / shape | title / text | colorKey | x | y | size |
-|---|---|---|---|---|---|---|
-| `d1` | `terminator` | Start — flat box on the floor | green | 380 | 70 | 290×145 |
-| `d2` | `io` | Compare the box contents with the parts checklist | violet | 380 | 285 | 290×145 |
-| `d3` | `document` | Read the printed instruction sheet | violet | 380 | 500 | 290×145 |
-| `d4` | `manualinput` | Write the unit number on the box label by hand | green | 380 | 715 | 290×145 |
-| `d5` | `preparation` | Lay out the panels, the fittings and the allen key | cyan | 380 | 930 | 290×145 |
-| `d6` | `decision` | Needs a second pair of hands? | amber | 380 | 1145 | 290×145 |
-| `d7` | `manual` | Ask a second person to hold the side panel | green | 0 | 1360 | 290×145 |
-| `d8` | `subprocess` | Build the drawer box (set out on its own sheet) | cyan | 760 | 1360 | 290×145 |
-| `d9` | `display` | Step diagram — the page you keep re-reading | violet | 380 | 1575 | 290×145 |
-| `d10` | `internalstorage` | Loose fittings held in the box during the job | violet | 380 | 1790 | 290×145 |
-| `d11` | `looplimit` | Loop: for each of the 8 cam locks | amber | 380 | 2005 | 290×145 |
-| `d12` | `process` | Push the next cam lock home | cyan | 380 | 2220 | 290×145 |
-| `d13` | `decision` | Cam locks left to fit? | amber | 380 | 2435 | 290×145 |
-| `d14` | `delay` | Wait 30 minutes for the wood glue to set | amber | 380 | 2650 | 290×145 |
-| `d15` | `process` | Fit the shelf and the drawer box | cyan | 380 | 2865 | 290×145 |
-| `d16` | `decision` | Frame square and level? | amber | 380 | 3080 | 290×145 |
-| `d17` | `connector` | A | slate | 760 | 3080 | 290×145 |
-| `d18` | `connector` | A | slate | 1140 | 3080 | 290×145 |
-| `d19` | `storeddata` | Leftover screws — kept in the box | violet | 380 | 3295 | 290×145 |
-| `d20` | `offpage` | To page 2 — fix the unit to the wall | slate | 380 | 3510 | 290×145 |
-| `d21` | `offpage` | From page 1 — unit assembled | slate | 380 | 3725 | 290×145 |
-| `d22` | `process` | Lift the unit into place | cyan | 380 | 3940 | 290×145 |
-| `d23` | `decision` | Sits flush against the wall? | amber | 380 | 4155 | 290×145 |
-| `d24` | `terminator` | End — unit assembled and in place | green | 380 | 4370 | 290×145 |
-| `dNote` | `note` | Two pages: page 1 assembles the frame, page 2 fixes the unit to the wall. The off-page connectors mark the page break. | slate | 760 | 70 | 400×200 |
+| id | shape | kind | title / text | colorKey | x | y | size |
+|---|---|---|---|---|---|---|---|
+| `d1` | `terminator` | MARKER | Order placed | green | 380 | 70 | 290×145 |
+| `d2` | `io` | DATA | Order accepted — items and prices | violet | 380 | 285 | 290×145 |
+| `d3` | `document` | DATA | Order confirmation | violet | 380 | 500 | 290×145 |
+| `d4` | `manualinput` | DATA | Recipient phone number | green | 380 | 715 | 290×145 |
+| `d5` | `preparation` | ACTION | Set up the packing station | cyan | 380 | 930 | 290×145 |
+| `d6` | `decision` | QUESTION | Any item marked fragile? | amber | 380 | 1145 | 290×145 |
+| `d7` | `manual` | ACTION | Wrap the fragile item by hand | green | 0 | 1360 | 290×145 |
+| `d8` | `subprocess` | ACTION | Run the packing procedure (set out on its own sheet) | cyan | 760 | 1360 | 290×145 |
+| `d9` | `display` | DATA | Order total and shipping fee | violet | 380 | 1575 | 290×145 |
+| `d10` | `internalstorage` | DATA | Cart items, kept until the session closes | violet | 380 | 1790 | 290×145 |
+| `d11` | `looplimit` | MARKER | For each of 8 items | amber | 380 | 2005 | 290×145 |
+| `d12` | `process` | ACTION | Pack the next cart item | cyan | 380 | 2220 | 290×145 |
+| `d13` | `decision` | QUESTION | Items left to pack? | amber | 380 | 2435 | 290×145 |
+| `d14` | `delay` | MARKER | Waiting for the courier pickup | amber | 380 | 2650 | 290×145 |
+| `d15` | `process` | ACTION | Seal and label the parcel | cyan | 380 | 2865 | 290×145 |
+| `d16` | `decision` | QUESTION | Parcel matches the packing slip? | amber | 380 | 3080 | 290×145 |
+| `d17` | `connector` | MARKER | A | slate | 760 | 3080 | 290×145 |
+| `d18` | `connector` | MARKER | A | slate | 1140 | 3080 | 290×145 |
+| `d19` | `storeddata` | DATA | Order history log | violet | 380 | 3295 | 290×145 |
+| `d20` | `offpage` | MARKER | To page 2: deliver the parcel | slate | 380 | 3510 | 290×145 |
+| `d21` | `offpage` | MARKER | From page 1: order packed | slate | 380 | 3725 | 290×145 |
+| `d22` | `process` | ACTION | Load the parcel on the van | cyan | 380 | 3940 | 290×145 |
+| `d23` | `decision` | QUESTION | Address found by the courier? | amber | 380 | 4155 | 290×145 |
+| `d24` | `terminator` | MARKER | Order delivered | green | 380 | 4370 | 290×145 |
+| `dNote` | `note` | — | Two pages: page 1 takes the order to a sealed parcel, page 2 delivers it. The off-page connectors mark the page break. | slate | 760 | 70 | 400×200 |
 
 Edges (27):
 
@@ -585,34 +691,42 @@ Edges (27):
 | 11 | `d10 → d11` | — |
 | 12 | `d11 → d12` | — |
 | 13 | `d12 → d13` | — |
-| 14 | `d13 → d12` | `Yes — next lock` |
-| 15 | `d13 → d14` | `No — all fitted` |
+| 14 | `d13 → d12` | `Yes — next item` |
+| 15 | `d13 → d14` | `No — all packed` |
 | 16 | `d14 → d15` | — |
 | 17 | `d15 → d16` | — |
-| 18 | `d16 → d17` | `No — not square` |
+| 18 | `d16 → d17` | `No — mismatch` |
 | 19 | `d17 → d18` | — |
-| 20 | `d18 → d11` | `wrong hole — back to the fittings` |
+| 20 | `d18 → d11` | `wrong item — back to the packing loop` |
 | 21 | `d16 → d19` | `Yes` |
 | 22 | `d19 → d20` | — |
 | 23 | `d20 → d21` | `page 2` |
 | 24 | `d21 → d22` | — |
 | 25 | `d22 → d23` | — |
 | 26 | `d23 → d24` | `Yes` |
-| 27 | `d23 → d22` | `No — not flush` |
+| 27 | `d23 → d22` | `No — address not found` |
 
-**Target counts:** 24 flow nodes + 4 labels + 1 note = **29 nodes / 27 edges**, **16 distinct flow
-shapes**, **three genuine back-edges** (`d13→d12`, `d18→d11` through the connector pair, `d23→d22`), plus
-the `d20→d21` page hand-off. Measured on the live engine: all 29 participants placed, 29 distinct
-coordinates, **22 layers** (21 flow rows + the trailing annotations row), y 0 → 2730.
+**Target counts:** 24 flow nodes + 1 note = **25 nodes / 27 edges**, **16 distinct flow
+shapes**, **three genuine back-edges** — which three, and why each is genuine:
+
+| back-edge | genuine because |
+|---|---|
+| `d13 → d12` | the packing loop: `d12` packs one item, `d13` asks whether items remain and re-enters `d12` — the loop body is upstream of its own exit test |
+| `d18 → d11` (through the connector pair `d17 → d18`) | the rework jump: `d18` is upstream of `d16`, and it re-enters `d11`, several layers above it — a genuine on-page jump, not a layout artefact |
+| `d23 → d22` | the delivery retry: `d22` loads the van, `d23` checks the courier found the address and re-enters `d22` |
+
+plus the `d20 → d21` page hand-off (forward, not a back-edge). Measured on the live engine: all 25
+participants placed, 25 distinct coordinates, **22 layers** (21 flow rows + the trailing annotations
+row), y 0 → 2730.
 
 **Is the shape set believable and readable, or 16 symbols bolted together?** Every symbol answers a
 question the process genuinely asks, and no node exists only to carry a shape: remove any one of them and
-the story breaks (no step diagram ⇒ the assembler has nothing to re-read mid-job; no box-of-loose-parts
-symbol ⇒ the cam-lock loop has nowhere to hold its work-in-progress; no leftover-screws store ⇒ the
-"are there screws left over?" branch has nothing to record into; no off-page pair ⇒ the board claims to be
-one page while the printed procedure obviously is two). The **one** element that requires a reading is
-`offpage`: it is used exactly as the notation intends (the assembly procedure continues on page 2 of the
-instruction sheet), and the single `Note` on the board says so in words, so a user meeting the home-plate
+the story breaks (no order total ⇒ the customer never sees what they owe; no cart-in-progress symbol ⇒ the
+packing loop has nowhere to hold its work-in-progress; no order-history log ⇒ the "parcel matches the slip"
+branch has nothing to record into; no off-page pair ⇒ the board claims to be one page while the order
+obviously has two legs). The **one** element that requires a reading is
+`offpage`: it is used exactly as the notation intends (the order continues on page 2 — the delivery leg),
+and the single `Note` on the board says so in words, so a user meeting the home-plate
 symbol for the first time is told what it means without leaving the board. There are **no phase headings** (D4): an edge-less annotation node is parked by the engine in a trailing
 orphan row, so a heading would fling itself to the bottom of the board while a footnote belongs there.
 
@@ -628,7 +742,7 @@ DAG is one long spine, so the engine produces **21 flow layers** (`d1` … `d24`
 `d16→d17→d18` connector branch beside it) plus a trailing orphan row holding the note →
 **22 layers** total, i.e. ≈2.9k px tall, and up to **9 distinct x positions** across the rows (the widest
 row is the branch, not a full 9-wide grid). Nothing is frozen (there are no `group` nodes at all), so every
-one of the 29 nodes is re-placed. A **probe must assert the layer count and that no two participants land
+one of the 25 nodes is re-placed. A **probe must assert the layer count and that no two participants land
 on the same coordinate** (AC 9), because a 24-flow-node graph with three back-edges is the case most likely
 to expose a layering bug.
 
@@ -725,9 +839,13 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
    offpage, manualinput, display, storeddata, looplimit, internalstorage`). Printed as a set-difference so
    a miss names the missing id. *Probe:* executed over the bundled module. (This is the HARD criterion.)
    **The exclusion is not a weakening:** `label`/`group`/`note` are canvas annotations, not flowchart shape
-   ids, and the three templates carry `label` nodes (D3) and a `note` — without the exclusion the
-   unfiltered expression would count `undefined` as a 6th/11th/17th "shape" and silently pass at the wrong
+   ids, and the three templates carry a `note` — without the exclusion the unfiltered expression would
+   count `undefined` as a 6th/11th/17th "shape" and silently pass at the wrong
    size. The criterion still demands exactly 5 / 10 / 16 real shape ids.
+   *(2026-09-20, corrected in place: this sentence previously read "the three templates carry `label`
+   nodes (D3) and a `note`" — that was true before **D4** (§8.1) removed the `label` nodes. The templates
+   now carry **zero** `label` nodes and **zero** `group` nodes; the exclusion still applies and now
+   covers only the single `note`.)*
 8. **Nesting is exact, not approximate:** `L1 ⊂ L2 ⊂ L3`, `|L3| === 16`, `|L2| === 10`, `|L1| === 5`,
    where `L1`/`L2`/`L3` are the sets AC 5/6/7 build with the shared predicate. *Probe:* same bundle,
    subset asserts.
@@ -778,6 +896,26 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
     demo-board invariant was superseded). *Probe:* the new harness never references the `boards/` path.
 20. **Docs/state honesty:** the harness prints, for each of the three templates, `nodes`, `edges`, distinct
     shape count and the level — so a future reader sees the measured numbers rather than a claim.
+21. **D6 — every node's text satisfies the grammar of its symbol.** For each node of all three templates, the
+    probe asserts the shape→kind mapping of §4.0 holds:
+    * **Process / Preparation / Manual / Subprocess** (`process`, `preparation`, `manual`, `subprocess`) →
+      **imperative**: the text does not end with `?` and its first word is not a determiner/noun-phrase
+      opener.
+    * **Decision** (`decision`) → the text **ends with `?`**.
+    * **DATA / THING** (`io`, `manualinput`, `display`, `storeddata`, `internalstorage`, `document`) → a
+      **noun phrase**: the text does not end with `?`, and its first word is **not** in the small imperative
+      denylist kept in the probe (`Check`, `Follow`, `Write`, `Read`, `Fit`, `Push`, `Wait`). That list is
+      the action verbs the five measured violations of §4.0 used (`Check`, `Follow`, `Write`) plus the same
+      rule applied to a MARKER symbol (`Wait` on a `delay` node).
+    * **MARKER** (`connector`, `offpage`, `looplimit`, `terminator`, `delay`) → marker form: a state / noun
+      phrase / jump label — the text is not a bare imperative from the same denylist.
+    The `note` node is excluded (it is an annotation, not a flowchart symbol — the same exclusion AC 5/7
+    already apply). *Probe:* **`checks/package-templates.mjs`** — it bundles `src/presets.ts` with the
+    project's own esbuild (the technique `checks/round-ad-flowchart.mjs` uses), walks
+    `nodes` of `flow-basic` / `flow-advanced` / `flow-complex`, applies the mapping above, and prints any
+    offending `{template, id, shape, text}` triples. Exit 0 only when all three templates are clean. This
+    criterion is what §4.0's `kind` column is audited against, and it is the ONLY criterion added by D6:
+    **AC 5/6/7/8 and every count in AC 9/13 are unchanged** (the domain swap changed content, not structure).
 
 ---
 
@@ -803,14 +941,16 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
    `x -140, y 2150`, below a flow ending at y 1935). Lane usage moves to a separate future round.
 4. **`offpage` is justified as a real two-page procedure, and a legend alternative is pre-written**
    (§4.5). The brief allows an honest fallback; this spec offers the exact edit rather than faking a second
-   page inside a one-page document. **This is the one symbol the domain swap did not fix:** even in
-   flat-pack furniture, `offpage` is the page-break convention rather than an object, so it stays the
-   single reading a user must accept and stays the subject of conflict C3.
+   page inside a one-page document. **This is the one symbol no domain swap has fixed:** across wash day,
+   flat-pack furniture (D1) and online ordering & delivery (D5) alike, `offpage` is the page-break
+   convention rather than an object, so it stays the single reading a user must accept and stays the
+   subject of conflict C3.
 5. **`internalstorage` vs `storeddata` mapped by PERSISTENCE, not by "memory".** `internalstorage` is
-   software's in-memory store; here it is **the loose parts held in the box during the job** — work held
-   only while the assembly runs, gone when it ends. `storeddata` is **the bag of leftover screws** — read
-   and written and kept between sessions. That contrast is the only reading that gives both symbols a
-   truthful job in this domain.
+   software's in-memory store; here it is **the temporary cart, gone when the session closes** — held only
+   while the order runs. `storeddata` is **the order-history log** — read and written and kept between
+   sessions. That contrast is the only reading that gives both symbols a truthful job in this domain (the
+   same persistence rule D1 applied to the box-of-parts / bag-of-screws pair; the rule survived the swap,
+   the objects did not).
 6. **`approval` gets `level: 'advanced'`** (§3.4) — metadata only; nodes/edges untouched.
 7. **Level is a label + grouping header, not a filter** (§3.5), with the row-count justification and the
    re-open condition (~15 rows / ~5 per level).
@@ -826,6 +966,16 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
     that is exactly what made the D1 domain swap a content-only edit: the ids did not change).
 12. **Colour keys for the new nodes reuse the flowchart legend's five keys only** (green/cyan/amber/violet/
     slate) so no legend row and no token is added.
+13. **The domain is decided on a symbol-coverage COUNT, not on taste (D5).** The criterion is a number —
+    symbols hosted with an honest job — because every subjective criterion ("funnier", "more universal")
+    produced an argument the last swap could not settle. Online ordering & delivery is the only candidate at
+    16/16; flat-pack furniture (16/16 on paper but trade-vocabulary-heavy) is the runner-up. Recorded so a
+    later round re-decides on a number.
+14. **The node text obeys a per-symbol GRAMMAR (D6, §4.0).** Four content kinds map onto the 16 symbols, the
+    grammar is per-symbol rather than per-template, and the rule for a node that cannot be written in its
+    symbol's grammar is **move the step, do not bend the sentence**. The five measured violations of the
+    flat-pack content are listed with their corrections in §4.0; the audit column is in every node table and
+    the runnable probe is AC 21.
 
 ---
 
@@ -836,18 +986,21 @@ already use), (b) a TEXT/structural read of a source file with comments blanked 
 Recorded FIRST so a later reader meets the decisions before the analysis that supports them. Each entry
 quotes Harvey's own words verbatim (Vietnamese); everything else in this file is English.
 
-**D1 — THE DOMAIN. Wash day is REPLACED by flat-pack furniture assembly (self-assembly furniture from a
-flat box).**
+**D1 — SUPERSEDED 2026-09-20 (second review round) BY D5. The domain WAS flat-pack furniture assembly
+(self-assembly furniture from a flat box).**
 Harvey, verbatim: *"với tôi B rất ok"* — where **B** was the mockup's candidate B, flat-pack furniture.
 His reason for preferring it: it is funnier, equally universal / everyday, and — per the mockup's coverage
 analysis — it also hosts all 16 ISO 5807 symbols honestly.
-**Consequences:** the domain for ALL THREE new templates is flat-pack furniture assembly. Wash day is kept
-on record as the RUNNER-UP, not as an alternative implementation (§4.1). The three symbols wash day only
-reached by convention now get an object: `offpage` = **page 2 of the printed instruction sheet**,
-`storeddata` = **the bag of leftover screws kept forever**, `internalstorage` = **the loose parts held in
-the box during assembly** (the honest contrast pair with `storeddata`). `offpage` remains the one
-convention-dependent symbol (a page break), so §4.5's pre-written 3-line fallback stays. The template IDS
-are unchanged (`flow-basic`/`flow-advanced`/`flow-complex`), so this is a content-only edit.
+**Kept on record, not deleted** (this project's rule for stale facts: correct in place, keep the history).
+It was superseded because a later round showed the DOMAIN itself — not the wording — was the readability
+problem (D5/D6), and flat-pack's trade vocabulary is exactly that cost. Its mapping survives as the
+runner-up's record: `offpage` = page 2 of the printed instruction sheet, `storeddata` = the bag of leftover
+screws kept forever, `internalstorage` = the loose parts held in the box during assembly, `document` = the
+printed instruction page, `manual` = the step needing a second person, `subprocess` = the pre-built
+sub-assembly, `looplimit` = "for each of the 8 cam locks", `connector` = "wrong hole — back to step 3",
+`preparation` = laying out the parts and the allen key. `offpage` remains the one convention-dependent
+symbol (a page break) under every domain, so §4.5's pre-written 3-line fallback stays. The template IDS are
+unchanged by both swaps (`flow-basic`/`flow-advanced`/`flow-complex`), so both were content-only edits.
 
 **D2 — THE GALLERY GETS NO TOOLBAR ENTRY. Boards menu ONLY.**
 Harvey, verbatim: *"trc mặt là menu Boards đi"* ('for now, the Boards menu').
@@ -880,6 +1033,48 @@ nodes plus (at Advanced and Complex) one `note`. Node counts become **10 / 15 / 
 the three boards can move wrongly on Auto-arrange, which is Harvey's own standing requirement
 (*"không phá layout là chính"*).
 
+**D5 — THE DOMAIN. Flat-pack furniture assembly (D1) is REPLACED by ONLINE ORDERING AND DELIVERY**
+(`order placed → cart → stock → payment → packing → delivery → done`), for ALL THREE templates.
+Harvey, verbatim (round 2): *"Ý là có thể đổi sang 1 domain để vẽ flowchart tốt hơn k. nội dung hiện tại
+hơi khó hiểu"* — the domain should change so the flowchart reads better; the current content is hard to
+follow. He chose the replacement domain from the orchestrator's candidate set.
+**The criterion was a COUNT, not taste:** how many of the 16 ISO 5807 symbols the domain hosts with an
+honest job. Verified by the orchestrator — **online ordering & delivery 16/16**, sending a parcel at a post
+office 12/16, ATM cash withdrawal 11/16, login + OTP 9/16. A domain loses a symbol when its only honest job
+is a metaphor or a decoding exercise, which is exactly the cost Harvey rejected.
+**Consequences:** the domain of all three templates is online ordering and delivery; **flat-pack furniture
+becomes the RUNNER-UP (§4.1), kept on record** the same way wash day was kept when flat-pack replaced it.
+The honest jobs of the hard symbols (§4.1, reused in §4.3–§4.5): `internalstorage` = the temporary cart,
+gone when the session closes; `storeddata` = the order-history log, kept and read between sessions;
+`manual` = hand-wrapping a fragile item; `offpage` = page 2 (the delivery leg); `display` = the order total +
+shipping fee shown back to the user; `manualinput` = the recipient phone number typed in; `subprocess` = the
+packing procedure, set out on its own sheet; `looplimit` = the loop over the items in the cart; `delay` =
+waiting for the courier pickup; `preparation` = setting up the packing station; `connector` = an on-page jump
+back to an earlier step. **The shape sets, node/edge counts and template IDS are UNCHANGED** (5/10/16 shapes;
+10/15/25 nodes; `flow-basic`/`flow-advanced`/`flow-complex`), so §6's shape ACs and every count still measure
+exactly as before: this swap, like the previous one, **costs no acceptance criterion**. `offpage` remains the
+one convention-dependent symbol — a page break — so §4.5's fallback stays and C3 stays open.
+
+**D6 — THE NODE-TEXT GRAMMAR. Every node's text must obey the grammar of its symbol.**
+Harvey, verbatim (round 1): *"content khó hiểu quá khó mà kiểu biết được đó là process, đó là input"* —
+reading a node you cannot tell what kind of step it is. D5 fixes the domain; **D6 fixes the sentence**.
+**The four content kinds (§4.0):** ACTION (Process / Preparation / Manual) = an imperative verb phrase;
+QUESTION (Decision) = a question ending in `?`; DATA / THING (Input-Output, Manual input, Display, Stored
+data, Internal storage, Document) = a noun phrase naming the data or the store, never the act of producing
+it; MARKER (Terminal, Loop limit, On-page connector, Off-page connector) = a state, noun phrase or jump
+label, never an action.
+**The rule:** a node whose text cannot be written in its symbol's grammar means **the symbol is wrong for
+that step — move the step, do not bend the sentence**. The grammar is per-SYMBOL, not per-template, so all
+three levels obey the same rule.
+**The measured defect it fixes:** the superseded flat-pack content had **5 nodes violating the grammar**,
+each with its corrected form listed in §4.0 — `io` carried an ACTION, `document` carried an ACTION,
+`looplimit` restated the loop, `manualinput` carried an ACTION, and `storeddata` described the store
+instead of naming it.
+**Consequences:** every node table in §4.3–§4.5 carries an auditable `kind` column, and §6 gains **AC 21** —
+a runnable probe (`checks/package-templates.mjs`) that asserts the shape→kind mapping for every node. The
+five grammar violations above were not wording problems but five symbols on the wrong step, which is why the
+rule points at the symbol, not at the label.
+
 ---
 
 **Conflicts between this brief and the real code (reported, not silently chosen):**
@@ -898,9 +1093,11 @@ list. *Recommendation: two passes, gallery in Pass 2.*
 
 **C3 — "all 16 shapes in one coherent flow" is met, but one symbol (`offpage`) is a convention rather than
 an object.** Handled honestly (§4.5) with a pre-written fallback. *Recommendation: keep the two-page
-reading, and let Harvey decide after seeing the seeded board; the fallback is a 3-line edit.* The D1 domain
-swap improved this — the procedure now genuinely continues on page 2 of a printed sheet — but it did not
-remove the convention, so C3 stays open as a conflict.
+reading, and let Harvey decide after seeing the seeded board; the fallback is a 3-line edit.* **Two domain
+swaps (D1, then D5) have not removed this** — wash day, flat-pack furniture and online ordering & delivery
+each have to borrow the page-break reading — so C3 stays open as a conflict: it is the one symbol whose
+honesty depends on the reader accepting a convention, not on the domain. The D5 domain improves the *story*
+(the order genuinely has two legs — packing and delivery) but not the *symbol*.
 
 ---
 
@@ -937,8 +1134,15 @@ round. **Lane usage moves to a separate future round**, and when it returns the 
 offsets the layers into the authored bands. That is a real design choice and must not be smuggled into a
 template round.
 
-**Q3 — MOOT: settled.** This asked whether "wash day" was the right domain for a shared tool. D1 (§8.1)
-settled the domain — flat-pack furniture assembly replaces wash day, and the new domain is generic by
-construction (no brand, company, person, locale, URL or email). Nothing to decide here. The old fallback
-suggestion ("posting and receiving a parcel") is dropped: it drifts toward the order/approval shape
-`approval` already covers, and the chosen domain does not need it.
+**Q3 — MOOT: settled.** This asked whether "wash day" was the right domain for a shared tool. **D1 settled
+it first (flat-pack furniture replaced wash day), and D5 (2026-09-20) re-settled it — online ordering and
+delivery now replaces flat-pack furniture.** The current domain is generic by construction (no brand,
+company, person, locale, URL or email). Nothing to decide here. The old fallback suggestion ("posting and
+receiving a parcel") is dropped: it drifts toward the order/approval shape `approval` already covers, and
+the chosen domain does not need it.
+
+**Q4 — SETTLED (was: what makes a node's text readable?).** **DECIDED as D6 (§8.1): a per-symbol
+node-text grammar.** Harvey's round-1 complaint (*"content khó hiểu quá khó mà kiểu biết được đó là
+process, đó là input"*) was first answered by rewording; the mockup showed the DOMAIN was the real problem
+(D5). Both fixes are now in: the domain swap (§4.1) and the grammar rule with its five measured violations
+(§4.0), auditable through every node table's `kind` column and runnable as §6 AC 21. Nothing open.
