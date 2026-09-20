@@ -1,8 +1,47 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-20 (midday) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-AD + AE + AF + AG1 + AG2 + **AH** shipped. All orchestrator-verified live.
+**Last session:** 2026-09-20 (afternoon) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
+AD + AE + AF + AG1 + AG2 + AH + **AI** shipped. All orchestrator-verified live.
+**Vault: ROUNDS S…AH are recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
+`pkm verify.sh` 43 passed / 0 failed).
 **Next: PACKAGE-N** (the palette redesign) — its spec is already written.
+
+## ROUND AI — vAlign finally paints, and the body control is flowchart-free
+
+Two of Harvey's review items, both decided by him.
+
+**ITEM 1 — the vertical-align control was present, correct, and doing nothing.** Harvey: *"text vẫn
+chỉ nằm trên dù đã chọn Align Middle. Text nên đc tự do trong khung shape"*. The orchestrator measured
+three label-only nodes at identical geometry varying ONLY `textStyle.vAlign`: all three had
+`--ts-align-items` resolving correctly AND `justify-content` correctly computed, yet **every title top
+gap was identical at 13px**. Cause: `.node-body` was **37px tall inside a 96px node**, so
+`justify-content` had no free space to distribute. Proof it was the box, not the value: switching the
+same node to `body: 'card'` made the box 96px and the gap 43px.
+
+**The root fix:** `src/styles.css` had `.node:not(.label-only) { height: 100% }` — an exclusion that
+deliberately kept `.node .lo-body`'s `min-height: 100%` INERT, on the reading that a live percentage
+would "drop every flowchart label into the middle". That reading was right about the geometry and wrong
+about the intent: `label-only`'s own no-write default IS `middle` (`vAlignForBody`), so the panel SHOWED
+Middle while the box painted top. The exclusion is gone; `.node` now takes a definite height, so the
+padded box is the node's box. **The vAlign VALUES were never the bug and were not touched.**
+
+Verified live: top/middle/bottom now measure top gaps **13 / 42 / 71** (was 13/13/13) with body height
+**96px** on all three. Card path not regressed (kicker + metric still paint). Harness
+`round-ai-body-valign` **18/18**, proven 12/18 RED on the pre-fix tree; notably the value/keyword
+assertion passes on BOTH trees — which is the point.
+
+**ITEM 2 — the `body` control is hidden for the sixteen flowchart shapes** (Harvey: *"Với flowchart tôi
+nghĩ k cần dùng card! Nhớ kiểm tra chỉ impact với flowchart element nhé"*). `hasBody` was added beside
+`hasSub` in `src/inspector.ts` and **reuses `NO_SUB_SHAPES`** rather than declaring a second list of the
+same ids. A flowchart node already carrying `body: 'card'` still paints it (control removed, data
+untouched). **Impact verified live: `service`, `note` and `actor` all KEEP the control.**
+
+**Process note (a real failure worth keeping):** the first attempt at this round spent **31 minutes on
+recon and wrote zero code**, then stalled on a request dropped when the network went down — `utime`
+rising 1 tick/10s while the report stopped growing, i.e. blocked, not computing. It was killed and
+re-dispatched with the recon supplied in the brief and a 6-tool-call budget; the second attempt finished
+in 21 minutes. **Lesson: put the recon IN the brief and cap it — and verify a child by PID + a GROWING
+log, never the log alone** (also recorded in the skill).
 
 ## ROUND AH — the colour-key note's dismissal key moved with its copy
 
