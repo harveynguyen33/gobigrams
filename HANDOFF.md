@@ -1,12 +1,15 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-20 (afternoon) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-AD + AE + AF + AG1 + AG2 + AH + AI + **AJ** shipped. All orchestrator-verified live.
-**Vault: ROUNDS S…AJ are now recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
+**Last session:** 2026-09-20 (evening) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB + AD + AE +
+AF + AG1 + AG2 + AH + AI + AJ shipped, then the **TEMPLATES arc (rounds 1–6 + the `delay` shape fix)**
+shipped on top — see the first `##` section below. All orchestrator-verified live.
+**Vault: ROUNDS S…AJ are recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
 `pkm verify.sh` 43 passed / 0 failed, re-verified by the orchestrator 2026-09-20).
-**ALL 25 HARNESSES GREEN as of ROUND AJ — there is no known-stale harness any more.**
-**Next: PACKAGE-N** (the palette redesign) — its spec is already written.
-**Dev server RUNNING** on `http://192.168.33.200:5200/` for Harvey's real-device test of PACKAGE-N.
+**The TEMPLATES arc is NOT yet in the vault** — it is the outstanding vault debt.
+**ALL 28 HARNESSES GREEN** as of the templates arc (25 → 28: `round-4-dialog-tooltip-approval`,
+`round-5-resize-undo`, and `package-templates` grew into the arc's own suite).
+**Dev server RUNNING** on `http://192.168.33.200:5200/` (it dies when the session that started it closes —
+if it is down, `npx vite --host 0.0.0.0 --port 5200`).
 
 ## ⚠️ BOARD STATE — read before touching `boards/`
 
@@ -30,7 +33,14 @@ a clean board instead (3 nodes / 2 edges, no `theme` key) against whatever board
 **No harness reads `boards/` any more** (verified 2026-09-20): `checks/package-q-reconnect-endpoints.mjs`
 derives its fixture from `src/presets.ts` / `src/DiagramNode.tsx` constants (ROUND AJ removed the live
 coupling) and `checks/round-ag2-copy-sub-swatch.mjs` only *mentions* `boards/` in a report line.
-**All 25/25 harnesses exit 0 with the folder emptied** — re-measured after the deletion.
+**All harnesses exit 0 with the folder emptied** — re-measured after the deletion. The templates arc added
+three files (`package-templates`, `round-4-dialog-tooltip-approval`, `round-5-resize-undo`) taking the total
+to **28**, and none of them reads `boards/` either.
+
+**Harvey's boards are HIS working canvas — never delete or rewrite them.** As of the end of the templates
+arc he holds 8 (`Untitled` … `Untitled 6` plus one he named himself). While probing, use a throwaway board
+and delete exactly that one afterwards (`POST /api/boards` → seed → `DELETE /api/boards/<id>`), and prove
+the before/after listing is otherwise unchanged.
 
 ### Harness tally re-measured 2026-09-20 after the board deletion (orchestrator, current tree)
 
@@ -44,6 +54,71 @@ verdict is green: `package-p-inspector` 153/153 · `package-q-panel-shortcuts` 5
 `package-p-render-check` all passed · `package-q-reconnect-endpoints` ALL GREEN ·
 `round-aj-table-handles` ALL GREEN · `round-s-edge-bend` ALL GREEN · `boot-no-flash` GREEN ·
 `theme-boot-script` GREEN · `theme-boot-sync` GREEN.
+
+## TEMPLATES arc 2026-09-20 — shipped `d7c8e0b` → `0e0e28e`
+
+**Harvey's ask:** templates for Flowchart at 3 levels (basic / advanced / complex), designed so more
+diagram families can be added later without a rewrite.
+
+**Where it lives:** the gallery is reached from the boards menu (**`Create from Templates`**, renamed from
+`Templates…`) and from the New-board dialog's **`Use template`** row. `src/templateCatalog.ts` builds and
+groups the catalog; `TemplatesGallery.tsx` is the ONE UI reader of it; `BoardDialog.tsx` no longer names
+`PRESETS` at all.
+
+**Shipped rounds (each one gated, orchestrator-verified live):**
+
+- **`c50a42e` pass 1** — a `level` field on `TemplateSpec`, three flowchart templates, family/level grouping,
+  `checks/package-templates.mjs`.
+- **`b30112b` round 2** — the three templates **re-domained to online ordering & delivery** (Harvey: the
+  flat-pack content was "khó hiểu"), plus a NODE-TEXT GRAMMAR: each shape may only carry the kind of
+  sentence it means — an imperative action for Process/Preparation/Subprocess/Manual-op, a `?`-terminated
+  question for Decision, a noun for data/document shapes, a state for Terminal/Loop-limit/Connector/Delay.
+  0 violations measured.
+- **`dddc6f1`** — two edge labels exceeded the preset's own `maxLabelChars: 30`; shortened, and guarded by a
+  new assertion so it cannot come back.
+- **`2d0cf20` pass 2** — `TemplatesGallery.tsx`: 2-pane desktop, responsive to tablet/phone, 7 cards.
+- **`d7c8e0b` delay shape fix** — the `delay` path was `M2 2 H100 A 48 48 …`, so the arc fell 52 units
+  (26% of the box) short of the right edge while `display` reached 198/200. Measured 26% → 0%, fixed in BOTH
+  render sites (`ShapeFrame` and the palette's `ShapePreview`). Only `delay` was affected; all 16 shapes swept.
+- **`32fb563` round 3** — `Use template` creates the board in ONE step (no dialog pit-stop), via a pure
+  `nextUntitledName(existing)` in `boards.ts` (smallest unused `Untitled N`; fills gaps; a user's own board
+  names never shift the numbering). ONE `createFromTemplate` owns board creation for both routes.
+- **`a8b79cf` round 4** — dialog reduced to TWO rows; menu row renamed `Create from Templates`; **the stuck
+  tooltip fixed**; the `approval` template deleted.
+- **`d866342` round 5** — a resize is one undoable step (see the trap below).
+- **`0e0e28e` round 6** — both dialog rows made visually uniform with the radio model deleted outright;
+  row gap 4 → 8px; the typed name now survives into the gallery.
+
+**THE TWO ROOT CAUSES WORTH REMEMBERING (both measured, not guessed):**
+
+1. **The stuck tooltip.** `Tooltip.tsx` showed on BOTH `onMouseEnter` and `onFocus`, but hid only on
+   `onMouseLeave` / blur / Escape. After a create or delete, `returnFocusTo.current.focus()` restores the
+   caret to the Boards button — focus lands with the pointer nowhere near it, `onFocus` fires, and **no
+   `mouseleave` will ever arrive** to dismiss it. Fix is modality-aware (a focus only opens the tooltip when
+   the focus came from the keyboard), applied INSIDE `Tooltip.tsx` so all ~20 call sites benefit.
+2. **Resize was not undoable.** A MOVE is covered at the gesture level (`onNodeDragStart` → `pushHistory`),
+   but a RESIZE had no equivalent hook: `NodeResizer` carried geometry props only, and `handleNodesChange`
+   only looked at `type === 'remove'`, so every `dimensions` change fell through. Fixed by keying off the
+   `resizing: true` flag with a per-gesture latch (`src/resizeHistory.ts`, pure) so one grip drag = ONE
+   entry — pushing per frame would bury the history under hundreds of steps. **Do NOT key off
+   `onResizeStart`**: d3-drag fires it on a bare CLICK on a grip, which would record an undo step for a
+   gesture that changed nothing.
+
+**A defect Harvey reported that was NOT real:** he saw the resize-undo gap only "when the shape has no
+connections". Measured both cases with a real mouse drag — standalone node and node-with-an-edge behave
+identically. Nothing in the history path references edges.
+
+**Deliberate non-changes:** the `approval` template was removed rather than re-levelled; create mode's
+`Create board` submit button was removed (both rows act on press, so it was dead UI) while rename/delete
+kept theirs; `Shape` is a 25-id union, not 19 (the spec's "19" predates ROUND AD).
+
+**A coder died mid-round 6** after finishing the source but before the gap fix and the harness re-anchors
+(harness red: package-templates 50/60, round-4 13/18, package-o-board-dialog 8/10). Round 6b finished only
+those two things. **Detect this by `ps aux | grep "[c]oder chat"` — a dead child sends no completion notice.**
+
+**Gates (orchestrator-measured on the current tree):** `tsc` 0 · `build` 0 · hex **142** · **all 28
+harnesses green** (`package-templates` 60/60, `round-4` 18/18, `package-o-board-dialog` 10/10,
+`round-5-resize-undo` new).
 
 ## ROUND AJ — the two known debts, cleaned
 
