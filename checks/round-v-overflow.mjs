@@ -482,9 +482,13 @@ console.log('    "no regression" claim. `overflow-wrap: anywhere` does not move 
 console.log('    space-separated line, but only a rendered box can prove it.');
 console.log('  * that the corner grips still land ON the border. The ancestry above is a');
 console.log('    structural argument; it is not a measurement of the painted dots.');
-console.log('  * PRE-EXISTING, not touched by ROUND V: `.tnode { overflow: hidden }` clips');
-console.log('    the per-column handles that TableNode renders INSIDE it (an 8px handle');
-console.log('    centred on the border sits 4px outside and the border-box clip cuts');
-console.log('    it). Table nodes are not resizable and this round added no clip there.');
+console.log('* STALE, AND NOW ROUNDED OFF BY ROUND AJ: `.tnode { overflow: hidden }` used');
+console.log('  to clip the per-column handles TableNode renders INSIDE it (an 8px handle');
+console.log('  centred on the border sits 4px outside and the border-box clip cut it).');
+console.log('  ROUND AJ removed the card\'s clip entirely, gave the header/rows their own');
+console.log('  inner 8px radius, and raised the handle to the standard 12px.');
+console.log('  `checks/round-aj-table-handles.mjs` owns that geometry now; this line is');
+console.log('  kept only as the record of what this file observed at the time.');
+console.log('  Table nodes are still not resizable.');
 
 process.exit(failed.length ? 1 : 0);

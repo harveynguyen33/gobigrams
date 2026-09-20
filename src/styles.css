@@ -2844,17 +2844,44 @@ kbd {
 .tnode {
   width: 100%; min-width: 200px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 9px; overflow: hidden;
+  border-radius: 9px;
   font-family: var(--sans); font-size: 11.5px;
   box-shadow: var(--shadow-sm);
 }
+/* ROUND AJ — the card's clip is GONE; the radius clip lives on the rows that
+   own a background instead.
+   WHY (measured live by the orchestrator, not derived): the six connection
+   handles are children of `.tnode` and RF centres each one ON its border with
+   `translate(-50%, -50%)`, so a 12px dot protrudes HALF = 6px. `overflow: hidden`
+   here clipped at the border box, so the painted handle was cut to a sliver —
+   measured 7x7 at one zoom where a goblin node's handle measured 11x11, i.e.
+   8px vs 12px box, both clipped.
+   WHAT THE CLIP WAS FOR, and where it went: the only painted content that can
+   reach a rounded corner is a BACKGROUND — `.tnode-head`'s bar at the top and
+   the `:hover` highlight on the bottom row. Both now carry their own corner
+   radius, so every painted pixel is where it was. The radius is the card's
+   INNER radius: 9px outer − 1px border = 8px, which is exactly the arc the
+   parent clip drew.
+   WHY NOT AN INNER WRAPPER: the per-column handles are children of a
+   `.tnode-col`, so any wrapper that holds the rows clips those handles too — it
+   would trade a 4px cut on six handles for a 6px cut on the same six. Only a
+   clip that is not an ancestor of ANY handle is safe, and that means no clip on
+   the card at all. Every painted pixel therefore keeps its old shape: see the
+   `border-radius` declarations on `.tnode-head` and `.tnode > :last-child`. */
+.tnode > :last-child { border-radius: 0 0 8px 8px; }
 .tnode.selected { border-color: var(--sel); box-shadow: 0 0 0 2px var(--sel); }
 .tnode-head {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 9px; background: var(--elevated);
   border-bottom: 1px solid var(--border);
   border-left: 3px solid var(--nc, var(--border-strong));
+  /* ROUND AJ — replaces the card's deleted clip (see the `.tnode` header): the
+     bar is the top-most painted row, so it carries the top arc, at the card's
+     INNER radius (9px outer − 1px border). `:last-child` is the collapsed,
+     column-less card, where the head owns all four corners. */
+  border-radius: 8px 8px 0 0;
 }
+.tnode-head:last-child { border-radius: 8px; }
 .tnode-ico { color: var(--nc, var(--dim)); flex: none; }
 .tnode-name {
   flex: 1; font-weight: 650; font-size: 12px; color: var(--fg);
@@ -2911,7 +2938,13 @@ kbd {
 .tnode.collapsed .tnode-more { border-top: 0; }
 /* per-column handles: invisible at rest, appear on node hover / selection */
 .tnode .react-flow__handle.tnode-h {
-  width: 8px; height: 8px; border-radius: 50%;
+  /* ROUND AJ — the box is the standard 12px, restated here explicitly so it is
+     checked AGAINST `.react-flow__handle` (styles.css:1111) rather than left
+     implicit. At 8px the table's dots were a visibly smaller grab target than
+     every other node's (measured live at one zoom: 7x7 vs 11x11). The rest of
+     this rule — the 1px `--nc` ring, the surface fill, the hover-only reveal —
+     is untouched. */
+  width: 12px; height: 12px; border-radius: 50%;
   border: 1px solid var(--nc, var(--sel)); background: var(--surface);
   opacity: 0; transition: opacity .15s;
 }
