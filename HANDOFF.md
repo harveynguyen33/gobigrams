@@ -1,9 +1,31 @@
 # HANDOFF — Diagram Studio
 
-**Last session:** 2026-09-20 (morning) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
-AD + AE + AF + **AG1** shipped. All orchestrator-verified live.
-**Next: AG2** (`sub` field hidden for flowchart, `Colour`→`Color` copy sweep, the 9-swatch row
-layout — it currently wraps 7+2, Harvey wants an even grid), then PACKAGE-N.
+**Last session:** 2026-09-20 (midday) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB +
+AD + AE + AF + AG1 + AG2 + **AH** shipped. All orchestrator-verified live.
+**Next: PACKAGE-N** (the palette redesign) — its spec is already written.
+
+## ROUND AH — the colour-key note's dismissal key moved with its copy
+
+**Harvey's standing rule (recorded):** *when a change makes persisted state no longer appropriate,
+CLEAR it rather than preserve it.* He picked this option for the case below.
+
+AG2 renamed the note's VISIBLE text `Colour…` → `Color…` but kept `KEY_NOTE_KEY` British on purpose,
+so an already-dismissed note would not reappear — with the cost that a user who dismissed it before
+the rename never sees the new copy. Fix: `KEY_NOTE_KEY = 'diagram-studio:color-key-note'`, which also
+matches the module's own name (`colorKeyNote.ts` was ALREADY American — only the key string was
+British).
+
+**The old key is ABANDONED, not migrated.** `parseKeyNote()` returns true for every value but `'0'`,
+so a British-era dismissal resolves to ABSENT and the note shows once. Migrating would re-hide it —
+the thing being fixed.
+
+**The assertion was INVERTED, not deleted** (`ag2-14` asserted the British key; a check that silently
+disappears is worse than one that changes verdict with a recorded reason).
+
+Verified live: a browser holding ONLY `colour-key-note='0'` shows the note reading
+`Color = our grouping, not ISO.`; dismissing writes `color-key-note='0'` and leaves the British entry
+untouched; reload + reselect keeps it dismissed. Coder also proved it by executing the shipped module
+with stubbed storage (5/5). Gates: tsc=0, build=0, hex 142 unchanged.
 
 ## ROUND AG1 — the colour palette (Harvey chose Option A). DONE + verified live
 
