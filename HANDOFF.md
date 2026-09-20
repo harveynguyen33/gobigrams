@@ -662,10 +662,15 @@ client connection + `stat -c %y boards/*.json`. If he is in the app, **verify on
 
 ### NEXT
 
-**PACKAGE-P is COMPLETE.** Harvey's Mac test of PACKAGE-P + PACKAGE-Q, then **PACKAGE-N — the palette
-redesign** (`PACKAGE-N-SPEC.md` is already written; the Excalidraw/draw.io research in
-`diagram-studio-research/` is its basis). Keep the review-gated pass discipline: land one pass, verify it live,
-then the next — a mistake in pass 1 gets built on three times otherwise.
+**PACKAGE-P is COMPLETE, and so is PACKAGE-N.** This section used to say *"then PACKAGE-N — the palette
+redesign"*, which went stale: **N shipped on 2026-09-17** (passes 1/2a/2b/2c/3/4a/4b/4c/5 all ✅ — the table
+and per-pass verification records further down this file are the record). `PACKAGE-N-SPEC.md` is spent; do
+not plan new work from it. **Nothing is queued after the TEMPLATES arc either.** The only open items on N are
+Harvey's real-device test and the two recorded cosmetic deviations (a `width="abc"` reason code, and the
+panel drop zone proving its wiring only by an actual file drop).
+
+**The standing discipline is unchanged:** land one pass, verify it live, then the next — a mistake in pass 1
+gets built on three times otherwise.
 
 **The pass-2 note that pass 3 resolved** (`getInspectorSections` not returning `text` for a goblin) is settled;
 `text` sits between `content` and `style` in that one array. The panel's label `<textarea>` is gone — the label
@@ -915,7 +920,7 @@ content visible (`.panel:not(.right)` — see step 2e); select → deselect does
 `⌘⇧\` alternates both-collapsed (`0px 1280px 0px`) / both-visible on every press. Breakpoints verified
 by resizing the `.app-host` element with `window.innerWidth` held at 1280. `tsc` = 0, `vite build` = 0.
 
-## ▶ NEXT SESSION: START HERE — PACKAGE N passes 1/2a/2b/3/2c are DONE; pass 4 + 5 remain
+## ▶ PACKAGE N — COMPLETE (all passes 1/2a/2b/2c/3/4a/4b/4c/5 ✅). Kept as the record.
 
 **Spec of record: `PACKAGE-N-SPEC.md` — read it before touching the palette.** It now has THREE
 revisions; Revision 3 is the current design and SUPERSEDES parts of 1/v2 (read §4.1, §5, §2.6, §12, §13).
