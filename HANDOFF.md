@@ -53,8 +53,9 @@ transparent) }` — so an untouched board paints exactly what it painted.
 the new harness) · `5c8f900` (AN-6b outline) · `2649632` (the spec). **Not yet pushed.**
 
 **Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **142** (ceiling 160) · **36/36 harnesses green**
-· new `checks/round-an-edge-panel.mjs` **18 PASS / 0 FAIL** with its REPLAY probes RED on `f75f5d1` (14 + 2)
-· `boards/` untouched.
+· new `checks/round-an-edge-panel.mjs` **19 PASS / 0 FAIL** (17 claim-level assertions + 2 REPLAY assertions;
+the vault capture measured 19 and corrected an earlier 18 in this line — the number counts printed PASS
+lines, not claims) with its REPLAY probes RED on `f75f5d1` (14 + 2) · `boards/` untouched.
 
 **⚠️ NOT VERIFIED — do not claim it is.** No live gesture, no live panel, no live undo: the headless browser
 renders ZERO edges. AN-5's runtime behaviour (selection surviving a real Ctrl+Z) and AN-3's real layout are
