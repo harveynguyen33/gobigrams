@@ -5,6 +5,14 @@
  * glyphs, from the map the edge itself animates), AM-4 (the live speed rail),
  * AM-5 (a compact count stepper sharing ONE row with a speed SLIDER).
  *
+ * ROUND AN, AN-4 RE-ANCHORED THE THREE `am4.*` CLAIMS. Their subject was the
+ * speed RAIL, and the owner deleted it ("tôi k cần cái Flow rail, xoá đi"), so
+ * the claims now assert the two things that are still true and still checkable:
+ * the rail is GONE from the component, the panel and the sheet, and the claim
+ * that kept a live subject is the one beside it — the speed value is still
+ * PRINTED and still driven by the same stored duration. The removal is recorded
+ * as the fact, in the code and here, rather than the assertions being dropped.
+ *
  * WHAT THIS FILE IS, and what it deliberately is not. It cannot see a browser:
  * this project's headless session renders ZERO edges (nodes render, `minimap
  * edges` = 0), so no live edge-panel measurement exists and none is claimed
@@ -276,32 +284,49 @@ section('AM-3 — the flow-glyph row is a real glyph row');
 section('AM-4 — the live speed rail');
 
 {
-  const railExists = /export function FlowRail\(/.test(PICKS);
-  const railUsed = /<FlowRail/.test(APP);
-  const durFromValue = /animationDuration:\s*`\$\{dur\}s`/.test(PICKS);
-  assert('am4.the-rail-is-rendered-and-its-duration-comes-from-the-stored-value',
-    railExists && railUsed && durFromValue,
-    `\`FlowRail\` exists = ${railExists}, App renders it = ${railUsed}, and the bead's \`animationDuration\` is ` +
-    `built from the clamped \`seconds\` = ${durFromValue}. The picture therefore CANNOT disagree with the number ` +
-    `beside it: both read the same prop.`);
+  /* RE-ANCHORED BY ROUND AN, AN-4. The rail was this section's whole subject and
+   * the owner deleted it, so the first half of the conjunction below is the
+   * removal and the second half is the LIVE SUBJECT: `.speedval`, printed beside
+   * the thumb and built from the same `value` the slider writes. The conjunction
+   * is RED at f75f5d1 because the rail is still there — stated rather than left
+   * for the reader to work out, since the second half alone is green on BOTH
+   * trees (the number did not change this round) and would prove nothing. */
+  const railGone = !/export function FlowRail\(/.test(PICKS) && !/<FlowRail/.test(APP);
+  const railRulesGone = !/flow-rail/.test(STYLES);
+  const stillPrints = /className="speedval"/.test(PICKS) && /\{seconds\.toFixed\(1\)\}s/.test(PICKS);
+  const stillWired = /<FlowSpeed[\s\S]{0,200}value=\{eFlowSpeed\}/.test(APP)
+    && /onInput=\{secs => updateEdge\(\{data: \{flowDuration: secs\}\}/.test(APP);
+  assert('am4.the-rail-is-deleted-everywhere-and-the-speed-value-is-still-printed',
+    railGone && railRulesGone && stillPrints && stillWired,
+    `\`FlowRail\` is absent from the component and from App = ${railGone}, the sheet declares no \`flow-rail\` ` +
+    `rule at all = ${railRulesGone}, and the read-out that replaced its job survives: \`.speedval\` prints ` +
+    `\`{seconds.toFixed(1)}s\` = ${stillPrints} and App still drives \`FlowSpeed\` from \`eFlowSpeed\` and writes ` +
+    `\`data.flowDuration\` = ${stillWired}. The removal is the first half (which is what makes this probe RED at ` +
+    `the pre-change tree); the second half is the claim with the live subject, and it is green on BOTH trees — ` +
+    `declared here so it is not mistaken for a kill.`);
 
-  const gate = /prefers-reduced-motion:\s*reduce[\s\S]{0,400}flow-rail-bead[\s\S]{0,200}animation:\s*none/
-    .test(STYLES) || /flow-rail-bead[\s\S]{0,200}animation:\s*none/.test(STYLES);
-  const noAnimGate = /\.ds-no-anim[\s\S]{0,600}flow-rail-bead[\s\S]{0,200}animation:\s*none/.test(STYLES)
-    || /flow-rail-bead[\s\S]{0,300}animation:\s*none/.test(STYLES);
-  assert('am4.the-bead-obeys-the-projects-OWN-two-motion-switches',
-    gate || noAnimGate,
-    `the rail's bead is stopped by an \`animation: none\` rule tied to the app's motion gate = ${gate || noAnimGate}. ` +
-    `The canvas payloads obey the same two switches (prefers-reduced-motion and \`.ds-no-anim\`), so the preview ` +
-    `cannot keep moving in a mode where the canvas has stopped — a second, divergent motion policy is what this ` +
-    `assertion is here to prevent.`);
+  /* the removal is RECORDED, not just performed: the reason lives in both places
+   * the code was, so a later round cannot "helpfully" re-add the preview. */
+  const reasonPicks = /AN-4[\s\S]{0,600}Flow rail/i.test(read('src/InspectorPickers.tsx'));
+  const reasonStyles = /AN-4[\s\S]{0,600}FLOW RAIL/i.test(read('src/styles.css'));
+  const reasonApp = /AN-4[\s\S]{0,600}RAIL WAS DELETED HERE/.test(read('src/App.tsx'));
+  assert('am4.the-removal-is-recorded-in-the-code-with-its-reason',
+    reasonPicks && reasonStyles && reasonApp,
+    `the reason is written where the component was = ${reasonPicks}, where its CSS was = ${reasonStyles}, and ` +
+    `where it was rendered = ${reasonApp}. AM-4's own note has been replaced by a DELETION note naming the owner's ` +
+    `sentence and the \`label\` prop that went with it, because this project's comments are its design record: an ` +
+    `illustration inside the panel is not a control, and without the note the next round re-derives the same idea.`);
 
-  const decorative = /THE RAIL IS DECORATIVE|decorative/i.test(read('src/InspectorPickers.tsx'))
-    && /aria-hidden/.test(PICKS);
-  assert('am4.the-rail-is-declared-decorative-and-hidden-from-assistive-tech',
-    decorative,
-    `the rail carries \`aria-hidden\` = ${/aria-hidden/.test(PICKS)} and its decorative status is recorded in the ` +
-    `code = true. The accessible value is the printed seconds; a bead conveys nothing a screen reader needs.`);
+  /* the motion gate went WITH the animation it gated — and the project's two REAL
+   * switches survive for the payloads that are still moving. */
+  const noRailGate = !/flow-rail/.test(STYLES);
+  const gatesIntact = /prefers-reduced-motion:\s*reduce/.test(STYLES) && /\.ds-no-anim/.test(STYLES);
+  assert('am4.the-motion-gate-went-with-the-animation-and-the-real-switches-survive',
+    noRailGate && gatesIntact,
+    `no \`flow-rail-bead\` rule is left to stop = ${noRailGate}, while the project's two switches still exist for ` +
+    `the canvas payloads = ${gatesIntact}. A gate for a deleted animation is dead CSS that reads as live policy; ` +
+    `deleting the rules WITHOUT the gate is the trap this probe exists for, and deleting the gate WITHOUT the ` +
+    `project's real motion policy is the opposite one.`);
 }
 
 /* ===========================================================================
@@ -399,13 +424,20 @@ section('AM-5 — the compact count + the speed slider');
   /* (f) The slider is styled from tokens only (no new hex — the sheet's literal
    *     count is asserted by ROUND AG's ceiling harness, and this is the local
    *     check that this round's own rules contributed none). */
-  const rangeRules = STYLES.slice(STYLES.indexOf('.flow-speed-range'), STYLES.indexOf('.flow-rail'));
+  /* RE-ANCHORED BY ROUND AN, AN-4: this slice used to end at `.flow-rail`, which
+   * AN-4 deleted — `indexOf` would have returned -1 and the slice would have run
+   * to the END OF THE SHEET, counting every hex literal in the file as if it were
+   * this block's. The end anchor is now the next real rule (the section wrapper),
+   * and the block is additionally asserted to no longer hold the deleted rail. */
+  const rangeRules = STYLES.slice(STYLES.indexOf('.flow-speed-range'), STYLES.indexOf('.insp-section + .insp-section'));
   const hexInRail = (rangeRules.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []);
-  assert('am5.the-slider-and-rail-rules-introduce-NO-hex-literal',
-    hexInRail.length === 0 && rangeRules.includes('var(--sel)') && rangeRules.includes('var(--border)'),
-    `the \`.flow-speed-range\` block carries ${hexInRail.length} hex literals and paints from \`var(--border)\` / ` +
-    `\`var(--sel)\` = true. Tokens only is the project rule for anything new; the sheet's global ceiling is ` +
-    `asserted separately and stayed at 142 through this round.`);
+  const railInBlock = /flow-rail/.test(rangeRules);
+  assert('am5.the-slider-block-introduces-NO-hex-literal-and-the-deleted-rail-is-out-of-it',
+    hexInRail.length === 0 && !railInBlock && rangeRules.includes('var(--sel)') && rangeRules.includes('var(--border)'),
+    `the \`.flow-speed-range\` block (${rangeRules.length} chars, bounded by the section wrapper that follows it) ` +
+    `carries ${hexInRail.length} hex literals and paints from \`var(--border)\` / \`var(--sel)\` = true; the deleted ` +
+    `rail's rules are no longer inside it = ${!railInBlock}. Tokens only is the project rule for anything new; the ` +
+    `sheet's global ceiling is asserted separately and stayed at 142 through this round.`);
 }
 
 /* ===========================================================================
@@ -449,8 +481,21 @@ if (pre) {
         const b = /const FLOW_ICON_OPTS: PickerOption\[\] = ([\s\S]{0,700}?)\];/.exec(pre.APP)?.[1] ?? '';
         return b.length > 0 && !/art:\s*null/.test(b);
       })()],
-    ['AM-4 · FlowRail exists', /export function FlowRail\(/.test(pre.PICKS)],
-    ['AM-4 · the panel renders the rail', /<FlowRail/.test(pre.APP)],
+    /* AN-4's re-anchored claims, controlled the same way: these predicates are
+       read on the PRE tree, where AN-4 has not run — the rail exists, so a claim
+       that it is DELETED detects the change; and no removal note exists yet. */
+    ['AM-4 · the rail exists on the pre-change tree (so its deletion is a kill)',
+      /export function FlowRail\(/.test(pre.PICKS)],
+    ['AM-4 · the panel renders the rail on the pre-change tree', /<FlowRail/.test(pre.APP)],
+    ['AM-4 · the sheet still gates the bead on the pre-change tree', /flow-rail-bead/.test(pre.STYLES)],
+    ['AM-4 · the removal note is absent on the pre-change tree',
+      /AN-4[\s\S]{0,600}Flow rail/i.test(commitFile(PRE_COMMIT, 'src/InspectorPickers.tsx'))],
+    ['AM-5 · the speed block still held the rail rules on the pre-change tree',
+      (() => {
+        const st = pre.STYLES;
+        const b = st.slice(st.indexOf('.flow-speed-range'), st.indexOf('.insp-section + .insp-section'));
+        return /flow-rail/.test(b);
+      })()],
     ['AM-5 · the speed control is a range input', /flow-speed-range/.test(pre.PICKS)],
     ['AM-5 · count and speed share the pair row', /<div className="pair">/.test(pre.APP)],
     /* Scoped to the pair row: a bare `compact` matches unrelated CSS-class names

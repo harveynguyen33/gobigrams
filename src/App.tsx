@@ -54,7 +54,7 @@ import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
   /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
      two pure helpers the harness executes rather than restates. */
-  FlowSpeed, FlowRail, storableSeconds,
+  FlowSpeed,
   ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtFlow, ArtWidth,
   type PickerOption,
 } from './InspectorPickers';
@@ -5932,12 +5932,13 @@ export default function App() {
                   </div>
                 </div>
               )}
-              {(eFlow === 'dots' || eFlow === 'icon') && (
-                <FlowRail
-                  seconds={eFlowSpeed}
-                  label={`${eFlowCount} × ${storableSeconds(eFlowSpeed).toFixed(1)}s per loop`}
-                />
-              )}
+              {/* ROUND AN, AN-4 — THE RAIL WAS DELETED HERE: it rendered
+                  `<FlowRail seconds={eFlowSpeed} label={\`${eFlowCount} × …s per
+                  loop\`}/>` whenever the flow was `dots` or `icon`. The owner
+                  removed it ("tôi k cần cái Flow rail, xoá đi"), so no preview
+                  is rendered and NONE SHOULD BE RE-ADDED: the speed's read-out
+                  is the `.speedval` number inside `FlowSpeed` above, printed
+                  from the same stored duration. */}
               {eFlow === 'icon' && (
                 <div className="field">
                   <label>flow glyph</label>

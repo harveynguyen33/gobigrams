@@ -669,10 +669,10 @@ export function Stepper({value, onChange, min, max, title, compact = false}: {
    path matters for the same reason: holding an arrow key repeats `input`, so it
    opens a gesture the same way a pointer does, and `blur` closes it.
 
-   THE RAIL IS DECORATIVE AND IS NEVER THE SOURCE OF TRUTH. It reads the SAME
-   `value` prop the number beside it prints, so it cannot disagree with the
-   stored duration; it exists to make the speed FELT rather than read. If it ever
-   failed to render, the control would still work and still print the truth.
+   ROUND AN, AN-4 — THE RAIL THAT USED TO BE DESCRIBED HERE IS DELETED (see the
+   note at the end of this module): the owner did not want a preview of the
+   speed, so the only read-out left is `.speedval`, driven by the SAME `value`
+   prop, which is why that number is now the control's whole feedback.
    =========================================================================== */
 
 /** The slider's own numeric range, as the renderer clamps it (`GoblinEdge`). */
@@ -731,27 +731,19 @@ export function FlowSpeed({value, onInput, onGestureBoundary, title}: {
   );
 }
 
-/**
- * The live rail: a bead travelling at the edge's ACTUAL current duration, so the
- * picture IS the speed rather than a word for it. `animationDuration` is set from
- * the same seconds the number prints.
- *
- * THE MOTION GATE IS THE PROJECT'S OWN, NOT A SECOND ONE — `src/styles.css`
- * stops the bead under `prefers-reduced-motion: reduce` and under the app's
- * `.ds-no-anim` class, which are the same two switches the canvas payloads obey.
- * The bead is `aria-hidden`: it conveys nothing a screen reader needs, and the
- * seconds beside it are the accessible value.
- */
-export function FlowRail({seconds, label}: {seconds: number; label: string}) {
-  const dur = Math.max(SPEED_MIN, Math.min(SPEED_MAX, seconds));
-  return (
-    <div className="flow-rail" aria-hidden="true">
-      <span className="flow-rail-line" />
-      <span className="flow-rail-bead" style={{animationDuration: `${dur}s`}} />
-      <span className="flow-rail-note">{label}</span>
-    </div>
-  );
-}
+/* ROUND AN, AN-4 — THE FLOW RAIL IS DELETED, WITH ITS REASON, SO A LATER ROUND
+   DOES NOT RE-ADD IT. AM-4 put a bead on a rail here, travelling at the edge's
+   stored `flowDuration`, on the theory that the speed would be better FELT than
+   read. The owner removed it in his second device test: "tôi k cần cái Flow
+   rail, xoá đi". Gone: this component, its render site in the flow section, its
+   five rules in `styles.css`, both of its motion-gate entries, and the `label`
+   prop that carried its caption.
+
+   WHAT STAYED, and it is the whole live subject of the item: `FlowSpeed`'s
+   `.speedval` number, still printed beside the thumb and still built from the
+   same stored seconds the slider writes. So the speed is still legible and still
+   checkable; only the illustration went. Recorded so it is not re-learned: a
+   preview inside the panel is not a CONTROL, and the owner asked for controls. */
 
 /* ===========================================================================
    Section — the section wrapper for the ordered render.

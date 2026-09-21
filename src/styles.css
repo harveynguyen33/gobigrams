@@ -1890,49 +1890,19 @@ body {
   min-width: 40px; text-align: right; flex: none;
 }
 
-/* ROUND AM, AM-4 — the live rail. The picture of the speed: a bead travelling
-   the rail at the edge's ACTUAL `flowDuration`, so the animation IS the value.
-   DECORATIVE, NEVER THE SOURCE OF TRUTH (the number beside it reads the same
-   prop), and gated by the project's OWN motion switches, below. */
-.flow-rail {
-  position: relative; height: 34px; margin-top: 8px;
-  border: 1px solid var(--border); border-radius: 7px;
-  background: var(--bg); overflow: hidden;
-}
-.flow-rail-line {
-  position: absolute; left: 10px; right: 10px; top: 50%;
-  height: 1px; margin-top: -0.5px;
-  background: var(--border-strong);
-}
-.flow-rail-bead {
-  position: absolute; top: 50%; left: 10px;
-  width: 7px; height: 7px; margin-top: -3.5px;
-  border-radius: 50%; background: var(--sel);
-  animation: flow-rail-travel linear infinite;
-}
-/* the bead's own journey: from the rail's inner left to its inner right. The
-   `- 14px` is the bead's 7px width plus the 7px of inner padding it must stop
-   short of, so the bead arrives INSIDE the rail rather than half-past its edge. */
-@keyframes flow-rail-travel {
-  from { left: 10px; }
-  to { left: calc(100% - 17px); }
-}
-.flow-rail-note {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--mono); font-size: 10px; color: var(--dim2);
-  pointer-events: none;
-}
-/* THE MOTION GATE, THE PROJECT'S OWN TWO SWITCHES — the same pair the canvas
-   payloads honour (`.ds-no-anim .ds-animated-payload`, and the reduce-motion
-   block that freezes `.edge-flow-dash` / `.edge-flow-pulse`). The bead stops
-   under either; nothing here invents a third gate. `.ds-no-anim` is set on
-   `.app` AND on `.ds-flow-wrap`, so the descendant selector covers the panel
-   whichever wrapper the app happens to be inside. */
-@media (prefers-reduced-motion: reduce) {
-  .flow-rail-bead { animation: none; }
-}
-.ds-no-anim .flow-rail-bead { animation: none; }
+/* ROUND AN, AN-4 — THE FLOW RAIL'S FIVE RULES AND BOTH MOTION-GATE ENTRIES ARE
+   DELETED, AND THE REASON LIVES HERE SO THE NEXT ROUND DOES NOT "HELP".
+   Deleted: `.flow-rail`, `.flow-rail-line`, `.flow-rail-bead`, `.flow-rail-note`,
+   the `flow-rail-travel` keyframes they animated with, the `prefers-reduced-motion`
+   override for the bead, and the `.ds-no-anim` override for it.
+   Why: the owner does not want it ("tôi k cần cái Flow rail, xoá đi"). AM-4 drew
+   a bead moving at the edge's stored duration so the speed would be FELT rather
+   than read; he wanted none of it. The motion-gate entries go with the rules they
+   gated — a gate for a deleted animation is dead CSS that reads as live policy.
+   WHAT IS STILL HERE, immediately above: `.speedval`. The number is still
+   printed beside the thumb and still driven by the same stored `flowDuration`, so
+   the speed stayed legible when the picture left. */
+
 /* The section wrapper. Sections stack with the same rule the old hand-written
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
    gap between neighbours, none before the first. */
