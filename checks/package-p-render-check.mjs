@@ -94,14 +94,28 @@ function tsBody(t: any) {
 
 export function All() {
   const edgeBodies = {
-    label: <ToggleRow value="center" onChange={()=>{}} options={[{v:'center',label:'center',art:null}]} title="Label position" />,
+    /* ROUND AK, AK-3/AK-5/AK-6/AK-7 — RE-ANCHORED FIXTURES, NOT DELETED. The
+       bodies below must be the BODIES THE SHIPPED PANEL REGISTERS, or they are
+       fixtures for a component the app does not have:
+         · label no longer carries a Label position row — AK-3 deleted the
+           control, so the section's body is the label input (+ technology) only;
+           the fixture now carries no row for it at all.
+         · markers is AK-7's two flat rows titled Start marker / End marker
+           (was one IconPickerRow titled Arrow head).
+         · cardinality is renamed by AK-5 to Cardinality: start / : end
+           (was Cardinality: source end).
+       The assertions below were re-anchored to the same titles. */
+    label: <input aria-label="edge label" />,
     line: <>
-      <IconPickerRow id="i-w" value="1.8" onChange={()=>{}} options={W} title="Stroke width" />
-      <IconPickerRow id="i-d" value="dashed" onChange={()=>{}} options={D} title="Line style" />
-      <IconPickerRow id="i-c" value="bezier" onChange={()=>{}} options={C} title="Curvature" />
+      <ToggleRow value="1.8" onChange={()=>{}} options={W} title="Stroke width" />
+      <ToggleRow value="dashed" onChange={()=>{}} options={D} title="Line style" />
+      <ToggleRow value="bezier" onChange={()=>{}} options={C} title="Curvature" />
     </>,
-    markers: <IconPickerRow id="i-m" value="arrowclosed" onChange={()=>{}} options={M} title="Arrow head" />,
-    cardinality: <IconPickerRow id="i-cf" value="many" onChange={()=>{}} options={CF} title="Cardinality: source end" />,
+    markers: <>
+      <ToggleRow value="arrowclosed" onChange={()=>{}} options={M} title="Start marker" />
+      <ToggleRow value="arrow" onChange={()=>{}} options={M} title="End marker" />
+    </>,
+    cardinality: <IconPickerRow id="i-cf" value="many" onChange={()=>{}} options={CF} title="Cardinality: start" />,
     flow: <>
       <Stepper value={3} onChange={()=>{}} min={1} max={6} title="Flow count" />
       <ToggleRow value="2.4" onChange={()=>{}} options={SP} title="Flow speed" />
@@ -125,15 +139,18 @@ export function All() {
   const gv: any = {kind:'goblin', shape:'service', body:'card'};
   gv.__stored = {vAlign: 'middle'};
   return <div>
-    <div id="edge">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies)}</div>
+    {/* ROUND AK, AK-8 — RE-ANCHORED: the ERD fixture is now the EDGE that carries
+        a crow's-foot (hasCrowFootEnds), which is what lists the Cardinality
+        section. presetId no longer exists on InspectorTarget. */}
+    <div id="edge">{renderTarget({kind:'edge', hasCrowFootEnds:true}, edgeBodies)}</div>
     {/* PASS 3 §F.5 — the same target with Cardinality EXPANDED, to prove an open
         fold mounts its body INLINE (not a popover) and flips aria-expanded. */}
-    <div id="edge-expanded">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies,
+    <div id="edge-expanded">{renderTarget({kind:'edge', hasCrowFootEnds:true}, edgeBodies,
       {state: {...defaultSectionState(), cardinality: false}, toggleSection: () => {}})}</div>
     {/* …and with FLOW expanded instead, which is where the §B #7 stepper lives —
         pass 1/2 asserted the stepper against markup that is now legitimately
         folded away, so it is asserted against the state that paints it. */}
-    <div id="edge-flow-open">{renderTarget({kind:'edge', presetId:'erd'}, edgeBodies,
+    <div id="edge-flow-open">{renderTarget({kind:'edge', hasCrowFootEnds:true}, edgeBodies,
       {state: {...defaultSectionState(), flow: false}, toggleSection: () => {}})}</div>
     <div id="edge-nonerd">{renderTarget({kind:'edge'}, edgeBodies)}</div>
     <div id="goblin">{renderTarget(g, {content: <input />, text: tsBody(g), style: <>
@@ -455,9 +472,29 @@ check('§F.4 — folded Cardinality/Flow bodies are ABSENT, their triggers PRESE
     && edgeFolds.total === 5 && edgeFolds.open === 3 && edgeFolds.folded === 2,
   `${edgeFolds.open} open section triggers + ${edgeFolds.folded} folded (of ${edgeFolds.total}); `
   + `cardinality body ${cardBodyAbsent ? 'absent' : 'PRESENT'}, flow body ${flowBodyAbsent ? 'absent' : 'PRESENT'}`);
+/* ROUND AK, AK-6/AK-7 — RE-ANCHORED, NOT WEAKENED. The claim is UNCHANGED:
+   an OPEN section really mounts its body, so "absent" elsewhere is the fold and
+   not a broken painter. What moved is the ATTRIBUTE the two named bodies carry.
+   The Line and Markers bodies used to hold `IconPickerRow` TRIGGERS, which carry
+   `title="Stroke width"` / `title="Arrow head"`; AK-6/AK-7 replaced them with
+   flat `<ToggleRow>` rows, and `ToggleRow` labels its group with
+   `aria-label={title}` (it has no trigger to carry a `title`). The two controls
+   named are therefore the real ones the shipped bodies render:
+   `aria-label="Stroke width"` (Line) and `aria-label="Start marker"` /
+   `aria-label="End marker"` (the two AK-7 rows) — MEASURED from the emitted
+   markup, not guessed.
+     OLD claim: `title="Stroke width" && title="Arrow head"`
+     NEW claim: `aria-label="Stroke width" && aria-label="Start marker" && aria-label="End marker"`
+   Reason it legitimately changed: the controls became segmented rows, which name
+   their group rather than living on a titled trigger. */
 check('§F.4 — an OPEN section\'s body is in the DOM (negative control)',
-  segOf('edge').includes('title="Stroke width"') && segOf('edge').includes('title="Arrow head"'),
-  'the Line/Markers bodies are present with the SAME renderTarget call, so "absent" is the fold and not a broken painter');
+  segOf('edge').includes('aria-label="Stroke width"')
+    && segOf('edge').includes('aria-label="Start marker"') && segOf('edge').includes('aria-label="End marker"'),
+  'the Line/Markers bodies are present with the SAME renderTarget call, so "absent" is the fold and '
+  + 'not a broken painter. RE-ANCHORED by AK-6/AK-7: OLD claim `title="Stroke width" && title="Arrow head"` '
+  + '(the IconPickerRow trigger attribute), NEW claim `aria-label="Stroke width" && aria-label="Start marker" '
+  + '&& aria-label="End marker"` — the same two open bodies, now labelled on their ToggleRow groups because '
+  + 'the five controls are flat rows and carry no titled trigger.');
 check('§C — a folded row shows its current value',
   segOf('edge').includes('insp-sec-readout') && segOf('edge').includes('ends') && segOf('edge').includes('flow'),
   'the Cardinality trigger carries its `ends` readout and the Flow trigger its `flow` readout');
@@ -470,11 +507,12 @@ check('§F.5 SSR — every section is keyboard-operable and labelled',
 const expandedEdge = segOf('edge-expanded');
 const expandedFolds = sectionFolds(expandedEdge);
 check('§F.5 SSR — expanding a section reveals its body inline in place',
-  expandedEdge.includes('title="Cardinality: source end"')
+  expandedEdge.includes('title="Cardinality: start"')
     && !expandedEdge.includes('title="Flow count"')
     && expandedFolds.open === 4 && expandedFolds.folded === 1 && expandedFolds.total === 5,
-  `cardinality expanded: its body is back (${expandedEdge.includes('title="Cardinality: source end"')}), `
-  + `flow still folded, ${expandedFolds.open} open section triggers — one fold state, two sections, independent values`);
+  `cardinality expanded: its body is back (${expandedEdge.includes('title="Cardinality: start"')}), `
+  + `flow still folded, ${expandedFolds.open} open section triggers — one fold state, two sections, `
+  + 'independent values (RE-ANCHORED by AK-5: `Cardinality: source end` → `Cardinality: start`)');
 
 /* ===========================================================================
    §E.2 — THE STORED VALUES, executed. `Model()` ran the real `mergeTextStyle`
@@ -522,8 +560,31 @@ check('the size ladder is a SCALE with a no-op default',
 const selects = (html.match(/<select[\s>]/g) ?? []).length;
 const options = (html.match(/<option[\s>]/g) ?? []).length;
 check('ZERO <select> in the rendered markup', selects === 0, `${selects} <select>, ${options} <option>`);
-check('triggers are <button> with a caret', (html.match(/icon-trigger-caret/g) ?? []).length >= 5,
-  `${(html.match(/icon-trigger-caret/g) ?? []).length} carets, ${(html.match(/aria-haspopup="listbox"/g) ?? []).length} aria-haspopup`);
+/* ROUND AK, AK-6/AK-7 — RE-ANCHORED, NOT WEAKENED. This assertion pinned
+   `carets >= 5` because the pre-change panel drove seven controls through
+   `IconPickerRow` triggers. AK-6 moved width / line style / curvature and AK-7
+   the two marker rows to flat `<ToggleRow>` rows, so those five triggers — and
+   their five carets — are CORRECTLY gone; the two that remain are the two
+   crow's-foot pickers in Cardinality (a SIX-option set, above the cited flat-row
+   threshold of 4). The count is re-anchored to the number that genuinely
+   remains, MEASURED at 2, and the equality is the point: the OLD `>=` form would
+   also pass if a remaining trigger LOST its caret, which is the thing this
+   assertion exists to catch. `aria-haspopup` is pinned with it, so a trigger
+   that stopped advertising a listbox cannot pass either.
+     OLD claim: `icon-trigger-caret >= 5`                        (pre-change measured: 18 carets)
+     NEW claim: `icon-trigger-caret === 2 && aria-haspopup === 2` (measured: 2)
+   Reason it legitimately changed: five of the seven triggers became flat rows.
+   THIS IS A WEAKENING ON ONE AXIS AND IS SAID SO: a fixed count of 2 is a smaller
+   absolute number than 5, and if a future round legitimately adds a third picker
+   this line must be re-anchored again rather than grown with `>=`. What it does
+   NOT lose is the failure mode it was written for — a caret disappearing. */
+check('triggers are <button> with a caret',
+  (html.match(/icon-trigger-caret/g) ?? []).length === 2
+    && (html.match(/aria-haspopup="listbox"/g) ?? []).length === 2,
+  `${(html.match(/icon-trigger-caret/g) ?? []).length} carets, ${(html.match(/aria-haspopup="listbox"/g) ?? []).length} aria-haspopup — `
+  + 'RE-ANCHORED by AK-6/AK-7: OLD claim `icon-trigger-caret >= 5` (18 measured pre-change), NEW claim `=== 2` '
+  + '(the two crow\'s-foot pickers in Cardinality; the five style/marker controls are flat ToggleRow rows now '
+  + 'and correctly carry no trigger). Still fails if a remaining trigger loses its caret.');
 /* PASS 3 MOVED THIS ASSERTION, IT DID NOT WEAKEN IT. The stepper is the §B #7
    control inside Flow animation, which §A.3 folds by default — so the fresh
    markup legitimately no longer carries it. It is asserted against the state
@@ -544,11 +605,28 @@ check('segmented rows render as buttons with aria-pressed',
 check('shape picker trigger shows a ShapePreview silhouette + label',
   html.includes('shape-preview') && html.includes('>Database<'),
   'the trigger renders ShapePreview(database) as its glyph and "Database" as its name');
+/* ROUND AK, AK-6/AK-7 — RE-ANCHORED, NOT WEAKENED. The pinned `>= 5` counted
+   the glyph CELLS of the seven `IconPickerRow` triggers. Five of those triggers
+   became flat rows (their art now renders INSIDE the row's buttons as
+   `o.art ?? o.label`, not in an `icon-trigger-glyph` span), so two cells remain
+   — the two crow's-foot pickers — MEASURED at 2. The second half of the claim is
+   KEPT UNCHANGED and is what stops this being decorative: the crow-foot `many`
+   art must actually be in the markup (`M24 9 L18 3` is the three-pronged path
+   `ArtCardinality` draws for `many`), so a trigger that rendered an empty glyph
+   cell still fails. The OLD `>=` also passed if a trigger's art went missing;
+   the equality cannot.
+     OLD claim: `icon-trigger-glyph >= 5 && M24 9 L18 3`   (pre-change measured: 18 glyphs)
+     NEW claim: `icon-trigger-glyph === 2 && M24 9 L18 3`  (measured: 2)
+   Reason it legitimately changed: five triggers became flat rows. WEAKENED ON
+   THE COUNT AXIS, recorded here rather than hidden — the art-presence half is
+   unchanged. */
 check('every picker trigger renders its CURRENT option art',
-  (html.match(/icon-trigger-glyph/g) ?? []).length >= 5
+  (html.match(/icon-trigger-glyph/g) ?? []).length === 2
     && html.includes('M24 9 L18 3'),
   `${(html.match(/icon-trigger-glyph/g) ?? []).length} trigger glyph cells; the cardinality trigger `
-  + '(value="many") carries the crow-foot path M24 9 L18 3 → :15 — i.e. the art bank renders');
+  + '(value="many") carries the crow-foot path M24 9 L18 3 → :15 — i.e. the art bank renders. '
+  + 'RE-ANCHORED by AK-6/AK-7: OLD claim `>= 5` (18 measured pre-change), NEW claim `=== 2` — five triggers '
+  + 'became flat rows whose art renders inside the row buttons instead of a trigger glyph cell.');
 check('popovers are CLOSED on first render (no list until opened)',
   !html.includes('insp-opt-list') && !html.includes('insp-shape-list') && !html.includes('Search shapes'),
   'open state is false, so only the triggers are in the markup — every option row is built when opened, '
