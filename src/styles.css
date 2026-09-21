@@ -1382,7 +1382,23 @@ body {
      used, so an edge that carries neither key paints the EXACT colour it painted
      before the item: `--label-fg` unset → `--fg`, `--label-plate` unset → the
      class's own value. A custom property is used rather than `color:`/`background:`
-     so the sheet keeps its own cascade (see the note in `GoblinEdge`). */
+     so the sheet keeps its own cascade (see the note in `GoblinEdge`).
+
+     ROUND AN, AN-6 — TWO CORRECTIONS TO THE PARAGRAPH ABOVE, BOTH MEASURED.
+     They are corrections to a claim this sheet was making and not living up to,
+     which is why they are written here rather than left in the round's notes:
+
+       · `--label-plate` had NO consumer anywhere in this file (grep returned
+         zero), so the panel's `background color` swatch wrote a key that painted
+         nothing. It now has one — `.edge-label.lb-surface`, below — with the token
+         as the FALLBACK, so "unset → the class's own value" is true by
+         construction instead of by accident.
+       · `--label-fg` reached the paint, but while the label was SELECTED it was
+         overridden outright: `.edge-label.selected` declared `color: var(--sel)`,
+         so the authored colour lived in the custom property and never reached the
+         screen. That rule now owns only the ring; the `color` below is the SINGLE
+         writer in every state, which is what makes the swatch and the canvas
+         agree. */
   color: var(--label-fg, var(--fg)); background: var(--surface);
   border: 1px solid transparent; border-radius: 5px;
   padding: 1px 6px; cursor: grab; white-space: nowrap;
@@ -1397,7 +1413,27 @@ body {
    and therefore works on every input method; the `title` on the element is the
    documented affordance, which AK-2 leaves in place while deleting the sidebar
    hint that used to spell it out. */
-.edge-label.selected { border-color: var(--sel); color: var(--sel); }
+/* ROUND AN, AN-6a — THE SELECTION MAY NOT OVERWRITE THE AUTHORED COLOUR.
+   DELETED HERE: `color: var(--sel)`. This rule used to read
+   `.edge-label.selected { border-color: var(--sel); color: var(--sel); }`, and
+   the second declaration is why a SELECTED label lied about itself: the panel's
+   `text color` row writes `--label-fg`, the base rule above reads it, and this
+   (0,2,0) rule then painted `--sel` over the top for as long as the label stayed
+   selected. The swatch said one colour, the canvas said another.
+
+   ROUND AK FIXED EXACTLY THIS SHAPE FOR THE EDGE STROKE, and this is that answer
+   applied to the label. There the selection body took `--sel` and the authored
+   colour was drawn OVER it as an inner core, so the selection signal and the
+   authored colour stopped competing for one property. Here the chrome that
+   already carries the signal is the `border-color` on the line above — the ring
+   exists to say "selected", it carries no authored meaning, and it is left
+   exactly as it was. What is removed is only the property that had TWO writers.
+
+   UNSELECTED LABELS ARE BYTE-IDENTICAL: this rule never matched them, and the
+   base rule's own declarations are untouched by AN-6a, which is what the round's
+   parity claim rests on. The selected state stays VISIBLE — the ring is still
+   `--sel`, the same token and the same 1px border it always was. */
+.edge-label.selected { border-color: var(--sel); }
 
 /* ROUND AK, AK-10/AK-12 — the label's DRAG state: `:active` (pointer down) is
    the affordance, and the `::after` ring is the TAP TARGET. The ring is deleted
@@ -1455,7 +1491,25 @@ body {
     1px 0 0 var(--bg),
     -1px 0 0 var(--bg);
 }
-.edge-label.lb-surface { background: var(--surface); }
+/* ROUND AN, AN-6b — THE PLATE COLOUR NOW HAS ITS CONSUMER, AND THE TOKEN IS THE
+   FALLBACK. `GoblinEdge` has always emitted the stored colour as an inline custom
+   property (`...(labelBgColor ? {'--label-plate': labelBgColor} : {})`), and
+   NOTHING IN THIS FILE READ IT: the rule was `background: var(--surface)` and
+   grep for `--label-plate` in the sheet returned zero consumers. So the panel's
+   `background color` swatch wrote a key that painted nothing — the sixth instance
+   in this project of a value that is EMITTED BUT NEVER APPLIED.
+
+   THE SHAPE OF THE FIX IS THE FALLBACK, not a new rule and not a second writer.
+   With the token first, a board that stores a colour paints it; with nothing
+   stored the expression resolves to `var(--surface)`, which is the EXACT value
+   this rule declared before, so an untouched board paints byte-for-byte what it
+   painted. `outline` and `none` keep their own declarations: `none` is "no plate
+   at all" and `outline` is a hairline, and neither is a plate colour the user
+   should be able to fill — a `background color` row is only offered for a state
+   that HAS a background (the panel hides the row at `none`).
+
+   NO NEW HEX: one token, one fallback token. */
+.edge-label.lb-surface { background: var(--label-plate, var(--surface)); }
 .edge-label.lb-outline { background: transparent; border-color: var(--border-strong); }
 
 .edge-label-input {

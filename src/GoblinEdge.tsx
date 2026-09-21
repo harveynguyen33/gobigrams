@@ -1086,12 +1086,24 @@ const GoblinEdge = memo((props: EdgeProps) => {
               /* ROUND AL, AL-3 — the label's two colours, written as inline
                  CUSTOM PROPERTIES rather than as `color`/`background`, and that
                  choice is load-bearing twice over:
-                   · `.edge-label.selected` already declares `color: var(--sel)`,
-                     and an inline `color` would beat it, so a selected label
-                     would stop showing the selection colour;
+                   · ROUND AN, AN-6a RETIRED THE FIRST REASON, AND THIS IS WHY THE
+                     MECHANISM SURVIVES IT. While `.edge-label.selected` still
+                     declared `color: var(--sel)` the argument was a cascade one:
+                     an inline `color` would have beaten it and a selected label
+                     would have stopped showing the selection colour. The selected
+                     rule now owns only the ring, so `color` is uncontested in
+                     every state. A custom property is still the right mechanism,
+                     because it is what gives the sheet ONE writer per property
+                     and leaves this element's `style` object IDENTICAL when no
+                     key is stored;
                    · `.edge-label.lb-*` owns `background`, and the plate is a
                      three-state CLASS (AK-12's rule) that an inline background
-                     would flatten to one.
+                     would flatten to one. ROUND AN, AN-6b then gave
+                     `.lb-surface` the `--label-plate` CONSUMER (with the token as
+                     its FALLBACK), so the stored colour reaches the paint through
+                     the class while an untouched board still paints
+                     `var(--surface)` — the property is emitted here and applied
+                     there, which is the whole point of the split.
                  A custom property has no specificity of its own, so the sheet
                  keeps every one of those decisions and simply reads this colour
                  where it already knows how. Both are `undefined` when unset,
