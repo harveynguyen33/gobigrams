@@ -139,7 +139,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
   const d = (data ?? {}) as {
     shape?: string;
     offset?: 'center' | 'start' | 'end';
-    flow?: 'none' | 'dots' | 'dash' | 'pulse' | 'icon' | 'event';
+    flow?: 'none' | 'dots' | 'dash' | 'pulse' | 'icon';
     flowIcon?: 'mail' | 'package' | 'file' | 'zap' | 'settings' | 'database';
     flowCount?: number;
     flowDuration?: number;
@@ -730,18 +730,16 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // K2: the SMIL subtree is rebuilt only when the geometry or the flow props
   // actually change (React Flow re-runs the edge body on every pan/zoom tick).
   const payloads = useMemo(() => {
-    if (flow !== 'dots' && flow !== 'icon' && flow !== 'event') return null;
+    if (flow !== 'dots' && flow !== 'icon') return null;
 
-    // 16×12 "message being delivered" envelope: rounded rect + flap.
-    const envelope = (
-      <>
-        <rect x={-8} y={-6} width={16} height={12} rx={1.5}
-          fill={stroke} stroke="none" />
-        <path d="M-8,-6 L0,0.5 L8,-6" fill="none"
-          stroke="var(--card, var(--bg))" strokeWidth={1.3}
-          strokeLinecap="round" strokeLinejoin="round" />
-      </>
-    );
+    /* ROUND AK, AK-16 — THE `event` BRANCH IS DELETED, AND SO IS ITS ENVELOPE.
+       `flow:'event'` drew this 16×12 envelope while `flow:'icon'` with the
+       `mail` glyph drew a 24×20 chip carrying... an envelope. Two names, one
+       picture. The option is gone from the panel and `migrateEdge` folds a
+       stored `event` onto `icon` + `mail` on READ, so the old envelope is now
+       drawn by the `icon` branch's `FLOW_ICON_PATHS.mail` glyph and needs no
+       code of its own here. Dead code left "just in case" is how a removed
+       option comes back. */
 
     return Array.from({length: flowCount}).map((_, i) => {
       const motion = (
@@ -751,7 +749,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
           repeatCount="indefinite"
           path={path}
           begin={begin(i)}
-          rotate={flow === 'dots' || flow === 'event' ? 'auto' : '0'}
+          rotate={flow === 'dots' ? 'auto' : '0'}
         />
       );
       if (flow === 'dots') {
@@ -760,15 +758,6 @@ const GoblinEdge = memo((props: EdgeProps) => {
             style={{filter: `drop-shadow(0 0 4px ${stroke})`}}>
             {motion}
             <circle r={3} fill={stroke} />
-          </g>
-        );
-      }
-      if (flow === 'event') {
-        return (
-          <g key={i} className="edge-flow-event"
-            style={{filter: `drop-shadow(0 1px 2px rgba(0,0,0,.6))`}}>
-            {motion}
-            {envelope}
           </g>
         );
       }

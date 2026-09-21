@@ -346,21 +346,36 @@ const migrateEdge = (e: Edge): Edge => {
   const flowed: Edge = (m.animated && !d.flow)
     ? {...m, data: {...d, flow: 'dash'}}
     : m;
-  if (!key) return flowed;         // a genuine custom hex is left alone
-  const md = (flowed.data ?? {}) as any;
+  /* ROUND AK, AK-16 — `flow:'event'` IS FOLDED INTO `flow:'icon'` + `mail`.
+     The two options drew the same thing two ways: `event` painted a 16×12
+     ENVELOPE and `icon` painted a 24×20 chip carrying `FLOW_ICON_PATHS.mail`,
+     which is ITSELF an envelope glyph. Two names, one meaning — exactly the
+     "trùng lặp / confuse các option" the owner reported. Folding on READ (never
+     rewriting the board) keeps the look for any edge that already stored
+     `event`: the mail glyph IS the envelope it used to draw, so the animation
+     does not visibly change. MEASURED before folding: no persisted board in
+     `boards/` carries `flow:'event'` (11 edges in Harvey's board, only `fb7`
+     has a flow at all, and it is `dots`), so this migration is insurance rather
+     than a repair. `flowIcon` is left untouched — it is the decoration that
+     picks WHICH glyph the chip carries. */
+  const folded: Edge = ((m.data ?? {}) as any).flow === 'event'
+    ? {...m, data: {...((m.data ?? {}) as any), flow: 'icon', flowIcon: 'mail'}}
+    : m;
+  if (!key) return folded;         // a genuine custom hex is left alone
+  const md = (folded.data ?? {}) as any;
   // The literal is DROPPED, not kept alongside: the key is now the source of
   // truth and the render path resolves it, so a theme change actually recolours
   // the line. (`data.color` on an edge is the custom-hex escape hatch.)
-  const style = {...(flowed.style as any)};
+  const style = {...(folded.style as any)};
   if (keyForHex(style.stroke)) delete style.stroke;
-  const out: Edge = {...flowed, style, data: {...md, strokeKey: key}};
+  const out: Edge = {...folded, style, data: {...md, strokeKey: key}};
   // the arrowhead colour must become the token too, otherwise it keeps the
   // legacy hex and a theme switch leaves it stale.
-  if ((flowed.markerEnd as any)?.type && keyForHex((flowed.markerEnd as any).color)) {
-    out.markerEnd = {...(flowed.markerEnd as any), color: COLOR_VAR[key]};
+  if ((folded.markerEnd as any)?.type && keyForHex((folded.markerEnd as any).color)) {
+    out.markerEnd = {...(folded.markerEnd as any), color: COLOR_VAR[key]};
   }
-  if ((flowed.markerStart as any)?.type && keyForHex((flowed.markerStart as any).color)) {
-    out.markerStart = {...(flowed.markerStart as any), color: COLOR_VAR[key]};
+  if ((folded.markerStart as any)?.type && keyForHex((folded.markerStart as any).color)) {
+    out.markerStart = {...(folded.markerStart as any), color: COLOR_VAR[key]};
   }
   return out;
 };
@@ -3723,7 +3738,7 @@ export default function App() {
      the expanded body would show one. */
   const flowReadout = () =>
     eFlow === 'none' ? 'off'
-      : (eFlow === 'dots' || eFlow === 'icon' || eFlow === 'event') ? `on · ${eFlowCount}`
+      : (eFlow === 'dots' || eFlow === 'icon') ? `on · ${eFlowCount}`
       : 'on';
   const FOLDED_READOUT: Partial<Record<SectionId, {node: React.ReactNode; label: string}>> = {
     cardinality: {
@@ -5416,6 +5431,24 @@ export default function App() {
               </div>
               </>); return null; })()}
               {(() => { secBody('flow', <>
+                {/* ROUND AK, AK-16/AK-17 — ONE AXIS, FIVE NON-OVERLAPPING NAMES.
+                    `Envelope` was REMOVED: it drew the same thing as `Icon` with
+                    the `mail` glyph (both are an envelope travelling the line —
+                    `FLOW_ICON_PATHS.mail` in src/GoblinEdge.tsx IS an envelope),
+                    which is the duplication the owner reported. An edge that
+                    already stored `flow:'event'` still animates: `migrateEdge`
+                    folds it onto `icon` + `mail` on READ, so no board is
+                    rewritten and the look does not change.
+
+                    HONEST LIMIT, recorded in the code and not only in a report:
+                    NO mature tool surveyed for this round ships a connector-wide
+                    marching-ants animation — Miro, Lucidchart, Whimsical and
+                    FigJam all have ZERO; tldraw's only related control is a
+                    GLOBAL reduce-motion user preference; Excalidraw has no
+                    element-level animation at all. So the research could prove
+                    WHICH OPTIONS DUPLICATED and could NOT justify what to keep:
+                    the five names below are the owner's product call, not a
+                    precedent. The REMOVAL is the evidence-backed part. */}
                 <div className="field">
                   <label>flow animation</label>
                 <div className="swatches" style={{gap: 6}}>
@@ -5425,7 +5458,6 @@ export default function App() {
                     ['dash', 'Dash'],
                     ['pulse', 'Pulse'],
                     ['icon', 'Icon'],
-                    ['event', 'Envelope'],
                   ] as const).map(([v, lbl]) => (
                     <button
                       key={v}
@@ -5436,8 +5468,7 @@ export default function App() {
                         v === 'dots' ? 'Dots travel along the line (message being sent)'
                         : v === 'dash' ? 'Dashes march along the line'
                         : v === 'pulse' ? 'A bright segment sweeps the line'
-                        : v === 'icon' ? 'An icon chip travels the line (letter / package / …)'
-                        : v === 'event' ? 'An envelope travels the line — "a message being delivered"'
+                        : v === 'icon' ? 'A glyph chip travels the line — pick the glyph below'
                         : 'No flow animation'
                       }
                     >
@@ -5446,7 +5477,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              {(eFlow === 'dots' || eFlow === 'icon' || eFlow === 'event') && (
+              {(eFlow === 'dots' || eFlow === 'icon') && (
                 <div className="field-row">
                   <div className="field">
                     <label>count</label>
