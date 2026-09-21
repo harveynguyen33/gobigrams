@@ -141,15 +141,33 @@ assert('a.table → [table, columns, showMode]',
 assert('a.edge (non-ERD) → [label, line, markers, flow]',
   JSON.stringify(ids({kind: 'edge'})) === '["label","line","markers","flow"]',
   JSON.stringify(ids({kind: 'edge'})));
-assert('a.edge (ERD) → [label, line, markers, cardinality, flow]',
-  JSON.stringify(ids({kind: 'edge', presetId: 'erd'})) === '["label","line","markers","cardinality","flow"]',
-  JSON.stringify(ids({kind: 'edge', presetId: 'erd'})) + '  (the §A.3 `kind === edge && preset.id === erd` gate)');
-/* NEGATIVE CONTROL for the gate itself: a DIFFERENT preset must NOT carry it,
-   or the assertion above would pass on a function that always returns it. */
-assert('a.control-cardinality-is-preset-gated-not-always-present',
-  !ids({kind: 'edge', presetId: 'architecture'}).includes('cardinality')
-    && ids({kind: 'edge', presetId: 'erd'}).includes('cardinality'),
-  'architecture edge has no cardinality; erd edge does');
+/* ROUND AK, AK-8 — RE-ANCHORED, NOT DELETED. The gate moved from the BOARD's
+   preset to the EDGE's own crow's-foot markers, so the fixture that expresses
+   "this edge offers cardinality" is now `hasCrowFootEnds: true` instead of
+   `presetId: 'erd'`.
+     OLD claim: `{kind:'edge', presetId:'erd'}` → adds `cardinality`; a
+                different preset (`'architecture'`) does not.
+     NEW claim: `{kind:'edge', hasCrowFootEnds:true}` → adds `cardinality`; an
+                edge with no crow's-foot does not, WHATEVER the board's preset —
+                which is the whole point of the pass (spec §2, Item A).
+   `presetId` no longer exists on `InspectorTarget` at all, so the old fixture
+   would now be a TYPE error as well as a wrong expectation. */
+assert('a.edge (crow\'s-foot ends) → [label, line, markers, cardinality, flow]',
+  JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","line","markers","cardinality","flow"]',
+  JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true}))
+  + '  (RE-ANCHORED by AK-8: the gate reads `hasCrowFootEnds`, i.e. the EDGE\'s own '
+  + 'markerStart/markerEnd, NOT the board preset the old `presetId: \'erd\'` fixture named)');
+/* NEGATIVE CONTROL for the gate itself: an edge WITHOUT a crow's-foot must NOT
+   carry it, or the assertion above would pass on a function that always returns
+   it. This replaces the old preset-based control — same job, new key. */
+assert('a.control-cardinality-is-edge-gated-not-always-present',
+  !ids({kind: 'edge'}).includes('cardinality')
+    && !ids({kind: 'edge', hasCrowFootEnds: false}).includes('cardinality')
+    && ids({kind: 'edge', hasCrowFootEnds: true}).includes('cardinality'),
+  'RE-ANCHORED by AK-8 (was `a.control-cardinality-is-preset-gated-not-always-present`, '
+  + "which asserted 'architecture' edge → no cardinality, 'erd' edge → cardinality): a plain edge and "
+  + 'an edge with `hasCrowFootEnds:false` have no cardinality; one with the crow\'s-foot does. '
+  + 'The board preset no longer participates at all');
 
 /* --- the §A.2 named cases -------------------------------------------------- */
 for (const n of NAMED) {
@@ -194,21 +212,44 @@ console.log(`native dropdowns RENDERED in the region: ${regionSelects}   `
   + `in the whole file: ${fileSelects}   <option> in the region: ${regionOptions}`);
 
 /* THE TWELVE, each named with the line it occupied before this pass, and each
-   paired with the proof that a picker now carries it. */
+   paired with the proof that a picker now carries it.
+
+   ROUND AK, AK-6/AK-7 — RE-ANCHORED, NOT DELETED. Four rows moved control
+   FAMILY because Pass 1 flattened them into segmented rows:
+     · `label position` was DELETED entirely (AK-3) — it is no longer one of
+       "the twelve", so the row is REMOVED from this table and the deletion is
+       recorded in the AK-9 harness instead of being asserted as a conversion.
+     · `stroke width`, `line style`, `curvature` were `IconPickerRow` and are now
+       `ToggleRow` (AK-6) — same table values, new control.
+     · `arrow head` / `head start` were `IconPickerRow` and are now `ToggleRow`
+       (AK-7), AND renamed (AK-5): the MARKER tables are unchanged
+       (`MARKER_OPTS` / `MARKER_OPTS_START`), only the rendered labels moved.
+   The assertions below therefore still hold the INVARIANT that matters — every
+   value the old `<select>`s held is still offered, each by a real picker
+   component — while naming the control each one is carried by TODAY. */
 const TWELVE = [
-  {n: 1, what: 'label position', was: 4145, control: 'ToggleRow', proof: 'options={OFFSET_OPTS}'},
-  {n: 2, what: 'stroke width', was: 4162, control: 'IconPickerRow', proof: 'options={WIDTH_OPTS}'},
-  {n: 3, what: 'line style', was: 4175, control: 'IconPickerRow', proof: 'options={DASH_OPTS}'},
-  {n: 4, what: 'curvature', was: 4187, control: 'IconPickerRow', proof: 'options={CURVE_OPTS}'},
-  {n: 5, what: 'arrow head', was: 4210, control: 'IconPickerRow', proof: 'options={MARKER_OPTS}'},
-  {n: 6, what: 'head start', was: 4219, control: 'IconPickerRow', proof: 'options={MARKER_OPTS_START}'},
+  {n: 2, what: 'stroke width', was: 4162, control: 'ToggleRow', proof: 'options={WIDTH_OPTS}'},
+  {n: 3, what: 'line style', was: 4175, control: 'ToggleRow', proof: 'options={DASH_OPTS}'},
+  {n: 4, what: 'curvature', was: 4187, control: 'ToggleRow', proof: 'options={CURVE_OPTS}'},
+  {n: 5, what: 'start marker (was "arrow head")', was: 4210, control: 'ToggleRow', proof: 'options={MARKER_OPTS}'},
+  {n: 6, what: 'end marker (was "head start")', was: 4219, control: 'ToggleRow', proof: 'options={MARKER_OPTS_START}'},
   {n: 7, what: 'flow count', was: 4261, control: 'Stepper', proof: 'min={1} max={6}'},
   {n: 8, what: 'flow speed', was: 4270, control: 'ToggleRow', proof: 'options={SPEED_OPTS}'},
-  {n: 9, what: "crow's-foot source end", was: 4313, control: 'IconPickerRow', proof: 'options={CROW_START_OPTS}'},
-  {n: 10, what: "crow's-foot target end", was: 4332, control: 'IconPickerRow', proof: 'options={CROW_END_OPTS}'},
+  {n: 9, what: "crow's-foot start (was \"source end\")", was: 4313, control: 'IconPickerRow', proof: 'options={CROW_START_OPTS}'},
+  {n: 10, what: "crow's-foot end (was \"target end\")", was: 4332, control: 'IconPickerRow', proof: 'options={CROW_END_OPTS}'},
   {n: 11, what: 'node shape (19)', was: 4571, control: 'ShapesPicker', proof: '<ShapesPicker'},
   {n: 12, what: 'node body (2)', was: 4580, control: 'ToggleRow', proof: 'options={BODY_OPTS}'},
 ];
+/* ROUND AK, AK-3 — `label position` is DELETED, and the deletion is asserted
+   rather than merely implied by its absence from the table above. The row's
+   `OFFSET_OPTS` table and its `ArtLabelPos` glyph had no other consumer, so both
+   went with it. The STORED FIELD survives (`data.offset` is read by
+   `GoblinEdge.tsx`), so this asserts the CONTROL is gone, not the value. */
+const LABEL_POS_GONE = !APP.includes('OFFSET_OPTS')
+  && !APP.includes("'label position'") && !APP.includes('<label>label position</label>')
+  && !PICKS.includes('ArtLabelPos');
+console.log(`\nAK-3: the \`label position\` control is deleted (OFFSET_OPTS ${APP.includes('OFFSET_OPTS') ? 'PRESENT' : 'gone'}, `
+  + `ArtLabelPos ${PICKS.includes('ArtLabelPos') ? 'PRESENT' : 'gone'})`);
 console.log('\nthe twelve enumerated controls, each with its replacement:');
 const twelveOk = [];
 for (const c of TWELVE) {
@@ -223,8 +264,12 @@ assert('b.zero-selects-in-the-inspector-region', regionSelects === 0,
   `${regionSelects} native dropdown(s) rendered between the inspector marker and </aside>`);
 assert('b.zero-option-elements-in-the-inspector-region', regionOptions === 0,
   `${regionOptions} <option> element(s) left`);
-assert('b.all-twelve-enumerated-controls-converted', twelveOk.every(Boolean),
-  `${twelveOk.filter(Boolean).length}/12 carried by a picker component`);
+assert('b.all-eleven-surviving-enumerated-controls-converted', twelveOk.every(Boolean) && LABEL_POS_GONE,
+  `${twelveOk.filter(Boolean).length}/${TWELVE.length} carried by a picker component, and the twelfth `
+  + '(`label position`) was DELETED outright by AK-3 rather than converted — RE-ANCHORED by AK-6/AK-7 '
+  + 'from `b.all-twelve-enumerated-controls-converted`, which asserted a conversion for a row that no '
+  + 'longer ships. The invariant held is unchanged: every value the old selects offered is still '
+  + 'offered, each by a real picker component; one row left the panel on purpose and is asserted gone');
 assert('b.whole-file-select-count-recorded', fileSelects === 0,
   `App.tsx renders ${fileSelects} native dropdown(s) anywhere — the table/column editor rows use `
   + `<input aria-label="column N …"> + flag buttons (App.tsx:4513-4552), so nothing outside the panel kept one either`);
@@ -240,9 +285,14 @@ assert('b.option-art-tables-are-complete',
       {what: 'stroke width (5)', ok: APP.includes('const WIDTH_OPTS') && APP.includes('[1, 1.5, 1.8, 2, 3].map')},
       {what: 'line style (3)', ok: APP.includes("(['solid', 'dashed', 'dotted'] as const)")},
       {what: 'curvature (4)', ok: APP.includes("(['bezier', 'smoothstep', 'step', 'straight'] as const)")},
-      {what: 'label position (3)', ok: ['center', 'start', 'end'].every(v => APP.includes(`{v: '${v}', label: '${v}'`))},
-      {what: 'arrow head (3)', ok: APP.includes('const MARKER_OPTS') && APP.includes('MarkerType.ArrowClosed') && APP.includes('MarkerType.Arrow,')},
-      {what: 'head start (3, mirrored)', ok: (() => {
+      /* ROUND AK, AK-3 — RE-ANCHORED, NOT DELETED. This row used to assert the
+         `label position (3)` table still offered center/start/end. The CONTROL
+         and its `OFFSET_OPTS` table are deleted by AK-3, so the equivalent claim
+         is now the NEGATIVE one: the table is gone from the panel. The stored
+         value is not what this table was about, so nothing else moved. */
+      {what: 'label position (3) — DELETED by AK-3', ok: !APP.includes('OFFSET_OPTS')},
+      {what: 'arrow head → start (3)', ok: APP.includes('const MARKER_OPTS') && APP.includes('MarkerType.ArrowClosed') && APP.includes('MarkerType.Arrow,')},
+      {what: 'head start → end (3, mirrored)', ok: (() => {
         /* Scoped to its own declaration: `flip` also appears once in the crow-foot
            start table below, so a file-wide count would be 4 and read as a bug. */
         const i = APP.indexOf('const MARKER_OPTS_START');
@@ -255,15 +305,25 @@ assert('b.option-art-tables-are-complete',
           && !APP.includes("body: e.target.value as 'card' | 'label-only'")},
     ];
     for (const t of TABLES) console.log(`  ${t.ok ? ' ' : '!'} ${t.what}`);
-    const ARTS = ['ArtWidth', 'ArtDash', 'ArtCurve', 'ArtLabelPos', 'ArtArrow', 'ArtCardinality'];
+    /* ROUND AK, AK-3 — RE-ANCHORED, NOT DELETED. `ArtLabelPos` left this list
+       because it left the FILE (deleted with its only consumer, `OFFSET_OPTS`);
+       the other five are the live bank and are still asserted used. The glyph is
+       then asserted ABSENT from `InspectorPickers.tsx` as well, so the check
+       still fails if it is re-introduced without a consumer. */
+    const ARTS = ['ArtWidth', 'ArtDash', 'ArtCurve', 'ArtArrow', 'ArtCardinality'];
     for (const a of ARTS) {
       const n = countOf(APP, `<${a}`);
       console.log(`  ${n ? ' ' : '!'} ${a.padEnd(15)} ×${n} uses`);
       if (n === 0) TABLES.push({what: `${a} unused`, ok: false});
     }
+    const labelPosInBank = countOf(PICKS, 'ArtLabelPos');
+    console.log(`  ${labelPosInBank === 0 ? ' ' : '!'} ArtLabelPos     ×${labelPosInBank} declarations`
+      + '  (deleted by AK-3 with its only consumer)');
+    if (labelPosInBank !== 0) TABLES.push({what: 'ArtLabelPos re-introduced with no consumer', ok: false});
     return TABLES.every(t => t.ok);
   })(),
-  'every value the twelve selects held is still offered, and each option set is drawn by its own glyph');
+  'every value the surviving selects held is still offered, each option set is drawn by its own glyph, '
+  + 'and the one DELETED set (`label position`) is asserted gone rather than silently dropped');
 assert('b.popover-rows-render-the-option-art',
   countOf(PICKS, 'insp-opt-glyph') >= 2 && PICKS.includes('insp-opt-label')
     && (PICKS.includes('{o.art}') && PICKS.includes('{current?.art}')),
@@ -337,7 +397,9 @@ console.log(`COLLAPSED_DEFAULT at src/inspector.ts:${at(INSP_RAW, 'export const 
 console.log(`folded-by-default set: [${FOLDED_BY_DEFAULT.join(', ')}]`);
 
 const TRUE_FOR = [
-  {t: {kind: 'edge', presetId: 'erd'}, want: ['cardinality', 'flow']},
+  /* ROUND AK, AK-8 — `presetId: 'erd'` → `hasCrowFootEnds: true`, the same
+     re-anchor as the (a) block: the gate reads the EDGE now. */
+  {t: {kind: 'edge', hasCrowFootEnds: true}, want: ['cardinality', 'flow']},
   {t: {kind: 'edge'}, want: ['flow']},
   {t: {kind: 'goblin', shape: 'service', body: 'card'}, want: []},
   {t: {kind: 'label'}, want: []},
@@ -349,9 +411,11 @@ for (const c of TRUE_FOR) {
 assert('d.exactly-cardinality-and-flow-are-collapsed-by-default',
   JSON.stringify(FOLDED_BY_DEFAULT.slice().sort()) === '["cardinality","flow"]',
   `the §A.3 "collapsed by default" column, read from the module: [${FOLDED_BY_DEFAULT.join(', ')}]`);
-assert('d.erd-edge-collapses-cardinality-and-flow',
-  JSON.stringify(collapsed({kind: 'edge', presetId: 'erd'})) === '["cardinality","flow"]',
-  JSON.stringify(collapsed({kind: 'edge', presetId: 'erd'})));
+assert('d.crowfoot-edge-collapses-cardinality-and-flow',
+  JSON.stringify(collapsed({kind: 'edge', hasCrowFootEnds: true})) === '["cardinality","flow"]',
+  JSON.stringify(collapsed({kind: 'edge', hasCrowFootEnds: true}))
+  + "  (RE-ANCHORED by AK-8 from `d.erd-edge-collapses-cardinality-and-flow`: the section is present "
+  + "because the EDGE carries a crow's-foot, not because the BOARD is an ERD)");
 assert('d.goblin-collapses-nothing',
   collapsed({kind: 'goblin', shape: 'service', body: 'card'}).length === 0
     && collapsed({kind: 'goblin', shape: 'note', body: 'card'}).length === 0,
@@ -400,12 +464,20 @@ assert('d.curvature-picker-writes-no-bend',
        normalisation at :1880) — that is ROUND T's shipped work and must stay. The
        invariant this pass owns is narrower: the CURVATURE PICKER must not write a
        bend, because the slider that did was removed and must not come back. So the
-       picker's own onChange body is sliced out and checked on its own. */
-    const i = APP_RAW.indexOf('id="insp-curvature"');
+       picker's own onChange body is sliced out and checked on its own.
+
+       ROUND AK, AK-6 — RE-ANCHORED. The slice used to key on the control's
+       `id="insp-curvature"`, which a `ToggleRow` does not carry (it renders
+       buttons, not an id-bearing trigger). The slice is therefore taken from the
+       `curvature` LABEL the row still renders through to its `options` table —
+       the same span of the same onChange, found by the row instead of by an id
+       the new control does not have. The claim is unchanged. */
+    const i = APP_RAW.indexOf('<label>curvature</label>');
     const body = stripTs(APP_RAW.slice(i, APP_RAW.indexOf('options={CURVE_OPTS}', i)));
     const bends = countOf(body, 'bend');
-    console.log(`  curvature picker onChange: ${bends} occurrence(s) of "bend" (comments stripped)`);
-    return bends === 0 && body.includes('updateEdge({type: PATH_TYPES[id]})');
+    console.log(`  curvature row onChange: ${bends} occurrence(s) of "bend" (comments stripped)`
+      + `  [slice from <label>curvature</label> instead of the removed id="insp-curvature"]`);
+    return i >= 0 && bends === 0 && body.includes('updateEdge({type: PATH_TYPES[id]})');
   })(),
   'the picker sets edge.type + calls rememberEdgePath and nothing else');
 assert('d.resize-floors-are-still-declared-where-they-live',
@@ -540,19 +612,22 @@ assert('f.control-render-count-detects-a-reintroduction',
    null-filter were the only thing keeping it off screen. */
 console.log(`  cardinality registration is guarded by hasSection('cardinality'): `
   + `${APP.includes("hasSection('cardinality') && (() => { secBody('cardinality'")}`);
-assert('f.cardinality-body-is-built-only-for-an-erd-edge',
+assert('f.cardinality-body-is-built-only-for-a-crowfoot-edge',
   (() => {
     const i = APP.indexOf("secBody('cardinality'");
     const site = APP.slice(Math.max(0, i - 80), i);
     const guard = /hasSection\('cardinality'\)\s*&&/.test(site);
-    const listed = getInspectorSections({kind: 'edge', presetId: 'erd'}).some(s => s.id === 'cardinality');
+    /* ROUND AK, AK-8 — RE-ANCHORED: the fixtures now express the crow's-foot
+       EDGE, since that (not the board preset) is what lists the section. */
+    const listed = getInspectorSections({kind: 'edge', hasCrowFootEnds: true}).some(s => s.id === 'cardinality');
     const absent = !getInspectorSections({kind: 'edge'}).some(s => s.id === 'cardinality');
-    console.log(`  guard at the call site: ${guard}   erd lists cardinality: ${listed}   `
-      + `non-erd lists cardinality: ${!absent}`);
+    console.log(`  guard at the call site: ${guard}   crowfoot-edge lists cardinality: ${listed}   `
+      + `plain edge lists cardinality: ${!absent}`);
     return guard && listed && absent;
   })(),
   'the call site is gated on `inspSections` itself, not on the painter filtering it away afterwards — '
-  + 'the same list the painter walks, so there is no second copy of the ERD rule');
+  + 'the same list the painter walks, so there is no second copy of the crow\'s-foot rule. '
+  + 'RE-ANCHORED by AK-8 (was `f.cardinality-body-is-built-only-for-an-erd-edge`)');
 
 /* ===========================================================================
    PACKAGE-P PASS 2 (§E) — the Text section, its persistence, and the two
@@ -605,10 +680,11 @@ assert('f.the-note-no-longer-describes-the-omission',
 assert('f.control-non-goblin-targets-are-unchanged-from-pass-1',
   JSON.stringify(ids({kind: 'table'})) === '["table","columns","showMode"]'
     && JSON.stringify(ids({kind: 'edge'})) === '["label","line","markers","flow"]'
-    && JSON.stringify(ids({kind: 'edge', presetId: 'erd'})) === '["label","line","markers","cardinality","flow"]'
+    && JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","line","markers","cardinality","flow"]'
     && !ids({kind: 'table'}).includes('text') && !ids({kind: 'edge'}).includes('text'),
-  'table [table,columns,showMode]; non-ERD edge [label,line,markers,flow]; ERD edge adds cardinality '
-  + 'before flow; NO target other than goblin/label gained a `text` section');
+  'table [table,columns,showMode]; plain edge [label,line,markers,flow]; a crow\'s-foot edge adds '
+  + 'cardinality before flow (RE-ANCHORED by AK-8 from the `presetId: \'erd\'` fixture); '
+  + 'NO target other than goblin/label gained a `text` section');
 
 console.log('\n' + '='.repeat(78));
 console.log('(g) §E.3(a) — exactly ONE text editor is left');
@@ -1545,21 +1621,23 @@ const DEFAULTS = defaultSectionState();
 const perId = {};
 for (const id of Object.keys(DEFAULTS).sort()) {
   perId[id] = {defaultCollapsed: DEFAULTS[id], table: insp.COLLAPSED_DEFAULT[id],
-    forErdEdge: getInspectorSections({kind: 'edge', presetId: 'erd'}).find(s => s.id === id)?.collapsedDefault};
+    /* ROUND AK, AK-8 — RE-ANCHORED: a crow's-foot edge, not an ERD board. */
+    forCrowFootEdge: getInspectorSections({kind: 'edge', hasCrowFootEnds: true}).find(s => s.id === id)?.collapsedDefault};
 }
-console.log('  section id        default  COLLAPSED_DEFAULT  on an ERD edge');
+console.log('  section id        default  COLLAPSED_DEFAULT  on a crow\'s-foot edge');
 for (const [id, r] of Object.entries(perId)) {
   console.log(`    ${id.padEnd(14)}  ${String(r.defaultCollapsed).padEnd(7)}  `
-    + `${String(r.table).padEnd(17)}  ${r.forErdEdge === undefined ? '(not listed)' : r.forErdEdge}`);
+    + `${String(r.table).padEnd(17)}  ${r.forCrowFootEdge === undefined ? '(not listed)' : r.forCrowFootEdge}`);
 }
 const FOLDED_IDS = Object.keys(DEFAULTS).filter(id => DEFAULTS[id]).sort();
 const OPEN_IDS = Object.keys(DEFAULTS).filter(id => !DEFAULTS[id]).sort();
 assert('m.the-default-fold-state-is-exactly-cardinality-and-flow',
   FOLDED_IDS.join() === 'cardinality,flow'
-    && getInspectorSections({kind: 'edge', presetId: 'erd'})
+    && getInspectorSections({kind: 'edge', hasCrowFootEnds: true})
       .filter(s => s.collapsedDefault).map(s => s.id).join() === 'cardinality,flow',
-  `folded by default, per section id: [${FOLDED_IDS.join(', ')}] — and the same list is what an `
-  + 'ERD edge is told, so the panel and the truth table cannot disagree');
+  `folded by default, per section id: [${FOLDED_IDS.join(', ')}] — and the same list is what a `
+  + "crow's-foot edge is told, so the panel and the truth table cannot disagree "
+  + '(RE-ANCHORED by AK-8: the fixture is the edge that LISTS cardinality, not an ERD board)');
 assert('m.every-other-section-is-open-by-default',
   OPEN_IDS.join() === 'columns,content,label,line,markers,showMode,style,table,text'
     && OPEN_IDS.length === 9,

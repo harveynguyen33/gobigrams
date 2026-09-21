@@ -328,7 +328,22 @@ const NATURAL = [
   {name: 'weight', labels: ['Regular', 'Bold'],                   n: 2},
   {name: 'align',  labels: ['Left', 'Center', 'Right'],           n: 3},
   {name: 'valign', labels: ['Top', 'Middle', 'Bottom'],           n: 3},
-  {name: 'offset', labels: ['center', 'start', 'end'],            n: 3},
+  /* ROUND AK, AK-6/AK-3 — THE `offset` ROW IS GONE FROM THIS TABLE, WITH ITS
+     REPLACEMENT NAMED. It asserted the natural count of `OFFSET_OPTS`
+     (`center`/`start`/`end`, 3). That table and its `label position` control were
+     DELETED by AK-3 (a preset list beside a drag is the confusion to avoid), so
+     there is no row left to measure here.
+
+     WHAT REPLACED IT, AND WHY IT IS NOT LISTED. AK-7's two MARKER rows
+     (`MARKER_OPTS_START` / `MARKER_OPTS`, 3 options each) take the deleted row's
+     place in the panel, but they are deliberately NOT entries here: this table
+     measures a row's LONGEST LABEL as text, and a marker button renders a
+     26×18 `ArtArrow` GLYPH (`o.art ?? o.label`), with the words used only as the
+     tooltip. Measuring their labels as text would fail a row that is in fact
+     comfortable — the `closed arrow` string is ~79px against a 63px content box,
+     while the glyph it really draws is 26px. The marker rows are instead covered
+     by `aa1.every-ToggleRow-in-the-panel-divides-its-field-equal` below, which
+     reads their real option count from the table and checks the field arithmetic. */
   {name: 'body',   labels: ['card', 'label only'],                n: 2},
 ];
 const naturalContent = (n) => rowWidths(n, GAP) - 2 * resolvePadding(BTN, WRAPPER).inline - 2;
@@ -373,9 +388,9 @@ assert('aa1.no-other-row-needs-a-modifier-so-half-is-not-over-applied',
     && CALLS.filter(c => c.half).length === 1
     && CALLS.find(c => c.half)?.opts === 'SPEED_OPTS',
   `exactly ONE call site carries \`half\` (the Speed row). Every other segmented row's longest label fits `
-  + 'its natural equal share — size 13.7 / weight 46.4 / align 39.7 / valign 39.7 / offset 39.7 / body '
-  + '66.2px all inside their cells — so the modifier is applied where the measurement demands it and '
-  + 'nowhere else.');
+  + 'its natural equal share — size 13.7 / weight 46.4 / align 39.7 / valign 39.7 / body 66.2px all '
+  + 'inside their cells — so the modifier is applied where the measurement demands it and nowhere else. '
+  + '(RE-ANCHORED by AK-3: the `offset` row — 39.7px — left this list with the control it measured.)');
 
 /** The option count of ONE table, read from the declaration that REALLY builds
  *  it — never by scanning a fixed-size window (which would happily count a
@@ -420,10 +435,22 @@ const tableSize = (name) => {
   const literal = /^\s*\[/.test(rest);
   if (literal) return countEntries(rest);
   const mappedFrom = /^\s*(\w+)\s*\.map/.exec(rest)?.[1];
-  if (!mappedFrom) return 0;
-  const src = new RegExp(`const ${mappedFrom}\\s*:[^=]*=\\s*\\[`).exec(TS);
-  if (!src) return 0;
-  return countEntries(TS.slice(src.index + src[0].length - 1));
+  if (mappedFrom) {
+    const src = new RegExp(`const ${mappedFrom}\\s*:[^=]*=\\s*\\[`).exec(TS);
+    if (!src) return 0;
+    return countEntries(TS.slice(src.index + src[0].length - 1));
+  }
+  /* ROUND AK, AK-6 — THE IN-LINE `as const` FORM, which the two rows AK-6
+     converted to `ToggleRow` use:
+         const DASH_OPTS  = (['solid', 'dashed', 'dotted'] as const).map(…)
+         const CURVE_OPTS = (['bezier', …] as const).map(…)
+     The table is the parenthesised array itself, so it is counted in place. The
+     two branches above keep working untouched — this is an ADDITION to the
+     resolver, which is what makes the guard cover the rows this pass added
+     rather than reporting them as "count NOT READ". */
+  const inline = /^\s*\(\s*\[/.exec(rest);
+  if (inline) return countEntries(rest.slice(rest.indexOf('[')));
+  return 0;
 };
 console.log('\n  EVERY ToggleRow CALL SITE IN THE PANEL');
 let allRowsOk = true, rowsRead = 0;
@@ -446,7 +473,9 @@ assert('aa1.every-ToggleRow-in-the-panel-divides-its-field-equal',
   allRowsOk && rowsRead === CALLS.length && CALLS.length >= 8,
   `all ${CALLS.length} \`<ToggleRow/>\` call sites enumerated from App.tsx and every option count resolved `
   + `from the table that really builds it (4/2/6/3/3 in the Text section, matching TEXT_*_OPTS in `
-  + `src/textStyle.ts, plus OFFSET ${tableSize('OFFSET_OPTS')} / SPEED ${tableSize('SPEED_OPTS')} / BODY ${tableSize('BODY_OPTS')}) `
+  + `src/textStyle.ts, plus WIDTH 5 / DASH 3 / CURVE 4 / the two MARKER rows 3+3 / SPEED 4 / BODY 2 — `
+  + `AK-6 moved the three style controls and AK-7 the two marker controls into this control family, and `
+  + `the resolver was extended to read their in-line \`as const\` tables) `
   + `— each row's buttons are equal, every line sums to exactly the ${FIELD}px field, and the two `
   + 'word-rows carry the per-line modifiers their labels require (font 3+3, speed 2+2)');
 
