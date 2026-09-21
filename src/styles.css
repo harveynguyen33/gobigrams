@@ -1348,7 +1348,13 @@ body {
 .edge-label {
   position: absolute; pointer-events: all;
   font-family: var(--mono); font-size: 11px; font-weight: 600;
-  color: var(--fg); background: var(--surface);
+  /* ROUND AL, AL-3 — the two colour hooks the renderer sets as inline custom
+     properties. Each falls back to the token this rule (and `.lb-*`) already
+     used, so an edge that carries neither key paints the EXACT colour it painted
+     before the item: `--label-fg` unset → `--fg`, `--label-plate` unset → the
+     class's own value. A custom property is used rather than `color:`/`background:`
+     so the sheet keeps its own cascade (see the note in `GoblinEdge`). */
+  color: var(--label-fg, var(--fg)); background: var(--surface);
   border: 1px solid transparent; border-radius: 5px;
   padding: 1px 6px; cursor: grab; white-space: nowrap;
   touch-action: none;
@@ -1393,8 +1399,33 @@ body {
                  colour is `--border-strong` rather than `--surface` because on
                  the dark theme `--surface` would be a border nobody can see).
 
-   NO NEW HEX: `transparent` is a keyword and both colours are tokens. */
-.edge-label.lb-none { background: transparent; }
+   ROUND AL, AL-3 — the DEFAULT MOVED TO `none`, and the halo arrived with it.
+   The owner asked for exactly that ("By default nên là none", "none background
+   nên hoà với màu của nền canvas"), so the state that used to be the base rule's
+   own look is now the state that carries the text halo.
+
+   NO NEW HEX: `transparent` is a keyword, both colours are tokens, and the halo
+   is a `text-shadow` in `var(--bg)`. */
+.edge-label.lb-none {
+  background: transparent;
+  /* THE CANVAS-COLOURED HALO — tldraw's `showTextOutline` technique, which is
+     what makes a label with no plate legible on top of a line. Four offsets in
+     `var(--bg)` (the CANVAS colour, not `--surface`, which is the PANEL colour:
+     a halo in the panel's colour would paint a pale ring on the canvas) draw a
+     1px ring around every glyph, so the line cannot run THROUGH the text.
+
+     WHY NOT `paint-order` / a stroke: both are SVG properties and this label is
+     a DOM `<div>` through `EdgeLabelRenderer` (the same trap AK-12 names for
+     `labelBgStyle`). `text-shadow` is the one mechanism that works on a div.
+
+     APPLIED TO `none` ONLY: the other two states draw a plate, and a halo under
+     a plate would be a second edge nobody asked for. */
+  text-shadow:
+    0 1px 0 var(--bg),
+    0 -1px 0 var(--bg),
+    1px 0 0 var(--bg),
+    -1px 0 0 var(--bg);
+}
 .edge-label.lb-surface { background: var(--surface); }
 .edge-label.lb-outline { background: transparent; border-color: var(--border-strong); }
 

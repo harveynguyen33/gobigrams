@@ -85,20 +85,34 @@
 import type {Pt} from './edgeBend';
 
 /* ===========================================================================
-   AK-12 — the label plate: THREE STORED STATES.
+   AK-12 — the label plate: THREE STORED STATES. ROUND AL's AL-3 moved the
+   DEFAULT, and that is the whole of the change here.
    =========================================================================== */
 /** D2: `None` is a genuine stored value, not the absence of one. */
 export type LabelBg = 'none' | 'surface' | 'outline';
 export const LABEL_BG_VALUES: readonly LabelBg[] = ['none', 'surface', 'outline'];
-/** The DEFAULT, so a board that never touched the control renders as it did:
- *  `surface` is the plate `.edge-label` has always drawn (`var(--surface)`). */
-export const LABEL_BG_DEFAULT: LabelBg = 'surface';
+/** ROUND AL, AL-3 — THE DEFAULT IS `none`, where ROUND AK had `surface`.
+ *
+ *  The owner's own words: "By default nên là none". `surface` was the plate
+ *  `.edge-label` had always drawn, so a board that never touched the control
+ *  renders a plate today; with `none` the same board renders the glyphs with a
+ *  CANVAS-COLOURED HALO instead (see `.edge-label.lb-none` in `styles.css`),
+ *  which is the look he asked for — "none background nên hoà với màu của nền
+ *  canvas".
+ *
+ *  THE CONSEQUENCE, stated rather than discovered: this CHANGES what every
+ *  existing board renders, and his own board stores no `labelBg` at all, so it
+ *  is exactly the board that changes. That is the item — the default is the
+ *  look the user gets without touching anything, and he rejected the old one.
+ *  A board that DID store `surface` keeps its plate, because a stored value is
+ *  read before this constant is ever consulted. */
+export const LABEL_BG_DEFAULT: LabelBg = 'none';
 
 /** Anything unrecognised resolves to the default — the tolerant-parse
  *  convention `inspectorState.ts` and `panelCollapse.ts` already use, so a
  *  hand-edited or future value can never render an unstyled plate. */
 export function labelBgOf(v: unknown): LabelBg {
-  return v === 'none' || v === 'outline' ? v : 'surface';
+  return v === 'surface' || v === 'outline' ? v : 'none';
 }
 
 /** The CLASS the state renders as, NOT an inline SVG `fill`.

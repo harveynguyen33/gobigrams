@@ -224,6 +224,18 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  SVG-`<rect>` API and this label is a DOM `<div>` through
      *  `EdgeLabelRenderer`, so copying that prop verbatim would be wrong. */
     labelBg?: 'none' | 'surface' | 'outline';
+    /** ROUND AL, AL-3 — the label's TEXT colour, as a symbolic key. Resolved
+     *  through `COLOR_VAR` like `strokeKey`, so a theme change repaints it for
+     *  free. ABSENT is the default and falls back to the sheet's `var(--fg)`,
+     *  which is the colour `.edge-label` has always used — so a board that never
+     *  carried the key renders exactly as it did. */
+    labelTextKey?: ColorKey;
+    /** ROUND AL, AL-3 — the label PLATE's colour, as a symbolic key. Only
+     *  MEANINGFUL while `labelBg` is not `none`: at `none` there is no plate for
+     *  it to paint, which is why the PANEL hides the row in that state. ABSENT
+     *  leaves the plate to the class (the three-state `.lb-*` rules), so nothing
+     *  changes for a board that never carried it. */
+    labelBgKey?: ColorKey;
     /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
      *  `__onBend`, and its shape follows `__onBend`'s own lesson: the writer
      *  takes the RESULT, not the pointer.
@@ -232,11 +244,12 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  rest, because the bend lives in the STORED keys and `App` owns them. The
      *  label cannot work that way: what the label stores is `labelOffset` —
      *  relative to the ANCHOR — and the anchor comes from the path generator's
-     *  own label, which only this component has. So the RAILS are applied here
-     *  too (`labelWrite`: snap, then clamp), because this is the only side that
-     *  holds the resolved path, the anchor and the measured box; `App` receives
-     *  the finished pair and merges it. That keeps ONE derivation of the
-     *  geometry instead of a second, divergent copy in `App`. */
+     *  own label, which only this component has. So the WRITE is computed here
+     *  (`labelWrite` — since ROUND AL's AL-2 the plain difference between the
+     *  dragged point and the anchor, with both rails deleted), because this is
+     *  the only side that holds the resolved anchor; `App` receives the finished
+     *  pair and merges it. That keeps ONE derivation of the geometry instead of
+     *  a second, divergent copy in `App`. */
     __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
     /** ROUND AK, AK-13 — the double-click-on-the-PATH signal, threaded per-edge
      *  like `__edit` above but carrying a POSITION: a fresh timestamp AND the
@@ -709,6 +722,20 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // change recolours the path, the payload filters and the envelope flap with
   // no data edit at all. A literal hex (the custom escape hatch) still wins.
   const stroke = (d.strokeKey ? COLOR_VAR[d.strokeKey] : (props.style as any)?.stroke) ?? COLOR_VAR.slate;
+  /* ROUND AL, AL-3 — THE LABEL'S OWN TWO COLOURS, read through the SAME
+     symbolic-key vocabulary the stroke uses. `labelTextKey`/`labelBgKey` are
+     `ColorKey`s, so both resolve through `COLOR_VAR` and a theme change repaints
+     them for free — no hex enters the board or either file, which is the rule
+     PACKAGE-L set for colour storage.
+   *
+     THE FALLBACKS ARE THE OLD RENDER, deliberately: an unset text key falls back
+     to `var(--fg)` (the colour `.edge-label` has always used) and an unset
+     background key to `undefined`, so the CLASS decides — which is the pre-existing
+     three-state plate, untouched. So a board that never carried either key
+     renders exactly the colours it rendered before, and only a user who picks a
+     swatch sees a change. */
+  const labelText = (d.labelTextKey ? COLOR_VAR[d.labelTextKey] : undefined);
+  const labelBgColor = (d.labelBgKey ? COLOR_VAR[d.labelBgKey] : undefined);
   const flow = d.flow ?? 'none';
   const flowCount = Math.max(1, Math.min(6, d.flowCount ?? 3));
   const flowDur = Math.max(0.6, Math.min(8, d.flowDuration ?? 2.4));
@@ -910,8 +937,28 @@ const GoblinEdge = memo((props: EdgeProps) => {
           <div
             className={`edge-label ${labelBgClass(d.labelBg)}${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
             data-edge-id={id}
+            data-label-text={d.labelTextKey ?? ''}
+            data-label-bg={d.labelBgKey ?? ''}
             ref={labelBox}
-            style={{transform: `translate(-50%, -50%) translate(${lx}px, ${ly}px)`}}
+            style={{
+              transform: `translate(-50%, -50%) translate(${lx}px, ${ly}px)`,
+              /* ROUND AL, AL-3 — the label's two colours, written as inline
+                 CUSTOM PROPERTIES rather than as `color`/`background`, and that
+                 choice is load-bearing twice over:
+                   · `.edge-label.selected` already declares `color: var(--sel)`,
+                     and an inline `color` would beat it, so a selected label
+                     would stop showing the selection colour;
+                   · `.edge-label.lb-*` owns `background`, and the plate is a
+                     three-state CLASS (AK-12's rule) that an inline background
+                     would flatten to one.
+                 A custom property has no specificity of its own, so the sheet
+                 keeps every one of those decisions and simply reads this colour
+                 where it already knows how. Both are `undefined` when unset,
+                 which React omits — so a board that never carried a key emits
+                 the identical `style` object it did before this item. */
+              ...(labelText ? {'--label-fg': labelText} : {}),
+              ...(labelBgColor ? {'--label-plate': labelBgColor} : {}),
+            } as React.CSSProperties}
             onPointerDown={onLabelDown}
             onDoubleClick={e => {
               e.stopPropagation();
