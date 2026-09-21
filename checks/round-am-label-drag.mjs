@@ -31,8 +31,10 @@
  *
  * DS_ROOT overrides the project root.
  */
-import {readFileSync} from 'node:fs';
+import {readFileSync, mkdtempSync, writeFileSync, rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
 const ROOT = process.env.DS_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 
@@ -594,24 +596,32 @@ if (pre) {
         `created it), so the module half is a real file comparison rather than a missing-file pass.`
       : `GREEN ON BOTH TREES (so they prove nothing): ${greenOnPre.join(', ')}`);
 
-  /* The arithmetic half, run for real: the PRE-FIX module has no `anchorWrite`,
-     so the fixed engine cannot even be built on it — recorded rather than
-     hidden, because "the old module cannot express this call" is the same fact
-     as "the delta form did not exist". */
+  /* The arithmetic half, run for real: the PRE-FIX module is loaded from the
+     commit into a temp dir and imported exactly like the shipped one (Node 22
+     strips the types), so `anchorWrite`'s ABSENCE is a measured `typeof`, not a
+     grep. */
   let preAnchorWrite = 'ABSENT';
+  let preWriteKeys = null;
   try {
-    const preMod = await import(`data:text/javascript,${encodeURIComponent(pre.LIB.replace(/: [A-Za-z<>|{}[\], .]+/g, ''))}`);
+    const dir = mkdtempSync(join(tmpdir(), 'am-pre-'));
+    const file = join(dir, 'edgeLabel.ts');
+    writeFileSync(file, pre.LIB);
+    const preMod = await import(`${file}?t=${Date.now()}`);
     preAnchorWrite = typeof preMod.anchorWrite;
-  } catch {
-    preAnchorWrite = 'unloadable under this transform (the type-strip is not a full parser)';
+    preWriteKeys = Object.keys(preMod.labelWrite({W: {x: 70, y: 25}, anchor: {x: 50, y: 0}})).sort();
+    rmSync(dir, {recursive: true, force: true});
+  } catch (err) {
+    preAnchorWrite = `UNLOADABLE: ${err.message.split('\n')[0].slice(0, 60)}`;
   }
-  const preWriteHasNoNull = !/labelAnchor/.test(pre.LIB.split('export function labelWrite')[1] ?? '');
-  console.log(`  pre-fix \`src/edgeLabel.ts\`: \`anchorWrite\` ${preAnchorWrite}; its \`labelWrite\` returns no ` +
-    `\`labelAnchor\` key (${preWriteHasNoNull})`);
+  console.log(`  pre-fix \`src/edgeLabel.ts\`: \`anchorWrite\` typeof ${preAnchorWrite}; its \`labelWrite\` returns keys ` +
+    `${preWriteKeys === null ? 'UNMEASURED' : JSON.stringify(preWriteKeys)}`);
   assert('replay.the-pre-fix-module-has-no-delta-writer-at-all',
-    preAnchorWrite === 'undefined' || preAnchorWrite !== 'function',
-    `\`anchorWrite\` on ${PRE_COMMIT} is \`${preAnchorWrite}\` — so AM1-a/b/d could not have been satisfied there ` +
-    `even in principle, and the absolute \`labelWrite\` is provably the only writer that existed.`);
+    preAnchorWrite === 'undefined',
+    `\`typeof preMod.anchorWrite\` on ${PRE_COMMIT} is \`${preAnchorWrite}\` — the DELTA writer did not exist, so ` +
+    `AM1-a/b/d could not have been satisfied there even in principle. And its \`labelWrite\` returns ` +
+    `${preWriteKeys === null ? 'UNMEASURED' : JSON.stringify(preWriteKeys)} — two keys, NO \`labelAnchor\` — against ` +
+    `the shipped \`${JSON.stringify(Object.keys(M.labelWrite({W: {x: 70, y: 25}, anchor: {x: 50, y: 0}})).sort())}\`. ` +
+    `Both are measured by executing the committed file, not by reading it.`);
 }
 
 console.log('\n' + '='.repeat(78));
