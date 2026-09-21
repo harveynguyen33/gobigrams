@@ -276,12 +276,18 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  rest, because the bend lives in the STORED keys and `App` owns them. The
      *  label cannot work that way: what the label stores is `labelOffset` —
      *  relative to the ANCHOR — and the anchor comes from the path generator's
-     *  own label, which only this component has. So the WRITE is computed here
-     *  (`labelWrite` — since ROUND AL's AL-2 the plain difference between the
-     *  dragged point and the anchor, with both rails deleted), because this is
-     *  the only side that holds the resolved anchor; `App` receives the finished
-     *  pair and merges it. That keeps ONE derivation of the geometry instead of
-     *  a second, divergent copy in `App`. */
+     *  own label, which only this component has. So the WRITE is computed here,
+     *  because this is the only side that holds the resolved anchor; `App`
+     *  receives the finished pair and merges it. That keeps ONE derivation of the
+     *  geometry instead of a second, divergent copy in `App`.
+     *
+     *  ROUND AM, AM-1 — THE FORM IT IS COMPUTED IN. The gesture's write is
+     *  `anchorWrite` (a DELTA: the pointer's displacement from the reference
+     *  point, plus the `labelAnchor` frame it was measured in). `labelWrite`
+     *  survives as the ABSOLUTE form and is reached from only two places, both of
+     *  which mean the centred state — this component's `onStart` and its
+     *  create-on-double-click commit. See `src/edgeLabel.ts` for which caller
+     *  uses which and why. */
     __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
     /** ROUND AK, AK-13 — the double-click-on-the-PATH signal, threaded per-edge
      *  like `__edit` above but carrying a POSITION: a fresh timestamp AND the
@@ -660,11 +666,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
       onEnd: p => {
         setLabelCursor('grab');
         /* THE END REPORT CARRIES THE FINAL WRITE, so what is STORED is the
-           released point, with no rail between it and the board. The centred
-           branch is NOT a second code path here: `labelWrite` returns
-           `{0, 0} / pinned: false` when the released point IS the anchor, so
-           "let go exactly on the centre" and `Reset label position` still land
-           on one state rather than two that merely look alike. */
+           released point, with no rail between it and the board. ROUND AM, AM-1
+           — the centred branch is STILL not a second code path here, it just
+           lives one call further along: `anchorWrite` reports the pointer's
+           displacement, and `App`'s merge collapses a running total of `{0,0}`
+           to the UNPINNED state. So "let go exactly on the centre" and
+           `Reset label position` still land on one state rather than two that
+           merely look alike. */
         P_(p, 'end');
       },
     });

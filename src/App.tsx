@@ -279,9 +279,10 @@ type EdgeData = {
   __editAt?: {at: Pt; t: number};
   /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
    *  `__onBend`. It carries the FINISHED write, not the pointer: only the
-   *  renderer holds the resolved path, the anchor and the measured label box, so
-   *  the rails (`labelWrite`: snap, then clamp) are applied there and this merges
-   *  the result. */
+   *  renderer holds the resolved path and the anchor, so the write is computed
+   *  there (since ROUND AM's AM-1 by `anchorWrite` — a DELTA plus the anchor
+   *  frame it was measured in) and this merges the result — rebasing the stored
+   *  offset when the frame moved. */
   __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
 };
 
