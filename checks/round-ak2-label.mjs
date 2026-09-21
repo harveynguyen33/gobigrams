@@ -68,6 +68,7 @@ const APP = read('src/App.tsx');
 const EDGE = read('src/GoblinEdge.tsx');
 const HOOK = read('src/useEdgeGesture.ts');
 const CSS = read('src/styles.css');
+const LIB_SRC = read('src/edgeLabel.ts');
 const commitFile = (commit, p) =>
   execFileSync('git', ['show', `${commit}:${p}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
 
@@ -213,230 +214,243 @@ section('AK-10 — the click-vs-drag guard, and ONE gesture for both affordances
 }
 
 /* ===========================================================================
-   AK-14.2 — snap to centre, and what "screen pixels" means under zoom.
-   =========================================================================== */
-section('AK-14.2 — snap-back-to-centre, in SCREEN px scaled by the zoom');
+   AL-2 (was AK-14.2) — the snap is GONE; what replaced it is a SCREEN-px lock.
+   ===========================================================================
+   RE-ANCHORED BY ROUND AL, NOT DELETED. The claims below are the SAME claims in
+   the same order — that a small screen-space threshold governs the label drag,
+   that it is measured in SCREEN px so it scales by the zoom, and that a
+   degenerate zoom cannot destroy it. Only the FUNCTION they measure changed,
+   because the owner's device test rejected the rail the old one implemented:
+
+     OLD CLAIM (ROUND AK, AK-14.2): `snapToCentre(W, centre, zoom)` returns the
+       centre when `W` is within tldraw's `labelCenterSnapDistance = 10` SCREEN
+       px of it, so pulling the label near the middle puts it back — "the put-it-
+       back gesture with no extra UI".
+     NEW CLAIM (ROUND AL, AL-2): the rails are removed ("ko cần ràng buộc với
+       xung quanh line"), so there is no snap and no clamp; what the label drag
+       has instead is a 2.5 SCREEN-px LOCK — how far the pointer must travel
+       before the gesture counts as a drag at all, so a plain click writes
+       nothing. ROUND AK's `lock: 0` made every sub-pixel jitter a drag, which is
+       the third cause of his "click once and it jumps".
+
+   The threshold is still screen px and still divided by the zoom; it is now
+   applied at the GESTURE rather than at the WRITE, which is why it is a
+   different function with the same arithmetic inside. */
+section('AL-2 (re-anchored from AK-14.2) — the drag lock, in SCREEN px scaled by the zoom');
 {
-  const centre = {x: 100, y: 100};
-  const z1 = M.snapToCentre({x: 109, y: 100}, centre, 1);
-  const z1out = M.snapToCentre({x: 111, y: 100}, centre, 1);
-  assert('ak14-snap.within-10-screen-px-of-centre-snaps-EXACTLY-to-centre',
-    z1.x === 100 && z1.y === 100 && z1out.x === 111,
-    `at zoom 1: a point 9px away → ${JSON.stringify(z1)} (snapped), 11px away → ${JSON.stringify(z1out)} ` +
-    `(left alone). The threshold is tldraw's own \`labelCenterSnapDistance = 10\`, which is a SCREEN ` +
-    `distance — see the zoom cases next.`);
+  const L = M.LABEL_DRAG_LOCK_PX;
+  assert('al2-lock.the-lock-is-2-3-SCREEN-px-and-scaled-into-flow-px-by-the-zoom',
+    L >= 2 && L <= 3
+      && Math.abs(M.labelDragLockPx(1) - L) < 1e-9
+      && Math.abs(M.labelDragLockPx(2) - L / 2) < 1e-9
+      && Math.abs(M.labelDragLockPx(0.5) - L * 2) < 1e-9,
+    `\`LABEL_DRAG_LOCK_PX = ${L}\`; at zoom 1 the lock is ${M.labelDragLockPx(1)} flow px, at zoom 2 it is ` +
+    `${M.labelDragLockPx(2)} (a screen threshold is SMALLER in flow units when zoomed IN), at 0.5 it is ` +
+    `${M.labelDragLockPx(0.5)}. The threshold is tldraw's own convention — a SCREEN distance, divided by the ` +
+    `zoom — which is the half of AK-14.2's arithmetic that SURVIVES: what changed is that it now guards the ` +
+    `GESTURE (whether a move counts) instead of the WRITE (where the point lands). OLD claim, for the record: ` +
+    `\`snapToCentre(109,0 at 100,0 zoom 1) === 100\` and \`snapToCentre(104 at zoom 2) === 100\` snapped the ` +
+    `label home within 10 screen px. That function is deleted, and the AL harness's REPLAY splices it back to ` +
+    `prove the assertion would notice.`);
 
-  /* The threshold is SCREEN px, so the FLOW distance it tolerates SHRINKS as the
-     zoom grows: 10px on screen is 5 flow px at zoom 2. This is the arithmetic
-     tldraw's own `Vec.DistMin(next, def, snap / zoom)` performs, and getting it
-     backwards would make the snap unusable when zoomed IN. */
-  const at2 = M.snapToCentre({x: 104, y: 100}, centre, 2);
-  const at2out = M.snapToCentre({x: 106, y: 100}, centre, 2);
-  const at05 = M.snapToCentre({x: 119, y: 100}, centre, 0.5);
-  assert('ak14-snap.the-threshold-is-SCREEN-px-so-it-shrinks-in-flow-units-as-zoom-grows',
-    at2.x === 100 && at2out.x === 106 && at05.x === 100,
-    `zoom 2: 4 flow px (8 screen) → ${JSON.stringify(at2)} snapped; 6 flow px (12 screen) → ` +
-    `${JSON.stringify(at2out)} not snapped. zoom 0.5: 19 flow px (9.5 screen) → ${JSON.stringify(at05)} ` +
-    `snapped — which is the case a flow-space-only threshold would get wrong.`);
+  /* A CLICK IS NOT A DRAG. The defect this fixes: with `lock: 0` a press whose
+     pointer drifted one pixel counted as a drag, ran `onEnd`, and STORED a
+     position — so a plain click moved the label. */
+  const clickish = [[0, 0], [0.5, 0.5], [1, 1], [2, 0], [1.5, 1.5]];
+  const dragged = [[3, 0], [0, 3], [4, 4], [-5, 0], [2.5, 2.5]];
+  assert('al2-lock.a-click-is-not-a-drag-and-a-real-move-still-is',
+    clickish.every(([x, y]) => M.movedBy(x, y, L) === false)
+      && dragged.every(([x, y]) => M.movedBy(x, y, L) === true),
+    `at zoom 1 (lock ${L} flow px): ${clickish.length} click-sized deltas ` +
+    `(${clickish.map(([x, y]) => `(${x},${y})`).join(' ')}) are all NOT drags, and ${dragged.length} real ` +
+    `moves (${dragged.map(([x, y]) => `(${x},${y})`).join(' ')}) all are. Under ROUND AK's \`lock: 0\` the ` +
+    `first list is entirely drags — that is the defect, stated as a measurement rather than as a complaint.`);
 
-  /* A degenerate zoom must not divide by zero or disable the rail. */
-  assert('ak14-snap.a-non-positive-zoom-still-yields-a-usable-rail',
-    M.snapToCentre({x: 100, y: 100}, centre, 0).x === 100
-      && M.snapToCentre({x: 200, y: 200}, centre, 0).x === 200,
-    `zoom 0 is treated as zoom 1 (\`${M.screenToFlowPx(10, 0)}\` flow px) rather than producing NaN — ` +
-    `an unmeasured transform must not be able to destroy the snap`);
+  /* A degenerate zoom must not divide by zero or disable the guard. */
+  assert('al2-lock.a-non-positive-zoom-still-yields-a-usable-lock',
+    Number.isFinite(M.labelDragLockPx(0)) && M.labelDragLockPx(0) === L
+      && Number.isFinite(M.labelDragLockPx(-1)) && M.labelDragLockPx(-1) === L,
+    `zoom 0 → ${M.labelDragLockPx(0)} and zoom −1 → ${M.labelDragLockPx(-1)}, both falling back to the ` +
+    `un-scaled ${L} rather than returning Infinity — an unmeasured transform must not be able to disable the ` +
+    `guard at the moment the geometry is least trustworthy. (AK-14.2 made the same argument for its rail.)`);
+
+  /* THE RENDERER PASSES IT. A function nothing calls is not a fix. */
+  assert('al2-lock.the-renderer-passes-it-and-no-longer-passes-zero',
+    /lock:\s*labelDragLockPx\(t\[2\]\)/.test(EDGE_C) && !/lock:\s*0\b/.test(EDGE_C),
+    `\`lock: labelDragLockPx(t[2])\` in src/GoblinEdge.tsx = ${/lock:\s*labelDragLockPx\(t\[2\]\)/.test(EDGE_C)}, ` +
+    `and no \`lock: 0\` remains = ${!/lock:\s*0\b/.test(EDGE_C)}. The bend handle still passes the project's own ` +
+    `3px \`LOCK_PX\` through the SAME \`movedBy\` predicate, so the two affordances cannot disagree — that ` +
+    `invariant is AK-10's and is asserted next.`);
 }
 
 /* ===========================================================================
-   AK-14.3 — the clamp: along the INK, and never under an arrowhead.
-   =========================================================================== */
-section('AK-14.3 — the clamp runs along the path and reserves the glyph ends');
+   AL-2 (was AK-14.3) — THE CLAMP IS DELETED. The claims become the inverse, and
+   the deletion is measured rather than trusted.
+   ===========================================================================
+   RE-ANCHORED BY ROUND AL, NOT DELETED. ROUND AK's AK-14.3 owned five claims
+   here, all about `clampToRange`:
+     · a point outside the range slides IN along the line;
+     · the perpendicular survives the slide;
+     · the range is measured along the DRAWN path, not the chord;
+     · a path shorter than its clearances collapses to its midpoint;
+     · a degenerate path is returned untouched;
+     · plus `labelClearance` (tldraw's padding rule) and `labelHalfAlong` (the
+       box's extent projected onto the heading).
+   The owner's device test removed the requirement the whole block served —
+   "ko cần ràng buộc với xung quanh line. Nếu kéo quá xa thì đó là user issue
+   (ngoài ra đã có nút Reset Label Position rồi)" — so the clamp, the constant
+   and both clearances are deleted. What replaces those claims is the ONE claim
+   that matters now: a point handed to the writer comes back UNCHANGED, wherever
+   it is, and the functions that would have moved it are GONE from the module.
+
+   The claims are not dropped: every behaviour the old block measured is still
+   exercised — by the REPLAY at the bottom of this file, which splices the
+   deleted code back into a copy of the shipped module and shows the old
+   assertions FAILING on it. */
+section('AL-2 (re-anchored from AK-14.3) — the clamp is GONE, and a write is the plain difference');
 {
-  /* A 100px horizontal line, clearances of 30 at each end: the usable range is
-     [30, 70].
+  /* (a) THE FUNCTIONS AND THE CONSTANTS ARE ABSENT FROM THE MODULE. Not merely
+     unreferenced — absent, so the next pass cannot re-enable one by flipping a
+     default. */
+  const gone = ['snapToCentre', 'clampToRange', 'labelClearance', 'labelHalfAlong',
+    'LABEL_TO_ARROW_PADDING', 'LABEL_SNAP_PX', 'screenToFlowPx'];
+  const present = gone.filter(n => M[n] !== undefined);
+  assert('al2-clamp.the-two-rails-their-constant-and-their-clearances-are-DELETED',
+    present.length === 0,
+    present.length === 0
+      ? `all ${gone.length} are \`undefined\` on the shipped module (${gone.join(', ')}). ` +
+        `Deleted with them: the renderer's \`hasEndGlyph\`/\`hasHeadGlyph\` flags, its \`clearStart\`/\`clearEnd\`, ` +
+        `and the \`labelHalfH\` state + \`LABEL_HALF_H_PX\` import that existed only for the clamp's heading ` +
+        `projection. OLD claim (AK-14.3), for the record: \`clampToRange({x: 95, y: 0}, 100px line, 30, 30)\` ` +
+        `slid to x=70; that assertion now has nothing to measure because the function is gone.`
+      : `STILL PRESENT: ${present.join(', ')}`);
 
-     EVERY EXPECTED VALUE BELOW IS MEASURED (`node` probe against the shipped
-     module), not derived: the first draft of this section asserted what the
-     clamp "should" do and was wrong on the beyond-the-end cases. */
-  const line = [{x: 0, y: 0}, {x: 100, y: 0}];
-  const cases = [
-    [[10, 0], 30],   // projects INSIDE the path, before the range → slides in
-    [[0, 0], 30],    // exactly the start → slides in
-    [[95, 0], 70],   // projects inside, after the range → slides back
-    [[50, 0], 50],   // already inside the range → returned UNCHANGED
-    [[35, 0], 35],
-  ];
-  const got = cases.map(([W]) => M.clampToRange({x: W[0], y: W[1]}, line, 30, 30));
-  const ok = got.every((p, i) => Math.abs(p.x - cases[i][1]) < 1e-9);
-  assert('ak14-clamp.a-point-outside-the-range-slides-IN-ALONG-the-line',
-    ok,
-    got.map((p, i) => `W=(${cases[i][0]})→x=${p.x}`).join('  ') +
-    ` — the range is [start, L−end] = [30, 70] on a 100px path, and a point ALREADY inside it ` +
-    `(50, 35) is returned unchanged (a clamp that always moved the label would be worse than none)`);
+  /* (b) THE WRITER KEEPS WHAT IT IS HANDED. The fixture is deliberately chosen to
+     sit inside BOTH old rails at once: 4px from the anchor (inside the old
+     10-screen-px snap) and 1px outside a 45px clearance (outside the old usable
+     range). Under ROUND AK this returned the centred state; under AL it must
+     store the offset it was given. */
+  const w = (W, anchor = {x: 50, y: 0}) => M.labelWrite({W, anchor});
+  const inside = w({x: 54, y: 1});
+  assert('al2-clamp.a-point-inside-the-OLD-snap-radius-and-outside-the-OLD-range-is-stored-UNCHANGED',
+    inside.labelPinned === true
+      && Math.abs(inside.labelOffset.x - 4) < 1e-9
+      && Math.abs(inside.labelOffset.y - 1) < 1e-9,
+    `W=(54,1), anchor=(50,0) → ${JSON.stringify(inside)}. That point is ${Math.hypot(4, 1).toFixed(2)} flow px ` +
+    `from the anchor (INSIDE the 10px snap ROUND AK applied, which would have returned ` +
+    `\`{labelOffset: {0,0}, labelPinned: false}\`) and it sits 1px off a 45px clearance (OUTSIDE the range ` +
+    `the old clamp enforced, which would have slid it back). Both rails would have moved it; AL stores it.`);
 
-  /* THE PERPENDICULAR SURVIVES. This is the whole point of a FREE 2-D drag: a
-     label moved OFF the line must STAY off it while the clamp slides it along.
-     Both directions are covered — one pulled in from before the range, one from
-     after it. */
-  const offLow = M.clampToRange({x: 10, y: 40}, line, 30, 30);
-  const offHigh = M.clampToRange({x: 95, y: 40}, line, 30, 30);
-  assert('ak14-clamp.a-label-moved-OFF-the-line-keeps-its-perpendicular-while-being-slid',
-    Math.abs(offLow.x - 30) < 1e-9 && Math.abs(offLow.y - 40) < 1e-9
-      && Math.abs(offHigh.x - 70) < 1e-9 && Math.abs(offHigh.y - 40) < 1e-9,
-    `W=(10,40) → ${JSON.stringify(offLow)} and W=(95,40) → ${JSON.stringify(offHigh)}: x is clamped ` +
-    `to the range in both directions while y is held at 40. The clamp is therefore a move ALONG the ` +
-    `line only — it can never pull a deliberately offset label back onto the ink.`);
+  const far = w({x: 3050, y: -1200});
+  assert('al2-clamp.a-label-dragged-FAR-from-the-line-stays-exactly-where-it-was-put',
+    far.labelPinned === true && far.labelOffset.x === 3000 && far.labelOffset.y === -1200,
+    `W=(3050,−1200) → ${JSON.stringify(far)}. ROUND AK's clamp slid the along-the-line component back inside ` +
+    `\`[start, L−end]\`; the owner's own case was exactly this drag — "kéo ra xa, bỏ chọn, rồi chọn lại, click 1 ` +
+    `cái nó tự về giữa" — and with both rails gone the stored offset IS the drag's displacement. ` +
+    `Reset label position is the way back, which is what he asked for.`);
 
-  /* ALONG THE INK, NOT THE CHORD: a bent path's arc length is longer than the
-     straight distance between its ends, so a clamp that measured the chord would
-     let the label run past the real end of the drawn line. */
-  const bent = [{x: 0, y: 0}, {x: 0, y: 100}, {x: 100, y: 100}];
-  const bentLen = M.pathLength(bent);
-  const nearEnd = M.clampToRange({x: 90, y: 90}, bent, 30, 30);
-  assert('ak14-clamp.the-range-is-measured-along-the-DRAWN-path-not-the-chord',
-    Math.abs(bentLen - 200) < 1e-9
-      && Math.abs(nearEnd.x - 70) < 1e-9 && Math.abs(nearEnd.y - 90) < 1e-9,
-    `an L-shaped path is ${bentLen}px of ink but only 141.4px end-to-end; clamping (90, 90) gives ` +
-    `${JSON.stringify(nearEnd)} — the arc-length position is pulled from 190 to ${bentLen - 30} (the ` +
-    `range's far end) and the point's own 10px of perpendicular is carried through, so it lands at ` +
-    `(70, 90) rather than at the corner. A chord-based range would have allowed ${bentLen - 141.4}px ` +
-    `more travel.`);
+  /* (c) THE WRITER'S SHAPE: two points and nothing else. A parameter that is
+     accepted and ignored is how a rail comes back without anyone noticing. */
+  const sig = (LIB_SRC.match(/export function labelWrite\(p: \{([\s\S]*?)\}\): LabelWrite/) ?? ['', ''])[1];
+  const params = (sig.match(/(\w+)\s*:/g) ?? []).map(s => s.replace(/\s*:/, ''));
+  assert('al2-clamp.the-writer-takes-ONLY-the-two-points-it-uses',
+    params.length === 2 && params.includes('W') && params.includes('anchor'),
+    `\`labelWrite\` takes ${JSON.stringify(params)}. ROUND AK's took \`W, anchor, pts, zoom, start, end\` — the ` +
+    `resolved path, the zoom and the two END CLEARANCES — and every one of those inputs existed only to feed a ` +
+    `rail. Deleting the parameters is the strongest form of deleting the rails.`);
 
-  /* A path SHORTER than its own clearances must collapse to its midpoint rather
-     than invert the range (which would send the label off the far end). */
-  const short = [{x: 0, y: 0}, {x: 20, y: 0}];
-  const collapsed = M.clampToRange({x: 19, y: 0}, short, 30, 30);
-  const collapsed2 = M.clampToRange({x: 1, y: 0}, short, 30, 30);
-  assert('ak14-clamp.a-path-shorter-than-its-own-clearances-collapses-to-its-midpoint',
-    Math.abs(collapsed.x - 10) < 1e-9 && Math.abs(collapsed2.x - 10) < 1e-9,
-    `a 20px path with 30px of clearance at each end has NO usable range, so 30+30 >= 20 collapses to ` +
-    `L/2: (19,0) → ${JSON.stringify(collapsed)}, (1,0) → ${JSON.stringify(collapsed2)}. Inverting the ` +
-    `range instead would clamp 30+30 down to an EMPTY interval (\`Math.min(L−end, len)\` goes negative) ` +
-    `and emit an end-of-path point.`);
+  /* (d) THE CENTRED STATE IS STILL A STATE, not a pair of zeros. This is the
+     property the round before established and AL must not lose: "reset",
+     "dragged exactly onto the anchor" and "never moved" are ONE stored value. */
+  const exact = w({x: 50, y: 0});
+  assert('al2-clamp.a-write-whose-offset-is-zero-still-stores-the-UNPINNED-state',
+    exact.labelPinned === false && exact.labelOffset.x === 0 && exact.labelOffset.y === 0
+      && M.CENTRED.x === 0 && M.CENTRED.y === 0,
+    `W === anchor → ${JSON.stringify(exact)}: \`pinned: false\` with a zero offset, which is bit-identical to a ` +
+    `board that never carried the keys and to what \`Reset label position\` writes. So the deletion of the rails ` +
+    `did NOT split "centred" into two representations — the branch survived the clamp it used to share a ` +
+    `function with.`);
 
-  /* A degenerate path must be returned untouched, never NaN. */
-  const degenerate = M.clampToRange({x: 5, y: 5}, [], 30, 30);
-  const onePoint = M.clampToRange({x: 5, y: 5}, [{x: 9, y: 9}], 30, 30);
-  const zeroLen = M.clampToRange({x: 5, y: 5}, [{x: 1, y: 1}, {x: 1, y: 1}], 30, 30);
-  assert('ak14-clamp.a-degenerate-path-is-returned-untouched-and-never-NaN',
-    JSON.stringify(degenerate) === '{"x":5,"y":5}'
-      && JSON.stringify(onePoint) === '{"x":5,"y":5}'
-      && JSON.stringify(zeroLen) === '{"x":5,"y":5}',
-    `0 points → ${JSON.stringify(degenerate)}, 1 point → ${JSON.stringify(onePoint)}, ` +
-    `coincident points (0 length) → ${JSON.stringify(zeroLen)} — all returned unchanged, ` +
-    `so a path the parser could not read cannot inject NaN into the stored offset`);
-
-  /* THE BEYOND-THE-END CASE, CHARACTERISED HONESTLY.
-
-     The docblock promises the label "may never sit under an arrowhead and may
-     never run off an end". Measured: that holds for any `W` whose projection
-     lands ON the polyline — which is every case a drag produces ON or NEAR the
-     line. It does NOT hold for a `W` dragged beyond an end: `nearestOnPath`
-     clamps the projection to the segment, so the whole overhang comes back as
-     `perp` and is re-added to the clamped point.
-
-       W=(200,0) → (170,0)   [30 → the range's end 70, plus the 100px overhang]
-
-     This is a property of the SHIPPED module (its decomposition cannot separate
-     "along" from "across" for a point that lies on the line's own axis), the
-     round is a WIRING round, and the formula was frozen by the brief — so it is
-     RECORDED here rather than silently repaired. It is stated as the behaviour
-     it is, not as a wish. */
-  const beyond = M.clampToRange({x: 200, y: 0}, line, 30, 30);
-  const beyondNear = M.clampToRange({x: 130, y: 0}, line, 30, 30);
-  assert('ak14-clamp.a-point-BEYOND-the-path-end-keeps-its-overhang-(known-limitation)',
-    Math.abs(beyondNear.x - 100) < 1e-9 && Math.abs(beyond.x - 170) < 1e-9,
-    `W=(130,0) → ${JSON.stringify(beyondNear)} and W=(200,0) → ${JSON.stringify(beyond)}. ` +
-    `The clamp pulls the ARC-LENGTH position to the range's end (70) in both cases, but the vector from ` +
-    `the clamped projection point back to W is restored as the perpendicular, so a point dragged past ` +
-    `the end by d still lands d past it. The arrowhead clearance the range buys is therefore fully ` +
-    `effective for any label on the ink (the drag's normal case) and degrades for an overhang. ` +
-    `FLAGGED, not silently fixed: repairing it means changing a formula this round froze.`);
-
-  /* `labelClearance` is tldraw's rule: padding on a glyph end, ZERO on a bare one.
-     The mapping matters: the caller passes `hasEndGlyph` for the START clearance
-     and `hasHeadGlyph` for the END one (AK-5 renamed the controls, the storage
-     keys did not move). */
-  assert('ak14-clearance.a-glyph-end-reserves-padding-and-a-bare-end-reserves-NONE',
-    M.labelClearance(true) === M.LABEL_TO_ARROW_PADDING
-      && M.labelClearance(false) === 0
-      && M.LABEL_TO_ARROW_PADDING === 20,
-    `labelClearance(true) = ${M.labelClearance(true)}, labelClearance(false) = ${M.labelClearance(false)} — ` +
-    `tldraw's own rule (\`hasStartArrowhead ? range.start : 0\`), at tldraw's own constant. ` +
-    `It is NOT stroke-scaled, and that is checkable: every marker here is a fixed size.`);
-
-  /* The box's own half-extent ALONG the line — the clamp reserves the BOX, not
-     the label's centre, so the edge of the text clears the arrowhead. */
-  const alongHoriz = M.labelHalfAlong(line, {x: 50, y: 0}, 30, 8);
-  const alongVert = M.labelHalfAlong([{x: 0, y: 0}, {x: 0, y: 100}], {x: 0, y: 50}, 30, 8);
-  const alongDiag = M.labelHalfAlong([{x: 0, y: 0}, {x: 100, y: 100}], {x: 50, y: 50}, 30, 8);
-  assert('ak14-clearance.the-label-BOX-is-projected-onto-the-heading-it-sits-on',
-    Math.abs(alongHoriz - 30) < 1e-9
-      && Math.abs(alongVert - 8) < 1e-9
-      && Math.abs(alongDiag - 38 / Math.SQRT2) < 1e-9,
-    `a 60×16 box (halfW 30, halfH 8) on a HORIZONTAL heading → ${alongHoriz.toFixed(3)} (the half-WIDTH); ` +
-    `on a VERTICAL heading → ${alongVert.toFixed(3)} (the half-HEIGHT); on a 45° heading → ` +
-    `${alongDiag.toFixed(3)} (the support function |cos|·hw + |sin|·hh = ${(38 / Math.SQRT2).toFixed(3)}). ` +
-    `One number could not have stood for both extents, which is why the renderer measures a BOX.`);
+  /* (e) THE RENDERER NO LONGER COMPUTES A CLEARANCE, and the one rail that is
+     KEPT — the bend handle's nudge — is untouched. */
+  assert('al2-clamp.the-renderer-computes-no-clearance-and-the-HANDLE-rail-survives',
+    !/clearStart|clearEnd|labelHalfAlong|labelClearance|hasEndGlyph|hasHeadGlyph/.test(EDGE_C)
+      && /nudgeAlongPath\(/.test(EDGE_C) && M.nudgeAlongPath !== undefined,
+    `no \`clearStart\`/\`clearEnd\`/\`labelHalfAlong\`/\`labelClearance\`/\`hasEndGlyph\`/\`hasHeadGlyph\` remains in ` +
+    `src/GoblinEdge.tsx = ${!/clearStart|clearEnd|labelHalfAlong|labelClearance|hasEndGlyph|hasHeadGlyph/.test(EDGE_C)}, ` +
+    `and \`nudgeAlongPath\` is still called there and still exported = ${/nudgeAlongPath\(/.test(EDGE_C) && M.nudgeAlongPath !== undefined}. ` +
+    `That is the distinction the report has to make: the LABEL's rails went, the HANDLE's rail stayed, because it ` +
+    `protects the handle's hit area from the label's rather than the label from the line.`);
 }
 
 /* ===========================================================================
-   AK-10 — labelWrite: the ONE function a drag goes through. Snap FIRST, clamp
-   SECOND, and "centred" is a state rather than a pair of zeros.
-   =========================================================================== */
-section('AK-10/AK-14 — `labelWrite` is the one writer, and it returns a STATE not a point');
+   AL-2 (was AK-10/AK-14) — `labelWrite` is the one writer, with NO rails.
+   ===========================================================================
+   RE-ANCHORED BY ROUND AL, NOT DELETED. Three of the five claims below are the
+   same claim the old version made; two are the inverse, because the block they
+   measured (snap-first, clamp-second) is gone:
+
+     OLD (AK-14):  a point inside the 10px snap stores the CENTRED state; the
+                   clamp is applied BEFORE anything is stored (96 → 70); and
+                   SNAP WINS over CLAMP when both apply.
+     NEW (AL-2):   a point NEAR the anchor is stored where it was put (the snap
+                   is deleted); nothing is clamped (the clamp is deleted); and
+                   there is no order to test because neither rail exists.
+                   What SURVIVES unchanged: the offset is RELATIVE to the anchor,
+                   and a zero offset still stores the centred UNPINNED state. */
+section('AL-2 (re-anchored from AK-10/AK-14) — `labelWrite` is the one writer, and it has no rails');
 {
-  const line = [{x: 0, y: 0}, {x: 100, y: 0}];
   const anchor = {x: 50, y: 0};
-  const w = (W, zoom = 1, start = 30, end = 30) =>
-    M.labelWrite({W, anchor, pts: line, zoom, start, end});
+  const w = W => M.labelWrite({W, anchor});
 
-  const centred = w({x: 52, y: 3});   // 3.6px from the anchor, inside the 10px screen snap
-  assert('ak10-write.a-point-inside-the-snap-radius-stores-the-CENTRED-state',
-    centred.labelPinned === false
-      && centred.labelOffset.x === 0 && centred.labelOffset.y === 0,
-    `W=(52,3) (3.6px from the anchor, inside the 10px snap) → ${JSON.stringify(centred)}. ` +
-    `\`pinned: false\` + a zero offset is the state a board that NEVER carried the keys renders, ` +
-    `so "snapped back", "Reset label position" and "never moved" are ONE stored state.`);
+  /* OLD: `w({x: 52, y: 3})` was "3.6px from the anchor, inside the 10px screen
+     snap" and stored the centred state. NEW: it is stored as the offset it is.
+     Same fixture, opposite verdict — and the OLD verdict is still executed, by
+     the REPLAY at the bottom of this file, against the rails spliced back in. */
+  const near = w({x: 52, y: 3});
+  assert('al2-write.a-point-NEAR-the-anchor-is-no-longer-snapped-it-is-stored-where-it-was-put',
+    near.labelPinned === true
+      && Math.abs(near.labelOffset.x - 2) < 1e-9 && Math.abs(near.labelOffset.y - 3) < 1e-9,
+    `W=(52,3) — ${Math.hypot(2, 3).toFixed(2)}px from the anchor, INSIDE ROUND AK's 10-screen-px snap — → ` +
+    `${JSON.stringify(near)}. OLD claim: this stored \`{labelOffset: {0,0}, labelPinned: false}\` (the label ` +
+    `flew home). The owner rejected that rail ("ko cần ràng buộc"), so AL stores the point it was handed, ` +
+    `pinned.`);
 
   const moved = w({x: 70, y: 25});
-  assert('ak10-write.a-real-move-stores-RELATIVE-px-and-pins-the-label',
+  assert('al2-write.a-real-move-stores-RELATIVE-px-and-pins-the-label',
     moved.labelPinned === true
       && Math.abs(moved.labelOffset.x - 20) < 1e-9 && Math.abs(moved.labelOffset.y - 25) < 1e-9,
-    `W=(70,25) → ${JSON.stringify(moved)}. RELATIVE to the anchor (which the renderer derives), ` +
-    `not absolute: that is the only shape that survives a node move, a re-route or a resize.`);
+    `W=(70,25) → ${JSON.stringify(moved)}. UNCHANGED FROM ROUND AK, and it is the claim AL must not break: ` +
+    `the offset is RELATIVE to the anchor (which the renderer derives), not absolute — the only shape that ` +
+    `survives a node move, a re-route or a resize.`);
 
-  const clamped = w({x: 96, y: 40});
-  assert('ak10-write.the-clamp-is-applied-BEFORE-anything-is-stored',
-    clamped.labelPinned === true
-      && Math.abs(clamped.labelOffset.x - 20) < 1e-9
-      && Math.abs(clamped.labelOffset.y - 40) < 1e-9,
-    `W=(96,40) → ${JSON.stringify(clamped)}: x clamped 96→70 (the range's far end) then expressed as ` +
-    `a +20 offset, y held at 40. What is STORED is therefore always inside the usable range — the ` +
-    `clamp is a write-time rail, and the spec's "zero new fields" holds because it needs no state.`);
+  /* OLD: the clamp pulled 96 → 70 before storing, so nothing out of range could
+     be written. NEW: what is stored is what was dragged. */
+  const outside = w({x: 96, y: 40});
+  assert('al2-write.a-point-past-the-OLD-range-END-is-stored-UNCHANGED-not-slid-back',
+    outside.labelPinned === true
+      && Math.abs(outside.labelOffset.x - 46) < 1e-9
+      && Math.abs(outside.labelOffset.y - 40) < 1e-9,
+    `W=(96,40) → ${JSON.stringify(outside)}. OLD claim: x clamped 96→70 and stored as \`+20\` (the range ` +
+    `[30, 70] on the 100px path). Both the clamp and the range are gone, so 96 is stored as \`+46\`. ` +
+    `This is the whole of AL-2 as a measured value rather than a description.`);
 
-  /* THE ORDER: snap then clamp. This needs a point that is SIMULTANEOUSLY inside
-     the snap radius and outside the usable range, which on the default fixtures
-     is impossible — the anchor is the range's centre and the snap radius (10) is
-     far smaller than the range's half-width (20). So the fixture is tightened:
-     with 45px of clearance at each end the range is [45, 55], and W=(44,1) is
-     6.08 from the anchor (50,0) — inside the snap — while sitting 1px BELOW the
-     range. Measured, and it is the only shape of input that can tell the two
-     orders apart. */
-  const both = M.labelWrite({
-    W: {x: 44, y: 1}, anchor: {x: 50, y: 0}, pts: line, zoom: 1, start: 45, end: 45,
-  });
-  assert('ak10-write.SNAP-wins-over-CLAMP-when-both-apply',
-    both.labelPinned === false
-      && both.labelOffset.x === 0 && both.labelOffset.y === 0,
-    `range [45,55], snap radius 10 screen px, anchor (50,0). W=(44,1) is 6.08 from the anchor ` +
-    `(INSIDE the snap) and 44 < 45 (OUTSIDE the range). Stored: ${JSON.stringify(both)}. ` +
-    `If the clamp ran FIRST, x would be pulled to 45 and stored as a pinned −5 offset — the snap ` +
-    `would LOSE exactly where it is most wanted. Snap-first is therefore load-bearing rather than ` +
-    `stylistic, and this is the case that measures it.`);
+  /* The point that can tell the two ORDERS apart under ROUND AK is now simply a
+     point. Recorded so the fixture's purpose is not lost with the assertion it
+     used to serve: `W=(44,1)` with 45px clearances is 6.08 from the anchor
+     (inside the snap) and 1px below the range — the old code returned centred
+     BECAUSE snap ran first. */
+  const both = w({x: 44, y: 1});
+  assert('al2-write.the-fixture-that-told-the-two-OLD-orders-apart-is-now-just-a-point',
+    both.labelPinned === true
+      && Math.abs(both.labelOffset.x + 6) < 1e-9 && Math.abs(both.labelOffset.y - 1) < 1e-9,
+    `W=(44,1) → ${JSON.stringify(both)}. OLD (AK): with 45px clearances this was the ONLY fixture that could ` +
+    `distinguish snap-first from clamp-first, and it returned centred — proving snap ran first. There is no ` +
+    `order left to prove, so the fixture is kept with its verdict inverted, which is also the replay's ` +
+    `strongest single case.`);
 
-  /* A CENTRED label is bit-identical to an unpinned one at the anchor. */
-  assert('ak10-write.CENTRED-is-exactly-the-origin',
+  /* A CENTRED label is bit-identical to an unpinned one at the anchor. UNCHANGED. */
+  assert('al2-write.CENTRED-is-exactly-the-origin',
     M.CENTRED.x === 0 && M.CENTRED.y === 0
       && JSON.stringify(M.labelAnchor({
         sourceX: 0, sourceY: 0, targetX: 100, targetY: 0, labelX: 50, labelY: 0,
@@ -444,8 +458,9 @@ section('AK-10/AK-14 — `labelWrite` is the one writer, and it returns a STATE 
       })) === JSON.stringify(M.labelAnchor({
         sourceX: 0, sourceY: 0, targetX: 100, targetY: 0, labelX: 50, labelY: 0,
       })),
-    `a PINNED label at ${JSON.stringify(M.CENTRED)} resolves to the identical anchor as an UNPINNED one ` +
-    `— so the two states can never render differently, which is what lets the writer collapse them`);
+    `a PINNED label at ${JSON.stringify(M.CENTRED)} resolves to the identical anchor as an UNPINNED one — ` +
+    `so the two states can never render differently, which is what lets the writer collapse them into one ` +
+    `state. This is the property that makes \`Reset label position\` and "never moved" interchangeable.`);
 }
 
 /* ===========================================================================
@@ -679,16 +694,19 @@ section('AK-12/AK-14.1/AK-15 — the three controls are in the panel, in the rig
     `returns before it = ${roNoOp}. The label's own double-click is caught FIRST, because the label is ` +
     `portalled into a sibling layer — that is draw.io's "not inside an existing label" exclusion, done by the DOM.`);
 
-  /* The renderer opens the editor from the signal and stores the position on an
-     empty commit. */
-  const opensAt = /useEffect\(\(\) => \{\s*if \(!createAt \|\| ro\) return;/.test(EDGE_C)
-    && /setPendingCreate\(createAt\.at\)/.test(EDGE_C);
-  const commitsAt = /if \(pendingCreate\) \{[\s\S]*?labelWrite\(\{[\s\S]*?\}\), 'end'\)/.test(EDGE_C);
-  assert('ak13.the-renderer-opens-the-editor-from-the-signal-and-stores-the-position-on-an-empty-commit',
-    opensAt && commitsAt,
-    `the renderer opens the editor from \`__editAt\` (${opensAt}) and, when the created label is left ` +
-    `EMPTY, commits its position through the SAME \`labelWrite\` the drag uses (${commitsAt}) — so a ` +
-    `created label and a dragged one cannot land in two different states`);
+  /* The renderer opens the editor from the signal. RE-ANCHORED BY ROUND AL
+     (AL-4): the commit no longer stores an offset from the clicked point (see
+     the AL-4 section below for the full claim); it stores the CENTRED state. */
+  const opensAt = /useEffect\(\(\) => \{\s*if \(!createAt \|\| ro\) return;/.test(EDGE_C);
+  const noStoredPoint = !/setPendingCreate\(createAt\.at\)/.test(EDGE_C);
+  assert('ak13.a-double-click-opens-the-editor-and-the-click-point-is-no-longer-STORED',
+    opensAt && noStoredPoint,
+    `the renderer opens the editor from \`__editAt\` (${opensAt}) — and the clicked FLOW POINT is no longer ` +
+    `kept (\`setPendingCreate(createAt.at)\` gone = ${noStoredPoint}). OLD CLAIM (AK-13, for the record): ` +
+    `"the renderer stores the position on an empty commit, through the SAME \`labelWrite\` the drag uses". ` +
+    `ROUND AL's AL-4 inverted that deliberately — the owner's "hiện nó đang văng tùm lum" was exactly that ` +
+    `stored click offset — so the STORED value is now the centred unpinned state. The claim itself is not ` +
+    `dropped: it is carried, with the new verdict, by the AL-4 section below.`);
 }
 
 /* ===========================================================================
@@ -828,30 +846,48 @@ const loadMutant = async (name, mutations) => {
 
 /** The probe set: each is (module) => boolean — TRUE means "this module obeys
  *  the rule". Written against a module so the SAME function runs over the shipped
- *  file and each mutant. */
+ *  file, the PRE-CHANGE file (the negative control) and each mutant.
+ *
+ *  RE-ANCHORED BY ROUND AL (AL-2). Four clamp probes, two snap probes, the
+ *  clearance probe and the half-along probe measured functions ROUND AL DELETED.
+ *  Their claims are NOT dropped — they are inverted into the two "the rails are
+ *  absent" / "the write keeps what it is handed" probes below, and the ones the
+ *  old code would have FAILED are exercised against the pre-change module in
+ *  `PRE_MODULE` (see the REPLAY). Every `old claim` is named in the detail text
+ *  of the assertion that replaced it, above. */
 const MODULE_PROBES = {
-  'clamp: a point past the end slides back in':
-    /* W=(95,0) projects INSIDE the path, at arc length 95, which is past the
-       range's end (70) → pulled to 70. A mutant that ignores `end` leaves it at
-       95. (The beyond-the-end case, W=(200,0)→(170,0), is deliberately NOT used
-       here: it is a documented limitation of the shipped decomposition, not a
-       rule.) */
-    m => Math.abs(m.clampToRange({x: 95, y: 0}, [{x: 0, y: 0}, {x: 100, y: 0}], 30, 30).x - 70) < 1e-9,
-  'clamp: a point before the range slides in':
-    m => Math.abs(m.clampToRange({x: 10, y: 0}, [{x: 0, y: 0}, {x: 100, y: 0}], 30, 30).x - 30) < 1e-9,
-  'clamp: the perpendicular survives':
-    m => Math.abs(m.clampToRange({x: 95, y: 40}, [{x: 0, y: 0}, {x: 100, y: 0}], 30, 30).y - 40) < 1e-9,
-  'clamp: a too-short path collapses to its midpoint':
-    m => Math.abs(m.clampToRange({x: 19, y: 0}, [{x: 0, y: 0}, {x: 20, y: 0}], 30, 30).x - 10) < 1e-9,
-  'snap: within 10 SCREEN px snaps exactly to centre':
-    /* d is EXACTLY the threshold: 10 screen px at zoom 1, and 5 flow px at
-       zoom 2. `<=` snaps; a `<` mutant leaves it alone. Measured, not assumed —
-       a d=9 case is the same under both and would let the mutant through. */
-    m => m.snapToCentre({x: 110, y: 100}, {x: 100, y: 100}, 1).x === 100
-      && m.snapToCentre({x: 105, y: 100}, {x: 100, y: 100}, 2).x === 100,
-  'snap: the threshold is scaled by the zoom':
-    m => m.snapToCentre({x: 104, y: 100}, {x: 100, y: 100}, 2).x === 100
-      && m.snapToCentre({x: 106, y: 100}, {x: 100, y: 100}, 2).x === 106,
+  'lock: a click-sized delta is not a drag, a real move is':
+    m => m.movedBy(0, 0, m.LABEL_DRAG_LOCK_PX) === false
+      && m.movedBy(1, 1, m.LABEL_DRAG_LOCK_PX) === false
+      && m.movedBy(2, 0, m.LABEL_DRAG_LOCK_PX) === false
+      && m.movedBy(4, 0, m.LABEL_DRAG_LOCK_PX) === true,
+  'lock: the threshold is SCREEN px, divided by the zoom':
+    m => Math.abs(m.labelDragLockPx(2) - m.LABEL_DRAG_LOCK_PX / 2) < 1e-9
+      && Math.abs(m.labelDragLockPx(0.5) - m.LABEL_DRAG_LOCK_PX * 2) < 1e-9
+      && m.labelDragLockPx(0) === m.LABEL_DRAG_LOCK_PX,
+  'lock: the value sits inside the 2-3px window':
+    m => m.LABEL_DRAG_LOCK_PX >= 2 && m.LABEL_DRAG_LOCK_PX <= 3,
+  'rails: the two rails, their constant and their clearances are ABSENT':
+    m => m.snapToCentre === undefined && m.clampToRange === undefined
+      && m.labelClearance === undefined && m.labelHalfAlong === undefined
+      && m.LABEL_SNAP_PX === undefined && m.LABEL_TO_ARROW_PADDING === undefined
+      && m.screenToFlowPx === undefined,
+  'write: a point NEAR the anchor is stored where it was put (no snap)':
+    /* OLD CLAIM: this returned the centred state (it is 3.6px from the anchor,
+       inside the deleted 10-screen-px snap). */
+    m => {
+      const w = m.labelWrite({W: {x: 52, y: 3}, anchor: {x: 50, y: 0}});
+      return w.labelPinned === true && Math.abs(w.labelOffset.x - 2) < 1e-9
+        && Math.abs(w.labelOffset.y - 3) < 1e-9;
+    },
+  'write: a point FAR from the line keeps its full offset (no clamp)':
+    /* OLD CLAIM: the clamp slid the along-the-line component back inside the
+       path's range. The pre-change module THROWS on this probe (it is handed no
+       `pts`), which the REPLAY records rather than hides. */
+    m => {
+      const w = m.labelWrite({W: {x: 3050, y: -1200}, anchor: {x: 50, y: 0}});
+      return w.labelPinned === true && w.labelOffset.x === 3000 && w.labelOffset.y === -1200;
+    },
   'guard: exactly {0,0} is not a drag':
     m => m.movedBy(0, 0) === false && m.movedBy(0.1, 0) === true,
   'anchor: an unpinned label is bit-identical to the shipped expression':
@@ -874,22 +910,12 @@ const MODULE_PROBES = {
       });
     },
   'write: a centred result DELETES the pin (pinned false)':
-    m => m.labelWrite({
-      W: {x: 52, y: 3}, anchor: {x: 50, y: 0}, pts: [{x: 0, y: 0}, {x: 100, y: 0}],
-      zoom: 1, start: 30, end: 30,
-    }).labelPinned === false,
+    m => m.labelWrite({W: {x: 50, y: 0}, anchor: {x: 50, y: 0}}).labelPinned === false,
   'write: a real move stores RELATIVE px':
     m => {
-      const w = m.labelWrite({
-        W: {x: 70, y: 25}, anchor: {x: 50, y: 0}, pts: [{x: 0, y: 0}, {x: 100, y: 0}],
-        zoom: 1, start: 30, end: 30,
-      });
+      const w = m.labelWrite({W: {x: 70, y: 25}, anchor: {x: 50, y: 0}});
       return w.labelPinned === true && Math.abs(w.labelOffset.x - 20) < 1e-9;
     },
-  'clearance: a glyph end reserves padding, a bare end reserves none':
-    m => m.labelClearance(true) === 20 && m.labelClearance(false) === 0,
-  'half-along: the box is projected onto the heading':
-    m => Math.abs(m.labelHalfAlong([{x: 0, y: 0}, {x: 0, y: 100}], {x: 0, y: 50}, 30, 8) - 8) < 1e-9,
   'plate: an unknown value resolves to the default':
     m => m.labelBgOf('bogus') === 'surface' && m.labelBgClass('bogus') === 'lb-surface'
       && m.labelBgClass('outline') === 'lb-outline',
@@ -907,29 +933,33 @@ const MODULE_PROBES = {
  *  the shipped `src/edgeLabel.ts`; `loadMutant` throws if one does not apply, and
  *  that throw is itself reported (never swallowed) as a broken control. */
 const MUTANTS = [
-  {name: 'clamp-ignores-end',
-    m: [['const s = start + end >= L ? L / 2 : Math.max(start, Math.min(L - end, len));',
-         'const s = start + end >= L ? L / 2 : Math.max(start, len);']],
-    kills: 'clamp: a point past the end slides back in'},
-  {name: 'clamp-ignores-start',
-    m: [['const s = start + end >= L ? L / 2 : Math.max(start, Math.min(L - end, len));',
-         'const s = start + end >= L ? L / 2 : Math.min(L - end, len);']],
-    kills: 'clamp: a point before the range slides in'},
-  {name: 'clamp-drops-perp',
-    m: [['return {x: p.x + perp.x, y: p.y + perp.y};',
-         'return {x: p.x, y: p.y};']],
-    kills: 'clamp: the perpendicular survives'},
-  {name: 'clamp-inverts-range',
-    m: [['const s = start + end >= L ? L / 2 : Math.max(start, Math.min(L - end, len));',
-         'const s = Math.max(start, Math.min(L - end, len));']],
-    kills: 'clamp: a too-short path collapses to its midpoint'},
-  {name: 'snap-flow-px-only',
-    m: [['Math.hypot(W.x - centre.x, W.y - centre.y) * z <= LABEL_SNAP_PX',
-         'Math.hypot(W.x - centre.x, W.y - centre.y) <= LABEL_SNAP_PX']],
-    kills: 'snap: the threshold is scaled by the zoom'},
-  {name: 'snap-off-by-one-side',
-    m: [['* z <= LABEL_SNAP_PX', '* z < LABEL_SNAP_PX']],
-    kills: 'snap: within 10 SCREEN px snaps exactly to centre'},
+  /* ROUND AL (AL-2) — the rails coming BACK, which is the failure this round
+     exists to prevent, and the lock going back to ROUND AK's zero. */
+  {name: 'write-reintroduces-snap',
+    m: [['const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};',
+         'const labelOffset = Math.hypot(p.W.x - p.anchor.x, p.W.y - p.anchor.y) <= 10 ? {x: 0, y: 0} : {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};']],
+    kills: 'write: a point NEAR the anchor is stored where it was put (no snap)'},
+  {name: 'write-reintroduces-clamp',
+    m: [['const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};',
+         'const labelOffset = {x: Math.max(-200, Math.min(200, p.W.x - p.anchor.x)), y: p.W.y - p.anchor.y};']],
+    kills: 'write: a point FAR from the line keeps its full offset (no clamp)'},
+  {name: 'lock-back-to-zero',
+    m: [['export const LABEL_DRAG_LOCK_PX = 2.5;', 'export const LABEL_DRAG_LOCK_PX = 0;']],
+    kills: 'lock: the value sits inside the 2-3px window'},
+  {name: 'lock-flow-px-only',
+    m: [['return zoom > 0 ? LABEL_DRAG_LOCK_PX / zoom : LABEL_DRAG_LOCK_PX;',
+         'return LABEL_DRAG_LOCK_PX;']],
+    kills: 'lock: the threshold is SCREEN px, divided by the zoom'},
+  {name: 'rails-restored',
+    m: [['export function mirrorOffset(',
+         'export const LABEL_SNAP_PX = 10;\nexport const LABEL_TO_ARROW_PADDING = 20;\n'
+         + 'export function snapToCentre(W: Pt, centre: Pt, zoom: number): Pt { return {...W}; }\n'
+         + 'export function clampToRange(W: Pt, pts: Pt[], start: number, end: number): Pt { return {...W}; }\n'
+         + 'export function labelClearance(hasGlyph: boolean): number { return hasGlyph ? 20 : 0; }\n'
+         + 'export function labelHalfAlong(pts: Pt[], W: Pt, halfW: number, halfH: number): number { return halfW; }\n'
+         + 'export function screenToFlowPx(px: number, zoom: number): number { return px; }\n'
+         + 'export function mirrorOffset(']],
+    kills: 'rails: the two rails, their constant and their clearances are ABSENT'},
   {name: 'guard-becomes-truthy',
     m: [['return Math.hypot(dx, dy) > lock;', 'return Math.hypot(dx, dy) >= lock;']],
     kills: 'guard: exactly {0,0} is not a drag'},
@@ -942,15 +972,9 @@ const MUTANTS = [
          'return {labelOffset: {...CENTRED}, labelPinned: true};']],
     kills: 'write: a centred result DELETES the pin (pinned false)'},
   {name: 'write-absolute-not-relative',
-    m: [['return {labelOffset: {x: W.x - p.anchor.x, y: W.y - p.anchor.y}, labelPinned: true};',
-         'return {labelOffset: {x: W.x, y: W.y}, labelPinned: true};']],
+    m: [['const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};',
+         'const labelOffset = {x: p.W.x, y: p.W.y};']],
     kills: 'write: a real move stores RELATIVE px'},
-  {name: 'clearance-always-pads',
-    m: [['return hasGlyph ? LABEL_TO_ARROW_PADDING : 0;', 'return LABEL_TO_ARROW_PADDING;']],
-    kills: 'clearance: a glyph end reserves padding, a bare end reserves none'},
-  {name: 'half-along-uses-width',
-    m: [['return Math.abs(dir.x) * halfW + Math.abs(dir.y) * halfH;', 'return halfW;']],
-    kills: 'half-along: the box is projected onto the heading'},
   {name: 'plate-not-tolerant',
     m: [["return v === 'none' || v === 'outline' ? v : 'surface';", 'return v;']],
     kills: 'plate: an unknown value resolves to the default'},
@@ -970,6 +994,92 @@ assert('replay.the-shipped-module-passes-every-probe',
   `${Object.keys(MODULE_PROBES).length} probes run against the SHIPPED src/edgeLabel.ts — ` +
   (shippedFails.length === 0 ? 'all GREEN, so a RED below is the mutation and not the harness'
     : `FAILING ON THE SHIPPED FILE: ${shippedFails.join(', ')}`));
+
+/* ROUND AL (AL-2) — THE PRE-CHANGE MODULE IS THE NEGATIVE CONTROL for every
+ *  claim this round INVERTED.
+ *
+ *  A SECOND PIN, and it is not a convenience: `PRE_COMMIT` is the commit the
+ *  SOURCE half measures against, and `src/edgeLabel.ts` does not exist there at
+ *  all (it was created by ROUND AK, pass 2). The module's control therefore has
+ *  to be the last commit at which the ROUND AK version of the file was live —
+ *  `f0b00aa`, ROUND AK's final commit, i.e. exactly the tree the owner device-
+ *  tested and rejected. Reading it from the same commit as the source half would
+ *  silently skip this control, which is the failure mode it exists to prevent.
+ *
+ *  A probe that is TRUE on both trees would prove nothing, so each rail probe is
+ *  REQUIRED to be RED there.
+ *
+ *  The two write probes are the interesting ones, and they fail on the old file
+ *  for TWO different reasons — recorded rather than smoothed over:
+ *    · 'no snap'   returns the centred state (pinned false), so the probe is RED;
+ *    · 'no clamp'  THROWS: ROUND AK's `labelWrite` dereferences `p.pts`, and the
+ *                  probe deliberately passes only the two points.
+ *  A throw counts as RED and is labelled as such, because "the old code cannot
+ *  even accept this call" is exactly what removing the rail means. */
+const PRE_MODULE_COMMIT = process.env.DS_PRE_MODULE_COMMIT || 'f0b00aa';
+let preMod = null;
+try {
+  const preSrc = execFileSync('git', ['show', `${PRE_MODULE_COMMIT}:src/edgeLabel.ts`],
+    {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
+  const dir = mkdtempSync(join(tmpdir(), 'ak2-pre-'));
+  const file = join(dir, 'edgeLabel.ts');
+  writeFileSync(file, preSrc);
+  preMod = {mod: await import(`${file}?t=${Date.now()}`), dir};
+} catch (err) {
+  console.log(`  FAIL  the pre-change module could not be loaded from ${PRE_MODULE_COMMIT}: ${err.message.split('\n')[0]}`);
+  console.log('        This is the control for every INVERTED claim below. Do NOT delete it:');
+  console.log('        re-pin DS_PRE_MODULE_COMMIT to the last commit where the ROUND AK');
+  console.log('        edgeLabel.ts was live.');
+  failures++;
+}
+
+if (preMod) {
+  /* WHICH PROBES ARE AL's, stated as DATA rather than implied. "The rails are
+   *  gone", "the lock is not zero" and "a write keeps what it is handed" are
+   *  AL-2's claims and MUST be RED against ROUND AK's file. The rest assert
+   *  behaviour AL deliberately did not touch (the `{0,0}` guard, the anchor
+   *  parity, the centred pin, the plate, the reverse) and MUST be GREEN there —
+   *  listed individually so a reader can see they were run and found shared,
+   *  rather than skipped by a filter they cannot see.
+   *
+   *  `write: a real move stores RELATIVE px` is in the RED list although the
+   *  CLAIM is shared, because its verdict on the old file is RED for a reason
+   *  that IS this round's: the probe calls `labelWrite` with the TWO-POINT
+   *  signature AL introduced, and ROUND AK's version dereferences the `pts` a
+   *  rail needed, so it THROWS. "The old signature cannot accept this call" is
+   *  the same fact as "the rails' inputs are gone", one step earlier. */
+  const RED_ON_PRE = [
+    'lock: a click-sized delta is not a drag, a real move is',
+    'lock: the threshold is SCREEN px, divided by the zoom',
+    'lock: the value sits inside the 2-3px window',
+    'rails: the two rails, their constant and their clearances are ABSENT',
+    'write: a point NEAR the anchor is stored where it was put (no snap)',
+    'write: a point FAR from the line keeps its full offset (no clamp)',
+    'write: a real move stores RELATIVE px',
+  ];
+  console.log(`\n  the SAME probes over the PRE-CHANGE module (${PRE_MODULE_COMMIT}, ROUND AK's own edgeLabel.ts):`);
+  const wrongVerdict = [];
+  for (const [id, probe] of Object.entries(MODULE_PROBES)) {
+    let ok = true, how = '';
+    try { ok = probe(preMod.mod); } catch (err) { ok = false; how = ` (THROWS: ${err.message.split('\n')[0].slice(0, 58)})`; }
+    const want = RED_ON_PRE.includes(id) ? 'RED' : 'GREEN';
+    const got = ok ? 'GREEN' : 'RED';
+    if (got !== want) wrongVerdict.push(`${id} (want ${want}, got ${got})`);
+    console.log(`  ${got === want ? 'ok   ' : 'WRONG'}  ${want.padEnd(5)} ${id}${how}`);
+  }
+  console.log('');
+  assert('replay.every-AL-2-probe-is-RED-on-the-pre-change-module-and-every-shared-probe-is-GREEN-on-both',
+    wrongVerdict.length === 0,
+    wrongVerdict.length === 0
+      ? `${RED_ON_PRE.length} probes are RED against ROUND AK's own \`src/edgeLabel.ts\` (${PRE_MODULE_COMMIT}) and ` +
+        `GREEN against the shipped file, so each one really measures a change this round made; and the other ` +
+        `${Object.keys(MODULE_PROBES).length - RED_ON_PRE.length} probes are GREEN on BOTH trees, which is the ` +
+        `honest reading — AL did not touch the guard, the anchor expression, the centred pin, the plate or the ` +
+        `reverse, so a probe over any of them would prove nothing about this round. They are listed above with the ` +
+        `verdict they are REQUIRED to have rather than filtered out.`
+      : `PROBES WITH THE WRONG VERDICT: ${wrongVerdict.join(', ')}`);
+  rmSync(preMod.dir, {recursive: true, force: true});
+}
 
 /* Then each mutant must kill exactly the probe it names. */
 let controlBroken = [];

@@ -22,11 +22,13 @@ import {
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules, all pure, all executed by the
-   harness: the anchor + its 2-D offset (AK-10), the three plate states (AK-12),
-   the snap / clamp / guard rails (AK-14) and the reverse mirror (AK-15). */
+   harness: the anchor + its 2-D offset (AK-10), the three plate states (AK-12)
+   and the reverse mirror (AK-15). ROUND AL's AL-2 deleted the rails that the
+   import list used to carry (`labelClearance`, `labelHalfAlong`), and added
+   `labelDragLockPx` in their place — the drag's own screen-px click lock. */
 import {
-  HANDLE_CLEAR_PX, LABEL_HALF_H_PX, labelAnchor, labelBgClass, labelClearance,
-  labelHalfAlong, labelWrite, movedBy, nudgeAlongPath, pathPoints,
+  HANDLE_CLEAR_PX, LABEL_HALF_H_PX, labelAnchor, labelBgClass,
+  CENTRED, labelDragLockPx, labelWrite, movedBy, nudgeAlongPath, pathPoints,
   type LabelWrite,
 } from './edgeLabel';
 /* ROUND AK, PASS 2 — ONE gesture for both affordances on this edge. See the
@@ -131,16 +133,19 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  share a point. Measured, never estimated: `getBoundingClientRect` in a
    *  layout effect, divided by the zoom. */
   const labelBox = useRef<HTMLDivElement | null>(null);
-  /** The measured half-box of the label, in SCREEN px — the clamp's and the
-   *  handle-nudge's input. A HALF-WIDTH and a HALF-HEIGHT, not one number: the
-   *  label is a BOX, and which of its two extents matters depends on the
-   *  direction of the path at the point it sits on (`labelHalfAlong` projects
-   *  the box onto that heading), so both are kept. Measured from the element
-   *  rather than from the string, because the width is whatever the user typed.
-   *  The height is the same for every label and `LABEL_HALF_H_PX` stands in for
-   *  it until the first measurement lands. */
+  /** The measured HALF-WIDTH of the label, in SCREEN px — the handle-nudge's
+   *  input, and (since ROUND AL's AL-2 deleted the clamp) its ONLY consumer.
+   *  Measured from the element rather than from the string, because the width is
+   *  whatever the user typed.
+   *
+   *  THE HALF-HEIGHT IS GONE WITH THE CLAMP. ROUND AK measured both, because the
+   *  clamp needed the box's extent along the path's HEADING (`|cos|·hw +
+   *  |sin|·hh`) and a label can be tall. The nudge moves the handle ALONG the
+   *  line, so only the extent along the line matters and only the width is read;
+   *  a state variable nothing reads would cost a re-render for nothing.
+   *  `LABEL_HALF_H_PX` — the first frame's stand-in — is no longer imported for
+   *  the same reason. */
   const [labelHalfW, setLabelHalfW] = useState(0);
-  const [labelHalfH, setLabelHalfH] = useState(0);
   /** The live `[x, y, zoom]` — the same store value React Flow's own
    *  `screenToFlowPosition` reads, and the same one the label's counter-scale
    *  below needs. Subscribing here re-renders on pan/zoom only, exactly like
@@ -522,14 +527,11 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  not open the gesture's history entry, so the claim is released by simply
      *  returning before `beginGesture` runs. */
     if (!origin) return;
+    /** ROUND AL, AL-2 — the write is now a plain difference. The path, the zoom
+     *  and the two end clearances are no longer inputs: they existed only to feed
+     *  `snapToCentre` and `clampToRange`, and both rails are deleted. */
     const P_ = (p: Pt, phase: BendPhase) => {
-      const w = labelWrite({
-        W: p, anchor: L, pts: pathPts, zoom: t[2],
-        // the clearances already include the label box's own half-extent along
-        // the line (see the derivation above), which is what the range wants.
-        start: clearStart, end: clearEnd,
-      });
-      cb(id, w, phase);
+      cb(id, labelWrite({W: p, anchor: L}), phase);
     };
     beginGesture({
       el: e.currentTarget,
@@ -538,7 +540,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
       pointerId: e.pointerId,
       clientX: e.clientX,
       clientY: e.clientY,
-      lock: 0,
+      /* ROUND AL, AL-2 — 2.5 SCREEN px, scaled by the zoom, in place of ROUND
+         AK's `lock: 0`. Sirius Web's `{0,0}` guard counted ANY sub-pixel jitter
+         as a drag, so a plain click on the label ran `onEnd` and STORED a
+         position — the third cause of the owner's "click once and it jumps".
+         The guard itself stays (it is `movedBy`, shared with the bend handle);
+         only the value changes. */
+      lock: labelDragLockPx(t[2]),
       /* ONE history entry, at the START — the same convention `onBend`
          documents. The write is the UNPINNED state: a gesture that has not
          moved yet has moved nothing, and `labelPinned: false` is bit-identical
@@ -548,11 +556,11 @@ const GoblinEdge = memo((props: EdgeProps) => {
       onEnd: p => {
         setLabelCursor('grab');
         /* THE END REPORT CARRIES THE FINAL WRITE, so what is STORED is the
-           released point with the rails applied. The auto-unpin is NOT a second
-           branch here: `labelWrite` already returns `{0, 0} / pinned: false`
-           when the released point snapped to the centre, so "let go near the
-           middle" and `Reset label position` land on exactly the same state
-           rather than two that merely look alike. */
+           released point, with no rail between it and the board. The centred
+           branch is NOT a second code path here: `labelWrite` returns
+           `{0, 0} / pinned: false` when the released point IS the anchor, so
+           "let go exactly on the centre" and `Reset label position` still land
+           on one state rather than two that merely look alike. */
         P_(p, 'end');
       },
     });
@@ -573,58 +581,42 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  from the path ACTUALLY drawn, so a stored bend, a legacy `bend` fraction
    *  and a generator default are all handled by construction. */
   const pathPts = useMemo(() => pathPoints(path), [path]);
-  /** ROUND AK, AK-14.3 — DOES EACH END CARRY A GLYPH? The clamp's input, and
-   *  the ONE place the two ends' presence is decided.
+  /** ROUND AL, AL-2 — THE PER-END GLYPH FLAGS AND THE TWO CLEARANCES ARE GONE.
    *
-   *  THE MAPPING, and the trap it avoids: AK-5 renamed the UI controls
-   *  `start`/`end` but the STORAGE keys are still `markerStart`/`markerEnd`, and
-   *  the two ends are named for the ends of the LINE, not for the property. So
-   *  `hasEndGlyph` reads `markerEnd` and `hasHeadGlyph` reads `markerStart` —
-   *  getting that backwards would make the clamp clear the WRONG end (it would
-   *  reserve 20px for a bare end and let the label sit under a real arrowhead).
+   *  ROUND AK, AK-14.3 computed them here: `hasEndGlyph`/`hasHeadGlyph` read the
+   *  marker props (with a documented trap — the UI's `start`/`end` are stored as
+   *  `markerEnd`/`markerStart`) and the two fed `labelClearance` +
+   *  `labelHalfAlong` to produce `clearStart`/`clearEnd`, the clamp's inputs. The
+   *  clamp is deleted, so the flags and the clearances had no consumer left and
+   *  are deleted with it. Kept as a note rather than silently dropped: the
+   *  `markerEnd`↔`start` inversion above is a real trap, and AL-2 removes the
+   *  code that documented it.
    *
-   *  THE TWO SOURCES, both already here:
-   *    1. the marker PROP React Flow hands this component. It is derived in `App`
-   *       (`rfEdges`) and is NON-EMPTY for every marker kind — `markerFor` writes
-   *       `{type, color, width, height}` for the two arrow kinds, and `App`'s
-   *       `edgeMarkerUrl` writes `url('#…')` for a crow's foot. `GoblinEdge` is
-   *       handed the resolved URL, never the object, so presence is honestly
-   *       "this end has a glyph" whatever kind it is.
-   *    2. the RESOLVED MARKER URL, read from the property rather than from the
-   *       original object, which is why this works for all three kinds at once.
-   *
-   *  It is a PROPERTY read (`props.marker*`), never state: a marker change
-   *  re-renders the edge, so the clamp's inputs follow the panel with no extra
-   *  bookkeeping. */
-  const hasEndGlyph = !!props.markerEnd;
-  const hasHeadGlyph = !!props.markerStart;
+   *  `halfW`/`halfH` are still MEASURED (below) but now have ONE consumer, the
+   *  bend handle's own nudge. */
   /** The label's live box, in FLOW px. Measured from the element (never
    *  estimated from the string length) and divided by the zoom, because the
    *  label is counter-scaled by `1/t[2]` and its flow-space size therefore
-   *  depends on the zoom. `halfW` is a MEASUREMENT only (the label's width is
-   *  whatever the user typed, so no constant could stand for it and 0 is the
-   *  honest reading of "not measured yet"); `halfH` needs one only for the same
-   *  first frame, and it is the label's own `LABEL_HALF_H_PX`. */
+   *  depends on the zoom. Both are MEASUREMENTS: the width is whatever the user
+   *  typed, so no constant could stand for it, and 0 is the honest reading of
+   *  "not measured yet". `LABEL_HALF_H_PX` is no longer needed as a first-frame
+   *  fallback — the only consumer left is the handle nudge, which runs after the
+   *  label has mounted. */
   const halfW = labelHalfW / (t[2] || 1);
-  const halfH = (labelHalfH || LABEL_HALF_H_PX) / (t[2] || 1);
-  /** AK-14.3 — the clearances. `labelClearance` is tldraw's own rule (padding on
-   *  an end that carries a glyph, 0 on an end that carries none) and
-   *  `labelHalfAlong` adds the LABEL BOX's own half-extent along the path — the
-   *  box's EDGE must clear the glyph, not its centre. The formula is
-   *  `edgeLabel`'s and is not restated here: this supplies its two inputs. */
-  const clearStart = labelClearance(hasEndGlyph) + labelHalfAlong(pathPts, L, halfW, halfH);
-  const clearEnd = labelClearance(hasHeadGlyph) + labelHalfAlong(pathPts, L, halfW, halfH);
 
-  /** ROUND AK, AK-13 — WHERE A NEW LABEL GOES WHEN IT IS CREATED AND NEVER
-   *  TYPED INTO. The double-click's own point, converted to an offset from the
-   *  resolved anchor, so an empty commit still leaves the label under the
-   *  pointer AND stores a relative value (the same shape a drag stores).
+  /** ROUND AL, AL-4 — THE CREATE SIGNAL, and why the CLICK POINT is no longer
+   *  kept. The double-click still converts its point (`__editAt.at`) and the
+   *  editor opens there, so the input box appears under the pointer — but AL-4
+   *  stores the CENTRED state on commit rather than an offset from that point, so
+   *  the point is no longer retained anywhere. ROUND AK kept it in
+   *  `pendingCreate` state purely to feed the commit's write; the write no longer
+   *  needs it, so the state went with it — one fewer way for the create path and
+   *  the drag path to disagree.
    *
-   *  `null` outside a create signal, and it is read ONLY by the commit below —
-   *  the normal editor open (the element's own double-click, or the context
-   *  menu's "Edit label") leaves it null and therefore never writes a position. */
+   *  `undefined` outside a create signal, and it is read ONLY by the commit — the
+   *  normal editor open (the element's own double-click, or the context menu's
+   *  "Edit label") leaves it undefined and therefore never writes a position. */
   const createAt = d.__editAt;
-  const [pendingCreate, setPendingCreate] = useState<Pt | null>(null);
 
   // F2/AK-13: the two editor entry points. `__edit` is the context menu's "Edit
   // label" on an EXISTING label; `__editAt` is a double-click on the PATH, which
@@ -634,7 +626,6 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // the editor open the moment review mode is left.
   useEffect(() => {
     if (!createAt || ro) return;
-    setPendingCreate(createAt.at);
     setDraft(shown);
     setEditing(true);
   }, [createAt?.t]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -644,13 +635,18 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  `1/zoom`, so its FLOW size follows the zoom — the measurement has to as
    *  well). Read from `getBoundingClientRect`, never estimated from the string:
    *  the width is whatever the user typed. */
+  /** The label's own box, measured from the DOM at the zoom that is live, and
+   *  re-measured when the zoom changes (the label is counter-scaled by `1/zoom`,
+   *  so its FLOW size follows the zoom — the measurement has to as well). Read
+   *  from `getBoundingClientRect`, never estimated from the string: the width is
+   *  whatever the user typed. ONLY the half-WIDTH is kept — see the declaration
+   *  above for why the height went with the clamp. */
   useEffect(() => {
     const el = labelBox.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const z = t[2] || 1;
     setLabelHalfW(r.width / 2 / z);
-    setLabelHalfH(r.height / 2 / z);
   }, [shown, t, editing]);
 
   /** The handle's own position. The path's midpoint — the label's own anchor and
@@ -679,27 +675,29 @@ const GoblinEdge = memo((props: EdgeProps) => {
   const commit = () => {
     const v = draft.trim();
     d.onCommitLabel?.(id, v);
-    /* ROUND AK, AK-13 — AN EMPTY COMMIT AT A CREATED LABEL STILL LEAVES IT WHERE
-       THE DOUBLE-CLICK PUT IT. The spec is explicit ("otherwise create the label
-       at the clicked position and commit at the default when left empty"), and
-       `labelWrite` is what turns the click's point into a stored, rail-checked
-       offset — the same writer the drag uses, so a created label and a dragged
-       one cannot land in two different states. A commit at an EXISTING label
-       leaves `pendingCreate` null and writes no position at all, so editing text
-       never moves the label. */
-    if (pendingCreate) {
-      d.__onLabelWrite?.(id, labelWrite({
-        W: pendingCreate, anchor: L, pts: pathPts, zoom: t[2],
-        start: clearStart, end: clearEnd,
-      }), 'end');
-      setPendingCreate(null);
+    /* ROUND AL, AL-4 — A FIRST-CREATED LABEL CENTRES, AND THE CLICK POINT IS NOT
+       STORED. ROUND AK (AK-13) kept the double-click's own point and stored an
+       offset from it, which is what the owner saw as "hiện nó đang văng tùm lum"
+       — the label landed wherever on the path he happened to double-click. The
+       double-click still OPENS the editor (at the click point, so the box appears
+       under the pointer); only the STORED value changes, and it is now the
+       UNPINNED centred state — the very state `Reset label position` writes and
+       the state a board that never carried either key renders as. Three
+       situations, one stored value.
+
+       EDITING IS UNTOUCHED: this whole branch is reachable only from the CREATE
+       signal (`__editAt`); a commit at an EXISTING label — the element's own
+       double-click, or the context menu's "Edit label" — leaves `__editAt`
+       undefined, so no position is written and the text can be corrected without
+       the label moving. */
+    if (createAt) {
+      d.__onLabelWrite?.(id, {labelOffset: {...CENTRED}, labelPinned: false}, 'end');
     }
     setEditing(false);
   };
 
   const cancel = () => {
     setDraft(typeof label === 'string' ? label : '');
-    setPendingCreate(null);
     setEditing(false);
   };
 

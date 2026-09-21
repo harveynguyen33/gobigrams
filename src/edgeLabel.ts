@@ -27,38 +27,44 @@
    and `useEdgeGesture` in that file is that one gesture, now shared.
 
    ---------------------------------------------------------------------------
-   THE THREE RAILS, and the tool each number comes from.
+   ROUND AL, AL-2 — THE THREE RAILS ARE GONE, and this file is where they were.
 
-     AK-14.2  `LABEL_SNAP_PX = 10`      tldraw `labelCenterSnapDistance`, SCREEN
-                                        px, applied as `dist <= 10 / zoom` —
-                                        the same arithmetic as
-                                        `Vec.DistMin(next, def, snap / zoom)`.
-     AK-14.3  `LABEL_TO_ARROW_PADDING = 20`  tldraw's own constant
-                                        (`default-shape-constants.ts:43-48`).
-                                        OURS IS NOT STROKE-SCALED, and the
-                                        reason is checkable rather than a
-                                        shortcut: tldraw adds a per-stroke term
-                                        because its arrowheads are drawn from the
-                                        stroke width, while every marker this app
-                                        renders is a fixed 14px (`markerFor`) or
-                                        a fixed crow's foot (`crowfoot.tsx`), so
-                                        there is nothing for such a term to
-                                        track.
-     AK-10    `lock: 0`                 Sirius Web's `{0,0}` click-vs-drag guard.
+   ROUND AK shipped three rails around the label: `snapToCentre` (tldraw's
+   `labelCenterSnapDistance`, 10 screen px), `clampToRange` (tldraw's
+   `LABEL_TO_ARROW_PADDING` clearances, walked along the resolved polyline) and
+   `lock: 0` (Sirius Web's `{0,0}` click guard). The owner's device test rejected
+   all three uses, in his own words:
+
+     "cứ để nó kéo thoải mái đi đâu thì đi. ko cần ràng buộc với xung quanh line.
+      Nếu kéo quá xa thì đó là user issue (ngoài ra đã có nút Reset Label Position
+      rồi)"
+
+   So the two RAILS are deleted outright — the functions, their constants and the
+   inputs that existed only to feed them (`labelClearance`, `labelHalfAlong`,
+   `LABEL_TO_ARROW_PADDING`, `LABEL_SNAP_PX`, `screenToFlowPx`, and on the
+   renderer side the per-end glyph flags and the two clearances). A label dragged
+   far from the line STAYS far; a label parked near the centre STAYS where it was
+   put. `Reset label position` is now the ONLY way back, which is what he asked
+   for, and — because a centred write is the UNPINNED state rather than a stored
+   zero — "reset", "created" and "never moved" remain ONE stored value.
+
+   The third cause of "click once and it jumps" is fixed by CHANGING the lock's
+   VALUE, not by removing the guard: the label drag passes a 2.5 SCREEN-px lock
+   (`LABEL_DRAG_LOCK_PX` below, divided by the zoom) instead of `0`, so a plain
+   click — which always carries a pixel or so of jitter — writes nothing at all.
+   `movedBy` keeps its `lock` parameter because the bend handle still passes this
+   project's own 3px threshold through the SAME predicate: the two affordances
+   must not be able to disagree about what a drag is.
+
+   WHY THE RAILS WERE NOT MERELY DISABLED. A rail left in the file behind a flag
+   is a rail the next pass re-enables by habit, and the owner's complaint was
+   about the behaviour, not about a setting. The rails are gone, and the harness
+   replays them RESTORED so "gone" is a measurement (`checks/round-al-edge-
+   panel.mjs`).
 
    ---------------------------------------------------------------------------
    HONEST LIMITS, recorded here rather than discovered later.
 
-   * The clamp walks the RESOLVED PATH's polyline (`pathPoints`), so it is a
-     real distance along the ink, not a distance along the straight chord. It
-     measures a `Q` corner only by its endpoints, which is exact for the free
-     routes (`freePath`/`straightPath`/`bezierPath` put the label at a vertex)
-     and off by at most the corner radius (12px) elsewhere.
-   * The clamp is a WRITE-time rail: it guards every point the gesture stores,
-     so no new out-of-range state can be created. It deliberately does NOT
-     rewrite an offset already sitting in a saved board on load — moving a
-     user's stored value without a gesture would be a migration, and this pass
-     runs none.
    * `reverseEdgePatch` mirrors the legacy `offset` FRACTION (o → 1−o, tldraw
      and draw.io both keep the label at the same place along the line while the
      ends swap). It does NOT rewrite `labelOffset`: it is relative to the
@@ -67,6 +73,13 @@
      with a split that is not at the endpoints' midpoint) the label can shift by
      that split — the same "you may need to update any labels you had manually
      positioned" limit draw.io records for its own Reverse.
+   * With the clamp gone there is no write-time guard at all, so a drag can store
+     any offset a pointer can reach, including one that puts the label under an
+     arrowhead or off the ink entirely. That is the owner's explicit choice (a
+     far-dragged label is "user issue"), and `Reset label position` is the way
+     back. `nudgeAlongPath` below still moves the BEND HANDLE off the label, so
+     the two affordances cannot overlap even now — that rail protects the HANDLE,
+     not the label's position, and is therefore unaffected.
 --------------------------------------------------------------------------- */
 
 import type {Pt} from './edgeBend';
@@ -142,25 +155,41 @@ export function labelAnchor(p: {
 }
 
 /* ===========================================================================
-   AK-14.2 — snap back to the centre. AK-10 — the click-vs-drag guard.
+   ROUND AL, AL-2 — THE LABEL DRAG'S CLICK LOCK. AK-10's `{0,0}` guard.
    =========================================================================== */
-/** tldraw's `labelCenterSnapDistance`, in SCREEN px. Pull the label within this
- *  many screen pixels of its default centre and it snaps to exactly centre —
- *  which is the "put it back" gesture with no extra UI, and the reason AK-14.1's
- *  button is a convenience rather than the only way home. */
-export const LABEL_SNAP_PX = 10;
+/** How far a pointer must travel before the label drag counts as a drag, in
+ *  SCREEN px. 2.5 because that is a real click's own jitter: a press and release
+ *  without intent moves the pointer by a pixel or two at most, and ROUND AK's
+ *  `lock: 0` (Sirius Web's `{0,0}` test) treated EVERY one of those as a drag —
+ *  the gesture then ran `onEnd`, which writes. That was the third cause of the
+ *  owner's "click once and it jumps": a plain click on the label stored a
+ *  position instead of leaving it alone. 2.5 is under the 3px threshold the bend
+ *  handle already uses (`GoblinEdge.LOCK_PX`), so a drag that registers on one
+ *  affordance registers on the other.
+ *
+ *  SCREEN px, not flow px, and that is the point: this is a HAND tremor, and a
+ *  hand does not zoom. At 50% a flow-pixel threshold would be four times too
+ *  generous and a slow drag would never start. */
+export const LABEL_DRAG_LOCK_PX = 2.5;
 
-/** A screen-pixel threshold expressed in FLOW pixels, which is what a stored
- *  coordinate is: at zoom 2 a 10px screen threshold is 5 flow px. */
-export function screenToFlowPx(px: number, zoom: number): number {
-  return zoom > 0 ? px / zoom : px;
+/** `LABEL_DRAG_LOCK_PX` in FLOW px, which is what a stored coordinate and a
+ *  gesture delta are both measured in: at zoom 2 a 2.5px screen threshold is
+ *  1.25 flow px. A zoom of 0 (an unmeasured transform) falls back to the
+ *  un-scaled value rather than returning Infinity, which would disable the
+ *  guard at exactly the moment the geometry is least trustworthy. */
+export function labelDragLockPx(zoom: number): number {
+  return zoom > 0 ? LABEL_DRAG_LOCK_PX / zoom : LABEL_DRAG_LOCK_PX;
 }
 
 /** AK-10's guard, verbatim from Sirius Web: a gesture whose TOTAL delta is
  *  `{0,0}` is not a drag. `lock` lets the bend handle keep this project's own
  *  3px jitter threshold (`GoblinEdge.LOCK_PX`) through the same predicate, so
- *  the two affordances cannot disagree about what "a drag" is — the label
- *  passes 0 (any non-zero delta), which is exactly Sirius Web's test. */
+ *  the two affordances cannot disagree about what "a drag" is.
+ *
+ *  ROUND AL, AL-2: the label now passes `labelDragLockPx(zoom)` instead of `0`.
+ *  The parameter STAYS — a predicate with two callers and one threshold each is
+ *  still ONE predicate, which is the invariant ROUND AK put here; AL changes the
+ *  value the label supplies, never the test. */
 export function movedBy(dx: number, dy: number, lock = 0): boolean {
   return Math.hypot(dx, dy) > lock;
 }
@@ -171,7 +200,12 @@ export function movedBy(dx: number, dy: number, lock = 0): boolean {
 export const CENTRED: LabelOffset = {x: 0, y: 0};
 
 /* ===========================================================================
-   THE PATH, AS A POLYLINE. AK-14.3 clamps along the INK, not along the chord.
+   THE PATH, AS A POLYLINE. Now ONE consumer: the handle nudge (AK-11).
+
+   ROUND AK, AK-14.3 also used these to clamp the LABEL along the ink. ROUND AL's
+   AL-2 deleted the clamp, so what is left is `nudgeAlongPath` below — the rail
+   that keeps the BEND HANDLE off a painted label. The helpers are unchanged; only
+   the list of callers is shorter.
    =========================================================================== */
 const NUM = '(-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)';
 
@@ -257,89 +291,54 @@ export function nearestOnPath(pts: Pt[], W: Pt): {pt: Pt; len: number; perp: Pt;
 }
 
 /* ===========================================================================
-   AK-14.3 — CLAMP. A pure function of the resolved path + marker presence.
+   ROUND AL, AL-2 — THE CLAMP BLOCK IS DELETED.
+
+   ROUND AK, AK-14.3 lived here: `LABEL_TO_ARROW_PADDING`, `labelHalfAlong`,
+   `labelClearance` and `clampToRange`, i.e. the rail that slid a dragged label
+   back inside the usable range of the ink. The owner removed the requirement —
+   "ko cần ràng buộc với xung quanh line. Nếu kéo quá xa thì đó là user issue" —
+   so the four of them are gone TOGETHER: the constant, the two clearance
+   functions and the clamp. Removing the clamp alone would have left a measured
+   pair of clearances with no consumer, which is how a rail comes back.
+
+   WHAT REPLACED IT: nothing. `labelWrite` below stores the offset it is handed.
+   `Reset label position` is the way back, and the `nudgeAlongPath` rail below —
+   which positions the BEND HANDLE rather than the label — is untouched, because
+   it protects the handle's hit area from the label's, not the label from the
+   line.
    =========================================================================== */
 
-/** tldraw's `LABEL_TO_ARROW_PADDING` (`default-shape-constants.ts:43-48`),
- *  in FLOW px. tldraw scales it per stroke width and canvas scale because its
- *  arrowheads are derived from the stroke width; every marker THIS app paints is
- *  a fixed size (`markerFor` → 14×14, or a crow's foot from `crowfoot.tsx`), so
- *  there is no stroke term for a scaled constant to track. NOT stroke-scaled,
- *  deliberately, and that is the whole of the difference. */
-export const LABEL_TO_ARROW_PADDING = 20;
-
-/** The label box's own half-extent ALONG the line, for the clamp's clearances.
- *
- *  A label is a BOX, so what has to clear an arrowhead is the box's EDGE, not
- *  its centre. `halfW`/`halfH` are the box's half-width and half-height in flow
- *  px (measured from the DOM at gesture start, then divided by the zoom, because
- *  the label is counter-scaled and its FLOW size therefore depends on the zoom).
- *  The heading is taken at the nearest point on the path, and the half-extent is
- *  the box's support function along it — `|cos|·hw + |sin|·hh`, the same
- *  projection an AABB uses. A degenerate path falls back to the larger half. */
-export function labelHalfAlong(pts: Pt[], W: Pt, halfW: number, halfH: number): number {
-  if (pts.length < 2) return Math.max(halfW, halfH);
-  const {dir} = nearestOnPath(pts, W);
-  return Math.abs(dir.x) * halfW + Math.abs(dir.y) * halfH;
-}
-
-/** How far an END claims against the label, in FLOW px: tldraw's
- *  `LABEL_TO_ARROW_PADDING` on an end that carries a glyph, 0 on an end that
- *  carries none — tldraw's own rule
- *  (`hasStartArrowhead || hasStartBinding ? range.start : 0`). */
-export function labelClearance(hasGlyph: boolean): number {
-  return hasGlyph ? LABEL_TO_ARROW_PADDING : 0;
-}
-
-/** Slide `W` back inside the usable range: it may never sit under an arrowhead
- *  and may never run off an end.
- *
- *  `start`/`end` are distances in px from each end of the polyline, and they
- *  already include the label's own half-extent along the line (the caller adds
- *  it), so the LABEL BOX is what clears the glyph rather than the label's
- *  centre. A path shorter than the two clearances put together collapses to its
- *  own midpoint instead of inverting the range. The perpendicular component of
- *  `W` is preserved exactly, so the clamp can only ever move the label ALONG
- *  the line. */
-export function clampToRange(W: Pt, pts: Pt[], start: number, end: number): Pt {
-  const L = pathLength(pts);
-  if (pts.length < 2 || !(L > 0)) return {...W};
-  const {len, perp} = nearestOnPath(pts, W);
-  const s = start + end >= L ? L / 2 : Math.max(start, Math.min(L - end, len));
-  const p = pointAtLen(pts, s);
-  return {x: p.x + perp.x, y: p.y + perp.y};
-}
-
-/** AK-14.2 as a function: within `LABEL_SNAP_PX` SCREEN px of the centre →
- *  exactly the centre. Screen px are compared by scaling the FLOW distance by
- *  the zoom, which is tldraw's own `DistMin(next, def, snap / zoom)`. */
-export function snapToCentre(W: Pt, centre: Pt, zoom: number): Pt {
-  const z = zoom > 0 ? zoom : 1;
-  return Math.hypot(W.x - centre.x, W.y - centre.y) * z <= LABEL_SNAP_PX ? {...centre} : {...W};
-}
-
 /* ===========================================================================
-   AK-10/AK-14 — THE ONE FUNCTION A DRAG WRITES THROUGH.
+   ROUND AL, AL-2 — THE ONE FUNCTION A DRAG WRITES THROUGH.
    =========================================================================== */
 /** Turn the point a drag is at into the pair `App` stores.
  *
- *  Snap FIRST, clamp second: a point pulled to the centre is already inside the
- *  usable range (the centre is the range's interior for any non-degenerate
- *  path), so the two rails cannot fight, and a snapped gesture stores the
- *  UNPINNED state — which is bit-identical to a board that never carried the
- *  keys at all. That is what makes "snap back to centre" and "reset label
- *  position" the same state rather than two code paths. */
-export function labelWrite(p: {
-  W: Pt; anchor: Pt; pts: Pt[]; zoom: number;
-  /** clearance at each end, label half-extent already included */
-  start: number; end: number;
-}): LabelWrite {
-  const snapped = snapToCentre(p.W, p.anchor, p.zoom);
-  if (snapped.x === p.anchor.x && snapped.y === p.anchor.y) {
+ *  WHAT THIS USED TO BE. ROUND AK's version took `{W, anchor, pts, zoom, start,
+ *  end}` — the resolved path, the zoom and the two end clearances — and ran
+ *  `snapToCentre` first, `clampToRange` second. Both rails are gone (see the
+ *  header), so the function is now the plain difference between the dragged point
+ *  and the anchor. THAT IS THE WHOLE ITEM: the owner asked for no constraints,
+ *  and this is what "no constraints" looks like as a stored value.
+ *
+ *  THE TWO SHAPES IT CAN RETURN, and why there are still two. A write whose
+ *  offset is `{0,0}` is the CENTRED state, and it is returned UNPINNED — the
+ *  same value `Reset label position` writes and the same value a board that
+ *  never carried either key renders as. Keeping that branch means "reset",
+ *  "dragged exactly back to the anchor" and "never moved" are ONE stored value
+ *  rather than three that merely look alike, which is a property the round
+ *  before this one established and this round must not lose. Every other point
+ *  is PINNED with the offset it was handed.
+ *
+ *  NOTE ON WHAT IS NOT HERE: the zoom. The drag's own threshold is handled by
+ *  `labelDragLockPx` at the gesture (it is a screen-space question, not a
+ *  storage one); by the time a point reaches this function it has already been
+ *  accepted as a real move, so there is nothing left to scale. */
+export function labelWrite(p: {W: Pt; anchor: Pt}): LabelWrite {
+  const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};
+  if (labelOffset.x === 0 && labelOffset.y === 0) {
     return {labelOffset: {...CENTRED}, labelPinned: false};
   }
-  const W = clampToRange(snapped, p.pts, p.start, p.end);
-  return {labelOffset: {x: W.x - p.anchor.x, y: W.y - p.anchor.y}, labelPinned: true};
+  return {labelOffset, labelPinned: true};
 }
 
 /* ===========================================================================
