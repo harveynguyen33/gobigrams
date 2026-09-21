@@ -89,6 +89,12 @@ import TemplatesGallery from './TemplatesGallery';
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
 import {layoutDiagram} from './layout';
+/* ROUND AM, AM-3 — the flow glyphs' ONE home. Imported HERE and in
+   `GoblinEdge.tsx`, which is what makes AL-6's "reuses FLOW_ICON_PATHS' own
+   vocabulary" structural: the glyph chip row and the travelling chip read the
+   same map. The module holds no React Flow, so the panel can read it without
+   pulling the canvas in. */
+import {FLOW_ICON_PATHS} from './flowIcons';
 import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './crowfoot';
 import {
   useHoverChoreography, useInteractionGuard, useLayoutTransition, useAnimationGating,
@@ -3732,10 +3738,37 @@ export default function App() {
   const FLOW_OPTS: PickerOption[] = ([
     ['none', 'None'], ['dots', 'Dots'], ['dash', 'Dash'], ['pulse', 'Pulse'], ['icon', 'Icon'],
   ] as const).map(([v, label]) => ({v, label, art: <ArtFlow kind={v} />}));
-  const FLOW_ICON_OPTS: PickerOption[] = ([
+  /** ROUND AM, AM-3 — `flow glyph` becomes a row of SIX ICON CHIPS carrying the
+   *  glyph each option will actually travel along the line, drawn in miniature,
+   *  exactly as the approved mockup draws them. Two things had to change for
+   *  that to be honest rather than a second vocabulary:
+   *
+   *  1. `art` is no longer `null`. It was the whole reason the row rendered as
+   *     word-chips: `chipRow`'s glyph form falls back to `o.label`, so six
+   *     `art: null` options painted six words. Each now carries its own glyph.
+   *  2. The glyphs come from `FLOW_ICON_PATHS` — moved to `src/flowIcons.tsx`
+   *     (AM-3) so BOTH readers can reach it. AL-6's comment claimed this reuse;
+   *     the module boundary made it a promise. This file and `GoblinEdge.tsx`
+   *     now read the SAME map, so a chip cannot drift from the picture the edge
+   *     travels.
+   *
+   *  The chip wrapper (24×24 viewBox, `currentColor` stroke, 15px box) is
+   *  deliberately the travelling chip's own geometry at panel scale: same
+   *  viewBox, same stroke-only look, so the figure the user picks IS the figure
+   *  the line paints. Only the size is the panel's — the canvas keeps its
+   *  24×20 rounded plate and 0.6 glyph scale, untouched by this round. */
+  const FLOW_ICON_OPTS: PickerOption[] = (([
     ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
     ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],
-  ] as const).map(([v, label]) => ({v, label, art: null}));
+  ] as const)).map(([v, label]) => ({
+    v, label,
+    art: (
+      <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor"
+        strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {FLOW_ICON_PATHS[v]}
+      </svg>
+    ),
+  }));
   /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
   const BODY_OPTS: PickerOption[] = [
     {v: 'card', label: 'card', art: null},
@@ -5719,7 +5752,7 @@ export default function App() {
                 <div className="field">
                   <label>flow glyph</label>
                   {chipRow(FLOW_ICON_OPTS, eFlowIcon,
-                    v => updateEdge({data: {flowIcon: v as any, flow: 'icon' as any}}), 'Flow glyph')}
+                    v => updateEdge({data: {flowIcon: v as any, flow: 'icon' as any}}), 'Flow glyph', true)}
                 </div>
               )}
               {/* The ERD gate that used to sit here (`preset.id === 'erd' ? … :

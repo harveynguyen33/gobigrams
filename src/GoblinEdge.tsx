@@ -42,48 +42,14 @@ import {beginGesture, useEdgeGesture, type GestureDown} from './useEdgeGesture';
    the label's Text section cannot become a second text vocabulary. */
 import {edgeTextStyleVars, type TextStyle} from './textStyle';
 
-/**
- * Inline SVG paths for the flow-icon animation. 24×24 viewBox, stroke geometry
- * drawn by hand (mail / package / file / zap / settings / database) so the
- * travelling chip needs no external dependency and inherits the edge colour.
- */
-const FLOW_ICON_PATHS: Record<string, React.ReactNode> = {
-  // envelope / letter
-  mail: (
-    <>
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </>
-  ),
-  package: (
-    <>
-      <path d="m7.5 4.27 9 5.15" />
-      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-      <path d="M3.3 7 12 12l8.7-5" />
-      <path d="M12 22V12" />
-    </>
-  ),
-  file: (
-    <>
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-    </>
-  ),
-  zap: <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />,
-  settings: (
-    <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3m0 14v3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M2 12h3m14 0h3M4.9 19.1 7 17m10-10 2.1-2.1" />
-    </>
-  ),
-  database: (
-    <>
-      <ellipse cx="12" cy="5" rx="9" ry="3" />
-      <path d="M3 5v14a9 3 0 0 0 18 0V5" />
-      <path d="M3 12a9 3 0 0 0 18 0" />
-    </>
-  ),
-};
+/* ROUND AM, AM-3 — THE GLYPHS MOVED OUT, AND THIS FILE IS THE REASON. The six
+   paths lived here, which meant the inspector could not show what the edge
+   animates; AL-6's comment that the panel "reuses FLOW_ICON_PATHS' own
+   vocabulary" was a promise this module boundary could not keep. They now live
+   in `src/flowIcons.tsx` — React-Flow-free, so the panel can read it — and
+   BOTH the renderer (here, below) and `App.tsx` read THAT file. The path data
+   is untouched: only its address changed. */
+import {FLOW_ICON_PATHS} from './flowIcons';
 
 /**
  * ROUND T — how far the pointer must travel before the drag's axis is locked.
