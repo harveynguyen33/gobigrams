@@ -270,11 +270,32 @@ const GoblinEdge = memo((props: EdgeProps) => {
     /** ROUND AK, AK-13 — the double-click-on-the-PATH signal, threaded per-edge
      *  like `__edit` above but carrying a POSITION: a fresh timestamp AND the
      *  flow point the click landed on. A double-click on a line with no label
-     *  has nothing to edit, so the editor has to be opened here (the element
+     *  has nothing to edit yet, so the editor has to be opened here (the element
      *  does not exist yet) and the committed text has to know WHERE it was
      *  created. `__edit` keeps its own meaning — the context menu's "Edit
-     *  label" on an EXISTING label — and is not overloaded. */
+     *  label" on an EXISTING label — and is not overloaded.
+     *
+     *  ROUND AN, AN-1 — IT IS A ONE-SHOT, AND EVERY EXIT CONSUMES IT. See the
+     *  long note on `commit`/`cancel` below: the key was written by exactly one
+     *  place and deleted by none, so it stayed on the edge forever and every
+     *  later RENAME re-entered the create branch and re-centred the label. */
     __editAt?: {at: Pt; t: number};
+    /** ROUND AN, AN-1 — CONSUME THE CREATE SIGNAL, one per-edge callback for
+     *  BOTH exits of the editor (commit and cancel).
+     *
+     *  WHY A CALLBACK RATHER THAN CLEARING IT HERE. The signal lives in the
+     *  edge's own `data`, and this component does not own `edges` state — the
+     *  same reason `__onLabelWrite` and `onCommitLabel` are threaded in from
+     *  `App`. It is deliberately NOT a second writer of `__editAt` either: the
+     *  renderer never writes the key, it only tells `App` the moment is over,
+     *  so `openLabelAt` stays the signal's only writer and the deletion has one
+     *  home.
+     *
+     *  IT IS SEPARATE FROM `__onLabelWrite` ON PURPOSE. Cancel writes NOTHING —
+     *  a double-click whose editor is dismissed with Escape must leave the
+     *  document untouched — so it cannot reach the consume through the write
+     *  path. One named operation, two exits, no sentinel write form. */
+    __consumeEditAt?: (id: string) => void;
   };
 
   /** FB-L: one reader for the mode, used by both editor entry points. */
@@ -703,9 +724,28 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  needs it, so the state went with it — one fewer way for the create path and
    *  the drag path to disagree.
    *
-   *  `undefined` outside a create signal, and it is read ONLY by the commit — the
-   *  normal editor open (the element's own double-click, or the context menu's
-   *  "Edit label") leaves it undefined and therefore never writes a position. */
+   *  `undefined` outside a create signal, and it is read ONLY by the commit —
+   *  the normal editor open (the element's own double-click, or the context
+   *  menu's "Edit label") leaves it undefined and therefore never writes a
+   *  position.
+   *
+   *  ROUND AN, AN-1 — AND IT IS CONSUMED, WHICH IS WHAT MAKES THE CLAIM ABOVE
+   *  TRUE. This paragraph asserted exactly the same thing before this round —
+   *  "a commit at an EXISTING label leaves `__editAt` undefined" — and that claim
+   *  was FALSE for every edge that had ever been created through a path
+   *  double-click: the key was written by `openLabelAt` and deleted NOWHERE, so
+   *  it survived the commit and every later rename re-entered the create branch
+   *  in `commit` below and wrote the centred state. The owner's report is the
+   *  visible half of it: "nếu tôi đổi text, enter thì nó tự nhiên về lại center".
+   *
+   *  A ONE-SHOT THAT IS NEVER CLEARED IS NOT A ONE-SHOT, IT IS PERMANENT. The
+   *  signal now ENDS with the moment it opened: `commit` and `cancel` both call
+   *  `d.__consumeEditAt?.(id)`, which deletes the key from the edge's data. So
+   *  after the FIRST editor session on an edge the key is gone and a later
+   *  rename cannot re-trigger the centred write. It is ALSO folded away by the
+   *  READ path (`App.tsx migrateEdge`) for a board that already persisted one —
+   *  the user's own boards carry 4 / 2 / 1 occurrences (measured), so without
+   *  that a reload would put every label back in the create state. */
   const createAt = d.__editAt;
 
   // F2/AK-13: the two editor entry points. `__edit` is the context menu's "Edit
@@ -779,14 +819,38 @@ const GoblinEdge = memo((props: EdgeProps) => {
        signal (`__editAt`); a commit at an EXISTING label — the element's own
        double-click, or the context menu's "Edit label" — leaves `__editAt`
        undefined, so no position is written and the text can be corrected without
-       the label moving. */
+       the label moving.
+
+       ROUND AN, AN-1 — THE BRANCH IS NOW EXACTLY ONCE, BECAUSE THE SIGNAL IS
+       CONSUMED. Before this round the paragraph above was TRUE ONLY OF AN EDGE
+       THAT HAD NEVER BEEN CREATED THROUGH A PATH DOUBLE-CLICK: the key was never
+       cleared, so after one create it stayed on the edge and every later RENAME
+       took this branch and re-centred the label — the owner's "đổi text, enter
+       thì nó tự nhiên về lại center". `__consumeEditAt` below ends the signal with
+       the commit that read it, so the FIRST-created label still centres (the
+       intent AL-4 states, and the case its probe measures) and no later rename
+       can reach the centred write at all.
+
+       THE CONSUME IS UNCONDITIONAL AND OUTSIDE THE `if (createAt)` BRANCH, on
+       purpose: this is the "the moment is over" write, not a side effect of the
+       centred one. An edge whose signal was set but whose text was committed
+       unchanged still ends its create moment here — otherwise the stale key
+       survives to poison the next rename, which is the whole defect. */
     if (createAt) {
       d.__onLabelWrite?.(id, {labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: false}, 'end');
     }
+    d.__consumeEditAt?.(id);
     setEditing(false);
   };
 
   const cancel = () => {
+    /* ROUND AN, AN-1 — THE SECOND EXIT CONSUMES IT TOO. A double-click on the
+       path whose editor is dismissed with Escape (or blurred away) leaves the
+       document untouched — nothing is written — but the SIGNAL must still end,
+       or the next rename on this edge would re-enter the create branch and
+       re-centre the label. That asymmetry is exactly why the consume is its own
+       named callback rather than a branch inside the write. */
+    d.__consumeEditAt?.(id);
     setDraft(typeof label === 'string' ? label : '');
     setEditing(false);
   };

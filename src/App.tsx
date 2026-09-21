@@ -297,7 +297,18 @@ type EdgeData = {
    *  exactly like `__edit`: a fresh timestamp AND the flow point the click
    *  landed on. A double-click on a line with no label has nothing to edit yet,
    *  so the editor has to be opened by a signal (the element does not exist) and
-   *  the commit has to know where the label was created. */
+   *  the commit has to know where the label was created.
+   *
+   *  ROUND AN, AN-1 — IT IS A ONE-SHOT AND IT MUST NEVER SURVIVE ITS MOMENT.
+   *  It was written by `openLabelAt` and deleted NOWHERE, so it stayed on the
+   *  edge forever: every later rename re-entered the renderer's create branch
+   *  and wrote the CENTRED state (the owner's "đổi text, enter thì nó tự nhiên
+   *  về lại center"). Two halves fix it, and they are not alternatives —
+   *  `consumeEditAt` below ends the signal on both editor exits, and
+   *  `migrateEdge` FOLDS A STORED ONE AWAY ON READ, because this key reached
+   *  the saved document before the fix existed (measured: 4 + 2 + 1 occurrences
+   *  across three of the user's own boards), so without the read-time fold a
+   *  reload would put every label back in the create state. */
   __editAt?: {at: Pt; t: number};
   /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
    *  `__onBend`. It carries the FINISHED write, not the pointer: only the
@@ -394,21 +405,51 @@ const migrateEdge = (e: Edge): Edge => {
   const folded: Edge = ((m.data ?? {}) as any).flow === 'event'
     ? {...m, data: {...((m.data ?? {}) as any), flow: 'icon', flowIcon: 'mail'}}
     : m;
-  if (!key) return folded;         // a genuine custom hex is left alone
-  const md = (folded.data ?? {}) as any;
+  /* ROUND AN, AN-1 — A STORED `__editAt` IS FOLDED AWAY ON READ.
+   *
+   *  THE KEY IS A TRANSIENT SIGNAL, NOT DOCUMENT STATE (see the SKILL rule on
+   *  one-shots), and this project persisted it by accident: the renderer's
+   *  create branch read it, `openLabelAt` wrote it, and NOTHING deleted it — so
+   *  it rode into the saved document and stayed on every edge it had ever been
+   *  set on. MEASURED in the user's own boards: `mub08gfl725d408a.json` carries
+   *  4 occurrences, `mub6pfm9aa69a2cb.json` 2 and `mub0ur0w6c5ac3a4.json` 1.
+   *  The visible half was "rename a label and it jumps back to the centre";
+   *  the persisted half was worse — after a reload EVERY one of those labels
+   *  was in the create state, so renaming any of them re-centred it.
+   *
+   *  FOLDED ON READ, NEVER REWRITTEN ON DISK — the convention `flow:'event'`
+   *  above already uses, and the one the SKILL's transient-signal rule requires
+   *  ("fix a persisted one at READ time; NEVER rewrite the user's boards"). The
+   *  deleted key is the fix: `createAt` in `GoblinEdge` is then undefined on
+   *  every loaded board, so a rename takes the edit path and writes no position,
+   *  while a genuinely new path double-click still stamps a fresh signal from
+   *  `openLabelAt` and still centres the first-created label (AL-4's intent).
+   *
+   *  PLACED AFTER the flow fold and BEFORE the colour migration's early return,
+   *  so an edge with no legacy hex — which exits this function at `if (!key)`
+   *  below — is folded too. A tolerant parse that lived past that return would
+   *  miss exactly the modern boards that are most likely to carry the key. */
+  const unfolded: Edge = (() => {
+    const d2 = (folded.data ?? {}) as any;
+    if (!('__editAt' in d2)) return folded;
+    const {__editAt: _drop, ...rest} = d2;
+    return {...folded, data: rest};
+  })();
+  if (!key) return unfolded;         // a genuine custom hex is left alone
+  const md = (unfolded.data ?? {}) as any;
   // The literal is DROPPED, not kept alongside: the key is now the source of
   // truth and the render path resolves it, so a theme change actually recolours
   // the line. (`data.color` on an edge is the custom-hex escape hatch.)
-  const style = {...(folded.style as any)};
+  const style = {...(unfolded.style as any)};
   if (keyForHex(style.stroke)) delete style.stroke;
-  const out: Edge = {...folded, style, data: {...md, strokeKey: key}};
+  const out: Edge = {...unfolded, style, data: {...md, strokeKey: key}};
   // the arrowhead colour must become the token too, otherwise it keeps the
   // legacy hex and a theme switch leaves it stale.
-  if ((folded.markerEnd as any)?.type && keyForHex((folded.markerEnd as any).color)) {
-    out.markerEnd = {...(folded.markerEnd as any), color: COLOR_VAR[key]};
+  if ((unfolded.markerEnd as any)?.type && keyForHex((unfolded.markerEnd as any).color)) {
+    out.markerEnd = {...(unfolded.markerEnd as any), color: COLOR_VAR[key]};
   }
-  if ((folded.markerStart as any)?.type && keyForHex((folded.markerStart as any).color)) {
-    out.markerStart = {...(folded.markerStart as any), color: COLOR_VAR[key]};
+  if ((unfolded.markerStart as any)?.type && keyForHex((unfolded.markerStart as any).color)) {
+    out.markerStart = {...(unfolded.markerStart as any), color: COLOR_VAR[key]};
   }
   return out;
 };
@@ -2330,6 +2371,46 @@ export default function App() {
       : e)));
   }, [readOnly, setEdges]);
 
+  /** ROUND AN, AN-1 — CONSUME THE CREATE SIGNAL: the deletion half of the
+   *  one-shot, called by the renderer from BOTH exits of the label editor
+   *  (`commit` and `cancel`).
+   *
+   *  WHY IT HAD TO EXIST. `openLabelAt` above writes `__editAt` and, before this
+   *  round, nothing in the tree deleted it — grep proved one writer and zero
+   *  deleters. A one-shot that outlives its moment is permanent, so after the
+   *  first create the key stayed on the edge and EVERY later rename re-entered
+   *  the renderer's create branch and rewrote the label to the centred state
+   *  ("nếu tôi đổi text, enter thì nó tự nhiên về lại center").
+   *
+   *  WHY IT DOES NOT PUSH HISTORY. The signal was never a document edit the user
+   *  can see — it is UI state that happens to ride in `data`. Giving its removal
+   *  an undo step would put an entry on the stack whose undo restores a signal
+   *  that must not exist. `onCommitLabel`'s own rule is the same: a step that
+   *  changes nothing the user can perceive must not push.
+   *
+   *  WHY IT TOUCHES ONE EDGE. The editor is open on one edge; the delete is
+   *  keyed by that edge's id, so a stale signal on some OTHER edge is never
+   *  silently swept away here — `migrateEdge` folds those on load, and this
+   *  handles the live one.
+   *
+   *  A NO-OP WHEN THE KEY IS ABSENT (the common case): a rename of a normal,
+   *  existing label takes the editor's own double-click path, never stamps the
+   *  signal, and this call deletes nothing. It returns the same array object for
+   *  every edge it does not change, so an ordinary rename causes no state churn
+   *  and no re-render of unrelated edges. */
+  const consumeEditAt = useCallback((id: string) => {
+    setEdges(es => {
+      const i = es.findIndex(e => e.id === id);
+      if (i < 0) return es;
+      const d = (es[i].data ?? {}) as EdgeData;
+      if (!('__editAt' in d)) return es;
+      const {__editAt: _drop, ...rest} = d;
+      const next = es.slice();
+      next[i] = {...es[i], data: rest as EdgeData};
+      return next;
+    });
+  }, [setEdges]);
+
   /* ROUND AK, AK-13 — DOUBLE-CLICK ON THE EDGE PATH CREATES A LABEL THERE.
 
      WHY REACT FLOW'S OWN `onEdgeDoubleClick` AND NOT A HANDLER ON THE PATH. The
@@ -2484,6 +2565,13 @@ export default function App() {
              the EDGE GROUP, `onEdgeDoubleClick` below — React Flow owns that
              handler and the hit-test with it.) */
           __onLabelWrite: onLabelWrite,
+          /* ROUND AN, AN-1 — the DELETE half of the `__editAt` one-shot. The
+             renderer calls it from `commit` AND from `cancel`, so the create
+             signal ends with the editor session that opened it and a later
+             rename can no longer re-enter the centred-write branch. Same
+             per-edge threading as the three keys around it — the renderer does
+             not own `edges` state, so the deletion lives here. */
+          __consumeEditAt: consumeEditAt,
           // FB-L: the edge renderer owns the label's inline editor, so the
           // review-mode flag has to reach it per-edge — same shape as the two
           // keys above. Read-only keeps the label readable; it never opens the
@@ -2492,7 +2580,7 @@ export default function App() {
         },
       };
     }),
-    [edges, onCommitLabel, readOnly, onBend, onLabelWrite],
+    [edges, onCommitLabel, readOnly, onBend, onLabelWrite, consumeEditAt],
   );
 
   /** L3c: the symbolic keys whose crow's-foot glyphs this board needs. Keyed by
