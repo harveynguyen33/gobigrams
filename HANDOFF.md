@@ -1,13 +1,79 @@
 # HANDOFF — Diagram Studio
 
+## ▶ ROUND AK — connection-line (edge) utilities. DONE, pushed at `4a127cb`. PENDING HARVEY'S DEVICE TEST.
+
+**What it is:** eleven of Harvey's asks, resolved as ONE round in 3 passes — the edge panel, the label,
+and the flow animation. Spec `ROUND-AK-SPEC.md`; research + synthesis in
+`/home/harvey/diagram-studio-research/edge-utilities/` (3 grounded reports, C1 draw.io · C2
+Excalidraw+tldraw · C3 React Flow + Miro/Lucidchart/Whimsical/FigJam, plus `SYNTHESIS.md`).
+
+**PASS 1** (`b200d31`…`26c61e2`) — **bug #7 fixed**: two `!important` rules
+(`.react-flow__edge.selected .react-flow__edge-path` and `.ds-electric …`) REPLACED by a separate
+additive `<path class="edge-sel-overlay">` drawn under the body from React Flow's own `selected` flag, so
+a selected/hovered edge stops lying about its colour. Also: sidebar hint deleted · `intent label` +
+its `labelPresets` preset gate deleted outright · `label position` deleted · the orphan
+`animated (dash on the line)` field deleted (migrated to `flow:'dash'` on read) · markers renamed
+`start`/`end` and unified with Cardinality · stroke width / line style / curvature / both markers became
+full-width flat rows · **cardinality now gated on the EDGE (`hasCrowFootEnds`), not the board preset** —
+the last preset-keyed rule in the panel, following the project's own `hasSub`-keys-on-shape precedent.
+
+**PASS 2** (`1fae20e`, `50a8eff`) — `src/edgeLabel.ts` (NEW, 408 lines pure) + `src/useEdgeGesture.ts`
+(NEW, 161 lines — ONE hook for both the bend and the label, so one pointerdown can never start two
+gestures). The **label itself is now the drag target** (`data.labelOffset {x,y}` + `data.labelPinned`,
+nothing migrates on load) · `data.labelBg: 'none'|'surface'|'outline'` (3 real CSS classes, `None` is a
+stored value) · double-click on the LINE creates a label at that point · `Reset label position` button ·
+snap-to-centre · clamp clear of the arrowheads · `Reverse line direction`. The hover-only
+`.edge-label:hover` rule is deleted (there is no hover on touch).
+
+**PASS 3** (`4a127cb`) — `flow:'event'` (a 16×12 envelope) FOLDED into `flow:'icon'` + `mail`, because
+`FLOW_ICON_PATHS.mail` IS an envelope: two names, one picture. Folded ON READ in `migrateEdge`, so no
+board is rewritten. Panel list 6 → 5 (`None/Dots/Dash/Pulse/Icon`). The render branch, its envelope and
+the type-union member are all deleted. **The honest limit is recorded IN THE CODE:** no surveyed tool
+ships a connector-wide marching-ants animation, so only the *removal* is evidence-backed and the five
+names are the owner's call. `diagram-studio:animate` stays a **separate** axis.
+
+**Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **142** (ceiling 160) · **32/32 harnesses
+green** · `boards/` untouched (4 files). New harnesses: `round-ak-edge-panel`, `round-ak2-label`,
+`round-ak3-flow` — each with its negative control demonstrated RED on the pinned pre-change tree.
+
+**⚠️ WHAT IS *NOT* VERIFIED — do not claim it is.** The headless browser session for this project renders
+**ZERO edges** (nodes render, minimap nodes render, `minimap edges`=0, no React Flow warning) even on
+Harvey's own board, on the ORIGINAL tree, with a fresh server and a fresh browser session. So **no live
+measurement of bug #7 or of any gesture exists**. Everything above is source-level evidence plus
+harnesses. **Harvey's Mac test is the outstanding step.**
+
+**▶ HARVEY'S TEST LIST:** (1) select a coloured edge → change its colour → the BODY must change while
+still selected; hovering must not repaint the body either. (2) Drag the text itself around the line; drop
+it near the middle and it should snap back to centre. (3) Double-click an EMPTY line → a label is created
+where you clicked; double-click an existing label → it edits. (4) Label background `None` / `Surface` /
+`Outline` — `None` is truly transparent. (5) `Reset label position` and `Reverse line direction` in the
+sidebar. (6) A flowchart board and a C4 board must now show the SAME line sections; Cardinality appears
+only when THAT edge carries a crow's-foot. (7) Flow animation offers five options, no `Envelope`.
+(8) `Ctrl+Z` a few times.
+
+**Vault: ROUND AK is NOT yet in the vault** — ADR-031 + Change Log + MOC is the outstanding debt (the
+TEMPLATES arc debt noted below was paid on 2026-09-20; **do not re-pay it**).
+
+**PROCESS LESSON (this round):** the same narrow job failed across **three** coder dispatches — the first
+was SIGTERM'd by `agent_close` and lost everything uncommitted; the second hit its 150-iteration budget;
+the third exited after 7 minutes having written nothing. Per Harvey's LOOP-BREAK rule the orchestrator
+**stopped dispatching and finished it directly** — which worked. Give every long coder brief a
+**commit-as-you-go** rule: the run that had one survived with its work.
+
+---
+
 **Last session:** 2026-09-20 (evening) · **Status:** ✅ PACKAGE-P + W + X + Y + Z + AA + AB + AD + AE +
 AF + AG1 + AG2 + AH + AI + AJ shipped, then the **TEMPLATES arc (rounds 1–6 + the `delay` shape fix)**
 shipped on top — see the first `##` section below. All orchestrator-verified live.
 **Vault: ROUNDS S…AJ are recorded** (ADR-031 + Change Log + System Architecture + MOC + Content Index;
 `pkm verify.sh` 43 passed / 0 failed, re-verified by the orchestrator 2026-09-20).
-**The TEMPLATES arc is NOT yet in the vault** — it is the outstanding vault debt.
-**ALL 28 HARNESSES GREEN** as of the templates arc (25 → 28: `round-4-dialog-tooltip-approval`,
-`round-5-resize-undo`, and `package-templates` grew into the arc's own suite).
+**The TEMPLATES arc IS in the vault** — *(corrected 2026-09-21: this line used to say it was the
+outstanding debt. It was paid on 2026-09-20 and re-verified by the orchestrator on 2026-09-21 — ADR-031
+carries `## Vòng TEMPLATES (1–6) + fix shape delay` with its own Verification line, and the Change Log
+carries the matching 2026-09-20 row. The stale sentence is kept, dated, rather than deleted.)* The
+outstanding vault debt is now **ROUND AK** — see the section at the top of this file.
+**ALL 32 HARNESSES GREEN** as of ROUND AK (28 → 32: `round-ak-edge-panel`, `round-ak2-label`,
+`round-ak3-flow`, plus `checks/measure-flows.mjs`, a read-only probe).
 **Dev server RUNNING** on `http://192.168.33.200:5200/` (it dies when the session that started it closes —
 if it is down, `npx vite --host 0.0.0.0 --port 5200`).
 
