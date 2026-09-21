@@ -724,7 +724,7 @@ section('AL-6 — ONE chip system: two shapes, one height, content-sized with wr
     const f = fieldOf(slice, label);
     return f.includes('chipRow') && f.includes(table);
   });
-  const pillRows = [['stroke width', 'WIDTH_OPTS', lineSec], ['speed', 'SPEED_OPTS', flowSec],
+  const pillRows = [['stroke width', 'WIDTH_OPTS', lineSec],
     ['background', 'LABEL_BG_OPTS', secBodyOf(APP, 'label')]];
   const pillOk = pillRows.filter(([label, table, slice]) => {
     const f = fieldOf(slice, label);
@@ -736,7 +736,11 @@ section('AL-6 — ONE chip system: two shapes, one height, content-sized with wr
     `word rows on pills: ${pillOk.map(r => r[0]).join(', ')} (${pillOk.length}/${pillRows.length}). ` +
     `\`flow\` is FIVE options and it is a glyph row, which is what makes the "ten word-buttons on one line" reading go away: ` +
     `five 30px squares plus gaps is 170px of a 253px field, against ten word buttons at 98%. ` +
-    `\`flow glyph\` reuses \`FLOW_ICON_PATHS\`'s own vocabulary rather than inventing a second one.`);
+    `\`flow glyph\` reuses \`FLOW_ICON_PATHS\`'s own vocabulary rather than inventing a second one. ` +
+    `RE-ANCHORED by ROUND AM (AM-5): the \`speed\` row left BOTH lists — it is no longer a chip row of any shape, ` +
+    `because its four words became one \`FlowSpeed\` range input, so asserting a chip row for it would assert ` +
+    `something that no longer exists. The claim that carries the weight here is unchanged and still asserted: ` +
+    `every GLYPH row renders on squares and every surviving WORD chip row renders on pills.`);
 
   /* (h) THE ONE CONTROL. `chipRow` must be a single helper in the panel's own
    *     control kit, NOT a new component — and the chip element must be a real

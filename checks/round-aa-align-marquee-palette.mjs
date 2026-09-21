@@ -480,8 +480,15 @@ const P_HALF_APPLIED = (b) => {
      the row that AK-6 was protecting against the wrapped-word trade no longer
      exists in word form. The invariant is carried by the OTHER word rows now, so
      the clause becomes: no surviving row that renders words wraps one. Asserted
-     via the chip rows that remain plus the slider's own presence. */
-  const speedIsSlider = b.picks.includes('export function FlowSpeed(')
+     via the chip rows that remain plus the slider's own presence.
+
+     WHY `b.picks` IS READ GUARDED. This probe runs over TWO trees: the working
+     tree (which carries `picks`) and the PINNED pre-AL tree, whose bundle has no
+     `InspectorPickers.tsx` member at all — that file did not exist there in the
+     shape it has now. An unguarded read threw a TypeError mid-REPLAY, which kills
+     the negative control instead of reporting it. A missing member is a MISSING
+     SLIDER, so it must read as `false` (probe RED), never as a crash. */
+  const speedIsSlider = (b.picks ?? '').includes('export function FlowSpeed(')
     && b.app.includes('<FlowSpeed');
   const chipsContentSized = chipCallsOf(b.app).length >= 8
     && /\.chips\s*\{[^}]*flex-wrap:\s*wrap/.test(b.styles)
@@ -727,14 +734,26 @@ assert('aa1.the-control-is-unchanged-no-new-class-no-select',
  * CURVE_ICON_OPTS row as a `half` row (which the first, wrong draft of this
  * harness did, and the replay caught). This records WHICH rows are the glyph
  * rows, so the `half` probes above can be read as being about a DIFFERENT thing. */
+/* ROUND AM, AM-5 — THIS CLAIM MOVED OFF `SPEED_OPTS`, AND THE OLD FORM WAS RED.
+   The row this assertion protects is the one that left the chip family: `speed`
+   is no longer a chip row at all — its four words became ONE `FlowSpeed` range
+   input (`src/InspectorPickers.tsx`), so `SPEED_OPTS` is DELETED and
+   `chipCallsOf` can no longer contain it. The claim being preserved is the one
+   that made this assertion worth having in the first place: the fifth argument
+   `true` names the GLYPH figure (a square) and has nothing to do with the `half`
+   geometry — asserted here by a row that IS glyph-flagged (the flow row) and by a
+   row that is NOT (the label-background row), so a probe that conflated the two
+   would still redden. AM-5 did not weaken the distinction; it removed the one
+   example of it that stopped being a chip row. */
 assert('aa1.the-chip-glyph-rows-are-not-mistaken-for-half-rows',
   chipGlyphRowsOf(APP).length >= 4
-    && chipCallsOf(APP).includes('SPEED_OPTS')
-    && !chipGlyphRowsOf(APP).includes('SPEED_OPTS'),
-  `the glyph-flagged chip rows are [${chipGlyphRowsOf(APP).join(', ')}] — the square-figure rows — and the ` +
-  `Speed row is NOT among them (it is a WORD row, so its chip row is a pill row with no per-line modifier). So ` +
-  `\`true\` as the fifth argument is the GLYPH flag and not the \`half\` geometry, and the two \`half\` claims ` +
-  `above are about the modifier rather than about this flag.`);
+    && chipGlyphRowsOf(APP).includes('FLOW_ICON_OPTS')
+    && !chipGlyphRowsOf(APP).includes('LABEL_BG_OPTS'),
+  `the glyph-flagged chip rows are [${chipGlyphRowsOf(APP).join(', ')}] — the square-figure rows — and a WORD ` +
+  `row (LABEL_BG_OPTS) is NOT among them. So \`true\` as the fifth argument is the GLYPH flag and not the \`half\` ` +
+  `geometry, and the two \`half\` claims above are about the modifier rather than about this flag. RE-ANCHORED by ` +
+  `ROUND AM (AM-5): this claim used to name SPEED_OPTS, which stopped being a chip row when the speed control ` +
+  `became a range input — the distinction is asserted with rows that still exist.`);
 
 /* ===========================================================================
    ITEM 3 — Basic holds the generic item; Process and Decision are Flowchart.
