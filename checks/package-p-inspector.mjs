@@ -19,6 +19,7 @@
  * orchestrator's live pass. This file asserts the SOURCE and the DECISION.
  */
 import {readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
@@ -205,6 +206,94 @@ const REGION = stripTs(APP_RAW.slice(INSP_START, INSP_END > INSP_START ? INSP_EN
 console.log(`inspector region: App.tsx:${at(APP_RAW, '{/* RIGHT — inspector */}')} `
   + `→ :${APP_RAW.slice(0, INSP_END).split('\n').length}  (${REGION.split('\n').length} lines)`);
 
+/* ===========================================================================
+   ROUND AL — THE RE-ANCHORED ENUMERATION NEEDS A NEGATIVE CONTROL.
+   ===========================================================================
+   `b.all-eleven-surviving-enumerated-controls-converted` was re-anchored once
+   already (AK-6/AK-7) and is re-anchored AGAIN here: AL-6 moved four of its rows
+   (`WIDTH` / `DASH` / `CURVE` / the two MARKERS / `SPEED`) from the `<ToggleRow/>`
+   ELEMENT to the `chipRow(` CALL. Its own counter no longer matches, so the
+   `proof` each entry carries has to be read in either family.
+
+   A re-anchor must be shown RED on the tree it moved off, or it is a loosening.
+   `f0b00aa` is ROUND AK's last commit — the tree this assertion last PASSED on,
+   where all five rows were `options={…}` on a `<ToggleRow/>`. It is read with
+   `git show` (this harness has no env pin of its own). The REPLAY at the end of
+   the (b) section runs the same enumeration over it and FAILS if it is GREEN,
+   which is what proves the re-anchor measures AL's change rather than nothing. */
+const PRE_AL_COMMIT = process.env.DS_PRE_AL_COMMIT || 'f0b00aa';
+let preAl = null;
+try {
+  const preAppRaw = execFileSync('git', ['show', `${PRE_AL_COMMIT}:src/App.tsx`],
+    {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
+  const preEnd = preAppRaw.indexOf('</aside>', preAppRaw.indexOf('{/* RIGHT — inspector */}'));
+  preAl = {
+    app: stripTs(preAppRaw),
+    region: stripTs(preAppRaw.slice(preAppRaw.indexOf('{/* RIGHT — inspector */}'), preEnd > 0 ? preEnd : undefined)),
+  };
+} catch (err) {
+  /* A `git show` that FAILS carries `.status`; anything else here (a typo, a
+     missing import, a bad regex) is a harness BUG and is rethrown rather than
+     reported as "the tree could not be read" — swallowing it would turn this
+     guard into a silent pass and is exactly the failure mode this section
+     exists to prevent. */
+  if (err && (err.status !== undefined || /fatal:/.test(String(err.stderr ?? err.message)))) {
+    console.log(`\n  FAIL  the tree the re-anchored enumeration moved off could not be read from ${PRE_AL_COMMIT}: ${err.message}`);
+    console.log('        It is the negative control for the (b) enumeration. Re-pin DS_PRE_AL_COMMIT to');
+    console.log('        ROUND AK\'s last commit — do NOT delete the REPLAY: a control that disappears is');
+    console.log('        worse than one that fails.');
+  } else {
+    throw err;
+  }
+}
+/* Resolves an option table through the `_ICON_` alias AL-6 introduced:
+ *  `const DASH_ICON_OPTS = DASH_OPTS;` → `DASH_OPTS`. On the pre-change tree the
+ *  alias does not exist and the token resolves to itself, which is what makes the
+ *  control measurable (`options={DASH_OPTS}` was there, `chipRow(DASH_ICON_OPTS`
+ *  is here). */
+const aliasOf = (app, name) => {
+  const m = new RegExp(`const\\s+${name}\\s*(?::[^=;]*)?=\\s*(\\w+)\\s*;`).exec(app);
+  return m ? m[1] : null;
+};
+/** Does `token` reach `target` through that alias chain (exact at every hop, so
+ *  `MARKER_OPTS` != `MARKER_OPTS_START`)? */
+const resolvesTo = (app, token, target) => {
+  let cur = token;
+  for (let i = 0; i < 5 && cur; i++) {
+    if (cur === target) return true;
+    cur = aliasOf(app, cur);
+  }
+  return false;
+};
+/** THE CARRIER OF ONE TABLE, named explicitly, in `app`. The re-anchor must be RED
+ *  on the tree it moved off, so this does NOT accept "either inline family": a
+ *  row that moved has to be carried by the control it moved TO. `chipRow` resolves
+ *  the `_ICON_` alias AL-6 introduced (`DASH_ICON_OPTS = DASH_OPTS`); `ToggleRow`
+ *  is the literal `options={X}` the row had before AL-6, and is still the carrier
+ *  for the body row, which did NOT move. Returns true when `want` carries `table`. */
+const carriedBy = (app, table, want) => {
+  if (want === 'ToggleRow') return new RegExp(`options=\\{${table}\\}`).test(app);
+  if (want === 'chipRow') {
+    for (const m of app.matchAll(/chipRow\(\s*(\w+)\s*,/g)) {
+      if (resolvesTo(app, m[1], table)) return true;
+    }
+    return false;
+  }
+  return false;
+};
+/** THE TWELVE, as a PURE predicate of a source text, so the SAME enumeration runs
+ *  over the working tree and over `PRE_AL_COMMIT`. Each entry names the control
+ *  that must carry it TODAY; a row is converted when that control is present and
+ *  still offers the same table. */
+const enumeratedOk = (app, region) => TWELVE.map((c) => {
+  if (c.kind === 'row') {
+    const ok = carriedBy(app, c.table, c.carrier);
+    return {c, ok, how: ok ? c.carrier : `NO ${c.carrier} CARRIER`};
+  }
+  const renders = rendersOf(region, c.carrier);
+  return {c, ok: renders >= 1, how: `<${c.carrier}> ×${renders}`};
+});
+
 const regionSelects = countOf(REGION, '<select');
 const fileSelects = countOf(APP, '<select');
 const regionOptions = countOf(REGION, '<option');
@@ -224,21 +313,30 @@ console.log(`native dropdowns RENDERED in the region: ${regionSelects}   `
      · `arrow head` / `head start` were `IconPickerRow` and are now `ToggleRow`
        (AK-7), AND renamed (AK-5): the MARKER tables are unchanged
        (`MARKER_OPTS` / `MARKER_OPTS_START`), only the rendered labels moved.
-   The assertions below therefore still hold the INVARIANT that matters — every
-   value the old `<select>`s held is still offered, each by a real picker
-   component — while naming the control each one is carried by TODAY. */
+
+   ROUND AL, AL-6 — RE-ANCHORED AGAIN, and this is where the `proof` shape
+   changes. Six of the surviving rows moved from the `<ToggleRow/>` ELEMENT to
+   the `chipRow(` CALL, and AL-6 hands `chipRow` the `_ICON_` ALIAS of the same
+   table (`DASH_ICON_OPTS = DASH_OPTS`, `MARKER_ICON_OPTS = MARKER_OPTS`, …). So
+   the proof is no longer a literal `options={X}` string; each such row names the
+   CANONICAL `table` it must still offer AND the `carrier` it must now be on, and
+   `carriedBy` resolves the alias and requires THAT carrier — `chipRow` for the
+   six that moved, `ToggleRow` for the body row, which did not. Naming the
+   carrier rather than accepting "either inline family" is what makes the
+   re-anchor RED on `f0b00aa` (see the REPLAY). The rows carried by a popover or
+   a stepper keep a render count. */
 const TWELVE = [
-  {n: 2, what: 'stroke width', was: 4162, control: 'ToggleRow', proof: 'options={WIDTH_OPTS}'},
-  {n: 3, what: 'line style', was: 4175, control: 'ToggleRow', proof: 'options={DASH_OPTS}'},
-  {n: 4, what: 'curvature', was: 4187, control: 'ToggleRow', proof: 'options={CURVE_OPTS}'},
-  {n: 5, what: 'start marker (was "arrow head")', was: 4210, control: 'ToggleRow', proof: 'options={MARKER_OPTS}'},
-  {n: 6, what: 'end marker (was "head start")', was: 4219, control: 'ToggleRow', proof: 'options={MARKER_OPTS_START}'},
-  {n: 7, what: 'flow count', was: 4261, control: 'Stepper', proof: 'min={1} max={6}'},
-  {n: 8, what: 'flow speed', was: 4270, control: 'ToggleRow', proof: 'options={SPEED_OPTS}'},
-  {n: 9, what: "crow's-foot start (was \"source end\")", was: 4313, control: 'IconPickerRow', proof: 'options={CROW_START_OPTS}'},
-  {n: 10, what: "crow's-foot end (was \"target end\")", was: 4332, control: 'IconPickerRow', proof: 'options={CROW_END_OPTS}'},
-  {n: 11, what: 'node shape (19)', was: 4571, control: 'ShapesPicker', proof: '<ShapesPicker'},
-  {n: 12, what: 'node body (2)', was: 4580, control: 'ToggleRow', proof: 'options={BODY_OPTS}'},
+  {n: 2, what: 'stroke width', was: 4162, kind: 'row', table: 'WIDTH_OPTS', carrier: 'chipRow'},
+  {n: 3, what: 'line style', was: 4175, kind: 'row', table: 'DASH_OPTS', carrier: 'chipRow'},
+  {n: 4, what: 'curvature', was: 4187, kind: 'row', table: 'CURVE_OPTS', carrier: 'chipRow'},
+  {n: 5, what: 'start marker (was "arrow head")', was: 4210, kind: 'row', table: 'MARKER_OPTS', carrier: 'chipRow'},
+  {n: 6, what: 'end marker (was "head start")', was: 4219, kind: 'row', table: 'MARKER_OPTS_START', carrier: 'chipRow'},
+  {n: 7, what: 'flow count', was: 4261, kind: 'render', carrier: 'Stepper', proof: 'min={1} max={6}'},
+  {n: 8, what: 'flow speed', was: 4270, kind: 'row', table: 'SPEED_OPTS', carrier: 'chipRow'},
+  {n: 9, what: "crow's-foot start (was \"source end\")", was: 4313, kind: 'render', carrier: 'IconPickerRow', proof: 'options={CROW_START_OPTS}'},
+  {n: 10, what: "crow's-foot end (was \"target end\")", was: 4332, kind: 'render', carrier: 'IconPickerRow', proof: 'options={CROW_END_OPTS}'},
+  {n: 11, what: 'node shape (19)', was: 4571, kind: 'render', carrier: 'ShapesPicker', proof: '<ShapesPicker'},
+  {n: 12, what: 'node body (2)', was: 4580, kind: 'row', table: 'BODY_OPTS', carrier: 'ToggleRow'},
 ];
 /* ROUND AK, AK-3 — `label position` is DELETED, and the deletion is asserted
    rather than merely implied by its absence from the table above. The row's
@@ -251,25 +349,89 @@ const LABEL_POS_GONE = !APP.includes('OFFSET_OPTS')
 console.log(`\nAK-3: the \`label position\` control is deleted (OFFSET_OPTS ${APP.includes('OFFSET_OPTS') ? 'PRESENT' : 'gone'}, `
   + `ArtLabelPos ${PICKS.includes('ArtLabelPos') ? 'PRESENT' : 'gone'})`);
 console.log('\nthe twelve enumerated controls, each with its replacement:');
-const twelveOk = [];
-for (const c of TWELVE) {
-  const uses = countOf(REGION, c.proof);
-  const controlRenders = rendersOf(REGION, c.control);
-  const ok = uses >= 1 && controlRenders >= 1;
-  twelveOk.push(ok);
-  console.log(`  ${ok ? ' ' : '!'} #${String(c.n).padStart(2)} ${c.what.padEnd(22)} was App.tsx:${c.was}  →  `
-    + `<${c.control}> ×${controlRenders}  (${c.proof} ×${uses})`);
+const enumerated = enumeratedOk(APP, REGION);
+const twelveOk = enumerated.map(e => e.ok);
+for (const {c, ok, how} of enumerated) {
+  console.log(`  ${ok ? ' ' : '!'} #${String(c.n).padStart(2)} ${c.what.padEnd(22)} was App.tsx:${c.was}  →  ${how}`
+    + (c.table ? `  (table ${c.table})` : `  (${c.proof})`));
 }
 assert('b.zero-selects-in-the-inspector-region', regionSelects === 0,
   `${regionSelects} native dropdown(s) rendered between the inspector marker and </aside>`);
 assert('b.zero-option-elements-in-the-inspector-region', regionOptions === 0,
   `${regionOptions} <option> element(s) left`);
 assert('b.all-eleven-surviving-enumerated-controls-converted', twelveOk.every(Boolean) && LABEL_POS_GONE,
-  `${twelveOk.filter(Boolean).length}/${TWELVE.length} carried by a picker component, and the twelfth `
-  + '(`label position`) was DELETED outright by AK-3 rather than converted — RE-ANCHORED by AK-6/AK-7 '
-  + 'from `b.all-twelve-enumerated-controls-converted`, which asserted a conversion for a row that no '
-  + 'longer ships. The invariant held is unchanged: every value the old selects offered is still '
-  + 'offered, each by a real picker component; one row left the panel on purpose and is asserted gone');
+  `${twelveOk.filter(Boolean).length}/${TWELVE.length} carried by a picker component, and the twelfth ` +
+  `(\`label position\`) was DELETED outright by AK-3 rather than converted. RE-ANCHORED by ROUND AL (AL-6) ` +
+  `from the AK-6/AK-7 form — see the REPLAY below for the OLD claim and the control that it is RED on the ` +
+  `tree it moved off. The invariant held is unchanged: every value the old selects offered is still offered, ` +
+  `each by a REAL picker component (inline row OR popover OR stepper); one row left the panel on purpose and ` +
+  `is asserted gone.`);
+
+/* ===========================================================================
+   REPLAY (negative control) — the (b) enumeration over PRE_AL_COMMIT.
+   ===========================================================================
+   The round's law: a re-anchored assertion must be SHOWN RED on the tree it
+   moved off. `b.all-eleven-surviving-enumerated-controls-converted` is the
+   assertion this harness re-anchors, so it is re-run, UNCHANGED, over `f0b00aa`
+   — where its `proof` strings (`options={WIDTH_OPTS}` … `options={SPEED_OPTS}`)
+   were all present on `<ToggleRow/>` and its rows were all converted. If the
+   re-anchored form is GREEN there it proves nothing about AL-6 and this FAILS.
+
+   The AK-6/AK-7 re-anchor this replaces carried NO such control, and the brief's
+   rule is explicit that the pre-change tree is to be read with `git show` when
+   the harness has no env pin — which is what `preAl` above is.
+   =========================================================================== */
+console.log('\n' + '-'.repeat(78));
+console.log(`REPLAY (negative control) — the (b) enumeration over ${PRE_AL_COMMIT}`);
+console.log('-' .repeat(78));
+if (preAl) {
+  /* THE OLD CLAIM, read from the tree it moved off: the SAME six rows were
+     carried by `options={…}` on a `<ToggleRow/>` there, with the canonical
+     tables (the `_ICON_` aliases did not exist yet). */
+  const oldProofs = ['options={WIDTH_OPTS}', 'options={DASH_OPTS}', 'options={CURVE_OPTS}',
+    'options={MARKER_OPTS}', 'options={MARKER_OPTS_START}', 'options={SPEED_OPTS}'];
+  const oldPresent = oldProofs.filter(p => preAl.app.includes(p));
+  console.log(`  the OLD claim at ${PRE_AL_COMMIT}: ${oldPresent.length}/${oldProofs.length} of those rows were `
+    + `\`options={…}\` on \`<ToggleRow/>\``);
+  /* The PRE-AL form of the assertion, run against BOTH trees. This is what the
+     harness asserted before AL-6: each row's value offered via a literal
+     `options={X}` on a `<ToggleRow/>`. It is GREEN on the tree it moved OFF and
+     RED on the working tree, which is precisely why it had to be re-anchored. */
+  const oldForm = (app) => TWELVE.map((c) => c.kind === 'render'
+    ? rendersOf(app, c.carrier) >= 1
+    : app.includes(`options={${c.table}}`));
+  /* The RE-ANCHORED form, over the tree it moved off. It must be RED there. */
+  const preEnumerated = enumeratedOk(preAl.app, preAl.region);
+  const preOk = preEnumerated.filter(e => e.ok).length;
+  for (const {c, ok, how} of preEnumerated) {
+    console.log(`    ${ok ? ' ' : '!'} #${String(c.n).padStart(2)} ${c.what.padEnd(22)} → ${how}`);
+  }
+  const reAnchoredGreenNow = enumeratedOk(APP, REGION).every(e => e.ok);
+  const oldFormGreenHere = oldForm(APP).every(Boolean);
+  const oldFormGreenThere = oldForm(preAl.app).every(Boolean);
+  console.log(`\n  the RE-ANCHORED enumeration at ${PRE_AL_COMMIT}: ${preOk}/${preEnumerated.length} — `
+    + `${preOk === preEnumerated.length ? 'GREEN (proves nothing!)' : 'RED'}`);
+  console.log(`  the OLD (pre-AL-6) form:  at ${PRE_AL_COMMIT} ${oldFormGreenThere ? 'GREEN' : 'RED'}`
+    + `  ·  working tree ${oldFormGreenHere ? 'GREEN' : 'RED'}`);
+  assert('replay.the-re-anchored-enumeration-is-RED-on-the-tree-it-moved-off',
+    /* The law: a re-anchor must be RED exactly where the OLD claim held, and GREEN
+       where the new code is. `preOk < TWELVE.length` is that RED; it holds because
+       the six moved rows name `chipRow` as their carrier and there were ZERO
+       `chipRow(` calls at `f0b00aa`. The OLD form is asserted GREEN there for the
+       same reason — it is the claim that moved, not a claim that never held. */
+    preOk < preEnumerated.length && reAnchoredGreenNow && oldFormGreenThere,
+    `at ${PRE_AL_COMMIT}: the re-anchored enumeration is RED (${preOk}/${preEnumerated.length}) because the ` +
+    `six rows that moved name \`chipRow\` as their carrier and there are 0 \`chipRow(\` calls there, while the ` +
+    `OLD (pre-AL-6) form — every value offered by \`options={…}\` on \`<ToggleRow/>\` — is GREEN there and ` +
+    `RED on the working tree, where those same call sites are now \`chipRow(\` calls. That is the honest shape ` +
+    `of the re-anchor: the old claim held on the tree it moved off (so it could not stay), and the new claim ` +
+    `holds ONLY on the working tree. Naming the carrier instead of accepting "either inline family" is what ` +
+    `buys this; a looser predicate would be GREEN at ${PRE_AL_COMMIT} too and would prove nothing about AL-6.`);
+} else {
+  assert('replay.the-re-anchored-enumeration-is-RED-on-the-tree-it-moved-off', false,
+    `the control tree ${PRE_AL_COMMIT} could not be read, so the re-anchored (b) enumeration has no ` +
+    `negative control. Re-pin DS_PRE_AL_COMMIT to ROUND AK's last commit — do NOT delete this section.`);
+}
 assert('b.whole-file-select-count-recorded', fileSelects === 0,
   `App.tsx renders ${fileSelects} native dropdown(s) anywhere — the table/column editor rows use `
   + `<input aria-label="column N …"> + flag buttons (App.tsx:4513-4552), so nothing outside the panel kept one either`);
