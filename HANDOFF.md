@@ -1,6 +1,76 @@
 # HANDOFF — Diagram Studio
 
-## ▶ ROUND AK — connection-line (edge) utilities. DONE, pushed at `4a127cb`. PENDING HARVEY'S DEVICE TEST.
+## ▶ ROUND AL — the edge panel re-shaped from Harvey's device test. DONE, all gates green. PENDING HARVEY'S REVIEW + DEVICE TEST.
+
+**What it is:** the round that AMENDS ROUND AK from his own device test. Spec `ROUND-AL-SPEC.md`;
+his verbatim complaints with a measured cause for each in `ROUND-AL-FEEDBACK.md`; the **approved**
+mockup (v4, accepted after 4 revisions) is `/home/harvey/diagram-studio-research/mockup-al-sidebar-real.html`.
+
+**The seven items.** **AL-1** selection = option C — the body again paints `var(--sel)` (the look he
+liked) with a thin INNER `<path class="edge-sel-core">` in the AUTHORED colour, so changing the colour
+while selected is visible immediately; the rejected dashed halo (`.edge-sel-overlay`, its +5 width and
+its dasharray) is deleted, and an unselected edge renders byte-identically to before. **AL-2** BOTH
+rails (snap-to-centre, clamp-to-range) are DELETED from the write path — a label dragged far away stays
+there; the only way home is `Reset label position` — and the drag lock became a real 2-3 SCREEN px
+instead of `lock: 0`, so a plain click no longer writes an offset. **AL-3** the plate defaults to
+`none`; at `none` the glyphs get a canvas-coloured halo (`text-shadow` in `var(--bg)`) so the label and
+the line stop being ambiguous; two NEW swatch rows (`text color`, `background color`) read through the
+existing `resolveColorKey`. **AL-4** a FIRST-created label centres, ignoring the click point (an
+existing label still never moves when edited). **AL-5** the two actions keep their own sections
+(`Reset` in LABEL, `Reverse` in LINE) and became dashed action chips. **AL-6** ONE chip system for the
+whole panel: `.chips` (flex-wrap, no fixed columns) + a 30px pill + a 30×30 square glyph chip + a
+`.chip.act` action variant; the stepper buttons, the stepper value and the text input are 30px too; the
+crowded rows were split (width / line style / curvature each their own row; count and speed each their
+own row) and the flow + flow-glyph rows became square GLYPH chips (`ArtFlow`, new in
+`src/InspectorPickers.tsx`). **AL-7** count/speed appear only for a payload flow (`dots`/`icon`), with
+the reduce-motion gate still a separate axis. **C4 is explicitly OUT of this round** — he wants
+flowchart to be the good initial, applied to the others later.
+
+**Commits:** `4368dc7` (AL-1) · `5c0fb99` (AL-2 + AL-4) · `5a67cf7` (AL-3) · `a19272d` (AL-3 rest +
+AL-5/6/7 + the AL harness) · `deae093` (ArtFlow + the probe fixes) · then the four re-anchors
+`1cd018a`, `f719439`, `16dbb93`, `7026036`.
+
+**Gates:** `tsc=0` · `build=0` · hex=**142** (ceiling 160) · **33/33 harnesses green** ·
+`boards/` untouched (6 files: Harvey's own, including the 2 his session created at 16:07/16:30).
+
+**What is NOT proven:** the round's feel. Every number above is a source measurement or a pure-function
+run under Node (`checks/round-al-edge-panel.mjs`, whose own negative control puts all 13 of its source
+probes RED on the pre-change tree `f0b00aa`). Nobody has yet LOOKED at the new chips, dragged a label
+far off the line, or changed a colour while selected. That is the review below.
+
+### HARVEY — please test on your Mac (`http://192.168.33.200:5200/`)
+
+1. **Chip system**: open a line's sidebar. Every control should be the same 30px height — the pills,
+   the square glyph chips (flow, markers, line style, curvature), the count/speed steppers, the label
+   input. No row should look crowded or overflow. Does it read as ONE system?
+2. **Selection colour (AL-1)**: select a line and change its colour. The body must change **while
+   selected** (green body + a thin core in the new colour). Then check an unselected line looks exactly
+   as it did before.
+3. **Label free drag (AL-2)**: drag a label far off the line, click empty canvas, then select the edge
+   again. It must NOT jump back to the centre. `Reset label position` is the only way home.
+4. **Plain click writes nothing (AL-2)**: click ONCE on a label without moving. It must not shift.
+5. **Plate default (AL-3)**: a new label should have NO white plate, and the text should still be
+   legible over the line (canvas halo). Try `text color` and `background color`; the background swatch
+   row should only appear once a plate is on.
+6. **Double-click (AL-4)**: double-click a point on a line with no label — the label must appear
+   CENTRED, not where you clicked.
+7. **Flow row**: choose each of None/Dots/Dash/Pulse/Icon. Count and Speed must appear ONLY for Dots
+   and Icon. Do the dots fight the selection colour?
+8. **The two actions (AL-5)**: `Reset label position` at the bottom of Label, `Reverse line direction`
+   at the bottom of Line. Do they look intentional rather than dumped? (This is the exact thing you
+   called "nằm kỳ" — it was the structure that was wrong, not the buttons.)
+
+### VAULT DEBT — ROUND AK **and** AL together
+
+Neither round is in the vault yet. When recording, do BOTH in one pass: a new ADR-031 section covering
+ROUND AK + ROUND AL, one Change Log row, the Mermaid diagram update, and the Architecture MOC — all via
+`pkm`. Deliberately deferred until after his review, so a review finding does not have to be revised
+twice.
+
+---
+
+## ▶ ROUND AK — connection-line (edge) utilities. DONE, pushed at `4a127cb`. AMENDED BY ROUND AL ABOVE.
+
 
 **What it is:** eleven of Harvey's asks, resolved as ONE round in 3 passes — the edge panel, the label,
 and the flow animation. Spec `ROUND-AK-SPEC.md`; research + synthesis in
@@ -51,7 +121,7 @@ sidebar. (6) A flowchart board and a C4 board must now show the SAME line sectio
 only when THAT edge carries a crow's-foot. (7) Flow animation offers five options, no `Envelope`.
 (8) `Ctrl+Z` a few times.
 
-**Vault: ROUND AK is NOT yet in the vault** — ADR-031 + Change Log + MOC is the outstanding debt (the
+**Vault: ROUND AK + ROUND AL are NOT yet in the vault** — ADR-031 + Change Log + MOC is the outstanding debt (the
 TEMPLATES arc debt noted below was paid on 2026-09-20; **do not re-pay it**).
 
 **PROCESS LESSON (this round):** the same narrow job failed across **three** coder dispatches — the first
