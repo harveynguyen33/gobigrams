@@ -1503,14 +1503,23 @@ body {
    With the token first, a board that stores a colour paints it; with nothing
    stored the expression resolves to `var(--surface)`, which is the EXACT value
    this rule declared before, so an untouched board paints byte-for-byte what it
-   painted. `outline` and `none` keep their own declarations: `none` is "no plate
-   at all" and `outline` is a hairline, and neither is a plate colour the user
-   should be able to fill — a `background color` row is only offered for a state
-   that HAS a background (the panel hides the row at `none`).
+   painted. `none` keeps its own declaration — "no plate at all" is not a plate
+   colour the user should be able to fill, and the panel hides the colour row at
+   `none`; `outline` is the state below and takes the same shape.
 
    NO NEW HEX: one token, one fallback token. */
+/* ROUND AN, AN-6b — AND THE SAME SHAPE FOR THE OTHER PLATE STATE THAT ACCEPTS A
+   COLOUR. `outline` is offered the SAME `background color` swatch by the panel
+   (the row is gated on `eLabelBg !== 'none'`, asserted by ROUND AL's `al3`), so
+   without a consumer here the swatch stayed a no-op for exactly as long as
+   `surface` did — the same defect, one state over. The token is again the
+   FIRST argument and `transparent` is the FALLBACK, so an untouched outline
+   label paints the `transparent` this rule declared before, byte for byte, while
+   a label that STORES a colour now paints it. `none` deliberately does not take
+   one: it is "no plate at all" and it carries the canvas-coloured halo, and the
+   panel offers it no colour row. */
 .edge-label.lb-surface { background: var(--label-plate, var(--surface)); }
-.edge-label.lb-outline { background: transparent; border-color: var(--border-strong); }
+.edge-label.lb-outline { background: var(--label-plate, transparent); border-color: var(--border-strong); }
 
 .edge-label-input {
   font-family: var(--mono); font-size: 11px; font-weight: 600;

@@ -418,33 +418,48 @@ section('AN-6b — the plate colour is applied, with the token as the fallback')
 
 {
   const plate = ruleDecls(STYLES, '.edge-label.lb-surface');
-  const emitters = (STYLES.match(/var\(\s*--label-plate\b[^)]*\)/g) ?? []);
+  const outline = ruleDecls(STYLES, '.edge-label.lb-outline');
+  const none = ruleDecls(STYLES, '.edge-label.lb-none');
+  const emitters = (STYLES.match(/var\(\s*--label-plate\b/g) ?? []);
   const withFallback = /^var\(\s*--label-plate\s*,\s*var\(--surface\)\s*\)$/.test(plate.background ?? '');
+  const outlineFallback = /^var\(\s*--label-plate\s*,\s*transparent\s*\)$/.test(outline.background ?? '');
   const edgeEmits = /'--label-plate': labelBgColor/.test(EDGE);
-  assert('an6b.the-sheet-reads-label-plate-and-the-renderer-still-emits-it',
-    emitters.length === 1 && withFallback && edgeEmits,
-    `the sheet now has exactly ${emitters.length} \`--label-plate\` consumer = \`${plate.background}\`, with the ` +
-    `token FIRST and \`var(--surface)\` as its FALLBACK = ${withFallback}, and \`GoblinEdge\` still emits the stored ` +
-    `colour as the inline custom property = ${edgeEmits}. Before this item the count of consumers was ZERO: the ` +
-    `panel's \`background color\` swatch wrote a key nothing read — the sixth instance in this project of a value ` +
-    `that is emitted and never applied.`);
+  assert('an6b.the-sheet-reads-label-plate-in-BOTH-states-that-offer-a-colour-and-the-renderer-emits-it',
+    emitters.length === 2 && withFallback && outlineFallback && edgeEmits,
+    `the sheet now has ${emitters.length} \`--label-plate\` consumers: \`surface\` → \`${plate.background}\` (token ` +
+    `first, \`var(--surface)\` as the FALLBACK = ${withFallback}) and \`outline\` → \`${outline.background}\` (token ` +
+    `first, \`transparent\` as its fallback = ${outlineFallback}); \`GoblinEdge\` still emits the stored colour as the ` +
+    `inline custom property = ${edgeEmits}. TWO, not one, because the panel offers the SAME \`background color\` row ` +
+    `for both (\`eLabelBg !== 'none'\`): fixing only \`surface\` would have left the swatch a no-op one state over. ` +
+    `Before this item the count of consumers was ZERO — the panel wrote a key nothing read, the sixth instance in ` +
+    `this project of a value that is emitted and never applied.`);
 
-  /* UNTOUCHED-BOARD PARITY, COMPUTED: with nothing stored the new expression must
-     resolve to the value the rule declared before. */
+  /* UNTOUCHED-BOARD PARITY, COMPUTED, FOR BOTH STATES: with nothing stored each
+     new expression must resolve to exactly the value that rule declared before. */
   const preRule = (() => {
-    try { return ruleDecls(blankComments(commitFile(PRE_COMMIT, AN_STYLES)), '.edge-label.lb-surface'); }
-    catch { return {}; }
+    try {
+      const pre = blankComments(commitFile(PRE_COMMIT, AN_STYLES));
+      return {
+        surface: ruleDecls(pre, '.edge-label.lb-surface'),
+        outline: ruleDecls(pre, '.edge-label.lb-outline'),
+        none: ruleDecls(pre, '.edge-label.lb-none'),
+      };
+    } catch { return {surface: {}, outline: {}, none: {}}; }
   })();
-  const resolvedNow = unresolved(plate.background);
-  const parity = resolvedNow === preRule.background && preRule.background === 'var(--surface)';
-  assert('an6b.with-nothing-stored-the-plate-resolves-to-the-pre-change-value',
-    parity,
-    `pre-change rule: \`background: ${preRule.background}\`; fixed rule: \`background: ${plate.background}\`; ` +
-    `resolving the fixed one with \`--label-plate\` UNSET gives \`${resolvedNow}\` = ${parity}. This is computed ` +
-    `from the committed pre-change rule rather than restated, so "an untouched board paints exactly what it ` +
-    `painted" is a measured equivalence and not a promise. The two states that must NOT take a colour keep their ` +
-    `own declarations: \`lb-none\` is no plate at all and \`lb-outline\` is a hairline, and the panel hides the ` +
-    `colour row outside \`surface\`.`);
+  const surfaceParity = unresolved(plate.background) === preRule.surface.background
+    && preRule.surface.background === 'var(--surface)';
+  const outlineParity = unresolved(outline.background) === preRule.outline.background
+    && preRule.outline.background === 'transparent';
+  const noneUntouched = /^transparent$/.test(none.background ?? '');
+  assert('an6b.with-nothing-stored-EVERY-plate-resolves-to-its-pre-change-value',
+    surfaceParity && outlineParity && noneUntouched,
+    `surface: pre-change \`${preRule.surface.background}\`, fixed \`${plate.background}\`, resolves with the token ` +
+    `UNSET to \`${unresolved(plate.background)}\` = ${surfaceParity}. outline: pre-change ` +
+    `\`${preRule.outline.background}\`, fixed \`${outline.background}\`, resolves to ` +
+    `\`${unresolved(outline.background)}\` = ${outlineParity}. none is left with its own ` +
+    `\`background: ${none.background}\` = ${noneUntouched} — it is "no plate at all" and it carries the ` +
+    `canvas-coloured halo. Computed from the COMMITTED pre-change rules rather than restated, so "an untouched ` +
+    `board paints exactly what it painted" is a measured equivalence and not a promise.`);
 }
 
 /* ===========================================================================
@@ -501,11 +516,12 @@ if (pre) {
       ruleDecls(pre.STYLES, '.edge-label.selected').color === undefined],
     ['AN-6a · the cascade winner for a selected label is the authored colour', /^var\(--label-fg/
       .test(colourWinner(pre.STYLES).v)],
-    ['AN-6b · the sheet consumes `--label-plate`',
-      (pre.STYLES.match(/var\(\s*--label-plate\b[^)]*\)/g) ?? []).length > 0],
-    ['AN-6b · the consumer carries the surface fallback',
+    ['AN-6b · the sheet consumes `--label-plate` in the surface state',
       /^var\(\s*--label-plate\s*,\s*var\(--surface\)\s*\)$/
         .test(ruleDecls(pre.STYLES, '.edge-label.lb-surface').background ?? '')],
+    ['AN-6b · the sheet consumes `--label-plate` in the outline state',
+      /^var\(\s*--label-plate\s*,\s*transparent\s*\)$/
+        .test(ruleDecls(pre.STYLES, '.edge-label.lb-outline').background ?? '')],
   ];
   const greenOnPre = [];
   for (const [id, bad] of KILLS) {
