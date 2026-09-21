@@ -257,6 +257,16 @@ type EdgeData = {
   /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While falsy the label
    *  auto-centres; once true `labelOffset` wins. */
   labelPinned?: boolean;
+  /** ROUND AM, AM-1 — THE POINT the stored `labelOffset` was measured against,
+   *  in flow coordinates. It is what makes a dragged label keep tracking the
+   *  pointer while a NODE moves: when a write states a different anchor than the
+   *  one stored here, `onLabelWrite` first corrects the stored offset by the
+   *  anchor's movement and then applies the write. ABSENT is the normal state —
+   *  a board written before this round, and a centred label, carry no key — and
+   *  an absent anchor simply means "nothing to rebase against", so an existing
+   *  board renders byte-identically and the first drag adopts the live anchor as
+   *  its base. */
+  labelAnchor?: {x: number; y: number};
   /** ROUND AK, AK-12 — the label plate: THREE STORED STATES, where `None` is a
    *  genuine value rather than the absence of one. Rendered as a class on
    *  `.edge-label` by the renderer; absent resolves to `surface` (today's look). */
@@ -2178,15 +2188,43 @@ export default function App() {
          `onBend` does not use it).
 
      WHAT IT DOES NOT DO is re-derive geometry. `w` arrives finished — the
-     renderer applied `labelWrite` (snap, then clamp) because it is the only side
-     that holds the resolved path, the anchor and the measured label box. This
-     merges it.
+     renderer computed it, because it is the only side that holds the resolved
+     path and the anchor, and since ROUND AM's AM-1 the gesture's write is
+     `anchorWrite`: a displacement added to the gesture's base offset. This
+     applies it.
+
+     ROUND AM, AM-1 — THE REBASE, and why it is here rather than in the renderer.
+     A write states the anchor it was measured against (`w.labelAnchor`) and
+     carries the pointer's INCREMENT for this write. The stored offset is a
+     running total, so the two are combined:
+
+         corrected = stored + (storedAnchor − w.labelAnchor)     [the frame moved]
+         offset    = corrected + w.labelOffset                   [this write's increment]
+
+     The first line is what makes a label keep tracking the pointer while a NODE
+     moves: the anchor moved by `Δ`, so the stored offset — expressed in the OLD
+     anchor's frame — is `Δ` too large in the new one and is corrected by exactly
+     that. "The line moved 30px right, so a label that was 20px right of it is now
+     10px right of it": the label stays where the user's EYE put it and only the
+     NUMBER changes. Without it the next write's increment would be added to an
+     offset already measured from the wrong origin, and the label would drift by
+     the node's movement each time. When the frames agree the correction is
+     `{0,0}` and this reduces to the plain accumulation.
+
+     `w.labelAnchor === null` is the ABSOLUTE case — the centred/reset write and
+     the create commit — and it is NEVER rebased or accumulated: those offsets are
+     not measured against the geometry at all, they ARE the stored value. It also
+     CLEARS the stored anchor, because after it there is nothing left to measure
+     against.
 
      THE MERGE IS MODE-DEPENDENT ON PURPOSE, and it is what keeps the stored
-     document honest: a CENTRED write (`labelPinned: false`) DELETES both keys
-     instead of storing `{0,0}`/`true`, so "snapped back", "reset" and "never
-     moved" are one stored state and a board cannot accumulate a key that means
-     nothing. */
+     document honest: a CENTRED write (`labelPinned: false`) DELETES all THREE
+     keys instead of storing `{0,0}`/`true`, so "dragged back to the centre",
+     "reset" and "never moved" are one stored state and a board cannot accumulate
+     a key that means nothing. `labelAnchor` joins the other two on that list in
+     this round — three situations, one stored state. A gesture that ENDS at the
+     centre lands there through the same door: the total it writes is `{0,0}`,
+     which is the pinned-but-empty case collapsed below. */
   const onLabelWrite = useCallback((id: string, w: LabelWrite, phase: BendPhase) => {
     if (phase === 'start') {
       pushHistory();
@@ -2199,9 +2237,41 @@ export default function App() {
       if (!w.labelPinned) {
         delete data.labelOffset;
         delete data.labelPinned;
+        delete data.labelAnchor;
+        return {...e, data};
+      }
+      if (w.labelAnchor === null) {
+        // ABSOLUTE (the centred/reset write, the create commit): stored as it
+        // stands, and there is no frame to record.
+        if (w.labelOffset.x === 0 && w.labelOffset.y === 0) {
+          delete data.labelOffset;
+          delete data.labelPinned;
+          delete data.labelAnchor;
+        } else {
+          data.labelOffset = w.labelOffset;
+          data.labelPinned = true;
+          delete data.labelAnchor;
+        }
+        return {...e, data};
+      }
+      const stored = data.labelOffset;
+      const storedAnchor = data.labelAnchor;
+      const frameMoved = stored && storedAnchor
+        && (storedAnchor.x !== w.labelAnchor.x || storedAnchor.y !== w.labelAnchor.y);
+      const corrected = frameMoved
+        ? {x: stored!.x + (storedAnchor!.x - w.labelAnchor.x), y: stored!.y + (storedAnchor!.y - w.labelAnchor.y)}
+        : (stored ?? {x: 0, y: 0});
+      const offset = {x: corrected.x + w.labelOffset.x, y: corrected.y + w.labelOffset.y};
+      if (offset.x === 0 && offset.y === 0) {
+        // the gesture's total is the centred state — the SAME stored value as
+        // reset and never-moved, reached through the gesture's own door.
+        delete data.labelOffset;
+        delete data.labelPinned;
+        delete data.labelAnchor;
       } else {
-        data.labelOffset = w.labelOffset;
+        data.labelOffset = offset;
         data.labelPinned = true;
+        data.labelAnchor = w.labelAnchor;
       }
       return {...e, data};
     }));
@@ -2251,11 +2321,17 @@ export default function App() {
 
   /** ROUND AK, AK-14.1 — `Reset label position`, ONE history step.
    *
-   *  It clears BOTH keys rather than storing a centred offset, which is the same
-   *  state the snap-to-centre rail lands on — so the button and the gesture that
-   *  made it unnecessary end the label in one place. Lucidchart ("Reset line"),
-   *  Lucidspark and Miro all ship a reset; Miro had to add a SEPARATE touch
-   *  variant, which is the tell that a desktop-only idiom would not have done. */
+   *  It clears ALL THREE KEYS rather than storing a centred offset, which is the
+   *  same state a gesture that never moved lands on — so the button and the
+   *  gesture end the label in one place. Lucidchart ("Reset line"), Lucidspark
+   *  and Miro all ship a reset; Miro had to add a SEPARATE touch variant, which
+   *  is the tell that a desktop-only idiom would not have done.
+   *
+   *  ROUND AM, AM-1 — `labelAnchor` IS DELETED HERE TOO. It is the frame the
+   *  stored offset was measured in, so leaving it behind after the offset is gone
+   *  would be a key with nothing to describe — and the next drag would try to
+   *  rebase against it. Three situations, one stored state: reset, dragged back
+   *  to the centre, and never moved. */
   const resetLabelPos = useCallback(() => {
     if (!selEdgeId) return;
     pushHistory();
@@ -2264,6 +2340,7 @@ export default function App() {
       const data = {...((e.data ?? {}) as EdgeData)};
       delete data.labelOffset;
       delete data.labelPinned;
+      delete data.labelAnchor;
       return {...e, data};
     }));
   }, [selEdgeId, pushHistory, setEdges]);

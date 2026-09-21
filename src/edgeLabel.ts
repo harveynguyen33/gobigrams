@@ -63,6 +63,34 @@
    panel.mjs`).
 
    ---------------------------------------------------------------------------
+   ROUND AM, AM-1 — THE DRAG WROTE AN ABSOLUTE POINT, AND IT IS A DELTA NOW.
+
+   The owner's report: "khi nắm kéo text di chuyển, sau lần đầu, những lần sau
+   nắm kéo thì cái text bị giật và ra xa con trỏ chuột 1 khoảng" — the FIRST drag
+   follows the finger, every drag after it FREEZES under the finger and then
+   teleports by exactly the previous drag's distance.
+
+   WHY. `GoblinEdge` computed the anchor `L = labelAnchor({…})` DURING RENDER and
+   `onLabelDown` closed over that render's `L`, so the write was
+   `labelWrite({W, anchor: L})` = `W − L`. That is a DELTA only while `L` is the
+   anchor; once `labelPinned` is true `L` is the PAINTED position, so the write
+   becomes `pointer − painted`, and adding it back to `painted` gives
+   `pointer − (pointer − painted) = painted`: the label stops moving, and the
+   NEXT write teleports it by exactly the previous drag's distance. Measured on
+   the shipped module (anchor {100,100}): drag 1 finger {300,200} → painted
+   {300,200}, error 0.0px; drag 2 finger {400,250} → painted {200,150}, error
+   **223.6px**, which is exactly drag 1's own distance {200,100}.
+
+   THE FIX. The write carries the reference point it was computed against
+   (`labelAnchor` below) and the gesture states its own base offset, so the
+   pointer's displacement is what is stored rather than the pointer's position.
+   `anchorWrite` is that arithmetic; `GoblinEdge` supplies the reference point
+   TRACKED TO THE LIVE GEOMETRY, which is what makes a node moving during a drag
+   keep the label under the finger; `App` stores the pair, and a CENTRED write
+   still deletes all three keys so "reset", "dragged back to the centre" and
+   "never moved" stay ONE stored state (the invariant ROUND AK established).
+
+   ---------------------------------------------------------------------------
    HONEST LIMITS, recorded here rather than discovered later.
 
    * `reverseEdgePatch` mirrors the legacy `offset` FRACTION (o → 1−o, tldraw
@@ -138,8 +166,28 @@ export type LabelOffset = {x: number; y: number};
  *  the only side that holds the resolved path, the anchor and the measured
  *  label box) and `App` stores it. One name keeps the two ends of that wire in
  *  step, and it keeps the geometry in ONE place — `App` never has to re-derive
- *  a path it cannot see. */
-export type LabelWrite = {labelOffset: LabelOffset; labelPinned: boolean};
+ *  a path it cannot see.
+ *
+ *  ROUND AM, AM-1 ADDED THE THIRD KEY, `labelAnchor`, and it exists because
+ *  `App` has to be able to REBASE a stored offset when the point it was measured
+ *  against has moved (a node dragged mid-gesture, or any geometry change):
+ *
+ *    · `labelAnchor: {x, y}` — the offset was measured against THIS point, so
+ *      `App` may correct the stored offset when its own record says the point
+ *      has since moved. The drag is the only writer that passes one.
+ *    · `labelAnchor: null`   — the offset is ABSOLUTE: store it as it stands.
+ *      Only the CENTRED/reset write and the create-on-double-click commit pass
+ *      null, and a centred write deletes the key outright (`App`), so "no key"
+ *      and "null" both mean "nothing to rebase against".
+ *
+ *  NAMED `labelAnchor` AND NOT `anchor` because that is the exact field `App`
+ *  stores, so the wire and the document spell the same thing — and it reads as
+ *  the reference POINT, never as a second position. */
+export type LabelWrite = {
+  labelAnchor: LabelOffset | null;
+  labelOffset: LabelOffset;
+  labelPinned: boolean;
+};
 /** The legacy 3-slot fraction `data.offset` (its CONTROL was deleted by pass 1;
  *  the VALUE is still read, so a board that carries `start`/`end` renders
  *  exactly as it did). */
@@ -324,7 +372,79 @@ export function nearestOnPath(pts: Pt[], W: Pt): {pt: Pt; len: number; perp: Pt;
 
 /* ===========================================================================
    ROUND AL, AL-2 — THE ONE FUNCTION A DRAG WRITES THROUGH.
+   ROUND AM, AM-1 — now split into TWO writes, with NAMED callers.
    =========================================================================== */
+
+/** ROUND AM, AM-1 — THE DELTA GESTURE, and the fix for the owner's "the text
+ *  freezes under the finger and then jumps away" report.
+ *
+ *  WHAT WAS WRONG. ROUND AK/AL wrote `labelWrite({W, anchor: L})` where `L` was
+ *  the anchor computed DURING RENDER — the PAINTED position once `labelPinned`
+ *  is true. `labelWrite` returns `W − anchor`, so that was a delta only while
+ *  `L` was the anchor; after the first drag it was `pointer − painted`, and
+ *  adding it to `painted` pins the label (`pointer − (pointer − painted) =
+ *  painted`) and then teleports it by the previous drag's distance. `anchorWrite`
+ *  is the same call shape with the reference point and the gesture's own BASE
+ *  OFFSET stated, so `App` can rebase: the gesture reports WHERE the write was
+ *  measured from and what it started from, and the stored offset comes out as
+ *  the finger's displacement rather than the finger's position.
+ *
+ *  THE CONTRACT, stated exactly, because the two ways it could be misread are
+ *  both live bugs:
+ *
+ *    p = base ?? {0, 0}
+ *    labelOffset = p + (W − anchor)      // the write's offset
+ *    labelAnchor = anchor                // the frame it was measured in
+ *
+ *  · `anchor` IS THE ANCHOR THE WRITE IS MEASURED AGAINST — the LIVE auto-centre
+ *    anchor at the moment of the write (NOT the painted position, and NOT the
+ *    anchor of some earlier render). `GoblinEdge` reads it from a ref published
+ *    by every committed render, which is what makes it live.
+ *  · `base` IS THE GESTURE'S BASE OFFSET, and it is handed over ALREADY
+ *    RE-EXPRESSED in the write's frame — the renderer adds the frame shift and
+ *    the grab correction (see `GoblinEdge.onLabelDown`, which is the only caller
+ *    and spells both out). It is `{0,0}` in the common case, which is the shape
+ *    the spec states as `base + (W − grabPoint)`: the pointer's displacement from
+ *    where the finger landed, added to the offset the label was wearing.
+ *
+ *  WHY THE FIX IS A REBASE AND NOT A PLAIN DELTA. React Flow's controlled flow
+ *  means the `.edge-label` element does NOT re-render between a pointer event and
+ *  the React write, so the handler's closure is always one render behind — in
+ *  EVERY gesture, including the first. The old code therefore computed its write
+ *  against a STALE anchor: harmlessly while that anchor was the anchor, and
+ *  catastrophically once it was the painted position (the freeze-and-teleport
+ *  above). The delta is exact for ANY reference point; the failure was that the
+ *  reference point was the label's own painted position. `App` then rebases the
+ *  stored offset by the anchor's movement when a node moves mid-gesture, so the
+ *  two together track the finger instead of accumulating drift.
+ *
+ *  WHY `labelAnchor: anchor` IS RETURNED RATHER THAN null: the write is RELATIVE
+ *  in the sense that matters — it was measured against a point the geometry can
+ *  move, and `App` may correct the stored offset when its own record of that
+ *  point disagrees with this one. A write that is genuinely ABSOLUTE (the
+ *  centred/reset write, the create commit) passes null instead and is never
+ *  rebased.
+ *
+ *  THE CENTRED BRANCH IS KEPT HERE TOO, for the same reason `labelWrite` gives:
+ *  a gesture whose pointer has not moved from the base offset writes the
+ *  UNPINNED state, so "grabbed and released without moving" stays the identical
+ *  stored value as "reset" and "never moved". */
+export function anchorWrite(p: {anchor: Pt; base: LabelOffset | null; W: Pt}): LabelWrite {
+  const b = p.base ?? {x: 0, y: 0};
+  const labelOffset = {x: b.x + (p.W.x - p.anchor.x), y: b.y + (p.W.y - p.anchor.y)};
+  /* NO CENTRED BRANCH HERE, deliberately, and this is the one place the two
+     writers' shapes differ. `labelWrite` collapses a zero offset to the unpinned
+     state because its callers can only ever mean "put it back in the centre".
+     A gesture cannot know that: its base offset lives in `App` (which owns the
+     freshest record of it), so the offset this function returns is the DELTA —
+     whether the RESULT is the centred state is decided where the base is added,
+     one call away, against the offset actually stored. Collapsing here would
+     reset a dragged label to the centre whenever the finger happened to return
+     to where it grabbed (AM1-d's own probe, which requires the pre-drag position
+     to come back EXACTLY, including a non-zero offset). */
+  return {labelAnchor: p.anchor, labelOffset, labelPinned: true};
+}
+
 /** Turn the point a drag is at into the pair `App` stores.
  *
  *  WHAT THIS USED TO BE. ROUND AK's version took `{W, anchor, pts, zoom, start,
@@ -333,6 +453,23 @@ export function nearestOnPath(pts: Pt[], W: Pt): {pt: Pt; len: number; perp: Pt;
  *  header), so the function is now the plain difference between the dragged point
  *  and the anchor. THAT IS THE WHOLE ITEM: the owner asked for no constraints,
  *  and this is what "no constraints" looks like as a stored value.
+ *
+ *  ROUND AM, AM-1 — WHICH CALLERS USE WHICH FORM, because there are now two
+ *  writers and that split is deliberate:
+ *
+ *    · `anchorWrite` (above) is the GESTURE's writer. It states a base offset,
+ *      which is what makes the drag a delta, and it returns the reference point
+ *      so `App` can rebase.
+ *    · `labelWrite` (this one) is the ABSOLUTE form, and it is used by exactly
+ *      the two callers whose offset is NOT a displacement: the CREATE path (the
+ *      commit after a double-click on the line) and the CENTRED/reset write.
+ *      Both write the centred state, so both pass `labelAnchor: null` — which is
+ *      what a null means: "this offset was not measured against a point the
+ *      geometry can move, do not rebase it".
+ *
+ *  `labelWrite`'s arithmetic and signature are UNCHANGED (ROUND AK/AL's harnesses
+ *  assert both), so it stays the honest subject of those claims; only the returned
+ *  object gained the null key.
  *
  *  THE TWO SHAPES IT CAN RETURN, and why there are still two. A write whose
  *  offset is `{0,0}` is the CENTRED state, and it is returned UNPINNED — the
@@ -350,9 +487,9 @@ export function nearestOnPath(pts: Pt[], W: Pt): {pt: Pt; len: number; perp: Pt;
 export function labelWrite(p: {W: Pt; anchor: Pt}): LabelWrite {
   const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};
   if (labelOffset.x === 0 && labelOffset.y === 0) {
-    return {labelOffset: {...CENTRED}, labelPinned: false};
+    return {labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: false};
   }
-  return {labelOffset, labelPinned: true};
+  return {labelAnchor: null, labelOffset, labelPinned: true};
 }
 
 /* ===========================================================================

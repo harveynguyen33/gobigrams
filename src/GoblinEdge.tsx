@@ -27,8 +27,8 @@ import {
    import list used to carry (`labelClearance`, `labelHalfAlong`), and added
    `labelDragLockPx` in their place — the drag's own screen-px click lock. */
 import {
-  HANDLE_CLEAR_PX, LABEL_HALF_H_PX, labelAnchor, labelBgClass,
-  CENTRED, labelDragLockPx, labelWrite, movedBy, nudgeAlongPath, pathPoints,
+  HANDLE_CLEAR_PX, LABEL_HALF_H_PX, anchorWrite, labelAnchor, labelBgClass,
+  CENTRED, labelDragLockPx, movedBy, nudgeAlongPath, pathPoints,
   type LabelWrite,
 } from './edgeLabel';
 /* ROUND AK, PASS 2 — ONE gesture for both affordances on this edge. See the
@@ -160,6 +160,29 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  threshold, exactly as the bend handle does — and NO hover state is
    *  involved: this is set by the gesture, so it works on touch. */
   const [labelCursor, setLabelCursor] = useState<'grab' | 'grabbing'>('grab');
+  /** ROUND AM, AM-1 — THE LIVE ANCHOR: the AUTO-CENTRE anchor (the label's
+   *  position with NO offset applied) that this component resolved on the last
+   *  COMMITTED render.
+   *
+   *  WHY IT IS A REF AND NOT THE CLOSURE'S VALUE. `onLabelDown` closes over the
+   *  render that CREATED it, and React Flow's controlled flow means `.edge-label`
+   *  does not re-render between a pointermove and the write that pointermove
+   *  triggers — so a value captured in the closure is one render behind for
+   *  everything except the very first write of a gesture. A ref is read at the
+   *  moment of the write, so it carries the anchor of the last committed render
+   *  instead, which is the frame the write has to be stated in.
+   *
+   *  IT IS THE ANCHOR, NOT THE PAINTED POSITION (`L` when the label is pinned).
+   *  The two differ by the stored offset, and the write's arithmetic is stated in
+   *  the offset's own frame — using the painted point would fold the offset into
+   *  the base and count it twice (AM1-b in the round's harness measures exactly
+   *  that mistake). The painted `L` keeps its single job: the transform below.
+   *
+   *  DECLARED BY AN EFFECT, not during render: the value has to belong to the
+   *  render that COMMITTED — the same one a handler closure would come from —
+   *  or the ref would describe a render the user never saw. No dependency array:
+   *  the anchor follows the geometry, the zoom and the stored offset. */
+  const anchorRef = useRef<Pt | null>(null);
 
   const d = (data ?? {}) as {
     shape?: string;
@@ -218,6 +241,15 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  the snap-to-centre rail (AK-14.2) — which is why the snap and the reset
      *  land on the SAME state instead of two that merely look alike. */
     labelPinned?: boolean;
+    /** ROUND AM, AM-1 — THE POINT the stored `labelOffset` was measured
+     *  against, in flow coordinates: `App` writes it from the write's own
+     *  `labelAnchor` and it exists so the offset can be REBASED when that point
+     *  moves (a node dragged mid-gesture, or any geometry change that shifts the
+     *  anchor). ABSENT is the normal state for a board written before this round
+     *  and for a centred label — and an absent anchor simply means "nothing to
+     *  rebase against", which is why NO board migrates: the renderer never reads
+     *  this key, it only stores it. */
+    labelAnchor?: {x: number; y: number};
     /** ROUND AK, AK-12 — the label plate, THREE STORED STATES (`None` is a real
      *  value, not the absence of one). Rendered as a CLASS on `.edge-label`,
      *  never as an inline SVG fill: React Flow's own `labelBgStyle` is an
@@ -429,6 +461,29 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // The handle's own position: computed below, once the label's own geometry
   // (its painted state, the resolved path and the measured box) is available.
 
+  /** ROUND AM, AM-1 — THE AUTO-CENTRE ANCHOR of this render, and the ref that
+   *  publishes it to the gesture. This is the point a stored `labelOffset` is
+   *  measured AGAINST — `labelAnchor` with no offset applied, i.e. the label's
+   *  own centre — and it is deliberately NOT `L` below: `L` is the PAINTED
+   *  position and differs from this by the stored offset.
+   *
+   *  WHAT IT IS FOR. It is the anchor the write REPORTS (`anchorWrite`'s
+   *  `labelAnchor`), so `App` can rebase a stored offset when the geometry moves
+   *  — a node dragged between two gestures, or the edge re-routed — and keep the
+   *  label where the user's eye put it. The write's own arithmetic does not need
+   *  it (the anchor cancels out of a pointer delta, which is why a stale one
+   *  cannot corrupt the drag); it is the REPORT that matters.
+   *
+   *  PUBLISHED BY AN EFFECT, not during render, so the value belongs to the
+   *  render that COMMITTED — the same one a handler closure comes from. No
+   *  dependency array: the anchor follows the geometry and the zoom, and it is
+   *  one object write per render, which this file already pays on every
+   *  pan/zoom tick. */
+  const anchor = labelAnchor({sourceX, sourceY, targetX, targetY, labelX, labelY, offset: d.offset});
+  useEffect(() => {
+    anchorRef.current = anchor;
+  });
+
   /** ROUND S/T — pointerdown on the midpoint handle, draw.io's mechanic.
    *
    *  ONE history entry at the START of the gesture (`App.onBend`), never per
@@ -540,11 +595,43 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  not open the gesture's history entry, so the claim is released by simply
      *  returning before `beginGesture` runs. */
     if (!origin) return;
-    /** ROUND AL, AL-2 — the write is now a plain difference. The path, the zoom
-     *  and the two end clearances are no longer inputs: they existed only to feed
-     *  `snapToCentre` and `clampToRange`, and both rails are deleted. */
+    /* ROUND AM, AM-1 — THE GESTURE'S OWN BOOKKEEPING, frozen HERE.
+
+       `prev` is the last pointer point this gesture REPORTED, and it starts at
+       the point the finger landed on. The write is therefore the pointer's
+       INCREMENT (`W − prev`), which is what makes the label follow the finger:
+       the shipped code wrote the pointer's POSITION measured from a stale
+       reference, so the stored offset froze and then jumped.
+
+       `anchorWrite`'s shape states this in the file's own vocabulary:
+       `anchor` is the LIVE auto-centre anchor and `base` is `anchor − prev`, so
+       the returned offset is `(anchor − prev) + (W − anchor) = W − prev` — THE
+       ANCHOR CANCELS, which is the honest invariant the round's spec asks to be
+       documented: the delta is exact for ANY anchor, so a stale one cannot
+       corrupt it, and the anchor's only job is to be REPORTED (`labelAnchor`) so
+       `App` can rebase the stored offset when the geometry itself moved.
+
+       WHY THE INCREMENT AND NOT THE SPEC'S LITERAL `base + (W − origin)`. The
+       literal form, with `base` the offset in force at grab time, double-counts
+       that offset on every write AFTER the first once `App` adds the write to
+       the rebased stored value — measured: gesture 2 on a label pinned by
+       gesture 1 lands at `W1 + W2 − 2·anchor`, i.e. the label is off by the
+       FIRST drag's distance, which is the very defect this round fixes. With
+       the increment the total is `stored + Σ(increments)` = `stored + (W −
+       origin)`, which is the spec's own `base + (W − grabPoint)` reached
+       additively so that neither the first write nor the hundredth can
+       double-count. `App`'s rebase supplies the "base" half of the spec's
+       formula, and it is applied ONCE per write because the stored value is the
+       running total. */
+    let prev = origin;
+    /** ROUND AM, AM-1 — THE WRITE. `labelWrite` is GONE from this path: it is
+     *  the ABSOLUTE form, and a gesture is a displacement. The anchor is read
+     *  PER WRITE from the ref, so the frame reported is the live one even if a
+     *  node moves under the finger mid-gesture. */
     const P_ = (p: Pt, phase: BendPhase) => {
-      cb(id, labelWrite({W: p, anchor: L}), phase);
+      const A = anchorRef.current ?? anchor;
+      cb(id, anchorWrite({anchor: A, base: {x: A.x - prev.x, y: A.y - prev.y}, W: p}), phase);
+      prev = p;
     };
     beginGesture({
       el: e.currentTarget,
@@ -564,7 +651,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
          documents. The write is the UNPINNED state: a gesture that has not
          moved yet has moved nothing, and `labelPinned: false` is bit-identical
          to a board that never carried the keys. */
-      onStart: () => cb(id, {labelOffset: {x: 0, y: 0}, labelPinned: false}, 'start'),
+      onStart: () => cb(id, {labelAnchor: null, labelOffset: {x: 0, y: 0}, labelPinned: false}, 'start'),
       onMove: p => P_(p, 'move'),
       onEnd: p => {
         setLabelCursor('grab');
@@ -704,7 +791,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
        undefined, so no position is written and the text can be corrected without
        the label moving. */
     if (createAt) {
-      d.__onLabelWrite?.(id, {labelOffset: {...CENTRED}, labelPinned: false}, 'end');
+      d.__onLabelWrite?.(id, {labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: false}, 'end');
     }
     setEditing(false);
   };
