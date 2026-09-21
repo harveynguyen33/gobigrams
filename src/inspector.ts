@@ -23,14 +23,38 @@
 
 import type {Shape} from './shapes';
 
+/** ROUND AK, AK-8 — `presetId` WAS A FIELD HERE, AND IT IS GONE.
+
+ *  It existed for exactly ONE consumer: the Cardinality gate, which §A.3 wrote
+ *  as `kind === 'edge' && preset.id === 'erd'`. That is the SAME board-level key
+ *  the deleted `labelPresets` used, and it has the same defect: `preset` is ONE
+ *  string on the BOARD document, so a board holding a flowchart template AND a
+ *  C4 template makes it a lie about half its edges. With the gate re-keyed onto
+ *  the EDGE's own data (`hasCrowFootEnds` below) nothing reads `presetId`, so
+ *  the field is REMOVED rather than left as an unused hook a future pass might
+ *  reach for by habit.
+ *
+ *  NOTHING ELSE IN THE TREE CONSUMES IT — verified by grep: `presetId` appears
+ *  in `App.tsx` only as the board-preset STATE (`const [presetId, setPresetId]
+ *  = useState<PresetId>`, `adoptBoardPreset`, the save payload), which is board
+ *  metadata and unrelated to this target type. The panel still needs that state
+ *  for the palette / legend / template defaults; it simply no longer hands it to
+ *  the section decision. */
+
 /** The discriminated selection the inspector must render for. */
 export type InspectorTarget =
-  | {kind: 'edge'; /** §A.3 writes the Cardinality condition as
-       *  `kind === 'edge' && preset.id === 'erd'`, so the preset is part of the
-       *  TARGET, not a second gate in the render. A non-ERD edge has no
-       *  crow's-foot notation to offer, so the section is absent from the list
-       *  entirely rather than rendered empty. */
-      presetId?: string}
+  | {kind: 'edge';
+      /** ROUND AK, AK-8 — THE CARDINALITY GATE, READ FROM THE EDGE ITSELF.
+       *  `true` when the edge carries a crow's-foot marker on EITHER end. The
+       *  predicate is computed by the caller from the selected edge's own
+       *  `markerStart` / `markerEnd` (`isCrowFoot()` in `src/crowfoot.tsx`), so a
+       *  section can no longer appear or vanish because of the board's preset.
+       *
+       *  THE CONSEQUENCE IS DELIBERATE (spec §2): a plain C4 board whose edge has
+       *  no crow's-foot LOSES the Cardinality section — correct, it has no
+       *  cardinality to express — and an ERD-styled edge on a non-ERD board
+       *  GAINS it, which is the fix Harvey's question asks for. */
+      hasCrowFootEnds?: boolean}
   | {kind: 'table'}
   | {kind: 'label'}
   | {kind: 'goblin'; shape: Shape; body: 'card' | 'label-only'};
@@ -216,10 +240,21 @@ export function getInspectorSections(target: InspectorTarget): InspectorSection[
     case 'edge': {
       /* ORDER (per the header note above — `text` sits between content and style
          for a goblin, which is why THAT branch is written out rather than zipped
-         from a single array). The edge list is the §D order, with Cardinality
-         gated on the preset exactly as §A.3 states it. */
+         from a single array). The edge list is the §D order.
+
+         ROUND AK, AK-8 — CARDINALITY IS NOW GATED ON THE EDGE, NOT THE PRESET.
+         It used to read `target.presetId === 'erd'`, i.e. the BOARD's diagram
+         type — the same board-level key the deleted `labelPresets` gate used, and
+         wrong for the same reason: one board can hold a flowchart template AND a
+         C4 template, so `preset` is a lie about half its edges. The condition is
+         now `hasCrowFootEnds`, computed by the caller from the SELECTED EDGE's own
+         `markerStart` / `markerEnd` via `isCrowFoot()` — the precedent §A.2 set for
+         nodes (`hasSub` keys on the SHAPE, "because even with the preset it would
+         be wrong"). §A.3's consequence is accepted deliberately: a C4 edge with no
+         crow's-foot loses the section, an ERD-styled edge on a non-ERD board gains
+         it. */
       const ids: SectionId[] = ['label', 'line', 'markers'];
-      if (target.presetId === 'erd') ids.push('cardinality');
+      if (target.hasCrowFootEnds) ids.push('cardinality');
       ids.push('flow');
       return ids.map(sec);
     }

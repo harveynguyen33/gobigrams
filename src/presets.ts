@@ -36,8 +36,17 @@ export type EdgeDefaults = {
   /** ERD crow's-foot ends (L3c). These override the plain markers above. */
   crowStart?: CrowFoot | null;
   crowEnd?: CrowFoot | null;
-  /** Intent-label suggestions shown in the edge inspector (L3b). */
-  labelPresets?: string[];
+  /* ROUND AK, AK-8 — `labelPresets?: string[]` WAS HERE. It is DELETED, with the
+     reason. It was a per-PRESET list of suggested edge labels, and the panel
+     gated a whole `intent label` row on `preset.edges.labelPresets?.length` —
+     i.e. on the BOARD's preset. A board holding a flowchart template AND a C4
+     template (which Harvey does) makes that board-level string a lie about half
+     its edges. The project already solved this exact problem for NODES: `hasSub`
+     keys on the SHAPE, because even with the preset it would be wrong — the
+     mixed palette offers the same shapes. Removed: the field, its two data sites
+     (`C4_EDGES` + `FLOWCHART_EDGES`), the `C4_LABELS` array, and the JSX block
+     that rendered the buttons. `technField` and the `technology` input STAY —
+     they are a different field with a real consumer. */
   /** Render `techn` as a dim second line after the label. */
   technField?: boolean;
   /** Whether the six flow animations are offered for this preset. */
@@ -257,16 +266,17 @@ const c4PaletteItem = (t: C4Type): PaletteItem => {
 
 const C4_PALETTE_ITEMS: PaletteItem[] = C4_PALETTE_TYPES.map(c4PaletteItem);
 
-/* C4 relationship intent labels — an intent VERB PHRASE, not a bare "uses"
-   (the c4model notation page says to avoid single words), plus the technology
-   suffix the container level calls for. */
-const C4_LABELS = [
-  'uses', 'views account balances and makes payments using', 'reads from',
-  'gets account information from, and makes payments using', 'sends events to',
-  'makes API calls to · HTTPS/JSON', 'reads from and writes to · sync, JDBC',
-  'publishes events to · Kafka', 'sends e-mail using · SMTP', 'sends e-mails to',
-  'serves static assets to · HTTPS', 'invokes · in-process', 'delegates to',
-];
+/* ROUND AK, AK-8 — `C4_LABELS` WAS HERE, and it is DELETED.
+   It was the C4 preset's list of relationship intent VERB PHRASES ("uses",
+   "publishes events to · Kafka", …) that the edge panel offered as one-click
+   label buttons. It was gated on the board's preset, so it appeared or vanished
+   according to a board-level fact rather than anything about the edge in front
+   of the user — the defect Harvey asked about ("tại sao sidebar của line lại
+   khác nhau ở mỗi type?"). Removing it (with the field and its two data sites)
+   deletes the gate outright rather than re-keying it: the row offered no
+   capability the plain `label` input does not, and draw.io's edge Format panel
+   has no equivalent. The `technology` input that the C4 preset ALSO needs is a
+   different field and stays (`technField`). */
 
 /* The three real presets' edge defaults, declared here (above the templates)
    because the templates build their edges through the same factory. */
@@ -276,7 +286,6 @@ export const C4_EDGES: EdgeDefaults = {
   dash: 'dashed',
   markerStart: null,
   markerEnd: MarkerType.ArrowClosed,
-  labelPresets: C4_LABELS,
   technField: true,
   flowAllowed: false,
 };
@@ -287,7 +296,6 @@ export const FLOWCHART_EDGES: EdgeDefaults = {
   dash: 'solid',
   markerStart: null,
   markerEnd: MarkerType.ArrowClosed,
-  labelPresets: ['Yes', 'No', 'True', 'False', 'Retry', 'Timeout', 'Otherwise', 'revise'],
   flowAllowed: true,
 };
 

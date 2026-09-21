@@ -1214,12 +1214,55 @@ body {
 
 /* edges */
 .react-flow__edge-path { stroke-width: 1.8; }
-.react-flow__edge.selected .react-flow__edge-path { stroke: var(--sel) !important; }
+
+/* ROUND AK, AK-1 — THE SELECTION INDICATOR: A SEPARATE PATH, NOT A RECOLOUR.
+
+   DELETED HERE: `.react-flow__edge.selected .react-flow__edge-path { stroke:
+   var(--sel) !important; }`. That rule OVERWROTE the inline stroke the app
+   writes through `updateEdge({data:{strokeKey}})`, so a SELECTED edge lied about
+   its own colour: the body painted `--sel` while the `<marker>` — a separate
+   element whose `<defs>` id encodes its own colour — followed the stored key.
+   Reproduced by selecting a coloured edge and changing its colour.
+
+   THE REPLACEMENT IS ADDITIVE. Rendered by `src/GoblinEdge.tsx` as a second
+   `<path>` (`.edge-sel-overlay`) drawn UNDER the authored body — the same
+   additive shape draw.io puts on its overlay pane, and the same separation
+   Excalidraw / tldraw make. It carries no stored value, so it cannot disagree
+   with the panel.
+
+   COLOUR: tokens only, no new hex. `--sel` is the selection colour the removed
+   rule used, so the signal reads exactly as it did while the body no longer
+   lies. The `stroke-dasharray` is written inline on the element (dash lengths
+   are geometry), so this rule states only the paint.
+
+   TOUCH / KEYBOARD: this is driven by React Flow's own `selected` flag, never by
+   `:hover` — a tap selects with no pointer resting on the element, which is what
+   AK-1's touch rule requires. */
+.edge-sel-overlay {
+  stroke: var(--sel);
+  fill: none;
+  pointer-events: none;
+}
+
+/* ROUND AK, AK-1 — A DEAD RULE FAMILY, WITH THE PROOF IT WAS INERT.
+   `.react-flow__edge.selected .react-flow__edge-text { fill: var(--sel); }` was
+   reported by the research as a THIRD instance of the restroke bug. It is not
+   one, and it was never live: React Flow renders `react-flow__edge-text` only
+   from its `<EdgeText>` helper, which `BaseEdge` mounts ONLY when it is handed a
+   `label` prop (`@xyflow/react/dist/esm/index.js` BaseEdge: `label &&
+   isNumeric(labelX) && isNumeric(labelY) ? EdgeText : null`). `src/GoblinEdge.tsx`
+   calls `<BaseEdge>` with no `label`, and this app's labels are DOM
+   `<div class="edge-label">` elements through `EdgeLabelRenderer` — so neither
+   `edge-text` nor `edge-textwrapper` is ever in the DOM. Grep confirms nothing in
+   `src/` other than this sheet names `edge-text`, so the SELECTED-only rule is
+   DELETED. The base rule is kept (it is the same dead family as `--edge-text-bg`
+   / `.react-flow__edge-textbg`; retiring the family is not this pass's scope) and
+   the whole block is left as the written record that it is inert. */
 .react-flow__edge-text {
   font-family: var(--mono); font-size: 11px; font-weight: 600;
   fill: var(--fg);
 }
-.react-flow__edge.selected .react-flow__edge-text { fill: var(--sel); }
+
 
 /* ---------- Q/T: the edge ENDPOINT grab affordance — PAINT REMOVED ----------
    ROUND Q painted React Flow's `react-flow__edgeupdater` circle (r=14 →
@@ -1287,7 +1330,15 @@ body {
   border: 1px solid transparent; border-radius: 5px;
   padding: 1px 6px; cursor: text; white-space: nowrap;
 }
-.edge-label:hover { border-color: var(--border-strong); background: var(--elevated); }
+/* ROUND AK, AK-1 — THE HOVER-ONLY LABEL STATE IS DELETED, WITH ITS REASON.
+   DELETED HERE: `.edge-label:hover { border-color: var(--border-strong);
+   background: var(--elevated); }`. It was the label's ONLY resting affordance
+   and it required a pointer to be HOVERING the element, which a touch device
+   never does — so on touch the label had no border at all and nothing marked it
+   as interactive. The rule below is driven by React Flow's own `selected` flag
+   and therefore works on every input method; the `title` on the element is the
+   documented affordance, which AK-2 leaves in place while deleting the sidebar
+   hint that used to spell it out. */
 .edge-label.selected { border-color: var(--sel); color: var(--sel); }
 .edge-label-input {
   font-family: var(--mono); font-size: 11px; font-weight: 600;
@@ -2650,10 +2701,32 @@ kbd {
    K5 post-it treatment (actor / note) + group header badge
    ===================================================================== */
 
-/* ---- K1: electric edge (hovered edge, or an edge attached to a hovered node) ---- */
+/* ---- K1: electric edge (hovered edge, or an edge attached to a hovered node) ----
+
+   ROUND AK, AK-1 — THE HOVER EFFECT NO LONGER REPAINTS THE AUTHORED BODY.
+
+   DELETED HERE (two `!important` declarations that were the second live
+   instance of the selection bug):
+       stroke: var(--sel) !important;      ← the colour lie
+       stroke-width: 4 !important;         ← the weight lie
+   Both overwrote the values the panel writes and the panel then displayed: a
+   hovered edge whose stored colour was, say, `amber` painted `--sel`, and one
+   whose stored width was `1.8` painted `4`. That is the SAME defect the
+   selection rule carried (see the AK-1 note at styles.css:1216), on the hover
+   path instead of the selected one.
+
+   WHAT IS KEPT, AND WHY IT IS NOT A LIE. The glow, the marching dash and the
+   keyframe are ADDITIVE marks: none of them encodes a stored value, so none of
+   them can disagree with the panel. The marching dash is deliberately left on
+   the body rather than moved to a second path — it is the one part of this
+   effect that must follow the body's exact geometry, and the body's colour and
+   weight are now untouched beneath it.
+
+   THE BODY'S `stroke` IS NOW NEVER OVERWRITTEN BY ANY RULE IN THIS SHEET. The
+   selection indicator is a separate element (`.edge-sel-overlay`, AK-1 note
+   above); hover adds only the marks below. `checks/round-ak-edge-panel.mjs`
+   asserts both `!important` overrides are absent. */
 .ds-electric .react-flow__edge-path {
-  stroke: var(--sel) !important;
-  stroke-width: 4 !important;
   filter: drop-shadow(0 0 8px var(--sel));
   stroke-dasharray: 5 5;
   animation: ds-edge-dash .5s linear infinite;

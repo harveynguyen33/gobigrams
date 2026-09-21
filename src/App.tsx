@@ -45,7 +45,7 @@ import {
 } from './inspector';
 import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
-  ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtLabelPos, ArtWidth,
+  ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtWidth,
   type PickerOption,
 } from './InspectorPickers';
 /* PACKAGE-P §E — the Text section's data half. ONE import covers both targets:
@@ -275,6 +275,26 @@ const EDGE_HANDLE_REMAP: Record<string, string> = {
 const remapEdgeHandle = (id: string | null | undefined): string | null | undefined =>
   id == null ? id : (EDGE_HANDLE_REMAP[id] ?? id);
 
+/* ROUND AK, AK-4 — THE ORPHAN `animated` FLAG, MIGRATED ON READ.
+
+   The `animated (dash on the line)` toggle was DELETED from the edge panel: it
+   was a `field` sitting OUTSIDE every section (no `secBody` wrapper, directly
+   under Flow Animation) that rendered the SAME marching-dash effect as
+   `flow: 'dash'` — two controls, one effect. The React Flow side of it is
+   `.react-flow__edge.animated path { stroke-dasharray: 5; animation: dashdraw … }`
+   (`@xyflow/react/dist/style.css:162`); ours is `.edge-flow-dash`
+   (`styles.css:2356`). `flow: 'dash'` is kept; the flag is not.
+
+   NOTHING PERSISTED IT AS TRUE, MEASURED: every edge in `boards/` carries
+   `"animated": false` (11 of them, 0 true) — the field only ever wrote `false`
+   because `makeEdge` (`src/presets.ts:177`) hard-codes `animated: false` and the
+   toggle was the only writer. But the read is still MAPPED rather than dropped,
+   so an older board that did set it keeps the look the user chose: `animated:
+   true` on an edge with no `flow` becomes `flow: 'dash'`, which is the same
+   marching dash. An edge that already names a `flow` keeps its own value — the
+   flag must never overwrite a deliberate choice. The `animated` KEY is left in
+   place on the object (unknown to `Edge`, harmless in JSON) exactly as
+   `src/presets.ts` still writes it, so nothing is rewritten on the board. */
 const migrateEdge = (e: Edge): Edge => {
   // G: the handle remap runs FIRST, and the colour migration below works on
   // its result, so an edge with no legacy hex (the `!key` early return) still
@@ -288,20 +308,26 @@ const migrateEdge = (e: Edge): Edge => {
   const key = isColorKey(d.strokeKey)
     ? (d.strokeKey as ColorKey)
     : keyForHex((m.style as any)?.stroke) ?? keyForHex((m.markerEnd as any)?.color);
-  if (!key) return m;               // a genuine custom hex is left alone
+  /* AK-4: the legacy flag maps onto the surviving option — only when the edge
+     has not named a flow of its own. */
+  const flowed: Edge = (m.animated && !d.flow)
+    ? {...m, data: {...d, flow: 'dash'}}
+    : m;
+  if (!key) return flowed;         // a genuine custom hex is left alone
+  const md = (flowed.data ?? {}) as any;
   // The literal is DROPPED, not kept alongside: the key is now the source of
   // truth and the render path resolves it, so a theme change actually recolours
   // the line. (`data.color` on an edge is the custom-hex escape hatch.)
-  const style = {...(m.style as any)};
+  const style = {...(flowed.style as any)};
   if (keyForHex(style.stroke)) delete style.stroke;
-  const out: Edge = {...m, style, data: {...d, strokeKey: key}};
+  const out: Edge = {...flowed, style, data: {...md, strokeKey: key}};
   // the arrowhead colour must become the token too, otherwise it keeps the
   // legacy hex and a theme switch leaves it stale.
-  if ((m.markerEnd as any)?.type && keyForHex((m.markerEnd as any).color)) {
-    out.markerEnd = {...(m.markerEnd as any), color: COLOR_VAR[key]};
+  if ((flowed.markerEnd as any)?.type && keyForHex((flowed.markerEnd as any).color)) {
+    out.markerEnd = {...(flowed.markerEnd as any), color: COLOR_VAR[key]};
   }
-  if ((m.markerStart as any)?.type && keyForHex((m.markerStart as any).color)) {
-    out.markerStart = {...(m.markerStart as any), color: COLOR_VAR[key]};
+  if ((flowed.markerStart as any)?.type && keyForHex((flowed.markerStart as any).color)) {
+    out.markerStart = {...(flowed.markerStart as any), color: COLOR_VAR[key]};
   }
   return out;
 };
@@ -3299,8 +3325,16 @@ export default function App() {
   const eFlowSpeed = (((selectedEdge?.data as any)?.flowDuration ?? 2.4) as number);
   const eFlowIcon = (((selectedEdge?.data as any)?.flowIcon ?? 'mail') as string);
   const ePathType = (Object.keys(PATH_TYPES) as PathType[]).find(k => PATH_TYPES[k] === selectedEdge?.type && k !== 'custom') ?? 'bezier';
-  const eOffset = (((selectedEdge?.data ?? {}) as EdgeData).offset ?? 'center');
+  /* ROUND AK, AK-3 — `eOffset` WAS HERE, and it is deleted with the field it
+     fed. It was the `data.offset` readout for the `label position` row; with that
+     row gone nothing reads it. The VALUE is untouched — `GoblinEdge.tsx:383`
+     still reads `d.offset` — so a board carrying `start`/`end` still renders it. */
 
+  /* NOTE, reported rather than fixed in passing: `markerOptions` below is DEAD
+     (it is defined and never read — checked by grep). It was ALREADY dead before
+     this pass (the PACKAGE-P picker conversion replaced its one consumer with
+     `MARKER_OPTS`), so it is not this pass's to remove and it is left byte-for-byte
+     as found. Flagged here so the next pass does not mistake it for a regression. */
   const markerOptions = [
     {v: 'none', label: 'None'},
     {v: MarkerType.ArrowClosed, label: 'Arrow (closed)'},
@@ -3331,12 +3365,12 @@ export default function App() {
   const CURVE_OPTS: PickerOption[] = (['bezier', 'smoothstep', 'step', 'straight'] as const).map(c => ({
     v: c, label: c, art: <ArtCurve kind={c} />,
   }));
-  /** The label's position along the edge — a 3-button segmented row (§B #1). */
-  const OFFSET_OPTS: PickerOption[] = [
-    {v: 'center', label: 'center', art: <ArtLabelPos pos="center" />},
-    {v: 'start', label: 'start', art: <ArtLabelPos pos="start" />},
-    {v: 'end', label: 'end', art: <ArtLabelPos pos="end" />},
-  ];
+  /* ROUND AK, AK-3 — `OFFSET_OPTS` WAS HERE, AND IT IS DELETED, with the
+   *  `ArtLabelPos` glyph it drew (that glyph had no other consumer). The table
+   *  backed the `label position` row — a 3-button preset for a value the label
+   *  drag already sets — so it went with the row. THE STORED FIELD IS UNTOUCHED:
+   *  `data.offset` is still read by `GoblinEdge.tsx:383`, so a board that
+   *  carries `start`/`end` renders exactly as it did. */
   /** Flow speed (§B #8) — 4 ordinal words, short enough for inline buttons. */
   const SPEED_OPTS: PickerOption[] = [
     {v: '4', label: 'slow', art: null},
@@ -3414,7 +3448,19 @@ export default function App() {
      the returned ordered list, so the panel's shape is decided in exactly one
      place instead of by three nested ternaries in the render. */
   const inspTarget: InspectorTarget =
-    edgeMode || selCount >= 2 ? {kind: 'edge', presetId: preset.id}
+    edgeMode || selCount >= 2
+      /* ROUND AK, AK-8 — THE CARDINALITY GATE IS READ FROM THE EDGE, NOT THE
+         BOARD. `hasCrowFootEnds` asks whether the SELECTED edge carries a
+         crow's-foot marker on either end (`isCrowFoot`), so the section appears
+         on an edge that HAS cardinality to express and nowhere else — instead of
+         appearing on every edge of an ERD board and no edge of any other. The
+         multi-select branch carries no single edge, so it is false there; its
+         Cardinality rows are meaningless for N edges anyway. */
+      ? {kind: 'edge',
+         hasCrowFootEnds: edgeMode
+           ? (isCrowFoot((selectedEdge?.markerStart as any)?.type)
+              || isCrowFoot((selectedEdge?.markerEnd as any)?.type))
+           : false}
       : selected?.type === 'table' ? {kind: 'table'}
       : selected?.type === 'label' ? {kind: 'label'}
       : selected
@@ -4945,25 +4991,16 @@ export default function App() {
                     onChange={e => updateEdge({label: e.target.value})}
                   />
                 </div>
-                {preset.edges.labelPresets?.length ? (
-                  <div className="field">
-                    <label>intent label{preset.edges.technField ? ' (label · technology)' : ''}</label>
-                    <div className="swatches" style={{gap: 6}}>
-                      {preset.edges.labelPresets.map(l => (
-                        <button
-                          key={l}
-                          type="button"
-                          className="mbtn"
-                          title={`Use “${l}”`}
-                          onClick={() => {
-                            const [label, techn] = l.split(' · ');
-                            updateEdge({label, data: preset.edges.technField ? {techn: techn ?? undefined} : undefined});
-                          }}
-                        >{l}</button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                {/* ROUND AK, AK-8 — THE `intent label` BLOCK IS DELETED, WITH ITS
+                    REASON. It was gated on `preset.edges.labelPresets?.length`,
+                    i.e. on the BOARD's preset, so the row appeared on a C4 or
+                    flowchart board and vanished elsewhere — regardless of which
+                    edge was selected. Harvey asked exactly this ("tại sao sidebar
+                    của line lại khác nhau ở mỗi type?"); the gate is gone AND the
+                    field is gone, so there is no board-level fact left to key it
+                    on. The `technology` input below STAYS: `technField` is a
+                    different field with a live consumer (`GoblinEdge` renders
+                    `d.techn` as a dim second line), and it is not a label list. */}
                 {preset.edges.technField ? (
                   <div className="field">
                     <label>technology</label>
@@ -4974,26 +5011,65 @@ export default function App() {
                     />
                   </div>
                 ) : null}
-                <div className="field">
-                  <label>label position</label>
-                  <ToggleRow
-                    value={eOffset}
-                    onChange={v => updateEdge({data: {offset: v as 'center' | 'start' | 'end'}})}
-                    options={OFFSET_OPTS}
-                    title="Label position"
-                  />
-                </div>
+                {/* ROUND AK, AK-3 — THE `label position` FIELD IS DELETED, WITH
+                    ITS REASON. It offered a 3-button preset (center / start /
+                    end) for a value the panel was ALREADY able to set by drag,
+                    which is the confusion to avoid: draw.io ships a 9-way
+                    `Position` dropdown that its own renderer IGNORES for edges
+                    (its manual concedes it anchors to the diamond, not the
+                    connector). Centre is reachable by dragging near the middle,
+                    so the preset list carried no capability the drag did not.
+
+                    THE STORED FIELD IS UNTOUCHED. `data.offset` is still read by
+                    `GoblinEdge.tsx:383`, so a board that already carries
+                    `start`/`end` renders exactly as it did — this deletes the
+                    CONTROL, not the value. (`pass 2 / AK-10 replaces the preset
+                    with the free 2-D drag the field was duplicating.) */}
               </>); return null; })()}
               {(() => { secBody('line', <>
                 <div className="field">
                   <label>stroke color</label>
                   {swatchRow(eStrokeKey, setEdgeColor)}
                 </div>
-              <div className="field-row">
+                {/* ROUND AK, AK-6 — ONE FULL-WIDTH FLAT ROW PER CONTROL.
+
+                    WAS: `stroke width` and `line style` inside a shared
+                    `.field-row` (a 2-column grid, so each control got half the
+                    panel), and `curvature` a lone `IconPickerRow` trigger +
+                    popover. NOW: each owns its own `.field`, and each is a flat
+                    `ToggleRow` — the existing control kit, not a new control.
+
+                    WHY A ROW AND NOT A POPOVER — THE THRESHOLD, CITED.
+                    tldraw states it in source: `items.length > 4 ? Grid : Row`
+                    (`StylePanelButtonPicker.tsx#L152`), and Excalidraw behaves
+                    identically (flat rows for 3-4, a popover for its 9-marker
+                    set). MEASURED option counts here, not assumed:
+                    `line style` 3, `curvature` 4 — both flat rows, as the rule
+                    says. `stroke width` is 5 (`[1, 1.5, 1.8, 2, 3]`), so it is
+                    the ONE set above the cited threshold; it is kept as a row
+                    because the row still measures clean — 5 cells over the 253px
+                    field with 5px gaps is a `(253 - 4*5) / 5 = 46.6px` cell and a
+                    `46.6 - 16 - 2 = 28.6px` content box, which fits the 26px
+                    `ArtWidth` glyph with 2.6px of slack — and because the brief
+                    asks for it explicitly. THE COUNT DISCREPANCY IS REPORTED
+                    RATHER THAN SILENTLY ABSORBED: the same brief states the width
+                    set is 3 options; it is measured at 5.
+
+                    WHY FLAT ROWS AT ALL, HONESTLY. "mature tools use button rows"
+                    is TRUE for markers and FALSE for line style — draw.io uses a
+                    `<select>` there. The defensible reason here is first-time-user
+                    DISCOVERABILITY for a tool that will be shared: every option is
+                    visible without opening anything. That is the claim; no false
+                    precedent is cited.
+
+                    EQUAL WIDTHS come from the existing `.insp-seg .insp-seg-btn
+                    { flex: 1 1 0; min-width: 0 }` rule (the ROUND AA fix), so no
+                    per-count arithmetic and no hard-coded pixel width is added
+                    here. `checks/round-aa-align-marquee-palette.mjs` is the guard
+                    that enumerates these call sites from the source. */}
                 <div className="field">
                   <label>stroke width</label>
-                  <IconPickerRow
-                    id="insp-stroke-width"
+                  <ToggleRow
                     value={eWidth}
                     onChange={v => updateEdge({style: {strokeWidth: Number(v)}})}
                     options={WIDTH_OPTS}
@@ -5002,60 +5078,73 @@ export default function App() {
                 </div>
                 <div className="field">
                   <label>line style</label>
-                  <IconPickerRow
-                    id="insp-line-style"
+                  <ToggleRow
                     value={eDash}
                     onChange={v => updateEdge({style: {strokeDasharray: dashArray(v)}})}
                     options={DASH_OPTS}
                     title="Line style"
                   />
                 </div>
-              </div>
-              <div className="field">
-                <label>curvature</label>
-                <IconPickerRow
-                  id="insp-curvature"
-                  value={ePathType}
-                  onChange={v => {
-                    const id = v as PathType;
-                    /* G: the chosen curvature becomes the default for the NEXT
-                       edges drawn. The preference is persisted, never written
-                       back onto other edges, and the control still shows
-                       `ePathType` — the SELECTED edge — so an older bezier edge
-                       keeps reading `bezier` while the default is `smoothstep`.
-                       NOTHING HERE TOUCHES `bendX`/`bendY`: the picker sets
-                       `edge.type` and calls `rememberEdgePath`, exactly as the
-                       select it replaces did. */
-                    updateEdge({type: PATH_TYPES[id]});
-                    if (id !== 'custom') rememberEdgePath(id);
-                  }}
-                  options={CURVE_OPTS}
-                  title="Curvature"
-                />
-              </div>
+                <div className="field">
+                  <label>curvature</label>
+                  <ToggleRow
+                    value={ePathType}
+                    onChange={v => {
+                      const id = v as PathType;
+                      /* G: the chosen curvature becomes the default for the NEXT
+                         edges drawn. The preference is persisted, never written
+                         back onto other edges, and the control still shows
+                         `ePathType` — the SELECTED edge — so an older bezier edge
+                         keeps reading `bezier` while the default is `smoothstep`.
+                         NOTHING HERE TOUCHES `bendX`/`bendY`: the picker sets
+                         `edge.type` and calls `rememberEdgePath`, exactly as the
+                         select it replaces did. */
+                      updateEdge({type: PATH_TYPES[id]});
+                      if (id !== 'custom') rememberEdgePath(id);
+                    }}
+                    options={CURVE_OPTS}
+                    title="Curvature"
+                  />
+                </div>
               </>); return null; })()}
               {(() => { secBody('markers', <>
-              <div className="field-row">
-                <div className="field">
-                  <label>arrow head</label>
-                  <IconPickerRow
-                    id="insp-marker-end"
-                    value={eMarkerEnd}
-                    onChange={v => updateEdge({markerEnd: markerFor(v, eStroke)})}
-                    options={MARKER_OPTS}
-                    title="Arrow head"
-                  />
-                </div>
-                <div className="field">
-                  <label>head start</label>
-                  <IconPickerRow
-                    id="insp-marker-start"
-                    value={eMarkerStart}
-                    onChange={v => updateEdge({markerStart: markerFor(v, eStroke)})}
-                    options={MARKER_OPTS_START}
-                    title="Head start"
-                  />
-                </div>
+              {/* ROUND AK, AK-5/AK-7 — THE TWO END CONTROLS.
+                  RENAMED: `arrow head` → `start`, `head start` → `end`. The
+                  labels were the defect, not the wiring: today's "arrow head" is
+                  `markerEnd` and today's "head start" is `markerStart`, so the row
+                  labels now match the values they write. Decision D3 chose
+                  Start/End over "head start/head end" because no surveyed tool
+                  uses "head" (tldraw uses `Start`/`End`), and the "Markers"
+                  section title already supplies the context.
+                  STORAGE KEYS ARE UNCHANGED: `markerStart` / `markerEnd` and
+                  `markerFor()` are untouched — this is a string change only.
+
+                  EACH IS NOW A FLAT 3-OPTION ROW (was an `IconPickerRow` trigger
+                  + popover). 3 options ≤ the cited threshold of 4 (AK-6 note),
+                  and `MARKER_OPTS` / `MARKER_OPTS_START` were already
+                  `PickerOption[]` tables, so they are reused verbatim as row
+                  options — `ArtArrow`'s `flip` variant supplies the mirrored
+                  glyphs, so the start row still reads as the mirror of the end
+                  row. This is the half where "mature tools use button rows" IS
+                  true (draw.io puts its arrowheads in a row), and it is cited as
+                  such. */}
+              <div className="field">
+                <label>start</label>
+                <ToggleRow
+                  value={eMarkerStart}
+                  onChange={v => updateEdge({markerStart: markerFor(v, eStroke)})}
+                  options={MARKER_OPTS_START}
+                  title="Start marker"
+                />
+              </div>
+              <div className="field">
+                <label>end</label>
+                <ToggleRow
+                  value={eMarkerEnd}
+                  onChange={v => updateEdge({markerEnd: markerFor(v, eStroke)})}
+                  options={MARKER_OPTS}
+                  title="End marker"
+                />
               </div>
               </>); return null; })()}
               {(() => { secBody('flow', <>
@@ -5146,9 +5235,17 @@ export default function App() {
                   copy of the same rule. §C additionally folds this section by
                   default; pass 1 renders it open. */}
               {hasSection('cardinality') && (() => { secBody('cardinality', <>
+                  {/* ROUND AK, AK-5 — `source end` / `target end` RENAMED to the
+                      SAME two words the Markers section now uses (`start` /
+                      `end`), so the panel stops using three vocabularies for two
+                      ends. Storage keys (`markerStart` / `markerEnd`) are
+                      unchanged — a string change only.
+                      These stay `IconPickerRow` (a popover): the crow's-foot set
+                      is SIX options, above the cited flat-row threshold of 4
+                      (AK-6 note), and 6 glyphs do not fit a 253px row legibly. */}
                   <div className="field-row">
                     <div className="field">
-                      <label>source end</label>
+                      <label>start</label>
                       <IconPickerRow
                         id="insp-card-start"
                         value={(((selectedEdge!.markerStart as any)?.type ?? 'none') as string)}
@@ -5158,11 +5255,11 @@ export default function App() {
                             : (v === 'none' ? undefined : ({type: v as MarkerType, color: eStroke, width: 14, height: 14} as any))});
                         }}
                         options={CROW_START_OPTS}
-                        title="Cardinality: source end"
+                        title="Cardinality: start"
                       />
                     </div>
                     <div className="field">
-                      <label>target end</label>
+                      <label>end</label>
                       <IconPickerRow
                         id="insp-card-end"
                         value={(((selectedEdge!.markerEnd as any)?.type ?? 'none') as string)}
@@ -5172,7 +5269,7 @@ export default function App() {
                             : (v === 'none' ? undefined : ({type: v as MarkerType, color: eStroke, width: 14, height: 14} as any))});
                         }}
                         options={CROW_END_OPTS}
-                        title="Cardinality: target end"
+                        title="Cardinality: end"
                       />
                     </div>
                   </div>
@@ -5180,23 +5277,28 @@ export default function App() {
                     Derived: <b>{cardinalityLabel((selectedEdge!.markerStart as any)?.type, (selectedEdge!.markerEnd as any)?.type) || '—'}</b>
                   </div>
               </>); return null; })()}
-              <div className="field">
-                <label>animated (dash on the line)</label>
-                <button
-                  className={`toggle${selectedEdge!.animated ? ' on' : ''}`}
-                  onClick={() => updateEdge({animated: !selectedEdge!.animated})}
-                >
-                  {selectedEdge!.animated ? 'on' : 'off'}
-                </button>
-              </div>
+              {/* ROUND AK, AK-4 — THE ORPHAN `animated (dash on the line)` FIELD
+                  IS DELETED. It sat OUTSIDE every section (no `secBody`, so it
+                  rendered as a loose row under Flow Animation) and drew the SAME
+                  marching-dash effect as the Flow Animation picker's `Dash`
+                  option — two controls, one effect. `flow: 'dash'` is the one
+                  that survives. An edge that had persisted `animated: true` keeps
+                  its look: `migrateEdge` (App.tsx, AK-4 note) maps it to
+                  `flow: 'dash'` on read. See that note for the measurement that
+                  nothing in `boards/` ever set it true. */}
               </>); return null; })()}
               {/* K3: the payload-animation control moved to Settings → Canvas
                   ("Reduce motion"), where the preference belongs; the state and
                   its persisted override stay in useAnimationGating. */}
-              <div className="hint">
-                Double-click the label on the canvas to rename it (<kbd>Enter</kbd> commit ·
-                <kbd>Esc</kbd> cancel). Every change is undoable with <kbd>⌘/Ctrl Z</kbd>.
-              </div>
+              {/* ROUND AK, AK-2 — THE SIDEBAR HINT IS DELETED.
+                  It read "Double-click the label on the canvas to rename it
+                  (Enter commit · Esc cancel). Every change is undoable with
+                  ⌘/Ctrl Z." — four sentences of instructions standing where a
+                  control belongs. draw.io's live edge Format panel contains ZERO
+                  sentence-length strings; the controls themselves carry the
+                  affordance (`.edge-label`'s own `title` already says
+                  "Double-click to rename this connection"), and the keyboard
+                  contract is on the shortcuts sheet (`?`). */}
               {renderSections()}
             </>
           ) : selCount >= 2 ? (

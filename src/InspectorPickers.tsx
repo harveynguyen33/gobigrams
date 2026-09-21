@@ -256,17 +256,22 @@ export const ArtCardinality = ({kind, flip}: {kind: string; flip?: boolean}) => 
   </G>
 );
 
-/** Where the edge's label sits along the line: the box IS the label. */
-export const ArtLabelPos = ({pos}: {pos: 'center' | 'start' | 'end'}) => (
-  <G>
-    <line x1="1" y1="9" x2="25" y2="9" stroke="currentColor" strokeWidth="1.4" opacity="0.55" />
-    <rect
-      x={pos === 'start' ? 3 : pos === 'end' ? 15 : 9}
-      y="5" width="8" height="8" rx="1.6"
-      fill="var(--elevated)" stroke="currentColor" strokeWidth="1.5"
-    />
-  </G>
-);
+/** Where the edge's label sits along the line: the box IS the label.
+ *
+ *  ROUND AK, AK-3 — DELETED WITH ITS ONLY CONSUMER. `ArtLabelPos` was drawn
+ *  solely by `OFFSET_OPTS` in `App.tsx`, which backed the `label position` row.
+ *  That row is gone (the label drag sets the same value), so the glyph has no
+ *  referent. Left in the file as a written record rather than silently dropped;
+ *  `checks/package-p-inspector.mjs` re-anchors its `ArtLabelPos` count to 0.
+ *
+ *  export const ArtLabelPos = ({pos}: {pos: 'center' | 'start' | 'end'}) => (
+ *    <G>
+ *      <line x1="1" y1="9" x2="25" y2="9" stroke="currentColor" strokeWidth="1.4" opacity="0.55" />
+ *      <rect x={pos === 'start' ? 3 : pos === 'end' ? 15 : 9} y="5" width="8" height="8"
+ *        rx="1.6" fill="var(--elevated)" stroke="currentColor" strokeWidth="1.5" />
+ *    </G>
+ *  );
+ */
 
 /* ===========================================================================
    IconPickerRow — trigger + caret + popover of icon+label rows (§B #2-#6,#9,#10).

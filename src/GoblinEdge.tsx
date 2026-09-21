@@ -482,6 +482,35 @@ const GoblinEdge = memo((props: EdgeProps) => {
 
   return (
     <>
+      {/* ROUND AK, AK-1 — THE SELECTION INDICATOR, DRAWN UNDER THE BODY.
+
+          WHY A SECOND PATH AND NOT A CSS RESTROKE. The rule that used to live
+          at `src/styles.css:1217` —
+          `.react-flow__edge.selected .react-flow__edge-path { stroke: var(--sel)
+          !important }` — overwrote the inline stroke the panel writes, so a
+          SELECTED edge painted `--sel` while the panel (and the `<marker>`, a
+          separate element) still showed the stored colour. Selection was a
+          RECOLOUR, and a recolour can lie.
+
+          The indicator is therefore its own element, exactly as every surveyed
+          tool does it (draw.io: a dashed shape on the overlay pane; Excalidraw /
+          tldraw: a separate indicator pass). It is rendered FIRST, so it paints
+          UNDER `BaseEdge`'s authored path and never hides the colour it is
+          pointing at; `pointer-events: none` (in the sheet) keeps it out of the
+          hit area, so the click that selects the edge is unchanged.
+
+          `selected` is React Flow's own per-edge flag, so this adds NO state and
+          needs NO hover — a tap on a touch device selects just as a click does.
+          The dash is inline because it is geometry, not a theme decision; the
+          colour comes from `--sel` in the sheet (no new hex). */}
+      {selected && (
+        <path
+          className="edge-sel-overlay"
+          d={path}
+          strokeWidth={((props.style as any)?.strokeWidth ?? 1.8) + 5}
+          strokeDasharray="6 4"
+        />
+      )}
       <BaseEdge
         id={id}
         path={path}
