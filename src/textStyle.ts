@@ -579,3 +579,49 @@ export function textStyleVars(
   }
   return out;
 }
+
+/** ROUND AM, AM-2 — THE EDGE LABEL'S OWN SUBSET of `textStyleVars`, as a
+ *  FUNCTION rather than at the call site.
+ *
+ *  WHY THIS EXISTS AT ALL. The edge label is the fourth target of the text
+ *  vocabulary and it is NOT a node: it is an inline chip with no padded box, so
+ *  two of `TextStyle`'s six fields have no element to act on here.
+ *
+ *    · `align`    — `.edge-label` is a `display: inline` chip whose width IS its
+ *                   text; there is no box for `text-align` or `justify-content`
+ *                   to distribute text inside. Its POSITION on the line is
+ *                   `data.labelOffset`, set by the drag.
+ *    · `vAlign`   — same box, same reason, one axis over.
+ *    · `colorKey` — the label's colour is ALREADY a control, and a different
+ *                   one: `data.labelTextKey`, rendered by the LABEL section
+ *                   (`--label-fg`, set by `GoblinEdge`). The Text section
+ *                   deliberately renders no colour row for an edge, so emitting
+ *                   `--ts-color` here would be a SECOND writer for the label's
+ *                   ink — one the panel never shows, so a stored value in it
+ *                   could repaint the label with nothing in the UI to undo it.
+ *                   `--ts-color` keeps its single, node-and-label-kind meaning.
+ *
+ *  WHY NOT FILTER THE OUTPUT AT THE CALL SITE. That is what the first cut of
+ *  AM-2 did, as a `delete` chain on the returned record, and it was wrong for
+ *  this project's reason rather than for style: the decision becomes invisible
+ *  to any harness (a probe would have to re-implement the deletes to ask what
+ *  the label really emits) and the `delete v['--ts-valign']` pair silently
+ *  assumed `textStyleVars` would emit `--ts-valign` and `--ts-align-items`
+ *  TOGETHER, so a third property added to that pair in a future round would
+ *  leak onto the label with nothing to catch it. Here the rule is stated once,
+ *  positively, and `checks/round-am-edge-panel.mjs` executes THIS function to
+ *  assert both halves: what an edge style emits, and what it must NOT.
+ *
+ *  IT DELEGATES RATHER THAN RE-DERIVING. The three properties it does emit come
+ *  from the SAME `textStyleVars` call the node path makes, with the same
+ *  emitter, so an untouched board emits nothing (the `{}` of a style-less
+ *  label) and the sheet's fallbacks paint the previous bytes exactly. */
+export function edgeTextStyleVars(ts: TextStyle | undefined): Record<string, string> {
+  const out = textStyleVars(ts, 'left', 'middle');
+  delete out['--ts-color'];
+  delete out['--ts-align'];
+  delete out['--ts-justify'];
+  delete out['--ts-valign'];
+  delete out['--ts-align-items'];
+  return out;
+}

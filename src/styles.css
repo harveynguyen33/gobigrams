@@ -1347,7 +1347,36 @@ body {
    does not exist on touch. */
 .edge-label {
   position: absolute; pointer-events: all;
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  /* ROUND AM, AM-2 — THE LABEL'S TEXT STYLE, FROM THE SAME THREE PROPERTIES THE
+     NODE PATH EMITS. `data.labelStyle` (a `TextStyle`) is spread onto this
+     element by `textStyleVars` — the SAME emitter `DiagramNode.tsx` and
+     `LabelNode.tsx` use, so there is ONE text vocabulary and not a second one
+     that could drift from the node's — and each of these three declarations
+     keeps TODAY'S LITERAL as its fallback.
+
+     WHY FALLBACKS AND NOT A SEPARATE RULE FOR "STYLED" LABELS. An untouched board
+     carries no `labelStyle`, so `textStyleVars` returns `{}` and React emits no
+     inline custom property at all: every label on every existing board resolves
+     through the fallbacks below and must paint the EXACT bytes it painted before
+     this item. So the fallbacks are not decoration — they ARE the parity
+     guarantee, and each one is the value this rule carried before the change:
+
+       font-size   was the literal `11px`      → `calc(11px * var(--ts-scale, 1))`
+       font-weight was the literal `600`       → `var(--ts-weight, 600)`
+       font-family was the literal `var(--mono)` → `var(--ts-font, var(--mono))`
+
+     THE `1` AND THE `600` ARE LOAD-BEARING AND EACH DIFFERS FROM THE NODE'S.
+     `.node-sub` and the other node rows fall back to `400`, because that IS their
+     resting weight — this label has always been SEMIBOLD, so its no-write weight
+     is `600` and `textStyleVars`'s `700` for a stored `weight:'bold'` is a real
+     change ON TOP of it. Falling back to `400` here would have silently lightened
+     every existing label: a parity defect with no visual alarm, which is exactly
+     the class of bug this round's byte-identical rule exists to catch. `--ts-font`
+     resolves to a full family STACK (`TEXT_FONT_FAMILY`), which is why the
+     fallback is the mono stack `var(--mono)` and not a key name. */
+  font-family: var(--ts-font, var(--mono));
+  font-size: calc(11px * var(--ts-scale, 1));
+  font-weight: var(--ts-weight, 600);
   /* ROUND AL, AL-3 — the two colour hooks the renderer sets as inline custom
      properties. Each falls back to the token this rule (and `.lb-*`) already
      used, so an edge that carries neither key paints the EXACT colour it painted

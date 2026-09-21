@@ -252,8 +252,35 @@ export function getInspectorSections(target: InspectorTarget): InspectorSection[
          nodes (`hasSub` keys on the SHAPE, "because even with the preset it would
          be wrong"). §A.3's consequence is accepted deliberately: a C4 edge with no
          crow's-foot loses the section, an ERD-styled edge on a non-ERD board gains
-         it. */
-      const ids: SectionId[] = ['label', 'line', 'markers'];
+         it.
+
+         ROUND AM, AM-2 — `text` NOW SITS IN THIS LIST, and its POSITION is the
+         whole argument for it. The header note above states the goblin order as
+         `content → text → style` and gives the reason: a target's reason to exist
+         first, then how its text is FORMATTED, then the shape/line it is painted
+         with. An edge's equivalent of "content" is its LABEL — the words on the
+         line, which is the one thing an edge carries that a user reads — so the
+         edge order is the same ladder read in the edge's own vocabulary:
+         `label → text → line → markers → [cardinality] → flow`.
+
+         WHY IT IS NOT APPENDED AT THE END (the tempting one-line change). An
+         appended `text` would put "how big is the text" AFTER "what colour is the
+         line", "which arrowheads" and "which cardinality" — i.e. three sections
+         about the PATH between the label and the control that formats that label.
+         The goblin branch could zip its ids from one array; this one is written
+         out precisely because `text`'s index is a decision and a decision belongs
+         where a reader can see it.
+
+         THE SECTION IS NOT A NAMESAKE OF THE GOBLIN'S. Both read the SAME
+         `TextStyle` model and the SAME `textStyleVars` emitter (`src/textStyle.ts`
+         — one text vocabulary, deliberately not a second), but an edge label is
+         an inline chip with no padded box to align INSIDE, so this target renders
+         SIZE / WEIGHT / FONT and never ALIGN or vAlign. That omission is a fact
+         about the label, not an unfinished row: its position is the drag gesture
+         (`data.labelOffset`), which is a different affordance from `text-align`.
+         The edge's text COLOUR also stays where it already is — `labelTextKey` in
+         the LABEL section — so the colour control is not duplicated here. */
+      const ids: SectionId[] = ['label', 'text', 'line', 'markers'];
       if (target.hasCrowFootEnds) ids.push('cardinality');
       ids.push('flow');
       return ids.map(sec);

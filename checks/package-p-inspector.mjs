@@ -139,8 +139,8 @@ assert('a.label → [text]',
 assert('a.table → [table, columns, showMode]',
   JSON.stringify(ids({kind: 'table'})) === '["table","columns","showMode"]',
   JSON.stringify(ids({kind: 'table'})));
-assert('a.edge (non-ERD) → [label, line, markers, flow]',
-  JSON.stringify(ids({kind: 'edge'})) === '["label","line","markers","flow"]',
+assert('a.edge (non-ERD) → [label, text, line, markers, flow]',
+  JSON.stringify(ids({kind: 'edge'})) === '["label","text","line","markers","flow"]',
   JSON.stringify(ids({kind: 'edge'})));
 /* ROUND AK, AK-8 — RE-ANCHORED, NOT DELETED. The gate moved from the BOARD's
    preset to the EDGE's own crow's-foot markers, so the fixture that expresses
@@ -153,11 +153,14 @@ assert('a.edge (non-ERD) → [label, line, markers, flow]',
                 which is the whole point of the pass (spec §2, Item A).
    `presetId` no longer exists on `InspectorTarget` at all, so the old fixture
    would now be a TYPE error as well as a wrong expectation. */
-assert('a.edge (crow\'s-foot ends) → [label, line, markers, cardinality, flow]',
-  JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","line","markers","cardinality","flow"]',
+assert('a.edge (crow\'s-foot ends) → [label, text, line, markers, cardinality, flow]',
+  JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","text","line","markers","cardinality","flow"]',
   JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true}))
   + '  (RE-ANCHORED by AK-8: the gate reads `hasCrowFootEnds`, i.e. the EDGE\'s own '
-  + 'markerStart/markerEnd, NOT the board preset the old `presetId: \'erd\'` fixture named)');
+  + 'markerStart/markerEnd, NOT the board preset the old `presetId: \'erd\'` fixture named. '
+  + 'RE-ANCHORED AGAIN by ROUND AM (AM-2): the `text` section joined the edge list, so both '
+  + 'edge expectations gained it — see the AM note on `f.control-non-goblin-targets` for WHERE '
+  + 'it was placed and why.)');
 /* NEGATIVE CONTROL for the gate itself: an edge WITHOUT a crow's-foot must NOT
    carry it, or the assertion above would pass on a function that always returns
    it. This replaces the old preset-based control — same job, new key. */
@@ -838,15 +841,34 @@ assert('f.the-note-no-longer-describes-the-omission',
     && /PASS 2 COMPLETED/.test(INSP_RAW),
   'src/inspector.ts now states the omission as CLOSED, and the header keeps the reason the ORDER is '
   + 'what it is (one decision point, not three nested ternaries)');
-/* NEGATIVE CONTROL for the ordering assertions: a target that must NOT have it. */
-assert('f.control-non-goblin-targets-are-unchanged-from-pass-1',
+/* NEGATIVE CONTROL for the ordering assertions: a target that must NOT have it.
+   ROUND AM (AM-2) — RE-ANCHORED, NOT WEAKENED. The old claim's last clause was
+   "NO target other than goblin/label gained a `text` section" — which is exactly
+   what AM-2 changes on purpose: an EDGE now lists `text` as well, because an
+   edge's label is a piece of text a user formats and the section is the same
+   SIZE/WEIGHT/FONT vocabulary a node's is. The clause is not deleted; it is
+   re-pointed at the targets that must STILL not have it (a table never does),
+   and the edge's new position is asserted positively beside it — `text` sits
+   AFTER `label` and BEFORE `line`, which is the one thing that could silently
+   move if the array were ever re-ordered. A plain "no other target has text"
+   survives for `table`. */
+assert('f.control-the-targets-that-must-NOT-gain-text-still-do-not',
   JSON.stringify(ids({kind: 'table'})) === '["table","columns","showMode"]'
-    && JSON.stringify(ids({kind: 'edge'})) === '["label","line","markers","flow"]'
-    && JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","line","markers","cardinality","flow"]'
-    && !ids({kind: 'table'}).includes('text') && !ids({kind: 'edge'}).includes('text'),
-  'table [table,columns,showMode]; plain edge [label,line,markers,flow]; a crow\'s-foot edge adds '
-  + 'cardinality before flow (RE-ANCHORED by AK-8 from the `presetId: \'erd\'` fixture); '
-  + 'NO target other than goblin/label gained a `text` section');
+    && JSON.stringify(ids({kind: 'edge'})) === '["label","text","line","markers","flow"]'
+    && JSON.stringify(ids({kind: 'edge', hasCrowFootEnds: true})) === '["label","text","line","markers","cardinality","flow"]'
+    && JSON.stringify(ids({kind: 'label'})) === '["text"]'
+    && !ids({kind: 'table'}).includes('text')
+    /* the POSITION, not merely the presence: `text` is between `label` and
+       `line` for an edge, which is the ladder `content → text → style` read in
+       the edge's own vocabulary (see the AM-2 note in `src/inspector.ts`). */
+    && ids({kind: 'edge'}).indexOf('text') === ids({kind: 'edge'}).indexOf('label') + 1
+    && ids({kind: 'edge'}).indexOf('text') < ids({kind: 'edge'}).indexOf('line'),
+  'table still [table,columns,showMode] with NO `text`; plain edge [label,text,line,markers,flow]; '
+  + 'a crow\'s-foot edge adds cardinality before flow. RE-ANCHORED by ROUND AM (AM-2): the OLD '
+  + 'claim\'s second half ("NO target other than goblin/label gained a `text` section") is the '
+  + 'thing AM-2 changed deliberately, so it is replaced by the two claims that still hold — a '
+  + 'table never gains it, and for an edge it lands at index 1 (directly after `label`, before '
+  + '`line`). A `text` that drifted to the END of the edge list, or onto a table, reddens this.');
 
 console.log('\n' + '='.repeat(78));
 console.log('(g) §E.3(a) — exactly ONE text editor is left');
@@ -928,11 +950,25 @@ assert('h.the-panel-WRITES-through-that-merge-and-never-directly',
   /* ROUND Z FIX 2 — BOTH defaults ride in, the vertical one read off the same
      target the horizontal one is. A two-argument call here would compile (the
      model requires both, so it could not) and would silently re-introduce a
-     single global vertical default. */
+     single global vertical default.
+     ROUND AM (AM-2) — RE-ANCHORED, NOT WEAKENED. The old claim ended in
+     `countOf(APP, 'mergeTextStyle(') === 1` — "the only writer is
+     `writeTextStyle`". AM-2 adds a SECOND target that stores the same
+     `TextStyle` (an edge's `data.labelStyle`), so there are now exactly TWO
+     call sites, one per stored key, and the claim becomes `=== 2` with BOTH
+     argument tuples named. That is a STRONGER assertion than the count was: a
+     third writer appearing anywhere still reddens it, and a writer that
+     dropped either default now fails on the tuple rather than on the count.
+     The property the probe was really protecting — "no call site constructs a
+     `textStyle` object literal", i.e. no value the user did not choose — is
+     unchanged and still asserted. */
   APP.includes('mergeTextStyle(tsStored, patch, tsAlignDefault, tsVAlignDefault)')
-    && countOf(APP, 'mergeTextStyle(') === 1
-    && !/textStyle:\s*\{/.test(APP),
-  'the only writer is `writeTextStyle`, one call into the merge; no call site constructs a textStyle '
+    && APP.includes('mergeTextStyle(edgeLabelStored, patch, tsAlignDefault, tsVAlignDefault)')
+    && countOf(APP, 'mergeTextStyle(') === 2
+    && !/textStyle:\s*\{/.test(APP) && !/labelStyle:\s*\{/.test(APP),
+  'the two writers are `writeTextStyle` (a node/`label` target, `tsStored`) and '
+  + '`writeEdgeLabelStyle` (an EDGE, `edgeLabelStored`), each ONE call into the same merge with '
+  + 'BOTH per-target defaults passed; no call site constructs a `textStyle` OR a `labelStyle` '
   + 'object literal, which is what a "writes a value the user did not choose" bug looks like');
 assert('h.defaults-are-per-target-for-align-and-derived-not-hardcoded',
   TS.includes("body === 'label-only' ? 'center' : 'left'")
@@ -1640,7 +1676,21 @@ console.log('='.repeat(78));
 /* The eight rows, as SUBJECT KEYS (the sweep's own notion of "the element this
    rule styles"), each with the stack its PRE-ITEM-2 base rule declares. That
    pair is the contract: the consumer's fallback must be byte-identical to this
-   stack, or a node with NOTHING STORED changes family. */
+   stack, or a node with NOTHING STORED changes family.
+   ROUND AM (AM-2) — A NINTH SUBJECT, THE EDGE LABEL, IS NOT A "NODE-TEXT ROW".
+   `.edge-label` now reads `--ts-font` too (it is the fourth target of the same
+   text vocabulary), so the sweep sees TEN consumers over NINE subjects. It is
+   deliberately NOT added to `TS_FONT_ROWS`: this table's contract is "the stack
+   its PRE-ITEM-2 base rule declares", and `.edge-label` had no base rule to
+   inherit from — before this round it declared the stack LITERALLY for the first
+   time, which is exactly the literal AM-2 put in the fallback position. Adding
+   it here would quietly turn a table about the EIGHT pre-existing node rows into
+   one about nine targets and make the (l2.a) count assertion meaningless. It is
+   asserted where it belongs instead — on its own subject, with its own literal —
+   by `checks/round-am-edge-panel.mjs` (`am2.sheet`). The two claims below are
+   scoped to the eight rows they name and count the edge label as the one KNOWN
+   extra, which is what keeps them able to fail: a TENTH consumer, or an edge
+   label that lost the parity fallback, still reddens them. */
 const TS_FONT_ROWS = [
   ['.node-kicker', 'var(--mono)'],
   ['.node-title', 'var(--sans)'],
@@ -1662,9 +1712,15 @@ const FAMILY_BASE = new Map(TS_FONT_ROWS);
    editor's subject key is folded back onto the row it belongs to here, and
    (l2.a) asserts the 8-subject / 9-consumer shape rather than a bare count. */
 const EDITOR_OF = new Map([['.node-label-input', '.label-node']]);
+/* ROUND AM (AM-2) — the ONE consumer that belongs to no node row. It is
+   subtracted from the node-row claims below and asserted on its own subject
+   elsewhere; it is NOT an alias (nothing folds it onto a row it is not). */
+const EDGE_LABEL_SUBJECT = '.edge-label';
 const rowKey = c => EDITOR_OF.get(subjectKey(c.selectors[0])) ?? subjectKey(c.selectors[0]);
 const TS_FONT = sweepSheet(STYLES_RAW, '--ts-font');
-console.log(`  rules parsed: ${TS_FONT.rules.length}   var(--ts-font, …) consumers: ${TS_FONT.consumers.length}`);
+const NODE_ROW_CONSUMERS = TS_FONT.consumers.filter(c => rowKey(c) !== EDGE_LABEL_SUBJECT);
+console.log(`  rules parsed: ${TS_FONT.rules.length}   var(--ts-font, …) consumers: ${TS_FONT.consumers.length}`
+  + ` (${NODE_ROW_CONSUMERS.length} node-row + 1 edge label)`);
 for (const c of TS_FONT.consumers) {
   const subj = rowKey(c);
   const want = FAMILY_BASE.get(subj);
@@ -1674,20 +1730,23 @@ for (const c of TS_FONT.consumers) {
     (lose.length ? `  ** LOSES to \`${lose[0].theirSel}\` ${lose[0].theirs} at :${lose[0].theirLine} **`
       : c.base ? `  -> equal specificity (later wins), base \`${c.base.sel}\` @:${c.base.line}`
         : '  (no earlier rule of equal specificity on this subject)') +
-    (want === undefined ? '  !! NOT ONE OF THE EIGHT ROWS' : ''));
+    (want === undefined ? `  (not one of the eight node rows${subj === EDGE_LABEL_SUBJECT ? ' — the AM-2 edge label, asserted separately' : ' !! UNKNOWN SUBJECT'})` : ''));
 }
 
-const fontSubjects = TS_FONT.consumers.map(rowKey);
+const fontSubjects = NODE_ROW_CONSUMERS.map(rowKey);
 const fontDupes = fontSubjects.filter((s, i) => fontSubjects.indexOf(s) !== i);
-console.log(`  subjects: ${TS_FONT.consumers.length} consumers, ${new Set(fontSubjects).size} distinct, dupes: [${[...new Set(fontDupes)].join(', ')}]`);
+console.log(`  subjects: ${NODE_ROW_CONSUMERS.length} node-row consumers, ${new Set(fontSubjects).size} distinct, dupes: [${[...new Set(fontDupes)].join(', ')}]`);
 console.log(`  LOSING: ${TS_FONT.violations.length}   fallback-vs-base mismatches: ${TS_FONT.fallbackBad.length}`);
 
 assert('l2.a-ts-font-has-exactly-one-consumer-per-node-text-row',
-  TS_FONT.consumers.length === 9 && fontDupes.join('|') === '.label-node'
+  NODE_ROW_CONSUMERS.length === 9 && fontDupes.join('|') === '.label-node'
     && [...new Set(fontSubjects)].sort().join('|') === TS_FONT_ROWS.map(r => r[0]).sort().join('|'),
   `the eight rows (${TS_FONT_ROWS.map(r => r[0]).join(', ')}) — NINE consumers, because \`.label-node\` is ` +
   'the one row with a second render site and reads `--ts-font` twice (root + `.node-label-input`, the ' +
-  'in-place editor); every other row reads it exactly once, so one write still sets the whole node');
+  'in-place editor); every other row reads it exactly once, so one write still sets the whole node. '
+  + 'RE-ANCHORED by ROUND AM (AM-2): the subject list is now the NINE node rows, and `' + EDGE_LABEL_SUBJECT + '`\'s own '
+  + `consumer (the tenth, added by AM-2) is excluded BECAUSE it is a different target, not an alias of one of these. ` +
+  'A tenth NODE-ROW consumer, or a node row losing its read, still fails here.');
 assert('l2.b-no-earlier-rule-outranks-a-ts-font-consumer',
   TS_FONT.violations.length === 0,
   TS_FONT.violations.length === 0
@@ -1697,10 +1756,18 @@ assert('l2.b-no-earlier-rule-outranks-a-ts-font-consumer',
       'picker would silently do nothing there');
 assert('l2.c-every-ts-font-fallback-is-the-stack-its-base-declares',
   TS_FONT.fallbackBad.length === 0
-    && TS_FONT.consumers.every(c => c.fallback === FAMILY_BASE.get(rowKey(c))),
-  '9/9 fallbacks (8 rows, the label read on BOTH of its render sites) equal that row\'s own pre-ITEM-2 ' +
-  'stack (`' + TS_FONT_ROWS.map(r => `${r[0]}→${r[1]}`).join('`, `') +
-  '`), so a node carrying no `--ts-font` paints exactly what it painted before');
+    && TS_FONT.consumers.every(c => c.fallback === FAMILY_BASE.get(rowKey(c))
+      /* ROUND AM (AM-2) — the edge label's fallback is ITS OWN literal: before
+         AM-2 `var(--mono)` was declared on this rule for the first time, so that
+         IS the stack its pre-change rule carried. Asserted here so the parity
+         claim covers every consumer the sweep sees; asserted in full (with the
+         weight fallback's `600`, which is the one that differs from every node
+         row's `400`) by `checks/round-am-edge-panel.mjs`. */
+      || (rowKey(c) === EDGE_LABEL_SUBJECT && c.fallback === 'var(--mono)')),
+  '10/10 fallbacks (8 node rows, the label read on BOTH of its render sites, and the AM-2 edge '
+  + 'label) equal that row\'s own pre-change stack (`' + TS_FONT_ROWS.map(r => `${r[0]}→${r[1]}`).join('`, `')
+  + '`, `.edge-label→var(--mono)`), so a node or a line carrying no `--ts-font` paints exactly what it '
+  + 'painted before');
 
 /* --- THE CONTROLS — the extended sweep must FAIL on the shape it hunts ---- */
 /* The shape the diagram-studio note measures: a (0,3,0) per-shape rule pinning
@@ -2003,7 +2070,16 @@ assert('p.the-label-prints-in-its-own-family-exactly-once',
   + 'span, so no family can print its name twice');
 /* ROUND X, ITEM 3 — the font field's control, read OFF the field itself. The
    label `font` is unique in the panel, so the slice from it to its closing
-   `</div>` IS the field, and the slice is what is asserted — not the file. */
+   `</div>` IS the field, and the slice is what is asserted — not the file.
+   ROUND AM (AM-2) — THERE ARE NOW TWO FONT FIELDS, and this probe is scoped to
+   the FIRST one (`indexOf` finds the goblin's, which is emitted before the
+   edge's). The claim about a single site is replaced by a claim about BOTH
+   sites: `countOf(APP, 'options={FONT_OPTS}') === 2` — one per text target — so
+   a third font row appearing, or one of the two losing the shared table, still
+   reddens it. Everything asked of the FIELD is asked of the first field only,
+   which is the correct scope for "is this control the segmented row": both
+   fields render the same const (`FONT_OPTS`) and the same `grid3` modifier, and
+   the AM-2 harness asserts the edge body's own three rows directly. */
 const FONT_FIELD = (() => {
   const i = APP.indexOf('<label>font</label>');
   return i < 0 ? '' : APP.slice(i, APP.indexOf('</div>', i));
@@ -2012,7 +2088,10 @@ console.log(`  the font field: ${FONT_FIELD.length} chars of code, control = `
   + `${FONT_FIELD.includes('<ToggleRow') ? 'ToggleRow' : FONT_FIELD.includes('<IconPickerRow') ? 'IconPickerRow' : 'NONE'}`);
 assert('p.the-font-control-is-the-existing-segmented-row-and-is-not-a-select',
   countOf(APP, '<select') === 0
-    && countOf(APP, 'options={FONT_OPTS}') === 1
+    /* ROUND AM (AM-2) — TWO text targets now render this row (a goblin/label
+       target and an edge), so the count is 2 rather than 1. See the note above
+       `FONT_FIELD`. */
+    && countOf(APP, 'options={FONT_OPTS}') === 2
     && FONT_FIELD.includes('<ToggleRow')
     && !FONT_FIELD.includes('IconPickerRow')
     /* ROUND Z, ITEM 1 — the six-button modifier is `grid3`, NOT `wide`: six in a

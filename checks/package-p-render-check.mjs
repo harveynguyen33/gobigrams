@@ -116,6 +116,17 @@ export function All() {
       <ToggleRow value="arrow" onChange={()=>{}} options={M} title="End marker" />
     </>,
     cardinality: <IconPickerRow id="i-cf" value="many" onChange={()=>{}} options={CF} title="Cardinality: start" />,
+    /* ROUND AM (AM-2) — the edge's TEXT body. The shipped panel registers its
+       body const, whose three rows are SIZE / WEIGHT / FONT on the SHARED option
+       tables — the rows below are built from the same src/textStyle.ts tables and
+       carry the same three titles, so this fixture is what the app paints. The
+       two rows an edge does NOT get (colour, align) are the point: they are
+       absent HERE for the same reason they are absent in the app. */
+    text: <>
+      <ToggleRow value="md" onChange={()=>{}} options={SZ} title="Edge label text size" />
+      <ToggleRow value="regular" onChange={()=>{}} options={WT} title="Edge label text weight" />
+      <ToggleRow value="jetbrains" onChange={()=>{}} options={FT} title="Edge label text font" grid3 />
+    </>,
     flow: <>
       <Stepper value={3} onChange={()=>{}} min={1} max={6} title="Flow count" />
       <ToggleRow value="2.4" onChange={()=>{}} options={SP} title="Flow speed" />
@@ -290,8 +301,8 @@ console.log(`[data-section] order, non-ERD edge : ${nonErd.map(s => s.id).join('
 console.log(`[data-section] order, goblin       : ${goblin.map(s => s.id).join(' → ')}`);
 console.log(`[data-section] order, label        : ${label.map(s => s.id).join(' → ')}`);
 
-check('rendered ERD edge order', edge.map(s=>s.id).join() === 'label,line,markers,cardinality,flow', edge.map(s=>s.id).join());
-check('rendered non-ERD edge omits cardinality', nonErd.map(s=>s.id).join() === 'label,line,markers,flow', nonErd.map(s=>s.id).join());
+check('rendered ERD edge order', edge.map(s=>s.id).join() === 'label,text,line,markers,cardinality,flow', edge.map(s=>s.id).join());
+check('rendered non-ERD edge omits cardinality', nonErd.map(s=>s.id).join() === 'label,text,line,markers,flow', nonErd.map(s=>s.id).join());
 check('rendered goblin order (PASS 2: text between content and style)', goblin.map(s=>s.id).join() === 'content,text,style', goblin.map(s=>s.id).join());
 check('rendered label order', label.map(s=>s.id).join() === 'text', label.map(s=>s.id).join());
 /* PASS 2 — the four §E.1 controls are in the PAINTED markup of BOTH targets,
@@ -445,11 +456,19 @@ check('ROUND Z FIX 2 — a stored choice lands as the two custom properties, one
 
 /* PASS 3 §C/§F.4 — the fold is now REAL, and on a fresh profile it is §A.3's
    truth table: Cardinality and Flow folded, everything else open. The readout
-   values here are the ones the panel would show for the harness's own bodies. */
+   values here are the ones the panel would show for the harness's own bodies.
+   ROUND AM (AM-2) — the OPEN list gained `text` (5 open, 2 folded, 7 sections),
+   because an edge now carries the label's Text section. The FOLDED set is
+   unchanged and that is the claim being protected: no new section arrives
+   already-folded, and the two §A.3 folded defaults are still exactly those two. */
+const openEdgeIds = edge.filter(s => s.collapsed === 'false').map(s => s.id).join();
 check('PASS 3 — nothing folded except cardinality + flow (the §A.3 default)',
   edge.filter(s => s.collapsed === 'true').map(s => s.id).join() === 'cardinality,flow'
-    && edge.filter(s => s.collapsed === 'false').map(s => s.id).join() === 'label,line,markers',
-  edge.map(s => `${s.id}=${s.collapsed}`).join(' '));
+    && openEdgeIds === 'label,text,line,markers',
+  edge.map(s => `${s.id}=${s.collapsed}`).join(' ')
+    + '  (RE-ANCHORED by ROUND AM/AM-2: the open list is label,text,line,markers — 4 open of 6 on an '
+    + 'ERD-edge fixture — and the folded pair is unchanged. OLD claim\'s open list was label,line,markers, '
+    + 'i.e. the same list minus the text section AM-2 added.)');
 check('collapsedDefault true exactly for cardinality + flow',
   edge.filter(s=>s.def==='true').map(s=>s.id).join() === 'cardinality,flow',
   edge.map(s=>`${s.id}=${s.def}`).join(' '));
@@ -469,9 +488,11 @@ const sectionFolds = seg => {
 const edgeFolds = sectionFolds(segOf('edge'));
 check('§F.4 — folded Cardinality/Flow bodies are ABSENT, their triggers PRESENT',
   cardBodyAbsent && flowBodyAbsent
-    && edgeFolds.total === 5 && edgeFolds.open === 3 && edgeFolds.folded === 2,
+    && edgeFolds.total === 6 && edgeFolds.open === 4 && edgeFolds.folded === 2,
   `${edgeFolds.open} open section triggers + ${edgeFolds.folded} folded (of ${edgeFolds.total}); `
-  + `cardinality body ${cardBodyAbsent ? 'absent' : 'PRESENT'}, flow body ${flowBodyAbsent ? 'absent' : 'PRESENT'}`);
+  + `cardinality body ${cardBodyAbsent ? 'absent' : 'PRESENT'}, flow body ${flowBodyAbsent ? 'absent' : 'PRESENT'}`
+  + '  (RE-ANCHORED by ROUND AM/AM-2: 6 sections, 4 open, 2 folded — the extra section is the edge\'s'
+  + ' `text` body, which ARRIVES OPEN. OLD claim was 5/3/2.)');
 /* ROUND AK, AK-6/AK-7 — RE-ANCHORED, NOT WEAKENED. The claim is UNCHANGED:
    an OPEN section really mounts its body, so "absent" elsewhere is the fold and
    not a broken painter. What moved is the ATTRIBUTE the two named bodies carry.
@@ -499,9 +520,10 @@ check('§C — a folded row shows its current value',
   segOf('edge').includes('insp-sec-readout') && segOf('edge').includes('ends') && segOf('edge').includes('flow'),
   'the Cardinality trigger carries its `ends` readout and the Flow trigger its `flow` readout');
 check('§F.5 SSR — every section is keyboard-operable and labelled',
-  (segOf('edge').match(/aria-controls="insp-sec-/g) ?? []).length === 5
-    && (segOf('edge').match(/<button[^>]*class="insp-sec-trigger"/g) ?? []).length === 5,
-  'one aria-controls + one native <button> per section, so Enter/Space work without any key handler');
+  (segOf('edge').match(/aria-controls="insp-sec-/g) ?? []).length === 6
+    && (segOf('edge').match(/<button[^>]*class="insp-sec-trigger"/g) ?? []).length === 6,
+  'one aria-controls + one native <button> per section (6 with AM-2\'s `text`), so Enter/Space work '
+  + 'without any key handler');
 /* §F.5's UI HALF, in markup: expanding a section reveals its body INLINE in the
    same section element (not a popover, not a portal) and flips aria-expanded. */
 const expandedEdge = segOf('edge-expanded');
@@ -509,10 +531,11 @@ const expandedFolds = sectionFolds(expandedEdge);
 check('§F.5 SSR — expanding a section reveals its body inline in place',
   expandedEdge.includes('title="Cardinality: start"')
     && !expandedEdge.includes('title="Flow count"')
-    && expandedFolds.open === 4 && expandedFolds.folded === 1 && expandedFolds.total === 5,
+    && expandedFolds.open === 5 && expandedFolds.folded === 1 && expandedFolds.total === 6,
   `cardinality expanded: its body is back (${expandedEdge.includes('title="Cardinality: start"')}), `
   + `flow still folded, ${expandedFolds.open} open section triggers — one fold state, two sections, `
-  + 'independent values (RE-ANCHORED by AK-5: `Cardinality: source end` → `Cardinality: start`)');
+  + 'independent values (RE-ANCHORED by AK-5: `Cardinality: source end` → `Cardinality: start`; '
+  + 'RE-ANCHORED AGAIN by ROUND AM/AM-2: 6 sections with `text` open, so 5 open + 1 folded).');
 
 /* ===========================================================================
    §E.2 — THE STORED VALUES, executed. `Model()` ran the real `mergeTextStyle`
@@ -596,9 +619,10 @@ check('stepper renders − / value / +',
   flowOpen.includes('insp-step-val') && flowOpen.includes('data-value="3"'),
   flowOpen.slice(flowOpen.indexOf('insp-stepper'), flowOpen.indexOf('insp-stepper') + 200).replace(/\n/g, ''));
 check('PASS 3 — the stepper is absent while Flow is folded (the fold, not a lost control)',
-  sectionFolds(flowOpen).folded === 1 && sectionFolds(flowOpen).open === 4
+  sectionFolds(flowOpen).folded === 1 && sectionFolds(flowOpen).open === 5
     && !segOf('edge').includes('data-value="3"'),
-  'folded: 0 steppers in the fresh markup; flow expanded: the stepper and its value are back');
+  'folded: 0 steppers in the fresh markup; flow expanded: the stepper and its value are back'
+  + '  (RE-ANCHORED by ROUND AM/AM-2: `open` is 5 of 6 sections with `text` in the panel; was 4 of 5)');
 check('segmented rows render as buttons with aria-pressed',
   (html.match(/insp-seg-btn/g) ?? []).length >= 3 && html.includes('aria-pressed="true"'),
   `${(html.match(/insp-seg-btn/g) ?? []).length} segmented buttons`);

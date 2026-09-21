@@ -271,6 +271,19 @@ type EdgeData = {
    *  genuine value rather than the absence of one. Rendered as a class on
    *  `.edge-label` by the renderer; absent resolves to `surface` (today's look). */
   labelBg?: 'none' | 'surface' | 'outline';
+  /** ROUND AM, AM-2 — the LABEL'S TEXT STYLE: the same `TextStyle` a node
+   *  stores on `data.textStyle`, under the edge's own key. ABSENT is the state
+   *  every existing board is in — `edgeTextStyleVars` returns `{}`, no custom
+   *  property reaches the element and `.edge-label`'s own fallbacks paint the
+   *  11px / 600 / `var(--mono)` it painted before this round.
+   *
+   *  WHY A SEPARATE KEY AND NOT `textStyle`. `data.textStyle` on an edge would
+   *  read as the text of something that is not a node, and an edge is the only
+   *  target where a stored `TextStyle` can carry fields the target cannot
+   *  express (align / vAlign / colorKey — see `edgeTextStyleVars`). The label's
+   *  ink stays `labelTextKey` above, so this key never becomes a second writer
+   *  for the colour. */
+  labelStyle?: TextStyle;
   /** ROUND AK, AK-13 — the double-click-on-the-path signal, threaded per-edge
    *  exactly like `__edit`: a fresh timestamp AND the flow point the click
    *  landed on. A double-click on a line with no label has nothing to edit yet,
@@ -3968,6 +3981,31 @@ export default function App() {
     update({textStyle: mergeTextStyle(tsStored, patch, tsAlignDefault, tsVAlignDefault)} as any);
   };
 
+  /* ROUND AM, AM-2 — THE EDGE TARGET'S READER AND WRITER, and why they are a
+     second PAIR of two lines rather than a second implementation.
+
+     The STORED FIELD differs (`data.labelStyle` on an edge, `data.textStyle` on
+     a node) and so does the thing the write is applied to (`updateEdge` patches
+     the selected EDGE; `update` patches the selected NODE). Everything that
+     decides what a choice MEANS is shared: the same `readTextStyle` reads it,
+     the same `mergeTextStyle` does the lazy write, and the same
+     `TEXT_SIZE_OPTS` / `TEXT_WEIGHT_OPTS` / `TEXT_FONT_OPTS` tables drive the
+     rows. A single generic helper would have to take the stored value, the
+     setter and the target defaults as parameters and would be LONGER than these
+     two expressions while hiding the one fact a reader needs — that a line and a
+     node store the same `TextStyle` under two different keys.
+
+     THE ONE HISTORY RULE IS INHERITED, NOT RE-STATED: `updateEdge` pushes once
+     per commit exactly as `update` does, so a click on Bold is one undo step.
+     That is also why the slider on the flow row needs the `coalesce` option
+     while these chips do not — see the note at the speed row in the flow
+     section. */
+  const edgeLabelStored = (selectedEdge?.data as any)?.labelStyle as TextStyle | undefined;
+  const edgeLabelShown = readTextStyle(edgeLabelStored, tsAlignDefault, tsVAlignDefault);
+  const writeEdgeLabelStyle = (patch: Partial<TextStyle>) => {
+    updateEdge({data: {labelStyle: mergeTextStyle(edgeLabelStored, patch, tsAlignDefault, tsVAlignDefault)}} as any);
+  };
+
   /** PACKAGE-P §E.1 — THE TEXT SECTION'S BODY, written ONCE and registered by
    *  both targets that list the section (`goblin` §A.3 + `label` §E.3). Writing
    *  it twice would be two copies of four controls that must agree; the four
@@ -4077,6 +4115,72 @@ export default function App() {
           onChange={v => writeTextStyle({vAlign: v as TextVAlign})}
           options={VALIGN_OPTS}
           title="Text vertical align"
+        />
+      </div>
+    </>
+  );
+
+  /** ROUND AM, AM-2 — THE EDGE LABEL'S TEXT SECTION: the same three controls,
+   *  the same tables, and deliberately not the same FOURTH and FIFTH rows.
+   *
+   *  WHY IT IS A SEPARATE CONST RATHER THAN A FLAG ON `tsBody`. The two bodies
+   *  differ by a RULE, not by a rendering detail: `tsBody`'s colour and align
+   *  rows are only meaningful for a target with a padded box and its own ink
+   *  control. Threading a `forEdge` boolean through `tsBody` would put "an edge
+   *  label is not a box" in the middle of five rows that DO apply, and would
+   *  leave the two rows it must skip one `&&` away from coming back — the shape
+   *  this project has already paid for. Written out, the omission is the
+   *  structure: what is here is what an edge label has.
+   *
+   *  THE READER AND THE WRITER ARE THE NODE'S, DELIBERATELY. `read` reads the
+   *  SAME `data.labelStyle` through the SAME `readTextStyle` (so a stored
+   *  multiplier that matches no step lights no step here either, and a legacy
+   *  ROUND-W font key reads as the family it already paints), and `write` goes
+   *  through the SAME `mergeTextStyle` lazy write (so switching back to the
+   *  inherited value stores ABSENCE and a label nobody touched keeps
+   *  `labelStyle === undefined`). Those two functions take the two align
+   *  defaults as arguments because those defaults are per-target; the pair
+   *  passed here is never read, because no align row renders — passing them is
+   *  what keeps one merge implementation rather than an edge-shaped copy.
+   *
+   *  THE THREE ROWS ARE THE SHARED TABLES, NOT COPIES: `SIZE_OPTS`,
+   *  `WEIGHT_OPTS` and `FONT_OPTS` are built from `TEXT_SIZE_OPTS` /
+   *  `TEXT_WEIGHT_OPTS` / `TEXT_FONT_OPTS`, i.e. the same `src/textStyle.ts`
+   *  tables the goblin body renders. So the ladder, the weights and the six
+   *  families cannot differ between a node and a line — one vocabulary.
+   *
+   *  NO COLOUR ROW, and that is a decision with a reason rather than an
+   *  omission: the label's colour is `labelTextKey`, rendered as its own `text
+   *  color` swatch row in the LABEL section, right above this one. A second
+   *  swatch row here would be two controls for one stored fact. */
+  const edgeLabelTextBody = (
+    <>
+      <div className="field">
+        <label>size</label>
+        <ToggleRow
+          value={edgeLabelShown.size ?? ''}
+          onChange={v => writeEdgeLabelStyle({size: v as TextSize})}
+          options={SIZE_OPTS}
+          title="Edge label text size"
+        />
+      </div>
+      <div className="field">
+        <label>weight</label>
+        <ToggleRow
+          value={edgeLabelShown.weight}
+          onChange={v => writeEdgeLabelStyle({weight: v as TextWeight})}
+          options={WEIGHT_OPTS}
+          title="Edge label text weight"
+        />
+      </div>
+      <div className="field">
+        <label>font</label>
+        <ToggleRow
+          value={edgeLabelShown.font}
+          onChange={v => writeEdgeLabelStyle({font: v as TextFont})}
+          options={FONT_OPTS}
+          title="Edge label text font"
+          grid3
         />
       </div>
     </>
@@ -5520,6 +5624,22 @@ export default function App() {
                   </button>
                 </div>
               </>); return null; })()}
+              {/* ROUND AM, AM-2 — THE EDGE LABEL'S TEXT SECTION, registered in
+                  the position `src/inspector.ts` gives it (`label → text →
+                  line`), between the label's own naming/colour controls and the
+                  line's. The ORDER is not decided here: `renderSections()` walks
+                  `inspSections`, so moving this block would change nothing and
+                  the one place to change the order stays the pure module.
+
+                  THE BODY IS A CONST, NOT AN INLINE LITERAL, and it is
+                  `edgeLabelTextBody` rather than `tsBody` because this target
+                  offers SIZE / WEIGHT / FONT and NOT the colour or align rows —
+                  the reasons are on that const. Registering `tsBody` here would
+                  put a `text color` swatch row directly under the LABEL
+                  section's own `text color` swatch row, i.e. two controls for one
+                  stored fact, and an align row that would paint nothing because
+                  `.edge-label` is an inline chip with no box to align inside. */}
+              {(() => { secBody('text', edgeLabelTextBody); return null; })()}
               {(() => { secBody('markers', <>
               {/* ROUND AK, AK-5/AK-7 — THE TWO END CONTROLS.
                   RENAMED: `arrow head` → `start`, `head start` → `end`. The

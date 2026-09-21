@@ -36,6 +36,11 @@ import {
    out so the bend handle and the label can never both start from one
    pointerdown. `GestureDown` is the shape a `claim`ed handler receives. */
 import {beginGesture, useEdgeGesture, type GestureDown} from './useEdgeGesture';
+/* ROUND AM, AM-2 — the label's TEXT STYLE, through the ONE emitter. `TextStyle`
+   is the stored shape (`data.labelStyle`) and `edgeTextStyleVars` is the
+   edge-label subset of `textStyleVars` — the same module the node path uses, so
+   the label's Text section cannot become a second text vocabulary. */
+import {edgeTextStyleVars, type TextStyle} from './textStyle';
 
 /**
  * Inline SVG paths for the flow-icon animation. 24×24 viewBox, stroke geometry
@@ -197,6 +202,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
     color?: string;
     /** L3b: C4 relationship technology, rendered dim after the label. */
     techn?: string;
+    /** ROUND AM, AM-2 — the label's TEXT STYLE (size / weight / font), the same
+     *  `TextStyle` a node stores on `data.textStyle`. ABSENT is the normal state
+     *  and the one every existing board is in: `edgeTextStyleVars` returns `{}`,
+     *  no custom property is emitted, and the sheet's own fallbacks paint the
+     *  11px / 600 / `var(--mono)` the label has always used. The edge's text
+     *  COLOUR is deliberately not part of it — that is `labelTextKey` below. */
+    labelStyle?: TextStyle;
     onCommitLabel?: (id: string, v: string) => void;
     /** F2: timestamp signal from the context menu to open the label editor */
     __edit?: number;
@@ -1054,9 +1066,35 @@ const GoblinEdge = memo((props: EdgeProps) => {
                  keeps every one of those decisions and simply reads this colour
                  where it already knows how. Both are `undefined` when unset,
                  which React omits — so a board that never carried a key emits
-                 the identical `style` object it did before this item. */
+                 the identical `style` object it did before this item.
+
+                 ROUND AM, AM-2 — THE TEXT STYLE JOINS THEM, THROUGH THE SAME
+                 EMITTER THE NODE USES. `textStyleVars` (`src/textStyle.ts`) is
+                 the ONE place a `TextStyle` becomes custom properties, and it is
+                 already what `DiagramNode` / `LabelNode` / the label node spread
+                 onto their roots. Calling it here is what makes the edge label's
+                 Text section the same text vocabulary as a node's rather than a
+                 second one that can drift (`--ts-scale` / `--ts-weight` /
+                 `--ts-font`, read by `.edge-label` in the sheet with today's
+                 literals as the fallbacks).
+
+                 THE SECTION'S OWN EMITTER, NOT A FILTER AT THE CALL SITE.
+                 `edgeTextStyleVars` (`src/textStyle.ts`) is `textStyleVars`'s
+                 edge-label subset — one call, one place where "which fields this
+                 target can express" is decided, so a harness can EXECUTE that
+                 decision instead of re-deriving it. The third and fourth
+                 arguments inside it are the two per-target align defaults; an
+                 edge label renders neither axis, which is exactly why the
+                 function drops both pairs rather than spreading an inert
+                 property onto the element. NO COLOUR ARRIVES FROM HERE either:
+                 the label's ink is `labelTextKey` (the `--label-fg` line above,
+                 owned by the LABEL section), and the Text section renders no
+                 colour row for an edge, so `--ts-color` stays a node-only
+                 property. An untouched board emits `{}` here, so the sheet's
+                 fallbacks paint the previous bytes exactly. */
               ...(labelText ? {'--label-fg': labelText} : {}),
               ...(labelBgColor ? {'--label-plate': labelBgColor} : {}),
+              ...edgeTextStyleVars(d.labelStyle),
             } as React.CSSProperties}
             onPointerDown={onLabelDown}
             onDoubleClick={e => {
