@@ -1605,24 +1605,69 @@ export default function App() {
     bumpHist(v => v + 1);
   }, [snapshot]);
 
+  /* ROUND AN, AN-5 — UNDO/REDO KEEP THE SELECTION. THIS IS A DEFECT FIX, NOT A
+     PREFERENCE. Figma, draw.io and Excalidraw all leave the object selected after
+     an undo, and they are right to: the SELECTION is UI state, the GRAPH is
+     document state, and undo restores the document. The old code could not do
+     that, because `snapshot()` normalises `selected: false` onto every node and
+     edge and `undo()` restored that snapshot VERBATIM — so React Flow's
+     controlled `onSelectionChange` then saw an empty selection and blanked
+     `selEdgeId`, which closed the inspector the user was working in.
+
+     THE SNAPSHOT STILL CARRIES `selected: false`, deliberately: history must
+     never replay a STALE selection (an entry captured twenty edits ago). What
+     survives is the LIVE selection, read from the tree at undo time, and it
+     survives ONLY FOR ENTITIES THAT STILL EXIST in the restored graph — undoing
+     a CREATE must clear the selection, because the thing selected is gone. The
+     two helpers below are that rule, and they are also why `sel`/`selCount`/
+     `selEdgeId` are DERIVED from what survived rather than written by hand: the
+     inspector reads the same predicate the canvas rings are painted from, so the
+     two cannot disagree. */
+  const liveSelection = useCallback(() => ({
+    nodes: nodesRef.current.filter(n => n.selected).map(n => n.id),
+    edges: edgesRef.current.filter(e => e.selected).map(e => e.id),
+  }), []);
+
+  const applySelection = useCallback((nodes: Node[], edges: Edge[],
+    live: {nodes: string[]; edges: string[]}) => {
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const edgeIds = new Set(edges.map(e => e.id));
+    const nKeep = new Set(live.nodes.filter(id => nodeIds.has(id)));
+    const eKeep = new Set(live.edges.filter(id => edgeIds.has(id)));
+    setNodes(nodes.map(n => ({...n, selected: nKeep.has(n.id)})));
+    setEdges(edges.map(e => ({...e, selected: eKeep.has(e.id)})));
+    /* The same SHAPE `onSelectionChange` uses (`s[0]`, and an edge only when
+       exactly one is selected), so the callback fired by this very restore agrees
+       with these values instead of overwriting them with an empty selection. */
+    const keptNodes = nodes.filter(n => nKeep.has(n.id)).map(n => n.id);
+    const keptEdges = edges.filter(e => eKeep.has(e.id)).map(e => e.id);
+    setSel(keptNodes[0] ?? null);
+    setSelCount(keptNodes.length);
+    setSelEdgeId(keptEdges.length === 1 ? keptEdges[0] : null);
+  }, [setNodes, setEdges, setSel, setSelCount, setSelEdgeId]);
+
   const undo = useCallback(() => {
     const prev = past.current.pop();
     if (!prev) return;
+    /* captured BEFORE the restore, so it is the selection the user is looking at */
+    const live = liveSelection();
     future.current.push(snapshot());
-    setNodes(prev.nodes);
-    setEdges(prev.edges);
+    applySelection(prev.nodes, prev.edges, live);
     bumpHist(v => v + 1);
-  }, [snapshot, setNodes, setEdges]);
+  }, [snapshot, liveSelection, applySelection]);
 
   const redo = useCallback(() => {
     const next = future.current.pop();
     if (!next) return;
+    const live = liveSelection();
     past.current.push(snapshot());
     while (past.current.length > MAX_HISTORY) past.current.shift();
-    setNodes(next.nodes);
-    setEdges(next.edges);
+    /* Redo gets the same rule, and the same edge case: a redo that brings back a
+       node the user has selected does NOT resurrect a selection for it unless it
+       was selected live — the `live` capture above is the only source. */
+    applySelection(next.nodes, next.edges, live);
     bumpHist(v => v + 1);
-  }, [snapshot, setNodes, setEdges]);
+  }, [snapshot, liveSelection, applySelection]);
 
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
