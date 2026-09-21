@@ -544,25 +544,48 @@ head('(h) CLEAR — reconnect drops bendX and bendY');
 /* ----------------------------------------------------------------- (i) NO SLIDER
    The bend-position control is GONE: not disabled, REMOVED. Comments are
    stripped first — prose about what was deleted is not a control, and the
-   classes themselves must appear NOWHERE live. */
+   classes themselves must appear NOWHERE live.
+
+   ROUND AM, AM-5 — RE-ANCHORED. The old form of this block ended with
+   "0 `type=\"range\"` in live source — the app has no range input". That was
+   true when ROUND T wrote it and it is FALSE now, but NOT because the bend
+   slider came back: AM-5 replaced the flow-speed word-chips with a range input
+   on `flowDuration`, a different control on a different field for a different
+   reason. The claim this block actually protects is "no BEND slider exists", so
+   that is what is asserted now — and the general clause is kept in a STRONGER
+   form than a count: the range input is allowed ONLY where AM-5 put it (the
+   `FlowSpeed` component's own file), and a `type="range"` in `App.tsx` — where
+   the bend slider lived and where a re-added one would go — still fails.
+   The `.range-row` / `bend position` / `.field-note` claims are UNCHANGED. */
 head('(i) NO SLIDER — the bend-position control is gone from the sources');
 {
   const stripJs = s => s.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
   const stripCss = s => s.replace(/\/\*[\s\S]*?\*\//g, '');
   const files = readdirSync(`${ROOT}/src`).filter(f => /\.(tsx?|css)$/.test(f));
-  let rangeRow = 0, rangeInput = 0, bendLabel = 0, fieldNote = 0;
+  let rangeRow = 0, bendLabel = 0, fieldNote = 0, rangeOutsideSlider = 0;
   const where = [];
+  const rangeHomes = [];
   for (const f of files) {
     const raw = readFileSync(`${ROOT}/src/${f}`, 'utf8');
     const s = /\.css$/.test(f) ? stripCss(raw) : stripJs(raw);
     const c = re => (s.match(re) ?? []).length;
     const a = c(/range-row/g), b = c(/type\s*=\s*"range"/g), d = c(/bend position/g), e = c(/field-note/g);
     if (a || b || d || e) where.push(`${f}: range-row=${a} range=${b} label=${d} field-note=${e}`);
-    rangeRow += a; rangeInput += b; bendLabel += d; fieldNote += e;
+    rangeRow += a; bendLabel += d; fieldNote += e;
+    /* Every range input must live in the FILE that declares `FlowSpeed`, and
+       nowhere else. `InspectorPickers.tsx` is that file; `App.tsx` carrying one
+       again is the regression this probe exists to catch. */
+    if (b > 0) {
+      rangeHomes.push(`${f}:${b}`);
+      if (f !== 'InspectorPickers.tsx') rangeOutsideSlider += b;
+    }
   }
   console.log(`     scanned ${files.length} files under src/ (comments stripped)`);
+  console.log(`     range inputs found in: ${rangeHomes.join(', ') || 'none'}  (AM-5's flow-speed slider)`);
   ok(rangeRow === 0, '0 `.range-row` occurrences in live source', where.join('; ') || '0');
-  ok(rangeInput === 0, '0 `type="range"` in live source — the app has no range input', '0');
+  ok(rangeOutsideSlider === 0 && /type="range"/.test(readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8')),
+    'the ONLY range input is AM-5\'s flow-speed slider in InspectorPickers.tsx — App.tsx has none',
+    rangeHomes.join('; ') || '0');
   ok(bendLabel === 0, '0 `bend position` labels in live source', '0');
   ok(fieldNote === 0, '0 `.field-note` occurrences in live source', '0');
   ok(!/bendSupport|bendAxis\(|bendActive4|axisLive|collapsed4/.test(stripJs(APP_SRC) + stripJs(EDGE_SRC)),

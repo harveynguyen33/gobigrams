@@ -1834,6 +1834,105 @@ body {
   color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   min-height: 30px; display: flex; align-items: center; justify-content: center;
 }
+/* ROUND AM, AM-5 — the COMPACT form. A full-width field stretched three
+   controls across 253px to show one digit (1..6). `.compact` fixes the group's
+   width at 96px: the two 34px buttons plus a 28px value, which is what the
+   number actually needs. It is a MODIFIER on the shipped class, so every
+   existing caller keeps the full-width geometry — the opt-in is the `compact`
+   prop on `Stepper`.
+   `flex: none` is load-bearing: the compact group sits in a `.pair` row beside
+   the slider, and without it the flex line would still stretch it. */
+.insp-stepper.compact {
+  width: 96px; flex: none;
+}
+.insp-stepper.compact .insp-step-btn { width: 28px; }
+.insp-stepper.compact .insp-step-val { min-width: 28px; font-size: 12px; }
+
+/* ROUND AM, AM-5 — COUNT AND SPEED SHARE ONE ROW. Two fields, the count fixed
+   at its compact width and the slider taking the rest. `align-items: flex-end`
+   lines the two controls up on their bottom edge, so the slider's 30px box and
+   the stepper's 30px box sit on one line rather than centred against the
+   taller label+control pair. */
+.pair { display: flex; gap: 8px; align-items: flex-end; }
+.pair .field { margin: 0; }
+.pair .grow { flex: 1; min-width: 0; }
+
+/* ROUND AM, AM-4/AM-5 — the speed slider, from TOKENS ONLY (track `--border`,
+   thumb `--sel`), matching the mockup's geometry: a 4px track, a 14px round
+   thumb. `appearance: none` is required before either thumb pseudo-element
+   paints, and the `-moz-` pair is not optional — Firefox ignores the `-webkit-`
+   ones, and a slider with no custom track there is a browser default grey. */
+.speedwrap { display: flex; align-items: center; gap: 8px; }
+.flow-speed-range {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; min-width: 0; height: 30px;
+  background: transparent; cursor: pointer; margin: 0;
+}
+.flow-speed-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px; background: var(--border);
+}
+.flow-speed-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--sel); border: 0; margin-top: -5px;
+}
+.flow-speed-range::-moz-range-track {
+  height: 4px; border-radius: 2px; background: var(--border);
+}
+.flow-speed-range::-moz-range-thumb {
+  width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--sel);
+}
+.flow-speed-range:focus-visible { outline: 1px solid var(--sel); outline-offset: 2px; }
+/* the real stored seconds, always printed beside the thumb — the inversion is
+   in the geometry, never in the number the user reads */
+.speedval {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  min-width: 40px; text-align: right; flex: none;
+}
+
+/* ROUND AM, AM-4 — the live rail. The picture of the speed: a bead travelling
+   the rail at the edge's ACTUAL `flowDuration`, so the animation IS the value.
+   DECORATIVE, NEVER THE SOURCE OF TRUTH (the number beside it reads the same
+   prop), and gated by the project's OWN motion switches, below. */
+.flow-rail {
+  position: relative; height: 34px; margin-top: 8px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg); overflow: hidden;
+}
+.flow-rail-line {
+  position: absolute; left: 10px; right: 10px; top: 50%;
+  height: 1px; margin-top: -0.5px;
+  background: var(--border-strong);
+}
+.flow-rail-bead {
+  position: absolute; top: 50%; left: 10px;
+  width: 7px; height: 7px; margin-top: -3.5px;
+  border-radius: 50%; background: var(--sel);
+  animation: flow-rail-travel linear infinite;
+}
+/* the bead's own journey: from the rail's inner left to its inner right. The
+   `- 14px` is the bead's 7px width plus the 7px of inner padding it must stop
+   short of, so the bead arrives INSIDE the rail rather than half-past its edge. */
+@keyframes flow-rail-travel {
+  from { left: 10px; }
+  to { left: calc(100% - 17px); }
+}
+.flow-rail-note {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; color: var(--dim2);
+  pointer-events: none;
+}
+/* THE MOTION GATE, THE PROJECT'S OWN TWO SWITCHES — the same pair the canvas
+   payloads honour (`.ds-no-anim .ds-animated-payload`, and the reduce-motion
+   block that freezes `.edge-flow-dash` / `.edge-flow-pulse`). The bead stops
+   under either; nothing here invents a third gate. `.ds-no-anim` is set on
+   `.app` AND on `.ds-flow-wrap`, so the descendant selector covers the panel
+   whichever wrapper the app happens to be inside. */
+@media (prefers-reduced-motion: reduce) {
+  .flow-rail-bead { animation: none; }
+}
+.ds-no-anim .flow-rail-bead { animation: none; }
 /* The section wrapper. Sections stack with the same rule the old hand-written
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
    gap between neighbours, none before the first. */

@@ -52,6 +52,9 @@ import {
 } from './inspector';
 import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
+  /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
+     two pure helpers the harness executes rather than restates. */
+  FlowSpeed, FlowRail, storableSeconds,
   ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtFlow, ArtWidth,
   type PickerOption,
 } from './InspectorPickers';
@@ -2099,10 +2102,28 @@ export default function App() {
   };
 
   /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart. */
-  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false) => {
+  const bendDragging = useRef(false);
+
+  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart.
+   *
+   *  `coalesce` — ROUND AM, AM-5 RESTORED THIS OPTION. ROUND T deleted it with
+   *  the bend slider it existed for; the flow-speed slider introduces the same
+   *  gesture shape and needs the same rule, so the machinery comes back
+   *  IDENTICALLY rather than in a second form.
+   *
+   *  It marks a CONTINUOUS gesture — a range drag — as ONE undo step: history is
+   *  recorded on the first move of the gesture only, so a 100-event drag costs
+   *  ONE entry (holding the pre-drag value) rather than flooding the 50-entry
+   *  stack and destroying the user's older undo steps. `src/resizeHistory.ts`
+   *  records the same lesson for the resize grip ("pushing per frame would bury
+   *  the user's real history under hundreds of steps — a worse bug than the one
+   *  being fixed"). The gesture ENDS when the control that opened it clears the
+   *  latch — see the slider's `onPointerUp` / `onKeyUp` / `onBlur`. */
+  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false, coalesce = false) => {
     if (!selEdgeId) return;
     if ('label' in patch) tickTask('label');
-    pushHistory();
+    if (!coalesce || !bendDragging.current) pushHistory();
+    if (coalesce) bendDragging.current = true;
     setEdges(es => es.map(e => {
       if (e.id !== selEdgeId) return e;
       const {style, markerEnd, markerStart, data, ...rest} = patch;
@@ -3676,13 +3697,17 @@ export default function App() {
    *  drag already sets — so it went with the row. THE STORED FIELD IS UNTOUCHED:
    *  `data.offset` is still read by `GoblinEdge.tsx:383`, so a board that
    *  carries `start`/`end` renders exactly as it did. */
-  /** Flow speed (§B #8) — 4 ordinal words, short enough for inline buttons. */
-  const SPEED_OPTS: PickerOption[] = [
-    {v: '4', label: 'slow', art: null},
-    {v: '2.4', label: 'normal', art: null},
-    {v: '1.4', label: 'fast', art: null},
-    {v: '0.8', label: 'very fast', art: null},
-  ];
+  /* ROUND AM, AM-5 — `SPEED_OPTS` IS DELETED, AND SO IS THE ROW IT FED.
+     It held four ordinal words — `slow` / `normal` / `fast` / `very fast` — over
+     `flowDuration`, a value the renderer accepts continuously (0.6…8s). Four
+     hard steps were COARSER than the field they wrote, and the row cost a full
+     50px of panel for them. The flow section now renders `FlowSpeed`: a range
+     input on the field's own range, so the four old values (4 / 2.4 / 1.4 / 0.8)
+     are all still reachable and everything between them is too.
+     NOTHING IS STORED DIFFERENTLY: the write is still
+     `updateEdge({data: {flowDuration: …}})`, so a board carrying any of the four
+     renders exactly as it did. The table is not kept "just in case" — a removed
+     option that keeps its table is how the option comes back. */
   /* ROUND AK, AK-12 — THE LABEL PLATE'S THREE STATES. `LABEL_BG_VALUES` is the
      canonical list (it is what the renderer's `labelBgClass` resolves against),
      and each entry's label is its own name capitalised, so the stored value and
@@ -5730,23 +5755,56 @@ export default function App() {
                     v => updateEdge({data: {flow: v === 'none' ? undefined : (v as any)}}),
                     'Flow animation', true)}
               </div>
+              {/* ROUND AM, AM-5 — COUNT AND SPEED ON ONE ROW, and the speed is a
+                  SLIDER. Two rows of ~50px collapse into one of ~44px:
+
+                  * `count` keeps the `Stepper` (a 6-value ordinal has no
+                    continuous form) but takes the new `compact` modifier, so it
+                    stops stretching a 253px field to show one digit.
+                  * `speed` was four word-chips — `slow / normal / fast / very
+                    fast` — over a value the renderer already accepts
+                    continuously (0.6…8s). It becomes a range input on exactly
+                    that range; the four old chip values 4 / 2.4 / 1.4 / 0.8 all
+                    live inside it, so no stored value is unreachable.
+
+                  BOTH STAY GATED ON A PAYLOAD FLOW (AL-7): `dots` and `icon` are
+                  the two flows that animate a bead, so they are the two that
+                  have a count and a speed at all. `none` / `dash` / `pulse` are
+                  line-level animations with no bead to count, and the gate is
+                  untouched by this round.
+
+                  ONE HISTORY ENTRY PER DRAG: `onGestureStart` pushes once (the
+                  latch in `updateEdge`'s `coalesce` option — the same rule
+                  `src/resizeHistory.ts` records for the resize grip), and every
+                  `input` after it coalesces into that entry. */}
               {(eFlow === 'dots' || eFlow === 'icon') && (
-                <div className="field">
-                  <label>count</label>
-                  <Stepper
-                    value={eFlowCount}
-                    onChange={n => updateEdge({data: {flowCount: n}})}
-                    min={1} max={6}
-                    title="Flow count"
-                  />
+                <div className="pair">
+                  <div className="field">
+                    <label>count</label>
+                    <Stepper
+                      value={eFlowCount}
+                      onChange={n => updateEdge({data: {flowCount: n}})}
+                      min={1} max={6}
+                      title="Flow count"
+                      compact
+                    />
+                  </div>
+                  <div className="field grow">
+                    <label>speed</label>
+                    <FlowSpeed
+                      value={eFlowSpeed}
+                      onInput={secs => updateEdge({data: {flowDuration: secs}}, false, true)}
+                      onGestureBoundary={() => { bendDragging.current = false; }}
+                      title="Flow speed"
+                    />
+                  </div>
                 </div>
               )}
               {(eFlow === 'dots' || eFlow === 'icon') && (
-                <div className="field">
-                  <label>speed</label>
-                  {chipRow(SPEED_OPTS, String(eFlowSpeed),
-                    v => updateEdge({data: {flowDuration: Number(v)}}), 'Flow speed')}
-                </div>
+                <FlowRail
+                  seconds={eFlowSpeed}
+                  label={`${eFlowCount} × ${storableSeconds(eFlowSpeed).toFixed(1)}s per loop`}
+                />
               )}
               {eFlow === 'icon' && (
                 <div className="field">

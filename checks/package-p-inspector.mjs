@@ -274,13 +274,23 @@ const resolvesTo = (app, token, target) => {
  *  the `_ICON_` alias AL-6 introduced (`DASH_ICON_OPTS = DASH_OPTS`); `ToggleRow`
  *  is the literal `options={X}` the row had before AL-6, and is still the carrier
  *  for the body row, which did NOT move. Returns true when `want` carries `table`. */
-const carriedBy = (app, table, want) => {
+const carriedBy = (app, table, want, root = ROOT) => {
   if (want === 'ToggleRow') return new RegExp(`options=\\{${table}\\}`).test(app);
   if (want === 'chipRow') {
     for (const m of app.matchAll(/chipRow\(\s*(\w+)\s*,/g)) {
       if (resolvesTo(app, m[1], table)) return true;
     }
     return false;
+  }
+  /* ROUND AM, AM-5 — a SLIDER carrier: the control is the `table` itself. This is
+     the third shape, added because one of the twelve genuinely changed FAMILY
+     rather than row style: `flow speed` was four chips and is now one continuous
+     range input, so there is no option table left to point at — the range IS the
+     guarantee that every value (the four old ones included) is reachable. Read
+     from the file that declares it, so the claim cannot drift from the code. */
+  if (want === 'slider') {
+    const picks = readFileSync(`${root}/src/InspectorPickers.tsx`, 'utf8');
+    return new RegExp(`export const ${table}\\s*=`).test(picks);
   }
   return false;
 };
@@ -335,7 +345,18 @@ const TWELVE = [
   {n: 5, what: 'start marker (was "arrow head")', was: 4210, kind: 'row', table: 'MARKER_OPTS', carrier: 'chipRow'},
   {n: 6, what: 'end marker (was "head start")', was: 4219, kind: 'row', table: 'MARKER_OPTS_START', carrier: 'chipRow'},
   {n: 7, what: 'flow count', was: 4261, kind: 'render', carrier: 'Stepper', proof: 'min={1} max={6}'},
-  {n: 8, what: 'flow speed', was: 4270, kind: 'row', table: 'SPEED_OPTS', carrier: 'chipRow'},
+  /* ROUND AM, AM-5 — `flow speed` changed FAMILY, not just row style: the four
+     word-chips are replaced by ONE continuous range input over the field's own
+     0.6…8s. So its `carrier` is the `slider` shape above, and `table` names the
+     two constants that bound it (declared in `src/InspectorPickers.tsx`, read
+     there). `was: 4270` is unchanged — this is the same control at the same row,
+     offering the same values by a different mechanism. */
+  {n: 8, what: 'flow speed', was: 4270, kind: 'row', table: 'SPEED_MIN', carrier: 'slider',
+    /* The pre-AL-6 `options={…}` literal this row carried on `<ToggleRow/>`. Kept
+       as its OWN field rather than derived from `table`, because AM-5 changed the
+       carrier AND the table name: the OLD form must still name the OLD table or
+       the negative control measures a string that never existed there. */
+    preTable: 'SPEED_OPTS'},
   {n: 9, what: "crow's-foot start (was \"source end\")", was: 4313, kind: 'render', carrier: 'IconPickerRow', proof: 'options={CROW_START_OPTS}'},
   {n: 10, what: "crow's-foot end (was \"target end\")", was: 4332, kind: 'render', carrier: 'IconPickerRow', proof: 'options={CROW_END_OPTS}'},
   {n: 11, what: 'node shape (19)', was: 4571, kind: 'render', carrier: 'ShapesPicker', proof: '<ShapesPicker'},
@@ -402,7 +423,7 @@ if (preAl) {
      RED on the working tree, which is precisely why it had to be re-anchored. */
   const oldForm = (app) => TWELVE.map((c) => c.kind === 'render'
     ? rendersOf(app, c.carrier) >= 1
-    : app.includes(`options={${c.table}}`));
+    : app.includes(`options={${c.preTable ?? c.table}}`));
   /* The RE-ANCHORED form, over the tree it moved off. It must be RED there. */
   const preEnumerated = enumeratedOk(preAl.app, preAl.region);
   const preOk = preEnumerated.filter(e => e.ok).length;
@@ -465,7 +486,18 @@ assert('b.option-art-tables-are-complete',
         return countOf(seg, 'flip') === 3;
       })()},
       {what: "crow's foot (6)", ok: ['none', 'one', 'zeroOrOne', 'many', 'zeroOrMany'].every(v => APP.includes(`{v: '${v}'`)) && APP.includes("label: 'arrow'")},
-      {what: 'flow speed (4)', ok: ['4', '2.4', '1.4', '0.8'].every(v => APP.includes(`{v: '${v}', label: `))},
+      /* ROUND AM, AM-5 — RE-ANCHORED, NOT DELETED. This row asserted the
+         `flow speed (4)` table still offered 4 / 2.4 / 1.4 / 0.8 as chips. The
+         CHIPS are replaced by a range input, so the equivalent claim is that the
+         control which replaced them still REACHES all four values: the slider is
+         a continuous field over `0.6…8`, and each of the four old chip values is
+         inside that closed interval. `SPEED_MIN` / `SPEED_MAX` are read from the
+         module that declares them, so the range cannot drift from the claim. */
+      {what: 'flow speed (slider over 0.6–8, covering the four old chip values)', ok:
+        PICKS_RAW.includes('export const SPEED_MIN = 0.6')
+        && PICKS_RAW.includes('export const SPEED_MAX = 8')
+        && ['4', '2.4', '1.4', '0.8'].every(v => Number(v) >= 0.6 && Number(v) <= 8)
+        && APP.includes('<FlowSpeed')},
       {what: 'body (2, not 19)', ok: APP.includes("{v: 'card', label: 'card'") && APP.includes("{v: 'label-only', label: 'label only'")
           && !APP.includes("body: e.target.value as 'card' | 'label-only'")},
     ];
@@ -636,12 +668,32 @@ assert('d.curvature-picker-writes-no-bend',
        buttons, not an id-bearing trigger). The slice is therefore taken from the
        `curvature` LABEL the row still renders through to its `options` table —
        the same span of the same onChange, found by the row instead of by an id
-       the new control does not have. The claim is unchanged. */
+       the new control does not have. The claim is unchanged.
+
+       ROUND AM, AM-5 — THE END ANCHOR WAS STALE AND IS FIXED. The slice ran to
+       `indexOf('options={CURVE_OPTS}')`, and AL-6 did not merely RENAME that
+       table — it changed the row's CARRIER, and a `chipRow` takes its table as
+       the FIRST ARGUMENT, not as an `options={…}` prop. So the anchor stopped
+       existing in that form entirely, `indexOf` returned -1 and the slice ran
+       from the curvature label TO THE END OF THE FILE (18,684 of 160,416 chars)
+       instead of to the row's own end. The claim survived on luck: nothing after
+       that label happened to contain the string `bend` — until AM-5's
+       `bendDragging` reference did, and the probe went red on a reference that is
+       NOWHERE NEAR the curvature row. An unbounded slice is exactly the failure
+       mode this assertion names, so the anchor is now the chipRow call the row
+       REALLY makes, and the slice is the row again (one line, and `bend` absent).
+       The end index is asserted to EXIST, so a future rename fails loudly here
+       instead of silently measuring the whole file. */
     const i = APP_RAW.indexOf('<label>curvature</label>');
-    const body = stripTs(APP_RAW.slice(i, APP_RAW.indexOf('options={CURVE_OPTS}', i)));
+    /* In the pre-AL-6 form the onChange body came BEFORE `options={…}`; the
+       `chipRow` form passes it as the THIRD ARGUMENT, so the slice runs to the
+       call's own end marker instead. The claim measured is the same span of the
+       same onChange either way. */
+    const j = APP_RAW.indexOf(", 'Curvature', true)}", i);
+    const body = j < 0 ? '' : stripTs(APP_RAW.slice(i, j));
     const bends = countOf(body, 'bend');
     console.log(`  curvature row onChange: ${bends} occurrence(s) of "bend" (comments stripped)`
-      + `  [slice from <label>curvature</label> instead of the removed id="insp-curvature"]`);
+      + `  [slice from <label>curvature</label> to the chipRow call's end, ${j < 0 ? 'ANCHOR NOT FOUND — slice would be unbounded' : `${body.length} chars`}]`);
     return i >= 0 && bends === 0 && body.includes('updateEdge({type: PATH_TYPES[id]})');
   })(),
   'the picker sets edge.type + calls rememberEdgePath and nothing else');

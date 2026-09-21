@@ -73,8 +73,12 @@ try {
   console.log('        REPLAY asserts they are RED there. Re-pin DS_PRE_AL_COMMIT to ROUND AK\'s');
   console.log('        last commit (the tree these assertions last passed on).');
 }
-/* The working-tree bundle in the SAME shape, so one probe runs over both. */
-const SHIP_B = {appRaw: APP_RAW, stylesRaw: STYLES_RAW, app: APP, styles: STYLES};
+/* The working-tree bundle in the SAME shape, so one probe runs over both.
+   ROUND AM, AM-5 — `picks` is added so a probe can read `src/InspectorPickers.tsx`
+   too. `P_HALF_APPLIED` needs it because AM-5 moved the Speed row's carrier out
+   of `App.tsx` entirely, into that file's `FlowSpeed`. */
+const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
+const SHIP_B = {appRaw: APP_RAW, stylesRaw: STYLES_RAW, app: APP, styles: STYLES, picks: PICKS_RAW};
 
 const results = [];
 const rmFile = rmSync;
@@ -471,11 +475,18 @@ const chipGlyphRowsOf = (app) => {
 const P_HALF_APPLIED = (b) => {
   const wouldWrap = speedWorst > speedContent4 && speedWorst < speedContent2;   // the arithmetic
   const noToggleHalf = toggleHalfRowsOf(b.app).length === 0;
-  const speedIsChip = chipCallsOf(b.app).includes('SPEED_OPTS');
-  const chipsContentSized = chipCallsOf(b.app).length >= 9
+  /* ROUND AM, AM-5 — `speed` is no longer a CHIP row at all. Its four word-chips
+     became one continuous range input (`FlowSpeed`), so `SPEED_OPTS` is gone and
+     the row that AK-6 was protecting against the wrapped-word trade no longer
+     exists in word form. The invariant is carried by the OTHER word rows now, so
+     the clause becomes: no surviving row that renders words wraps one. Asserted
+     via the chip rows that remain plus the slider's own presence. */
+  const speedIsSlider = b.picks.includes('export function FlowSpeed(')
+    && b.app.includes('<FlowSpeed');
+  const chipsContentSized = chipCallsOf(b.app).length >= 8
     && /\.chips\s*\{[^}]*flex-wrap:\s*wrap/.test(b.styles)
     && /\.chip\s*\{[^}]*white-space:\s*nowrap/.test(b.styles);
-  return wouldWrap && noToggleHalf && speedIsChip && chipsContentSized;
+  return wouldWrap && noToggleHalf && speedIsSlider && chipsContentSized;
 };
 /** P2 — `half` is NOT over-applied: NO surviving `<ToggleRow/>` carries it (the
  *  one row that needed it left the equal-share family), and every OTHER segmented
@@ -512,7 +523,7 @@ const P_ROWS_DIVIDE = (b) => {
     const each = (FIELD - (perLine - 1) * gap) / perLine;
     return each > 0 && Math.abs(each * perLine + (perLine - 1) * gap - FIELD) < 0.01;
   });
-  return rowsOk && chipCallsOf(b.app).length >= 9;
+  return rowsOk && chipCallsOf(b.app).length >= 8;
 };
 
 /* THE SPEED-ROW ASSERTION (re-anchored by AL-6 — see `P_HALF_APPLIED`). Placed
@@ -529,9 +540,16 @@ assert('aa1.the-four-across-word-row-carries-the-two-per-line-modifier-because-i
   `has no per-line modifier at all, so the row no longer carries \`half\` and does not need to: it wraps ` +
   `instead of dividing. The INVARIANT AK-6 was protecting — the four-across word row must not trade a ragged ` +
   `row for a WRAPPED word — is asserted the other way round now: no surviving \`<ToggleRow/>\` carries \`half\` ` +
-  `(${toggleHalfRowsOf(APP).length}), the Speed row IS a \`chipRow\`, and the chip row is content-sized ` +
+  `(${toggleHalfRowsOf(APP).length}), the chip row is content-sized ` +
   `(\`.chips { flex-wrap: wrap }\` + \`.chip { white-space: nowrap }\`), so \`very fast\` stays on one line. ` +
-  `This probe is RED at ${PRE_AL_COMMIT}, where the Speed row was \`<ToggleRow half>\`.`);
+  `This probe is RED at ${PRE_AL_COMMIT}, where the Speed row was \`<ToggleRow half>\`. ` +
+  `RE-ANCHORED AGAIN by ROUND AM (AM-5), and this one is a SECOND BEHAVIOUR CHANGE — the row the arithmetic ` +
+  `is about no longer renders words AT ALL: \`SPEED_OPTS\` is deleted and the four chips are one continuous ` +
+  `range input in \`FlowSpeed\`, so \`very fast\` cannot wrap because it is not painted. The clause that names ` +
+  `the Speed row's carrier is therefore \`<FlowSpeed\` rather than \`chipRow(SPEED_OPTS\`, and the remaining ` +
+  `chip-row count drops 9 -> 8 because that row left the family. The ARITHMETIC (\`very fast\` vs a 4-across ` +
+  `and a 2-across content box) is UNCHANGED and is still what makes content-sizing necessary for the word ` +
+  `rows that remain.`);
 const CALLS = (() => {
   const out = [];
   const re = /<ToggleRow([\s\S]*?)\/>/g;
@@ -669,17 +687,16 @@ for (const t of CHIPS) {
   console.log(`    ${t.padEnd(22)} ${n ? `${String(n).padStart(2)} options` : 'count NOT READ'}  content-sized (chipRow: flex-wrap, no equal-share grid)`);
 }
 assert('aa1.every-ToggleRow-in-the-panel-divides-its-field-equal',
-  allRowsOk && rowsRead === CALLS.length && CALLS.length >= 6 && CHIPS.length >= 9,
+  allRowsOk && rowsRead === CALLS.length && CALLS.length >= 6 && CHIPS.length >= 8,
   `${CALLS.length} surviving \`<ToggleRow/>\` call sites enumerated from App.tsx and every option count ` +
   `resolved from the table that really builds it (4/2/6/3/3 in the Text section, matching TEXT_*_OPTS in ` +
   `src/textStyle.ts, plus BODY 2) — each row's buttons are equal and every line sums to exactly the ${FIELD}px ` +
-  `field; and ${CHIPS.length} \`chipRow\` call sites carry the rows AL-6 moved [${CHIPS.join(', ')}], each ` +
-  `content-sized. RE-ANCHORED by ROUND AL (AL-6): the OLD claim enumerated 8+ \`<ToggleRow/>\` sites including ` +
-  `WIDTH 5 / DASH 3 / CURVE 4 / the two MARKER rows 3+3 / SPEED 4. WHY IT MOVED: AL-6 replaced those five ` +
-  `LINE/MARKERS call sites with the one chip system, so the enumeration dropped to ${CALLS.length}. The ` +
-  `EQUAL-SHARE INVARIANT for the rows still on \`<ToggleRow/>\` is asserted UNCHANGED (it is the Text section and ` +
-  `the body switch); the moved rows are asserted to exist in the chip form, and the two halves together are ` +
-  `the same claim AK-6/AK-7 made: every option visible, in a real row control.`);
+  `field; and ${CHIPS.length} \`chipRow\` call sites carry the rows AL-6 moved ` +
+  `[${CHIPS.join(', ')}], each content-sized. ` +
+  `RE-ANCHORED by ROUND AM (AM-5): the chip count is 8, not 9 — the SPEED row left the chip family when its ` +
+  `four words became ONE range input (\`FlowSpeed\` in src/InspectorPickers.tsx), so there is no ` +
+  `\`chipRow(SPEED_OPTS\` call any more and that table is deleted. The chip LIST above is printed rather ` +
+  `than restated, so a row silently dropping out is visible; a NINTH row leaving would still fail the count.`);
 
 assert('aa1.one-gap-across-every-segmented-row',
   computed(WRAPPER, 'gap')?.v === computed([...WRAPPER, 'grid3'], 'gap')?.v
