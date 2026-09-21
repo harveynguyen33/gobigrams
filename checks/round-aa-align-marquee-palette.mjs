@@ -39,6 +39,43 @@ const APP = stripTs(APP_RAW);
 const PRESETS = stripTs(PRESETS_RAW);
 const SET = stripTs(SET_RAW);
 
+/* ===========================================================================
+   ROUND AL — THE SECOND PIN, and the replay the re-anchored probes need.
+   ===========================================================================
+   This harness had NO negative control: every claim was read from the working
+   tree only, so a claim that happened to be true on both trees could never be
+   told apart from one that measures a change. ROUND AL re-anchors four of these
+   assertions (the rows that moved to `chipRow`), and the round's law is that a
+   re-anchored assertion must be SHOWN RED on the tree it moved off — otherwise
+   the "re-anchor" is indistinguishable from a loosening.
+
+   `f0b00aa` is ROUND AK's last commit, the tree these assertions last PASSED
+   on. It is a DIFFERENT commit from the working tree in exactly the way these
+   four claims moved, so it is the control that makes the re-anchors measurable.
+   Read with `git show`, this harness's only option (it does not support
+   `DS_PRE_COMMIT`), which is what the round's rule allows when a harness has no
+   env pin. The REPLAY section at the bottom runs the same probes over it and
+   FAILS if any is still GREEN there. */
+const PRE_AL_COMMIT = process.env.DS_PRE_AL_COMMIT || 'f0b00aa';
+const commitFile = (commit, p) =>
+  execFileSync('git', ['show', `${commit}:${p}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
+let preAl = null;
+try {
+  preAl = {
+    appRaw: commitFile(PRE_AL_COMMIT, 'src/App.tsx'),
+    stylesRaw: commitFile(PRE_AL_COMMIT, 'src/styles.css'),
+  };
+  preAl.app = stripTs(preAl.appRaw);
+  preAl.styles = stripTs(preAl.stylesRaw);
+} catch (err) {
+  console.log(`\n  FAIL  the tree the re-anchored claims moved off could not be read from ${PRE_AL_COMMIT}: ${err.message}`);
+  console.log('        The four re-anchored AA-1 assertions print their OLD claim from it and the');
+  console.log('        REPLAY asserts they are RED there. Re-pin DS_PRE_AL_COMMIT to ROUND AK\'s');
+  console.log('        last commit (the tree these assertions last passed on).');
+}
+/* The working-tree bundle in the SAME shape, so one probe runs over both. */
+const SHIP_B = {appRaw: APP_RAW, stylesRaw: STYLES_RAW, app: APP, styles: STYLES};
+
 const results = [];
 const rmFile = rmSync;
 const assert = (id, pass, detail = '') => {
@@ -319,15 +356,10 @@ const speedContent2 = rowWidths(2, GAP) - 2 * resolvePadding(BTN, [...WRAPPER, '
 console.log(`\n  SPEED row: 4-across content ${speedContent4.toFixed(1)}px vs "very fast" ${speedWorst.toFixed(1)}px`
   + `  →  ${speedWorst > speedContent4 ? 'WOULD WRAP' : 'fits'}`);
 console.log(`            2-across content ${speedContent2.toFixed(1)}px  →  ${speedWorst > speedContent2 ? 'WOULD WRAP' : 'fits'}`);
-assert('aa1.the-four-across-word-row-carries-the-two-per-line-modifier-because-it-must',
-  speedWorst > speedContent4 && speedWorst < speedContent2
-    && /options=\{SPEED_OPTS\}[\s\S]{0,80}?\bhalf\b/.test(APP)
-    && /\.insp-seg\.half \.insp-seg-btn \{[^}]*calc\(\(100% - 5px\) \/ 2\)/.test(STYLES),
-  `the Speed row's longest label (\`very fast\`, ${speedWorst.toFixed(1)}px measured) does NOT fit a `
-  + `4-across share (${speedContent4.toFixed(1)}px content box) and DOES fit a 2-across one `
-  + `(${speedContent2.toFixed(1)}px), so the row carries the \`half\` modifier — 2+2 with the same `
-  + 'flex-basis idiom as `grid3`. Without it the equal-width change would have traded a ragged row for a '
-  + 'wrapped word, which is a regression the content-sized row did not have.');
+/* THE SPEED-ROW ASSERTION IS MADE BELOW, after the ROUND AL probe block that
+   defines `P_HALF_APPLIED` — it is a `const` arrow function, so it must be
+   initialised before the assertion calls it. The arithmetic just printed above
+   is what the assertion measures; nothing is skipped. */
 
 /* EVERY OTHER ROW FITS AT ITS NATURAL COUNT — the negative control for the
    modifier above, so `half` is not sprinkled on rows that do not need it. */
@@ -362,11 +394,144 @@ for (const r of NATURAL) {
   if (!fits) naturalOk = false;
   console.log(`  ${r.name.padEnd(8)} ${String(r.n)}-across: longest ${worst.toFixed(1).padStart(6)}px vs ${naturalContent(r.n).toFixed(1).padStart(6)}px  ${fits ? 'fits its natural count' : 'NEEDS A MODIFIER'}`);
 }
-/* THE ENUMERATION, not the five the brief names: EVERY `ToggleRow` call site in
-   the panel is found from the source, its option count read from the table it
-   passes, and the row's geometry computed. A row added later with a count that
-   does not divide the field cleanly is caught here rather than found by eye. */
+/* ===========================================================================
+   ROUND AL (AL-6) — RE-ANCHORED PROBES AS FUNCTIONS OF A SOURCE BUNDLE.
+   ===========================================================================
+   The four AA-1 assertions below measured rows that ROUND AL moved from the
+   `<ToggleRow/>` ELEMENT to the `chipRow(` CALL. To keep the invariant they were
+   protecting AND to show each one RED on the tree it moved off, each is a PURE
+   PREDICATE OF A BUNDLE ({app, styles}) run twice — over the working tree (in
+   the RUN section below) and over `PRE_AL_COMMIT` (the REPLAY at the bottom). A
+   probe that is TRUE on both trees proves nothing and the REPLAY FAILS on it;
+   that is the round's law made mechanical, and it is what caught the first,
+   weaker form of the `markerRows` re-anchor in the sibling harness. */
+
 const hasModifier = (jsx, word) => new RegExp(`\\n\\s*${word}\\s*\\n`).test(jsx);
+/** EVERY `ToggleRow` call site in a stripped App source, with its option table and
+ *  the per-line modifier it carries. The row's OWN JSX decides both, so the
+ *  geometry is the geometry that call site really renders. */
+const toggleCallsOf = (app) => {
+  const out = [];
+  const re = /<ToggleRow([\s\S]*?)\/>/g;
+  let m;
+  while ((m = re.exec(app))) {
+    const opts = /options=\{(\w+)\}/.exec(m[1])?.[1];
+    if (opts) out.push({opts, grid3: hasModifier(m[1], 'grid3'), half: hasModifier(m[1], 'half')});
+  }
+  return out;
+};
+/** EVERY `chipRow(table, …)` call site's option token, in source order. */
+const chipCallsOf = (app) => [...app.matchAll(/chipRow\(\s*(\w+)\s*,/g)].map(m => m[1]);
+
+/* ── THE ONE CHIP ROW, AND WHY THE `half` CLAIM IS SCOPE-ONLY (AL-6). ─────────
+   AL-6 did not merely rename the carrier: the chip row is `flex-wrap: wrap` with
+   CONTENT-SIZED chips and carries NO per-line modifier. So the Speed row — the
+   one row that needed `half` at 4-across — no longer carries it: a chip row can
+   be as long as its items need (`very fast` fits because the row WRAPS). The
+   `half` claim therefore still holds for the rows it now describes (the
+   `<ToggleRow/>` ones), and NONE of them needs a modifier; the Speed row's
+   requirement is discharged by the chip row's own geometry. Both halves are
+   asserted, and each is RED on the tree it moved off — see the REPLAY.
+   ------------------------------------------------------------------------- */
+/** The `half`-carrying rows among the SURVIVING `<ToggleRow/>` call sites. The
+ *  chip form has no modifier, so this is now a `ToggleRow`-only question — and it
+ *  is RED at `f0b00aa`, where the Speed row was a `<ToggleRow half>`. */
+const toggleHalfRowsOf = (app) => toggleCallsOf(app).filter(c => c.half).map(c => c.opts);
+/** The `chipRow` call sites whose FIFTH argument is `true` — the GLYPH-flagged
+ *  rows (a square figure). Extracted with a real paren walk, NOT a lazy regex:
+ *  each call contains an arrow-function body, so a non-greedy `[\s\S]*?\)\}` would
+ *  span from the first `chipRow(` to the first `)}` in the whole file and report a
+ *  single, WRONG row. This exists to catch exactly that mis-read: `true` is the
+ *  GLYPH flag, NOT the `half` geometry, so conflating them would report
+ *  `CURVE_ICON_OPTS` as a `half` row. */
+const chipGlyphRowsOf = (app) => {
+  const out = [];
+  for (const m of app.matchAll(/chipRow\(/g)) {
+    let d = 0, end = m.index + m[0].length - 1;
+    for (let i = end; i < app.length; i++) {
+      if (app[i] === '(') d++;
+      else if (app[i] === ')' && --d === 0) { end = i; break; }
+    }
+    const call = app.slice(m.index, end + 1);
+    const table = /^chipRow\(\s*(\w+)/.exec(call)?.[1];
+    /* the last argument, before the closing paren */
+    const last = call.slice(0, -1).split(',').pop()?.trim();
+    if (table && /^true$/.test(last)) out.push(table);
+  }
+  return out;
+};
+
+/** P1 — the four-across word row STILL cannot divide, and its requirement is
+ *  discharged: NO surviving `<ToggleRow/>` carries `half`, and the Speed row is
+ *  a `chipRow` whose chips are content-sized (`flex-wrap`, no equal-share grid),
+ *  so `very fast` does not wrap. The ARITHMETIC (`very fast` vs a 4-across and a
+ *  2-across content box) is unchanged and is what makes the content-sizing
+ *  NECESSARY rather than incidental. This is RED at `f0b00aa`, where the Speed
+ *  row was `<ToggleRow half>` — the modifier the claim is about. */
+const P_HALF_APPLIED = (b) => {
+  const wouldWrap = speedWorst > speedContent4 && speedWorst < speedContent2;   // the arithmetic
+  const noToggleHalf = toggleHalfRowsOf(b.app).length === 0;
+  const speedIsChip = chipCallsOf(b.app).includes('SPEED_OPTS');
+  const chipsContentSized = chipCallsOf(b.app).length >= 9
+    && /\.chips\s*\{[^}]*flex-wrap:\s*wrap/.test(b.styles)
+    && /\.chip\s*\{[^}]*white-space:\s*nowrap/.test(b.styles);
+  return wouldWrap && noToggleHalf && speedIsChip && chipsContentSized;
+};
+/** P2 — `half` is NOT over-applied: NO surviving `<ToggleRow/>` carries it (the
+ *  one row that needed it left the equal-share family), and every OTHER segmented
+ *  row's longest label fits its natural equal share. RED at `f0b00aa`, where
+ *  exactly one `<ToggleRow>` carried `half` (the Speed row). */
+const P_HALF_NOT_OVER_APPLIED = (b) => naturalOk
+  && toggleHalfRowsOf(b.app).length === 0
+  && (b.app.match(/\n\s+half\n/g) ?? []).length === 0;
+/** P3 — the control family is unchanged and no native dropdown was introduced.
+ *  The `ToggleRow` COUNT dropped because rows moved to `chipRow`, so the claim
+ *  becomes `>= 6` surviving `ToggleRow` sites (the Text section + the body
+ *  switch) PLUS the one chip system (its `.chips` / `.chip` rules), all sharing
+ *  the `.insp-seg-btn` vocabulary — and still zero native `<select>`. The chip
+ *  clause is what makes this RED at `f0b00aa`, where neither rule existed; without
+ *  it the probe is `13 >= 6` there and would prove nothing. */
+const P_CONTROL_UNCHANGED = (b) => countOf(b.app, '<ToggleRow') >= 6
+  && countOf(b.app, '<select') === 0
+  && countOf(b.styles, '.insp-seg-btn') >= 4
+  && /\.chips\s*\{/.test(b.styles) && /\.chip\s*\{/.test(b.styles);
+/** P4 — every SURVIVING `ToggleRow` call site divides its field equally, AND the
+ *  chip rows that took over the AK-6/AK-7 rows exist. The chip COUNT is part of
+ *  the assertion on purpose: without it the probe is `13 rows ⊇ 6` at `f0b00aa`
+ *  and `6 rows ⊇ 6` on the working tree, i.e. GREEN on both — a re-anchor that
+ *  proves nothing (the sibling harness's new control caught precisely this shape
+ *  of mistake). The chip clause is what makes the probe RED on the tree AL
+ *  changed from: there were ZERO `chipRow` calls there. */
+const P_ROWS_DIVIDE = (b) => {
+  const calls = toggleCallsOf(b.app);
+  const rowsOk = calls.length >= 6 && calls.every((c) => {
+    const n = tableSizeOf(b.app, c.opts);
+    if (!n) return false;
+    const perLine = perLineOf(c, n);
+    const gap = gapOf(c);
+    const each = (FIELD - (perLine - 1) * gap) / perLine;
+    return each > 0 && Math.abs(each * perLine + (perLine - 1) * gap - FIELD) < 0.01;
+  });
+  return rowsOk && chipCallsOf(b.app).length >= 9;
+};
+
+/* THE SPEED-ROW ASSERTION (re-anchored by AL-6 — see `P_HALF_APPLIED`). Placed
+   here because the probes above are `const` functions and must be initialised
+   before this call; the arithmetic it measures was printed above. */
+assert('aa1.the-four-across-word-row-carries-the-two-per-line-modifier-because-it-must',
+  P_HALF_APPLIED(SHIP_B),
+  `the Speed row's longest label (\`very fast\`, ${speedWorst.toFixed(1)}px measured) still does NOT fit a ` +
+  `4-across equal share (${speedContent4.toFixed(1)}px content box) but DOES fit a 2-across one ` +
+  `(${speedContent2.toFixed(1)}px) — the arithmetic is unchanged and is what makes the fix necessary. ` +
+  `RE-ANCHORED by ROUND AL (AL-6), and this one is a BEHAVIOUR CHANGE, not only a re-point: the OLD claim ` +
+  `was that the row carried the \`half\` modifier (2+2 with the \`grid3\` flex-basis idiom). WHY IT MOVED: ` +
+  `AL-6 made the Speed row a \`chipRow\`, and a chip row is \`flex-wrap: wrap\` with CONTENT-SIZED chips — it ` +
+  `has no per-line modifier at all, so the row no longer carries \`half\` and does not need to: it wraps ` +
+  `instead of dividing. The INVARIANT AK-6 was protecting — the four-across word row must not trade a ragged ` +
+  `row for a WRAPPED word — is asserted the other way round now: no surviving \`<ToggleRow/>\` carries \`half\` ` +
+  `(${toggleHalfRowsOf(APP).length}), the Speed row IS a \`chipRow\`, and the chip row is content-sized ` +
+  `(\`.chips { flex-wrap: wrap }\` + \`.chip { white-space: nowrap }\`), so \`very fast\` stays on one line. ` +
+  `This probe is RED at ${PRE_AL_COMMIT}, where the Speed row was \`<ToggleRow half>\`.`);
 const CALLS = (() => {
   const out = [];
   const re = /<ToggleRow([\s\S]*?)\/>/g;
@@ -390,15 +555,19 @@ const perLineOf = (c, n) => (c.grid3 ? 3 : c.half ? 2 : n);
 const gapOf = (c) => (c.grid3 ? G3GAP : c.half ? parseFloat(HALF_GAP?.v ?? '5') : GAP);
 const ancestorsOf = (c) => (c.grid3 ? WRAPPER3 : c.half ? [...WRAPPER, 'half'] : WRAPPER);
 
+const _toggleHalf = toggleHalfRowsOf(APP);
 assert('aa1.no-other-row-needs-a-modifier-so-half-is-not-over-applied',
-  naturalOk && countOf(APP, 'options={SPEED_OPTS}') === 1
-    && (APP.match(/\n\s+half\n/g) ?? []).length === 1
-    && CALLS.filter(c => c.half).length === 1
-    && CALLS.find(c => c.half)?.opts === 'SPEED_OPTS',
-  `exactly ONE call site carries \`half\` (the Speed row). Every other segmented row's longest label fits `
-  + 'its natural equal share — size 13.7 / weight 46.4 / align 39.7 / valign 39.7 / body 66.2px all '
-  + 'inside their cells — so the modifier is applied where the measurement demands it and nowhere else. '
-  + '(RE-ANCHORED by AK-3: the `offset` row — 39.7px — left this list with the control it measured.)');
+  P_HALF_NOT_OVER_APPLIED(SHIP_B),
+  `NO surviving \`<ToggleRow/>\` call site carries \`half\` (${JSON.stringify(_toggleHalf)}) — the one row that ` +
+  `needed it, the Speed row (\`very fast\` = ${speedWorst.toFixed(1)}px vs a ${speedContent4.toFixed(1)}px 4-across ` +
+  `cell), left the equal-share family for the chip row, whose chips are CONTENT-SIZED. Every other segmented ` +
+  `row's longest label fits its natural equal share — size 13.7 / weight 46.4 / align 39.7 / valign 39.7 / ` +
+  `body 66.2px all inside their cells — so a modifier is applied nowhere, which is the strongest form of the ` +
+  `AK-6 claim. RE-ANCHORED by ROUND AL (AL-6): the OLD claim required exactly ONE \`half\` call site (the Speed ` +
+  `row, then a \`<ToggleRow/>\`). WHY IT MOVED: the one chip system, whose rows carry no per-line modifier. The ` +
+  `invariant — a modifier must not be sprinkled on rows that do not need it — is stated as "none is needed at ` +
+  `all"; a NEW \`half\` appearing on a surviving \`ToggleRow\` reddens this. (Earlier re-anchor by AK-3: the ` +
+  `\`offset\` row — 39.7px — left this list with the control it measured.)`);
 
 /** The option count of ONE table, read from the declaration that REALLY builds
  *  it — never by scanning a fixed-size window (which would happily count a
@@ -436,10 +605,10 @@ const countEntries = (arr) => {
   // `{` entries win when present; otherwise a flat literal of N items has N-1 commas.
   return count || strings + 1;
 };
-const tableSize = (name) => {
-  const decl = new RegExp(`const ${name}\\s*:[^=]*=\\s*`).exec(APP);
+const tableSizeOf = (app, name) => {
+  const decl = new RegExp(`const ${name}\\s*:[^=]*=\\s*`).exec(app);
   if (!decl) return 0;
-  const rest = APP.slice(decl.index + decl[0].length);
+  const rest = app.slice(decl.index + decl[0].length);
   const literal = /^\s*\[/.test(rest);
   if (literal) return countEntries(rest);
   const mappedFrom = /^\s*(\w+)\s*\.map/.exec(rest)?.[1];
@@ -474,7 +643,7 @@ const tableSize = (name) => {
 console.log('\n  EVERY ToggleRow CALL SITE IN THE PANEL');
 let allRowsOk = true, rowsRead = 0;
 for (const c of CALLS) {
-  const n = tableSize(c.opts);
+  const n = tableSizeOf(APP, c.opts);
   if (!n) { console.log(`    App.tsx:${c.line} ${c.opts.padEnd(16)} count NOT READ — reported, not guessed`); allRowsOk = false; continue; }
   rowsRead++;
   const perLine = perLineOf(c, n);
@@ -488,33 +657,67 @@ for (const c of CALLS) {
   console.log(`    App.tsx:${String(c.line).padStart(4)} ${c.opts.padEnd(16)} ${String(n).padStart(2)} buttons${tag}`
     + ` → each ${each.toFixed(1).padStart(6)}px  line total ${total.toFixed(1).padStart(6)}px  ${lines} row(s)  ${ok ? 'ok' : 'OVERFLOW'}`);
 }
+/* ROUND AL (AL-6) — THE CHIP ROWS, enumerated the same way, so the replacement
+   is reported beside the survivors rather than merely alluded to. A `chipRow` is
+   `flex-wrap: wrap` with content-sized chips, so its geometry is "as long as its
+   items need", not an equal share — this is the half of the claim the OLD
+   `>= 8 ToggleRow` enumeration covered and the new one covers in the chip form. */
+const CHIPS = chipCallsOf(APP);
+console.log('  EVERY chipRow CALL SITE IN THE PANEL');
+for (const t of CHIPS) {
+  const n = tableSizeOf(APP, t);
+  console.log(`    ${t.padEnd(22)} ${n ? `${String(n).padStart(2)} options` : 'count NOT READ'}  content-sized (chipRow: flex-wrap, no equal-share grid)`);
+}
 assert('aa1.every-ToggleRow-in-the-panel-divides-its-field-equal',
-  allRowsOk && rowsRead === CALLS.length && CALLS.length >= 8,
-  `all ${CALLS.length} \`<ToggleRow/>\` call sites enumerated from App.tsx and every option count resolved `
-  + `from the table that really builds it (4/2/6/3/3 in the Text section, matching TEXT_*_OPTS in `
-  + `src/textStyle.ts, plus WIDTH 5 / DASH 3 / CURVE 4 / the two MARKER rows 3+3 / SPEED 4 / BODY 2 — `
-  + `AK-6 moved the three style controls and AK-7 the two marker controls into this control family, and `
-  + `the resolver was extended to read their in-line \`as const\` tables) `
-  + `— each row's buttons are equal, every line sums to exactly the ${FIELD}px field, and the two `
-  + 'word-rows carry the per-line modifiers their labels require (font 3+3, speed 2+2)');
+  allRowsOk && rowsRead === CALLS.length && CALLS.length >= 6 && CHIPS.length >= 9,
+  `${CALLS.length} surviving \`<ToggleRow/>\` call sites enumerated from App.tsx and every option count ` +
+  `resolved from the table that really builds it (4/2/6/3/3 in the Text section, matching TEXT_*_OPTS in ` +
+  `src/textStyle.ts, plus BODY 2) — each row's buttons are equal and every line sums to exactly the ${FIELD}px ` +
+  `field; and ${CHIPS.length} \`chipRow\` call sites carry the rows AL-6 moved [${CHIPS.join(', ')}], each ` +
+  `content-sized. RE-ANCHORED by ROUND AL (AL-6): the OLD claim enumerated 8+ \`<ToggleRow/>\` sites including ` +
+  `WIDTH 5 / DASH 3 / CURVE 4 / the two MARKER rows 3+3 / SPEED 4. WHY IT MOVED: AL-6 replaced those five ` +
+  `LINE/MARKERS call sites with the one chip system, so the enumeration dropped to ${CALLS.length}. The ` +
+  `EQUAL-SHARE INVARIANT for the rows still on \`<ToggleRow/>\` is asserted UNCHANGED (it is the Text section and ` +
+  `the body switch); the moved rows are asserted to exist in the chip form, and the two halves together are ` +
+  `the same claim AK-6/AK-7 made: every option visible, in a real row control.`);
 
-/* THE GAP IS NOW ONE NUMBER. Before this round the font row carried 5px (its
-   own two-class rule) while every other segmented row silently inherited
-   `.swatches`'s 7px — a second ragged edge, in the spacing rather than the
-   widths. */
 assert('aa1.one-gap-across-every-segmented-row',
   computed(WRAPPER, 'gap')?.v === computed([...WRAPPER, 'grid3'], 'gap')?.v
     && computed(WRAPPER, 'gap')?.v === computed([...WRAPPER, 'half'], 'gap')?.v,
-  `the row gap is ${computed(WRAPPER, 'gap')?.v} for every segmented row — the default rows, the 3+3 font `
-  + 'row and the 2+2 speed row all state the same value, because each compound selector states it at a '
-  + "specificity that beats `.swatches`'s 7px rather than inheriting it");
+  `the row gap is ${computed(WRAPPER, 'gap')?.v} for every segmented row — the default rows, the 3+3 font ` +
+  `row and the 2+2 speed row all state the same value, because each compound selector states it at a ` +
+  `specificity that beats \`.swatches\`'s 7px rather than inheriting it. (This claim is unaffected by AL-6: ` +
+  `it measures the \`.insp-seg\` rules, which the rows still on \`<ToggleRow/>\` still use, and the chip rows ` +
+  `carry their own 5px row gap.)`);
 
-/* The control itself must not have changed: still `ToggleRow`, still `.insp-seg`. */
+/* The control itself must not have changed: still `ToggleRow` where it is used,
+ * still `.insp-seg`, still zero native selects — and the rows that moved are in
+ * the ONE chip system rather than a third control family. */
 assert('aa1.the-control-is-unchanged-no-new-class-no-select',
-  countOf(APP, '<ToggleRow') >= 8 && countOf(APP, '<select') === 0
-    && countOf(STYLES, '.insp-seg-btn') >= 4,
-  `${countOf(APP, '<ToggleRow')} ToggleRow call sites, ${countOf(APP, '<select')} native dropdowns, and the `
-  + 'shared `.insp-seg-btn` still supplies every segmented button — the fix is geometry only');
+  P_CONTROL_UNCHANGED(SHIP_B),
+  `${countOf(APP, '<ToggleRow')} surviving ToggleRow call sites (≥ 6) + ${CHIPS.length} chipRow call sites, ` +
+  `${countOf(APP, '<select')} native dropdowns, and the shared \`.insp-seg-btn\` still supplies every segmented ` +
+  `button (\`.chip\` supplies the chip rows) — the fix is geometry only. RE-ANCHORED by ROUND AL (AL-6): the ` +
+  `OLD claim required \`>= 8\` ToggleRow sites; AL-6 moved five of them into \`chipRow\`, so the count dropped ` +
+  `to ${countOf(APP, '<ToggleRow')}. WHY IT MOVED: the one chip system. The invariant — a REAL control family, ` +
+  `no native dropdown, no second button vocabulary — is unchanged, and the chip family is now counted beside ` +
+  `the ToggleRow family so a third one appearing would still redden this.`);
+
+/* THE GLYPH-FLAG DISTINCTION, asserted so the re-anchored probes above cannot
+ * pass on a MIS-READ. `chipRow(opts, value, onPick, title, glyph)` — the fifth
+ * argument `true` names the GLYPH figure (a square) and has nothing to do with
+ * the `half` geometry. A probe that conflated the two would have reported the
+ * CURVE_ICON_OPTS row as a `half` row (which the first, wrong draft of this
+ * harness did, and the replay caught). This records WHICH rows are the glyph
+ * rows, so the `half` probes above can be read as being about a DIFFERENT thing. */
+assert('aa1.the-chip-glyph-rows-are-not-mistaken-for-half-rows',
+  chipGlyphRowsOf(APP).length >= 4
+    && chipCallsOf(APP).includes('SPEED_OPTS')
+    && !chipGlyphRowsOf(APP).includes('SPEED_OPTS'),
+  `the glyph-flagged chip rows are [${chipGlyphRowsOf(APP).join(', ')}] — the square-figure rows — and the ` +
+  `Speed row is NOT among them (it is a WORD row, so its chip row is a pill row with no per-line modifier). So ` +
+  `\`true\` as the fifth argument is the GLYPH flag and not the \`half\` geometry, and the two \`half\` claims ` +
+  `above are about the modifier rather than about this flag.`);
 
 /* ===========================================================================
    ITEM 3 — Basic holds the generic item; Process and Decision are Flowchart.
@@ -777,6 +980,67 @@ assert('aa2.the-component-resolves-Partial-when-nothing-is-stored-and-follows-th
   + '`partial`; a stored `enclose` renders `full`; a stored `touch` renders `partial`. So the no-write '
   + 'default reaches the component as Partial (overlap), and the stored value overrides it — which is the '
   + 'prop `<ReactFlow>` receives.');
+
+/* ===========================================================================
+   REPLAY (negative control) — ROUND AL (AL-6), the four re-anchored AA-1 claims.
+   ===========================================================================
+   The round's law: an assertion whose verdict changed is RE-ANCHORED, and a
+   re-anchored assertion must be SHOWN RED on the tree it moved off — otherwise
+   "re-anchored" is indistinguishable from "loosened to pass". This harness had
+   no control at all before this pass (every claim read the working tree), so the
+   control is added here rather than assumed.
+
+   The four probes below are the SAME functions the four assertions above call,
+   run over `PRE_AL_COMMIT` (`f0b00aa`, ROUND AK's last commit — the tree these
+   assertions last PASSED on, where the rows were `<ToggleRow/>`). Each MUST be
+   RED there. A probe GREEN on both trees proves NOTHING about AL-6 and fails
+   this assertion, so a weakened re-anchor cannot hide behind a green summary.
+
+   The OTHER AA-1 assertions (`the-row-is-flex…`, `one-gap…`, `swatches…`, the
+   dead-grid rule, the geometry table) are NOT re-anchored: they measure the
+   `.insp-seg` / `.swatches` sheet rules and the Text-section tables, none of
+   which AL-6 touched. They are GREEN on both trees by design and are correctly
+   excluded from this RED set rather than listed and quietly filtered. */
+console.log('\n' + '='.repeat(78));
+console.log(`REPLAY (negative control) — the RE-ANCHORED probes over ${PRE_AL_COMMIT}`);
+console.log('each must be RED, or the re-anchor proves nothing');
+console.log('='.repeat(78));
+
+if (preAl) {
+  const PRE_B = {app: preAl.app, styles: preAl.styles};
+  const RE_ANCHORED = [
+    ['aa1.the-four-across-word-row-carries-the-two-per-line-modifier-because-it-must', P_HALF_APPLIED],
+    ['aa1.no-other-row-needs-a-modifier-so-half-is-not-over-applied', P_HALF_NOT_OVER_APPLIED],
+    ['aa1.every-ToggleRow-in-the-panel-divides-its-field-equal', P_ROWS_DIVIDE],
+    ['aa1.the-control-is-unchanged-no-new-class-no-select', P_CONTROL_UNCHANGED],
+  ];
+  const greenOnPre = [];
+  for (const [id, probe] of RE_ANCHORED) {
+    const ok = probe(PRE_B);
+    if (ok) greenOnPre.push(id);
+    console.log(`  ${ok ? 'GREEN (the re-anchor proves NOTHING)' : 'RED   '}  ${id}`);
+  }
+  /* A short, auditable readout of WHY each is red: the counts the probe keys on,
+     on both trees, so the RED is a measurement and not a bare boolean. */
+  console.log(`\n  the counts the four probes key on:`);
+  console.log(`    ToggleRow sites            work ${countOf(APP, '<ToggleRow')}   pre ${countOf(preAl.app, '<ToggleRow')}`);
+  console.log(`    chipRow sites              work ${chipCallsOf(APP).length}   pre ${chipCallsOf(preAl.app).length}`);
+  console.log(`    options={SPEED_OPTS}       work ${countOf(APP, 'options={SPEED_OPTS}')}   pre ${countOf(preAl.app, 'options={SPEED_OPTS}')}`);
+  console.log(`    chipRow(SPEED_OPTS         work ${countOf(APP, 'chipRow(SPEED_OPTS')}   pre ${countOf(preAl.app, 'chipRow(SPEED_OPTS')}`);
+  console.log(`    bare \`half\` word          work ${(APP.match(/\n\s+half\n/g) ?? []).length}   pre ${(preAl.app.match(/\n\s+half\n/g) ?? []).length}`);
+  console.log('');
+  assert('replay.every-re-anchored-probe-is-RED-on-the-tree-it-moved-off',
+    greenOnPre.length === 0,
+    greenOnPre.length === 0
+      ? `all ${RE_ANCHORED.length} re-anchored AA-1 probes are RED at ${PRE_AL_COMMIT} — the tree AL changed ` +
+        `from, where they last PASSED — and GREEN on the working tree, so each re-anchor measures the AL-6 ` +
+        `change itself and is not a weaker claim that happens to be true on both`
+      : `STILL GREEN AT ${PRE_AL_COMMIT} (the re-anchor is weaker than the claim it replaces): ${greenOnPre.join(', ')}`);
+} else {
+  assert('replay.every-re-anchored-probe-is-RED-on-the-tree-it-moved-off', false,
+    `the control tree ${PRE_AL_COMMIT} could not be read, so the four re-anchored AA-1 probes have no ` +
+    `negative control. Re-pin DS_PRE_AL_COMMIT to ROUND AK's last commit — do NOT delete this section.`);
+}
 
 /* ===========================================================================
    SUMMARY
