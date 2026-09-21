@@ -1,6 +1,87 @@
 # HANDOFF — Diagram Studio
 
-## ▶ ROUND AM — Harvey's five connection-line items. DONE, all gates green. PENDING HARVEY'S DEVICE TEST.
+## ▶ ROUND AN — Harvey's 2nd device test of the edge panel (6 items). DONE, gates green. PENDING HIS DEVICE TEST.
+
+**What it is:** six items from Harvey's second device test, resolved as ONE round. Spec `ROUND-AN-SPEC.md`
+(now COMMITTED — the reviewer's audit flagged it sitting untracked while its code was committed; see the
+standard at `/home/harvey/projects/PROJECT-PRACTICE.md`). Base `f75f5d1`.
+
+**AN-1 — renaming a label re-centred it. A REAL BUG, and worse than it looked.** Harvey: *"nếu tôi đổi text,
+enter thì nó tự nhiên về lại center"*. `__editAt` was a ONE-SHOT create signal written by exactly one place
+(`openLabelAt`, a double-click on the path) and **deleted by none** — so it stayed on the edge forever, and
+every later RENAME re-entered `commit`'s create branch and wrote the CENTRED state. It was also PERSISTED: grep
+measured it in three of his live boards (4 + 2 + 1 occurrences), so after a reload EVERY label was in create
+state. AL-4's own comment claimed *"a commit at an EXISTING label leaves `__editAt` undefined"* — false for
+every edge ever created through a path double-click. **Fix:** a new `__consumeEditAt` callback threaded from
+`App` so BOTH editor exits (commit and cancel) consume the signal, plus a FOLD-ON-READ that drops a stored key
+without rewriting any board. A first-created label still centres (AL-4 intact).
+
+**AN-3 — the flow-glyph row now draws in the flow row's own frame.** The two rows drew in different frames
+(`ArtFlow` through the shared `G` wrapper at `viewBox 26 18` / stroke 2; `FLOW_ICON_OPTS` building its own
+`24 24` / 15px svg), so their ink differed at the same 30×30 chip. Glyph PATHS unchanged; scaled inside the
+shared frame by **22/20** and the stroke divided by the same factor. **The spec said 22/24 and was WRONG** — the
+coder measured it: 22/24 divides by the GRID and lands at 18.3 units, i.e. SMALLER than the row above, the
+opposite error; the ink spans 2..22, so 22/20 is the factor. Chip stays 30×30; `.chips` already wraps.
+
+**AN-4 — the FlowRail is DELETED.** Harvey: *"tôi k cần cái Flow rail, xoá đi"*. Component, render site, all
+five CSS rules, the keyframes and both motion-gate entries, and the prop plumbing are gone; the reason is left
+in the code where it was so a later round cannot re-add it. The `.speedval` number beside the slider stays. The
+`am4.*` claims in `round-am-edge-panel.mjs` were RE-ANCHORED to the removal plus the surviving printed value
+(5 new probes, RED on `f75f5d1`) — not silently deleted.
+
+**AN-5 — undo now KEEPS the selection. This was a DEFECT, not a preference.** Figma / draw.io / Excalidraw all
+leave the object selected after an undo (selection is UI state, the graph is document state). Cause:
+`snapshot()` normalised `selected: false` and `undo()` restored it verbatim, so React Flow's controlled
+`onSelectionChange` blanked `selEdgeId` and the inspector closed. Fix: capture the LIVE selection ids at undo
+time and re-apply `selected: true` only to entities that still EXIST in the restored graph, deriving
+`sel`/`selCount`/`selEdgeId` from what survived. The SNAPSHOT still carries `selected: false`. An undo of a
+CREATE legitimately clears the selection.
+
+**AN-6a — a selected label no longer lies about its colour.** `.edge-label.selected` set `color: var(--sel)`
+OUTRIGHT, so while selected the authored `--label-fg` never reached the screen: the panel said it changed, the
+canvas disagreed (*"do cái select nó đè màu xanh khi chọn. Issue tương tự mũi tên"*). That rule now owns ONLY
+the ring (`border-color`), the base rule is the single `color` writer, and an unselected label is byte-identical.
+
+**AN-6b — `--label-plate` finally has consumers.** It was emitted inline and read by NO rule in `src/styles.css`
+(grep: zero) — the SIXTH "emitted but never applied" defect in this project, and why the `background color`
+swatch did nothing (*"cái background khi tôi đổi cũng k đổi màu luôn"*). Both plate states that offer the
+swatch now consume it with the token FIRST and the old value as the FALLBACK:
+`.lb-surface { background: var(--label-plate, var(--surface)) }` and `.lb-outline { … var(--label-plate,
+transparent) }` — so an untouched board paints exactly what it painted.
+
+**Commits:** `dd02b49` (AN-1) · `023a9e6` (AN-3) · `bd83d48` (AN-4) · `1d186e0` (AN-5) · `07f804a` (AN-6a/6b +
+the new harness) · `5c8f900` (AN-6b outline) · `2649632` (the spec). **Not yet pushed.**
+
+**Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **142** (ceiling 160) · **36/36 harnesses green**
+· new `checks/round-an-edge-panel.mjs` **18 PASS / 0 FAIL** with its REPLAY probes RED on `f75f5d1` (14 + 2)
+· `boards/` untouched.
+
+**⚠️ NOT VERIFIED — do not claim it is.** No live gesture, no live panel, no live undo: the headless browser
+renders ZERO edges. AN-5's runtime behaviour (selection surviving a real Ctrl+Z) and AN-3's real layout are
+proven at SOURCE level only. **Harvey's device test is the outstanding step.**
+
+**PROCESS FAILURE WORTH CARRYING:** the first AN coder run was killed by the ORCHESTRATOR'S OWN `pkill` aimed at
+a name pattern, mid-item, with 168 uncommitted lines — recovered only by committing the salvage. Kill by PID from
+the launch result, never by pattern; check `git status` before deciding a run is "burning recon" (a run with
+modified files has left that phase).
+
+### HARVEY — please test on your Mac (`http://192.168.33.200:5200/`)
+
+1. **Rename a label (AN-1)**: double-click a line's text, type, press Enter — the label must STAY where it is.
+   This is the exact bug; it also fixes every label on a board you RELOAD.
+2. **Flow glyph (AN-3)**: the six glyph chips should now read as one family with the `flow` row above them.
+3. **Flow rail (AN-4)**: it is GONE. `count` + the `speed` slider + the printed seconds remain.
+4. **Undo keeps the selection (AN-5)**: select a line, change something, Ctrl+Z — the line must stay SELECTED
+   and the inspector stay open.
+5. **Label colours (AN-6)**: select a line and change **text color** — it must change WHILE selected (ring
+   stays visible). Change **background** to Surface or Outline — the plate must take the colour.
+
+**VAULT DEBT — ROUNDS AK, AL, AM **and now AN** (4 rounds).** Do them in ONE pass via `pkm`: a new ADR-031
+section, Change Log rows, the Mermaid update, the Architecture MOC line.
+
+---
+
+## ▶ ROUND AM — Harvey's five connection-line items. DONE. PENDING HIS DEVICE TEST.
 
 **What it is:** five feedback items on the connection line, resolved as ONE round. Spec
 `ROUND-AM-SPEC.md`; the **approved** mockup (for AM-2…AM-5) is
