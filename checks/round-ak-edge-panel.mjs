@@ -139,9 +139,30 @@ P.overlayDeclared = src => /\.edge-sel-overlay\s*\{/.test(src.styles.code)
 P.overlayRendered = src => src.GoblinEdge.code.includes('edge-sel-overlay')
   && /className=["']edge-sel-overlay["']/.test(src.GoblinEdge.code);
 
-/* --- AK-2/AK-3/AK-4 (2): the removed controls are gone --- */
-const REMOVED_APP_STRINGS = ['intent label', 'label position', 'animated (dash on the line)'];
-P.removedAppStrings = src => REMOVED_APP_STRINGS.every(s => !src.App.code.includes(s));
+/* --- AK-2/AK-3/AK-4 (2): the removed controls are gone ---
+ *
+ * ── RE-ANCHORED BY ROUND AK PASS 2 (Job A1). OLD claim: the bare substring
+ *    `'label position'` had to be absent from `src/App.tsx`.
+ *    WHY THAT HAD TO CHANGE: it was a SUBSTRING false positive. Pass 2 added a
+ *    legitimate NEW control named `Reset label position` (App.tsx, AK-14.1), so
+ *    the substring appeared on a CORRECT tree and reddened this file. A check
+ *    that fires on the feature the round was asked to build is not a check.
+ *    NEW claim, ANCHORED POSITIVELY to the deleted control's OWN code: the
+ *    three needles below are the things that actually BUILT the removed
+ *    `label position` row on the pre-change tree (verified verbatim at
+ *    `90edd6c:src/App.tsx` lines 3302 / 3335 and its `onChange`):
+ *      - `const eOffset = …`          the value readout that fed the row
+ *      - `const OFFSET_OPTS`          the 3-button option table
+ *      - `data: {offset: …}`          the row's write
+ *    All three are checked in the CODE with comments blanked, so the AK-3 note
+ *    that quotes them does not count as the control existing. A future pass that
+ *    re-introduces the old field therefore still fails, while the new Reset
+ *    button — which shares only the words "label position" — passes. */
+const REMOVED_APP_STRINGS = ['intent label', 'animated (dash on the line)'];
+/** The deleted `label position` row, by its own code rather than by its name. */
+const REMOVED_OFFSET_NEEDLES = ['const eOffset', 'const OFFSET_OPTS', 'offset: v as'];
+P.removedAppStrings = src => REMOVED_APP_STRINGS.every(s => !src.App.code.includes(s))
+  && REMOVED_OFFSET_NEEDLES.every(s => !src.App.code.includes(s));
 
 /* --- AK-8 (3): the deleted preset data --- */
 P.presetDataGone = src => !src.presets.code.includes('labelPresets') && !src.presets.code.includes('C4_LABELS');
