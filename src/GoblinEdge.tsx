@@ -85,6 +85,26 @@ const FLOW_ICON_PATHS: Record<string, React.ReactNode> = {
  */
 const LOCK_PX = 3;
 
+/* ===========================================================================
+   ROUND AL, AL-1 — THE SELECTION COLOUR AND THE CORE'S WIDTH.
+
+   `SEL_STROKE` is the TOKEN, not a value: `var(--sel)` is exactly what the
+   deleted `!important` restroke painted, so the selected edge reads as it did
+   before ROUND AK and a theme change repaints it for free. It is a constant
+   rather than an inline literal because both the sheet's own note and this
+   file's comment name the same token, and one spelling of it is one thing to
+   keep in step.
+
+   `SEL_CORE_PX` is the AUTHORED colour's line, drawn on top of the selection
+   body. 1.1px is a HAIRLINE against every body the app can draw — the width
+   ladder is 1 / 1.5 / 1.8 / 2 / 3 (`WIDTH_OPTS`), so the thinnest body is still
+   ~1.4x the core and the core reads as a core rather than as a second line.
+   Deliberately NOT a function of `strokeWidth`: a proportional core would
+   vanish on the 1px body, and the point of it is that the colour is legible in
+   every case. */
+const SEL_STROKE = 'var(--sel)';
+const SEL_CORE_PX = 1.1;
+
 /**
  * Editable edge. Renders the built-in React Flow path generators, so switching
  * `type` between goblinEdge / smoothstep / step / straight never loses styling.
@@ -778,43 +798,57 @@ const GoblinEdge = memo((props: EdgeProps) => {
 
   return (
     <>
-      {/* ROUND AK, AK-1 — THE SELECTION INDICATOR, DRAWN UNDER THE BODY.
+      {/* ROUND AL, AL-1 — SELECTION IS OPTION C: THE OLD LOOK, MADE TRUTHFUL.
 
-          WHY A SECOND PATH AND NOT A CSS RESTROKE. The rule that used to live
-          at `src/styles.css:1217` —
-          `.react-flow__edge.selected .react-flow__edge-path { stroke: var(--sel)
-          !important }` — overwrote the inline stroke the panel writes, so a
-          SELECTED edge painted `--sel` while the panel (and the `<marker>`, a
-          separate element) still showed the stored colour. Selection was a
-          RECOLOUR, and a recolour can lie.
+          WHAT WAS HERE AND WHY IT WENT. ROUND AK replaced the restroke with a
+          second `<path>` at `strokeWidth + 5` carrying `strokeDasharray="6 4"`
+          (`.edge-sel-overlay`). The owner's device test rejected it in his own
+          words — "nhìn nó xấu sao ấy … đặc biệt khi chỉnh line animation, nhìn
+          nó rất kì": a +5px dashed halo reads as a FAT DASHED OUTLINE and, with
+          the flow payload running, it fights the moving dots. Both the width and
+          the dash are gone with the rule.
 
-          The indicator is therefore its own element, exactly as every surveyed
-          tool does it (draw.io: a dashed shape on the overlay pane; Excalidraw /
-          tldraw: a separate indicator pass). It is rendered FIRST, so it paints
-          UNDER `BaseEdge`'s authored path and never hides the colour it is
-          pointing at; `pointer-events: none` (in the sheet) keeps it out of the
-          hit area, so the click that selects the edge is unchanged.
+          WHAT IT IS NOW — the inverse of what AK shipped, and the look he
+          actually liked (the pre-AK behaviour, where the body turned `--sel`):
 
-          `selected` is React Flow's own per-edge flag, so this adds NO state and
-          needs NO hover — a tap on a touch device selects just as a click does.
-          The dash is inline because it is geometry, not a theme decision; the
-          colour comes from `--sel` in the sheet (no new hex). */}
-      {selected && (
-        <path
-          className="edge-sel-overlay"
-          d={path}
-          strokeWidth={((props.style as any)?.strokeWidth ?? 1.8) + 5}
-          strokeDasharray="6 4"
-        />
-      )}
+            · SELECTED — the body takes `var(--sel)` (the old look), exactly as
+              the deleted `!important` rule painted it, and the AUTHORED colour
+              is preserved as a thin 1.1px core ON TOP of it. So the panel can
+              never lie about the colour (which was AK-1's whole point) and the
+              eye sees the old, quieter signal. The core is a separate element
+              with its OWN class, deliberately NOT `react-flow__edge-path`, so
+              React Flow's own `.selected` rule and this sheet's `.ds-electric`
+              hover marks cannot reach it.
+            · UNSELECTED — ONE path, the authored one, byte-identical to today.
+              `style` is passed through UNCHANGED (`props.style` itself, not a
+              spread of it) when the edge is not selected, which is the pixel-
+              parity rule this file obeys everywhere.
+
+          TOKENS ONLY: the selection colour is `var(--sel)` (the token the
+          deleted rule used) and the core takes the resolved authored colour the
+          renderer was already handed. No hex is added to either file.
+
+          TOUCH: driven by React Flow's own `selected` flag — never by `:hover` —
+          so a tap on a touch device selects exactly as a click does. */}
       <BaseEdge
         id={id}
         path={path}
         markerStart={props.markerStart}
         markerEnd={props.markerEnd}
-        style={props.style}
+        style={selected ? {...props.style, stroke: SEL_STROKE} : props.style}
         interactionWidth={26}
       />
+
+      {selected && (
+        <path
+          className="edge-sel-core"
+          d={path}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={SEL_CORE_PX}
+          pointerEvents="none"
+        />
+      )}
 
       {flow === 'dash' && (
         <path

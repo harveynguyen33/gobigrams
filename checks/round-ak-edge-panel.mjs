@@ -132,12 +132,27 @@ const P = {};
 P.noSelectedRestroke = src => rulesWithProp(src.styles.code, ['react-flow__edge.selected', 'react-flow__edge-path'], 'stroke').length === 0;
 P.noElectricStrokeOverride = src => rulesWhere(src.styles.code, ['ds-electric', 'react-flow__edge-path'])
   .every(r => !declsOf(r.body).some(d => d.prop === 'stroke' && d.value.includes('!important')));
-/* the check is not vacuous: the ADDITIVE replacement must be declared AND drawn */
-P.overlayDeclared = src => /\.edge-sel-overlay\s*\{/.test(src.styles.code)
-  && declsOf((/\.edge-sel-overlay\s*\{([^}]*)\}/.exec(src.styles.code) ?? ['', ''])[1])
-    .some(d => d.prop === 'stroke');
-P.overlayRendered = src => src.GoblinEdge.code.includes('edge-sel-overlay')
-  && /className=["']edge-sel-overlay["']/.test(src.GoblinEdge.code);
+/* the check is not vacuous: the ADDITIVE replacement must be declared AND drawn.
+ *
+ * ── RE-ANCHORED BY ROUND AL (AL-1). OLD claim: `.edge-sel-overlay` was declared
+ *    with a `stroke` in `src/styles.css` AND rendered by `src/GoblinEdge.tsx`.
+ *    WHY THAT HAD TO CHANGE: the owner's device test rejected that element —
+ *    a +5px `strokeDasharray="6 4"` halo reads as a fat dashed outline and fights
+ *    the flow payload — so ROUND AL deleted BOTH the element and its rule and
+ *    replaced them with option C: the body takes `var(--sel)` and the AUTHORED
+ *    colour is preserved as a thin core (`.edge-sel-core`). The claim this
+ *    assertion exists to make is unchanged — "no restroke, a replacement that is
+ *    declared and drawn instead" — so it is re-anchored to the element that now
+ *    carries it. The OLD claim is printed in the detail string beside the new
+ *    one, and `checks/round-al-edge-panel.mjs` carries the AL-1 assertions
+ *    (the dash and the +5 are gone, the core is 1.1px, an unselected edge renders
+ *    one path) with their own negative control. */
+const SELECTION_CLASS = 'edge-sel-core';
+P.selectionCoreDeclared = src => new RegExp(`\\.${SELECTION_CLASS}\\s*\\{`).test(src.styles.code)
+  && declsOf((new RegExp(`\\.${SELECTION_CLASS}\\s*\\{([^}]*)\\}`).exec(src.styles.code) ?? ['', ''])[1])
+    .some(d => d.prop === 'pointer-events');
+P.selectionCoreRendered = src => src.GoblinEdge.code.includes(SELECTION_CLASS)
+  && new RegExp(`className=["']${SELECTION_CLASS}["']`).test(src.GoblinEdge.code);
 
 /* --- AK-2/AK-3/AK-4 (2): the removed controls are gone ---
  *
@@ -235,10 +250,13 @@ section('AK-1 — selection must never restroke the edge body');
     bad.length === 0
       ? `${elec.length} \`.ds-electric .react-flow__edge-path\` rule(s), none declaring \`stroke: … !important\` — hover keeps its glow and marching dash (ADDITIVE marks) and no longer repaints the authored body or its width`
       : `STILL OVERRIDING: ${bad.map(r => declsOf(r.body).filter(d => d.prop === 'stroke').map(d => d.value).join(', ')).join(' ; ')}`);
-  const decl = /\.edge-sel-overlay\s*\{([^}]*)\}/.exec(SHIP.styles.code);
-  assert('ak1.the-check-is-not-vacuous-the-selection-OVERLAY-is-declared-and-drawn',
-    P.overlayDeclared(SHIP) && P.overlayRendered(SHIP),
-    `\`.edge-sel-overlay\` declared in src/styles.css=${P.overlayDeclared(SHIP)}${decl ? ` with ${JSON.stringify(declsOf(decl[1]).map(d => `${d.prop}:${d.value}`).join('; '))}` : ''}, drawn by src/GoblinEdge.tsx=${P.overlayRendered(SHIP)} — so "no restroke" is a REPLACEMENT (a second additive path, the technique draw.io / Excalidraw / tldraw all use), not a deletion of the selection signal`);
+  const decl = new RegExp(`\\.${SELECTION_CLASS}\\s*\\{([^}]*)\\}`).exec(SHIP.styles.code);
+  assert('ak1.the-check-is-not-vacuous-the-selection-REPLACEMENT-is-declared-and-drawn',
+    P.selectionCoreDeclared(SHIP) && P.selectionCoreRendered(SHIP),
+    `${SELECTION_CLASS} declared in src/styles.css=${P.selectionCoreDeclared(SHIP)}${decl ? ` with ${JSON.stringify(declsOf(decl[1]).map(d => `${d.prop}:${d.value}`).join('; '))}` : ''}, drawn by src/GoblinEdge.tsx=${P.selectionCoreRendered(SHIP)} — ` +
+    `so "no restroke" is a REPLACEMENT, not a deletion of the selection signal. RE-ANCHORED by ROUND AL (AL-1): the OLD claim was that the ` +
+    `edge-sel-overlay element was declared with a stroke AND drawn; the owner's device test rejected that +5px dashed halo, and the ` +
+    `replacement is option C — the var(--sel) body with the authored colour as a thin core on top.`);
 }
 
 section('AK-2 / AK-3 / AK-4 — the three removed controls are absent from App.tsx');
@@ -303,7 +321,10 @@ section('AK-5 / AK-7 — the two marker rows are labelled `start` and `end`, and
 
    EVERY probe above is expected to be RED before the fix:
      · the restroke rule is PRESENT            (ak1)
-     · `.edge-sel-overlay` is absent from both the sheet and GoblinEdge (ak1)
+     · the selection replacement is absent from both the sheet and GoblinEdge
+       (ak1) — ROUND AL re-anchored this one onto `.edge-sel-core`, so it reads
+       the element AL ships rather than the `.edge-sel-overlay` element the AK
+       round shipped and AL deleted
      · all three removed strings are PRESENT   (ak2-4)
      · labelPresets / C4_LABELS are PRESENT    (ak8)
      · `presetId === 'erd'` IS the gate        (ak8)
@@ -335,7 +356,7 @@ if (pre) {
   const INVERTED = [
     ['ak1.no-.react-flow__edge.selected-.react-flow__edge-path-rule-carries-a-stroke', P.noSelectedRestroke],
     ['ak1.no-.ds-electric-rule-carries-stroke-!important', P.noElectricStrokeOverride],
-    ['ak1.selection-overlay-declared-and-drawn', src => P.overlayDeclared(src) && P.overlayRendered(src)],
+    ['ak1.selection-REPLACEMENT-declared-and-drawn', src => P.selectionCoreDeclared(src) && P.selectionCoreRendered(src)],
     ['ak2-4.the-three-removed-controls-are-absent', P.removedAppStrings],
     ['ak8.labelPresets-and-C4_LABELS-absent', P.presetDataGone],
     ['ak8.gate-reads-the-EDGE-not-the-preset', P.gateReadsEdge],
@@ -364,7 +385,7 @@ if (pre) {
   for (const r of preSel) console.log(`    ${r.sel} { ${declsOf(r.body).filter(d => d.prop.startsWith('stroke')).map(d => `${d.prop}: ${d.value}`).join('; ')} }`);
   for (const d of preElec) console.log(`    .ds-electric .react-flow__edge-path { ${d.prop}: ${d.value} }`);
   console.log(`    (the replacement, absent before this round and present now: ` +
-    `.edge-sel-overlay declared=${P.overlayDeclared(SHIP)} drawn=${P.overlayRendered(SHIP)})`);
+    `${SELECTION_CLASS} declared=${P.selectionCoreDeclared(SHIP)} drawn=${P.selectionCoreRendered(SHIP)}; the element the AK round shipped in place of the restroke was the one AL deleted — present in the pre-change sheet=${/\\.edge-sel-overlay/.test(pre.styles.code) ? 'yes' : 'no'}`);
   console.log(`\n  the pre-change strings this round removed, present at ${PRE_COMMIT}:`);
   for (const s of [...REMOVED_APP_STRINGS, 'labelPresets', 'C4_LABELS', "presetId === 'erd'", 'arrow head', 'head start']) {
     const where = REMOVED_APP_STRINGS.includes(s) ? 'App.tsx'

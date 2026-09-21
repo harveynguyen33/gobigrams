@@ -1224,22 +1224,38 @@ body {
    element whose `<defs>` id encodes its own colour — followed the stored key.
    Reproduced by selecting a coloured edge and changing its colour.
 
-   THE REPLACEMENT IS ADDITIVE. Rendered by `src/GoblinEdge.tsx` as a second
-   `<path>` (`.edge-sel-overlay`) drawn UNDER the authored body — the same
-   additive shape draw.io puts on its overlay pane, and the same separation
-   Excalidraw / tldraw make. It carries no stored value, so it cannot disagree
-   with the panel.
+   THE REPLACEMENT IS ADDITIVE, AND ROUND AL RESTYLED IT. ROUND AK rendered a
+   SECOND `<path>` (`.edge-sel-overlay`) at `strokeWidth + 5` with an inline
+   `strokeDasharray="6 4"`. The owner's device test rejected it ("nhìn nó xấu sao
+   ấy … đặc biệt khi chỉnh line animation, nhìn nó rất kì"): a +5px dashed halo
+   reads as a fat dashed OUTLINE and fights the flow payload. ROUND AL's AL-1
+   deleted that element and its rule outright and replaced it with option C —
+   the pre-AK look, made truthful:
+
+     · the BODY takes `var(--sel)`, exactly as the deleted `!important` rule
+       painted it (`src/GoblinEdge.tsx` passes `SEL_STROKE` as the inline stroke
+       when `selected`), so the selected line reads as the old, quiet signal he
+       liked; and
+     · the AUTHORED colour survives as a thin CORE drawn ON TOP
+       (`.edge-sel-core`, 1.1px, stroked with the resolved colour the renderer
+       already had), so the panel can never lie about the colour — the property
+       AK-1 was written to protect.
 
    COLOUR: tokens only, no new hex. `--sel` is the selection colour the removed
-   rule used, so the signal reads exactly as it did while the body no longer
-   lies. The `stroke-dasharray` is written inline on the element (dash lengths
-   are geometry), so this rule states only the paint.
+   rule used. The dash and the +5 width are GONE; `checks/round-al-edge-panel.mjs`
+   asserts both, and that the core is a declared class the sheet paints.
 
    TOUCH / KEYBOARD: this is driven by React Flow's own `selected` flag, never by
    `:hover` — a tap selects with no pointer resting on the element, which is what
    AK-1's touch rule requires. */
-.edge-sel-overlay {
-  stroke: var(--sel);
+/* The selection CORE — the authored colour, drawn over the `--sel` body.
+   Deliberately NOT `.react-flow__edge-path`: React Flow's own
+   `.react-flow__edge.selected .react-flow__edge-path` rule sets a stroke, and
+   this sheet's `.ds-electric .react-flow__edge-path` adds hover marks. A class
+   of its own is both outside those selectors, which is why the core cannot be
+   repainted by either. `stroke-width` is set on the ELEMENT (1.1px, a geometry
+   constant in `GoblinEdge.tsx`), so this rule states only what the sheet owns. */
+.edge-sel-core {
   fill: none;
   pointer-events: none;
 }
