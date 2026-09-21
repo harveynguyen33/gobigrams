@@ -219,6 +219,14 @@ const rowWidths = (n, gap) => (FIELD - (n - 1) * gap) / n;
    tables into `PickerOption`s, so the count cannot drift between the two. */
 const TS_RAW = readFileSync(`${ROOT}/src/textStyle.ts`, 'utf8');
 const TS = stripTs(TS_RAW);
+/* ROUND AK PASS 2 (Job A3) — every module in this project that DECLARES an
+   option table a `ToggleRow` can be handed. `tableSize` searches these in order
+   for a mapped row's source table. Add a module here when it starts owning one,
+   or the resolver goes blind to that row again and reports it as unread. */
+const TABLE_MODULES = [
+  ['src/textStyle.ts', TS],
+  ['src/edgeLabel.ts', stripTs(readFileSync(`${ROOT}/src/edgeLabel.ts`, 'utf8'))],
+];
 const tableCount = (name) => {
   const m = new RegExp(`${name}[^=]*=\\s*\\[([\\s\\S]*?)\\n\\];`).exec(TS);
   if (!m) return 0;
@@ -436,9 +444,20 @@ const tableSize = (name) => {
   if (literal) return countEntries(rest);
   const mappedFrom = /^\s*(\w+)\s*\.map/.exec(rest)?.[1];
   if (mappedFrom) {
-    const src = new RegExp(`const ${mappedFrom}\\s*:[^=]*=\\s*\\[`).exec(TS);
-    if (!src) return 0;
-    return countEntries(TS.slice(src.index + src[0].length - 1));
+    /* ── ROUND AK PASS 2 (Job A3) — THIS LOOKUP WAS BLIND TO EVERY MODULE BUT
+     *    `src/textStyle.ts`, so `LABEL_BG_OPTS = LABEL_BG_VALUES.map(…)` — the
+     *    AK-12 label-background row this pass added — resolved to 0 and the row
+     *    was reported as unread even though the harness's own geometry lines
+     *    said every row divides the field exactly. The source table for a mapped
+     *    row can live in ANY of this project's option-table modules, so the
+     *    lookup now searches each of them rather than assuming one. ONLY the
+     *    LOOKUP widened: `countEntries` and the field arithmetic below are
+     *    untouched, so the measured claim is exactly as strong as before. */
+    for (const [label, text] of TABLE_MODULES) {
+      const src = new RegExp(`const ${mappedFrom}\\s*:[^=]*=\\s*\\[`).exec(text);
+      if (src) return countEntries(text.slice(src.index + src[0].length - 1));
+    }
+    return 0;
   }
   /* ROUND AK, AK-6 — THE IN-LINE `as const` FORM, which the two rows AK-6
      converted to `ToggleRow` use:
