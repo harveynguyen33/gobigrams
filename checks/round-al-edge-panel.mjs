@@ -535,8 +535,21 @@ section('AL-5 — the two actions stay in the section that owns them, restyled a
 {
   const labelSec = secBodyOf(APP, 'label');
   const lineSec = secBodyOf(APP, 'line');
-  const reset = fieldOf(labelSec, 'Reset label position');
-  const reverse = fieldOf(lineSec, 'Reverse line direction');
+  /* ROUND AL — these two are ACTION buttons with no `<label>` of their own (a
+   *  `.field` holding only a button), so the field is located by the BUTTON'S OWN
+   *  TEXT. `fieldOf` looks for `<label>…</label>` and returns '' here — the first
+   *  draft of this probe used it and reported a correct tree as a failure, which
+   *  is the "a harness that fails a correct tree" defect this project already
+   *  names. `fieldOfText` is the same slice, keyed on the button label. */
+  const fieldOfText = (slice, text) => {
+    const i = slice.indexOf(`>${text}<`);
+    if (i < 0) return '';
+    const start = slice.lastIndexOf('<div className="field">', i);
+    const j = slice.indexOf('</div>', i);
+    return start < 0 ? '' : slice.slice(start, j < 0 ? undefined : j);
+  };
+  const reset = fieldOfText(labelSec, 'Reset label position');
+  const reverse = fieldOfText(lineSec, 'Reverse line direction');
   assert('al5.Reset-closes-the-LABEL-section-and-Reverse-closes-the-LINE-section',
     !!reset && /onClick=\{resetLabelPos\}/.test(reset)
       && !!reverse && /onClick=\{\(\) => reverseEdgeDir\(/.test(reverse)
@@ -953,15 +966,17 @@ const restoredSrc = MODULE_SRC.replace(
 );
 const restored = await loadMutant('restored', restoredSrc);
 const restoredOk = restored.mod.snapToCentre !== undefined && restored.mod.clampToRange !== undefined;
+const restoredSnapped = typeof restored.mod.snapToCentre === 'function'
+  ? restored.mod.snapToCentre({x: 1, y: 0}, {x: 0, y: 0}, 1)
+  : null;
 console.log(`  ${restoredOk ? 'GREEN (control BROKEN)' : 'RED   '}  AL-2 the rails are deleted from the module`
   + `  → restored copy: snapToCentre=${typeof restored.mod.snapToCentre}, clampToRange=${typeof restored.mod.clampToRange}`);
 assert('replay.the-module-probe-detects-RESTORED-rails',
-  !(restored.mod.snapToCentre === undefined && restored.mod.clampToRange === undefined)
-    && restored.mod.snapToCentre({x: 1, y: 0}, {x: 0, y: 0}, 1).x === 0,
+  restoredOk && restoredSnapped !== null && restoredSnapped.x === 0,
   `with the pre-round \`snapToCentre\` / \`clampToRange\` / \`labelClearance\` / \`labelHalfAlong\` spliced back into a copy of ` +
-  `the shipped file, the AL-2 assertion's predicate (\`snapToCentre === undefined && clampToRange === undefined\`) is FALSE and ` +
-  `the restored \`snapToCentre\` actually snaps (1,0)→${JSON.stringify(restored.mod.snapToCentre({x: 1, y: 0}, {x: 0, y: 0}, 1))}). ` +
-  `So "the rails are gone" is a measurement, not a hope: it fails the moment either function comes back.`);
+  `the shipped file, the AL-2 assertion's predicate is FALSE and the restored \`snapToCentre\` actually snaps ` +
+  `(1,0)→${JSON.stringify(restoredSnapped)}. So "the rails are gone" is a measurement, not a hope: it fails the moment ` +
+  `either function comes back.`);
 
 /* (2) A WRITER THAT RE-INTRODUCES A RAIL — the snap. */
 const snapBackSrc = MODULE_SRC.replace(

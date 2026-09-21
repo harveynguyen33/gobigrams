@@ -1737,13 +1737,63 @@ body {
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */
+/* ===========================================================================
+   ROUND AL, AL-6 — ONE CHIP SYSTEM FOR THE WHOLE PANEL.
+
+   WHY. The owner measured the panel as *"lúc to, lúc dài, lúc nhỏ"*. The cause
+   was three unrelated button families — `.insp-seg-btn` (`flex: 1 1 0`, equal
+   share), `.mbtn` (content-sized) and `.toggle` (its own shape) — so one visual
+   role had three sizes, and a row split into EQUAL columns gave a one-word
+   button and a two-word button the same width. That is the defect, measured,
+   not a matter of taste.
+
+   THE FIX IS TWO RULES AND ONE HEIGHT.
+     · `.chips` is `flex-wrap: wrap` with NO grid columns, so every chip is sized
+       by its OWN content and a row is as long as its items need. Rows are
+       allowed to differ in length.
+     · EXACTLY TWO shapes: a PILL (999px radius) for rows whose options are
+       words, and a SQUARE (`30x30`) for rows whose options are glyphs. A glyph
+       row built of squares is even BY CONSTRUCTION, so it cannot reproduce the
+       defect at all.
+     · ONE height — `30px` — on every interactive control in the panel: chips,
+       the stepper's buttons and its value, and the text input. Stated as a
+       HEIGHT, never left to padding arithmetic, so no font change can move it.
+   Tokens only; no new hex. */
+.chips {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 30px; padding: 5px 11px;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 999px;
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .14s, color .14s, background .14s;
+}
+.chip:hover { border-color: var(--border-strong); }
+.chip.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
+.chip:disabled { opacity: .45; cursor: not-allowed; }
+.chip svg { width: 15px; height: 15px; flex: 0 0 15px; }
+/* the glyph shape: a square, so a glyph row is even by construction */
+.chip.ic {
+  padding: 5px; width: 30px; height: 30px; min-height: 30px;
+  justify-content: center; border-radius: 7px;
+}
+/* the ACTION figure — Reset / Reverse. Dashed and dim so an action never reads
+   as a value with a selected state. */
+.chip.act {
+  color: var(--dim); background: transparent; border-style: dashed;
+}
+.chip.act:hover { color: var(--fg); border-style: solid; border-color: var(--border-strong); }
+
 .insp-stepper {
   display: flex; align-items: center; gap: 0;
   border: 1px solid var(--border); border-radius: 7px;
   background: var(--elevated); overflow: hidden;
 }
 .insp-step-btn {
-  width: 34px; height: 32px; flex: none;
+  width: 34px; height: 30px; flex: none;
   background: transparent; border: 0; color: var(--fg);
   font-family: var(--mono); font-size: 15px; line-height: 1; cursor: pointer;
   transition: color .12s;
@@ -1753,7 +1803,7 @@ body {
 .insp-step-val {
   flex: 1; text-align: center; font-family: var(--mono); font-size: 12.5px;
   color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
-  padding: 8px 0;
+  min-height: 30px; display: flex; align-items: center; justify-content: center;
 }
 /* The section wrapper. Sections stack with the same rule the old hand-written
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
@@ -1905,7 +1955,7 @@ body {
 .field input, .field select, .field textarea {
   width: 100%; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 7px;
-  padding: 8px 10px; font-size: 12.5px; font-family: var(--sans);
+  height: 30px; padding: 0 10px; font-size: 12.5px; font-family: var(--sans);
   outline: none; transition: border-color .15s;
 }
 /* focus/hover chrome for these lives in the CONTROL KIT section at the end of

@@ -3522,6 +3522,13 @@ export default function App() {
      (`labelBgOf` resolves anything unrecognised to `surface`, the shipped look),
      so a hand-edited board cannot render an unstyled plate. */
   const eLabelBg = labelBgOf((selectedEdge?.data as any)?.labelBg);
+  /* AL-3 — the label's two NEW colour keys, read through the SAME resolver the
+   *  edge stroke uses (`isColorKey` + `COLOR_VAR`), so both rows draw from the
+   *  panel's existing 9-key vocabulary and neither invents a palette. `null`
+   *  means \"not set\", which is what makes the swatch row show an unselected
+   *  state rather than a false default. */
+  const eLabelTextKey = resolveColorKey({strokeKey: (selectedEdge?.data as any)?.labelTextKey} as any);
+  const eLabelBgKey = resolveColorKey({strokeKey: (selectedEdge?.data as any)?.labelBgKey} as any);
   /* AK-14.1 — `Reset label position` is only meaningful once the label has
      actually been moved, so the button is disabled on a centred label rather
      than offering a step that would push a history entry and change nothing. */
@@ -3590,6 +3597,54 @@ export default function App() {
   const LABEL_BG_OPTS: PickerOption[] = LABEL_BG_VALUES.map(v => ({
     v, label: v === 'none' ? 'None' : v === 'surface' ? 'Surface' : 'Outline', art: null,
   }));
+
+  /* ==========================================================================
+     ROUND AL, AL-6 — THE ONE CHIP ROW. This is the panel's ONLY row control.
+
+     WHY ONE HELPER, AND WHY A REAL `<button>`. The owner measured three
+     unrelated button families on one panel (`"lúc to, lúc dài, lúc nhỏ"`); a
+     single helper is what makes that impossible to reintroduce — there is no
+     second place to add a button. The element is a native
+     `<button type="button">`, so Enter and Space work with NO key handler
+     (the same rule this project set for the section trigger), and the class
+     `chip` carries the figure: a PILL by default, `chip ic` for a glyph row
+     (the square), `chip act` for an action.
+
+     SIZE IS THE CONTENT'S. The row wraps (`styles.css` `.chips`) and no chip
+     carries `flex: 1 1 0`, so "None" is short and "Reset label position" is
+     long and each is the width it needs — the exact inverse of the equal-share
+     grid the owner measured as uneven. */
+  const chipRow = (opts: PickerOption[], value: string, onPick: (v: string) => void, title: string, glyph = false) => (
+    <div className="chips">
+      {opts.map(o => (
+        <button
+          key={o.v}
+          type="button"
+          className={`chip${glyph ? ' ic' : ''}${String(o.v) === value ? ' on' : ''}`}
+          title={o.label ? `${title}: ${o.label}` : title}
+          onClick={() => onPick(String(o.v))}
+        >
+          {glyph ? (o.art ?? o.label) : o.label}
+        </button>
+      ))}
+    </div>
+  );
+  /** AL-6 — the GLYPH variants of the four tables converted this round. They are
+   *  the SAME tables (same values, same writes) — only the row's figure changes,
+   *  so a value can never differ between the pill form and the glyph form. */
+  const DASH_ICON_OPTS = DASH_OPTS;
+  const CURVE_ICON_OPTS = CURVE_OPTS;
+  const MARKER_ICON_OPTS = MARKER_OPTS;
+  const MARKER_ICON_OPTS_START = MARKER_OPTS_START;
+  /** AL-6 — `flow` becomes a GLYPH row. `flow glyph` reuses `FLOW_ICON_PATHS`'s
+   *  own vocabulary rather than inventing a second one. */
+  const FLOW_OPTS: PickerOption[] = ([
+    ['none', 'None'], ['dots', 'Dots'], ['dash', 'Dash'], ['pulse', 'Pulse'], ['icon', 'Icon'],
+  ] as const).map(([v, label]) => ({v, label, art: null}));
+  const FLOW_ICON_OPTS: PickerOption[] = ([
+    ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
+    ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],
+  ] as const).map(([v, label]) => ({v, label, art: null}));
   /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
   const BODY_OPTS: PickerOption[] = [
     {v: 'card', label: 'card', art: null},
@@ -5260,14 +5315,24 @@ export default function App() {
                     `EdgeText`'s SVG-`<rect>` API, and this label is a DOM `<div>`
                     through `EdgeLabelRenderer`. */}
                 <div className="field">
-                  <label>background</label>
-                  <ToggleRow
-                    value={eLabelBg}
-                    onChange={v => updateEdge({data: {labelBg: v as any}})}
-                    options={LABEL_BG_OPTS}
-                    title="Label background"
-                  />
+                  <label>text color</label>
+                  {swatchRow(eLabelTextKey, k => updateEdge({data: {labelTextKey: k}}))}
                 </div>
+                <div className="field">
+                  <label>background</label>
+                  {chipRow(LABEL_BG_OPTS, eLabelBg,
+                    v => updateEdge({data: {labelBg: v as any}}), 'Label background')}
+                </div>
+                {/* AL-3 — the plate's COLOUR, shown only when there IS a plate.
+                    At `none` there is nothing to colour, so the row is absent
+                    rather than present-and-inert — the same rule the panel
+                    applies to `count`/`speed` (AL-7). */}
+                {eLabelBg !== 'none' && (
+                  <div className="field">
+                    <label>background color</label>
+                    {swatchRow(eLabelBgKey, k => updateEdge({data: {labelBgKey: k}}))}
+                  </div>
+                )}
                 {/* ROUND AK, AK-14.1 — `Reset label position`, ONE history step,
                     and a BUTTON rather than a right-click or a double-tap. Those
                     are desktop idioms: the double-tap already means "edit label"
@@ -5279,7 +5344,7 @@ export default function App() {
                 <div className="field">
                   <button
                     type="button"
-                    className="mbtn"
+                    className="chip act"
                     disabled={!eLabelMoved}
                     title={eLabelMoved
                       ? 'Put the label back on the line’s centre (one undo step)'
@@ -5333,42 +5398,29 @@ export default function App() {
                     that enumerates these call sites from the source. */}
                 <div className="field">
                   <label>stroke width</label>
-                  <ToggleRow
-                    value={eWidth}
-                    onChange={v => updateEdge({style: {strokeWidth: Number(v)}})}
-                    options={WIDTH_OPTS}
-                    title="Stroke width"
-                  />
+                  {chipRow(WIDTH_OPTS, eWidth,
+                    v => updateEdge({style: {strokeWidth: Number(v)}}), 'Stroke width')}
                 </div>
                 <div className="field">
                   <label>line style</label>
-                  <ToggleRow
-                    value={eDash}
-                    onChange={v => updateEdge({style: {strokeDasharray: dashArray(v)}})}
-                    options={DASH_OPTS}
-                    title="Line style"
-                  />
+                  {chipRow(DASH_ICON_OPTS, eDash,
+                    v => updateEdge({style: {strokeDasharray: dashArray(v)}}), 'Line style', true)}
                 </div>
                 <div className="field">
                   <label>curvature</label>
-                  <ToggleRow
-                    value={ePathType}
-                    onChange={v => {
-                      const id = v as PathType;
-                      /* G: the chosen curvature becomes the default for the NEXT
-                         edges drawn. The preference is persisted, never written
-                         back onto other edges, and the control still shows
-                         `ePathType` — the SELECTED edge — so an older bezier edge
-                         keeps reading `bezier` while the default is `smoothstep`.
-                         NOTHING HERE TOUCHES `bendX`/`bendY`: the picker sets
-                         `edge.type` and calls `rememberEdgePath`, exactly as the
-                         select it replaces did. */
-                      updateEdge({type: PATH_TYPES[id]});
-                      if (id !== 'custom') rememberEdgePath(id);
-                    }}
-                    options={CURVE_OPTS}
-                    title="Curvature"
-                  />
+                  {chipRow(CURVE_ICON_OPTS, ePathType, v => {
+                    const id = v as PathType;
+                    /* G: the chosen curvature becomes the default for the NEXT
+                       edges drawn. The preference is persisted, never written
+                       back onto other edges, and the control still shows
+                       `ePathType` — the SELECTED edge — so an older bezier edge
+                       keeps reading `bezier` while the default is `smoothstep`.
+                       NOTHING HERE TOUCHES `bendX`/`bendY`: the picker sets
+                       `edge.type` and calls `rememberEdgePath`, exactly as the
+                       select it replaces did. */
+                    updateEdge({type: PATH_TYPES[id]});
+                    if (id !== 'custom') rememberEdgePath(id);
+                  }, 'Curvature', true)}
                 </div>
                 {/* ROUND AK, AK-15 — `Reverse line direction` CLOSES THE `line`
                     SECTION, which is where draw.io ships it (Arrange → Reverse)
@@ -5382,7 +5434,7 @@ export default function App() {
                 <div className="field">
                   <button
                     type="button"
-                    className="mbtn"
+                    className="chip act"
                     title="Swap the two ends: the labels swap with them, the path does not change"
                     onClick={() => reverseEdgeDir(selectedEdge!.id)}
                   >
@@ -5413,21 +5465,13 @@ export default function App() {
                   such. */}
               <div className="field">
                 <label>start</label>
-                <ToggleRow
-                  value={eMarkerStart}
-                  onChange={v => updateEdge({markerStart: markerFor(v, eStroke)})}
-                  options={MARKER_OPTS_START}
-                  title="Start marker"
-                />
+                {chipRow(MARKER_ICON_OPTS_START, eMarkerStart,
+                  v => updateEdge({markerStart: markerFor(v, eStroke)}), 'Start marker', true)}
               </div>
               <div className="field">
                 <label>end</label>
-                <ToggleRow
-                  value={eMarkerEnd}
-                  onChange={v => updateEdge({markerEnd: markerFor(v, eStroke)})}
-                  options={MARKER_OPTS}
-                  title="End marker"
-                />
+                {chipRow(MARKER_ICON_OPTS, eMarkerEnd,
+                  v => updateEdge({markerEnd: markerFor(v, eStroke)}), 'End marker', true)}
               </div>
               </>); return null; })()}
               {(() => { secBody('flow', <>
@@ -5450,79 +5494,34 @@ export default function App() {
                     the five names below are the owner's product call, not a
                     precedent. The REMOVAL is the evidence-backed part. */}
                 <div className="field">
-                  <label>flow animation</label>
-                <div className="swatches" style={{gap: 6}}>
-                  {([
-                    ['none', 'None'],
-                    ['dots', 'Dots'],
-                    ['dash', 'Dash'],
-                    ['pulse', 'Pulse'],
-                    ['icon', 'Icon'],
-                  ] as const).map(([v, lbl]) => (
-                    <button
-                      key={v}
-                      className={`mbtn${(eFlow === v) ? ' on' : ''}`}
-                      style={(eFlow === v) ? {borderColor: 'var(--sel)', color: 'var(--sel)'} : undefined}
-                      onClick={() => updateEdge({data: {flow: v === 'none' ? undefined : (v as any)}})}
-                      title={
-                        v === 'dots' ? 'Dots travel along the line (message being sent)'
-                        : v === 'dash' ? 'Dashes march along the line'
-                        : v === 'pulse' ? 'A bright segment sweeps the line'
-                        : v === 'icon' ? 'A glyph chip travels the line — pick the glyph below'
-                        : 'No flow animation'
-                      }
-                    >
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
+                  <label>flow</label>
+                  {chipRow(FLOW_OPTS, eFlow,
+                    v => updateEdge({data: {flow: v === 'none' ? undefined : (v as any)}}),
+                    'Flow animation', true)}
               </div>
               {(eFlow === 'dots' || eFlow === 'icon') && (
-                <div className="field-row">
-                  <div className="field">
-                    <label>count</label>
-                    <Stepper
-                      value={eFlowCount}
-                      onChange={n => updateEdge({data: {flowCount: n}})}
-                      min={1} max={6}
-                      title="Flow count"
-                    />
-                  </div>
-                  <div className="field">
-                    <label>speed</label>
-                    <ToggleRow
-                      value={String(eFlowSpeed)}
-                      onChange={v => updateEdge({data: {flowDuration: Number(v)}})}
-                      options={SPEED_OPTS}
-                      title="Flow speed"
-                      half
-                    />
-                  </div>
+                <div className="field">
+                  <label>count</label>
+                  <Stepper
+                    value={eFlowCount}
+                    onChange={n => updateEdge({data: {flowCount: n}})}
+                    min={1} max={6}
+                    title="Flow count"
+                  />
+                </div>
+              )}
+              {(eFlow === 'dots' || eFlow === 'icon') && (
+                <div className="field">
+                  <label>speed</label>
+                  {chipRow(SPEED_OPTS, String(eFlowSpeed),
+                    v => updateEdge({data: {flowDuration: Number(v)}}), 'Flow speed')}
                 </div>
               )}
               {eFlow === 'icon' && (
                 <div className="field">
-                  <label>flow icon</label>
-                  <div className="swatches" style={{gap: 6}}>
-                    {([
-                      ['mail', 'Letter'],
-                      ['package', 'Package'],
-                      ['file', 'File'],
-                      ['zap', 'Zap'],
-                      ['settings', 'Gear'],
-                      ['database', 'DB'],
-                    ] as const).map(([v, lbl]) => (
-                      <button
-                        key={v}
-                        className={`mbtn${eFlowIcon === v ? ' on' : ''}`}
-                        style={(eFlowIcon === v) ? {borderColor: 'var(--sel)', color: 'var(--sel)'} : undefined}
-                        onClick={() => updateEdge({data: {flowIcon: v as any, flow: 'icon' as any}})}
-                        title={`Travelling "${lbl}" icon`}
-                      >
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
+                  <label>flow glyph</label>
+                  {chipRow(FLOW_ICON_OPTS, eFlowIcon,
+                    v => updateEdge({data: {flowIcon: v as any, flow: 'icon' as any}}), 'Flow glyph')}
                 </div>
               )}
               {/* The ERD gate that used to sit here (`preset.id === 'erd' ? … :
