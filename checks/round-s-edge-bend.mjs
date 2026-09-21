@@ -193,7 +193,15 @@ for (const [f, needle] of [
   ['GoblinEdge.tsx', 'const LOCK_PX'],
   ['GoblinEdge.tsx', 'if (!lockAxis.current) {'],
   ['GoblinEdge.tsx', 'lockAxis.current = bendAxisFor(kind, bGeo, dx, dy)'],
-  ['GoblinEdge.tsx', 'releasePointerCapture?.(ev.pointerId)'],
+  /* ── RE-ANCHORED BY ROUND AK PASS 2 (Job A2). OLD claim: the FILE was
+   *    `GoblinEdge.tsx`. The call was not DELETED, it MOVED: ROUND AK's AK-11
+   *    factored the bend gesture's pointer machinery into the ONE shared hook
+   *    that the label drag also uses, so one pointerdown can never start both
+   *    gestures. `el.releasePointerCapture?.(ev.pointerId)` now lives in
+   *    `src/useEdgeGesture.ts`, which is the file that OWNS the gesture. The
+   *    assertion is unchanged in strength: it still fails if the release goes
+   *    missing from whichever file owns the gesture. */
+  ['useEdgeGesture.ts', 'el.releasePointerCapture?.(ev.pointerId)'],
   ['GoblinEdge.tsx', 'cursor: dragCursor'],
   ['GoblinEdge.tsx', 'if (custom) {'],
   ['GoblinEdge.tsx', '[path, labelX, labelY] = freePath(bGeo, W, 0)'],
