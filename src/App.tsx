@@ -3864,24 +3864,68 @@ export default function App() {
    *     the module boundary made it a promise. This file and `GoblinEdge.tsx`
    *     now read the SAME map, so a chip cannot drift from the picture the edge
    *     travels.
-   *
-   *  The chip wrapper (24×24 viewBox, `currentColor` stroke, 15px box) is
-   *  deliberately the travelling chip's own geometry at panel scale: same
-   *  viewBox, same stroke-only look, so the figure the user picks IS the figure
-   *  the line paints. Only the size is the panel's — the canvas keeps its
-   *  24×20 rounded plate and 0.6 glyph scale, untouched by this round. */
-  const FLOW_ICON_OPTS: PickerOption[] = (([
-    ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
-    ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],
-  ] as const)).map(([v, label]) => ({
-    v, label,
-    art: (
-      <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor"
-        strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {FLOW_ICON_PATHS[v]}
-      </svg>
-    ),
-  }));
+   /* ROUND AN, AN-3 — THE GLYPH ROW DRAWS IN THE FLOW ROW'S OWN FRAME.
+      This row used to carry its own `<svg viewBox="0 0 24 24" width={15}
+      height={15}>`: a figure of ~12.5px of ink inside a 15px box, rendered at the
+      same 30×30 chip. Every figure in the `flow` row directly above it instead
+      goes through the shared `G` wrapper — a 26×18 viewBox with a `2` stroke, so
+      its ink spans roughly 22×10 OF THAT BOX. Two frames, two weights, same chip
+      size: that is the owner's report ("làm cái icon nó to như mấy cái nút như
+      trong flow cho đồng bộ kích thước"). The frame, the stroke and the classes
+      are now IDENTICAL to `ArtFlow`'s, so the two rows are one family by
+      construction rather than by two lookalike implementations.
+
+      THE GLYPH PATHS DID NOT CHANGE, and they are not copied either. The six
+      figures arrive from `FLOW_ICON_PATHS` — the map AM-3 moved into
+      `src/flowIcons.tsx` so this row and the travelling chip could not drift — and
+      are SCALED INSIDE the shared frame instead of being re-drawn for it. The
+      scale is read off the two geometries rather than guessed, and the rendered
+      pixel arithmetic is stated so the number can be checked:
+
+        · `ArtFlow`'s figures run from x=2 to x=24 — 22 UNITS of the 26-unit frame,
+          which is the span the flow row's ink occupies.
+        · These glyphs are drawn on a 24×24 grid whose own ink spans 2..22 — 20
+          UNITS (checked across all six: `mail`'s rect is 2..22, `settings`' spokes
+          reach 2..22, the rest sit inside that).
+        · So the factor is frame-span ÷ glyph-span = 22/20, NOT 22/24: dividing by
+          the glyph's GRID instead of its INK would shrink each figure to 18.3
+          frame units — smaller than the row above it, i.e. the defect in reverse.
+        · `stroke-width` is divided by that same factor, so what the browser paints
+          is the same TWO FRAME UNITS `ArtFlow` paints. Scaling a stroke without
+          this division is how a glyph ends up thinner at the same nominal width.
+
+      THE RENDERED RESULT, from source: `.chip svg` (`styles.css`) sizes BOTH rows'
+      `<svg>` to 15×15, so a frame unit is 15/26 = 0.577px in each. Both rows'
+      figures therefore land on 22 × 0.577 = 12.7px with a 2 × 0.577 = 1.15px
+      stroke. Before this item the glyph row was a 24-unit grid in the same 15px
+      box (0.625px per unit), i.e. a 12.5px figure with a 1.25px stroke: the two
+      rows were NEAR-EQUAL BY COINCIDENCE of two different frames and two
+      different strokes. They are now equal by construction — one frame, one
+      painted stroke — which is the parity the owner asked for and the reason the
+      fix is a frame change rather than a size tweak.
+
+      THE CHIP BOX STAYS 30×30 (`.chip.ic`): the complaint is the FIGURE's weight,
+      not the button's size, so no rule was enlarged. The row still wraps on its
+      own — `.chips` is `flex-wrap: wrap` and this row is that class — so six chips
+      that no longer fit drop to a second line without a new rule. */
+      const FLOW_GLYPH_SCALE = 22 / 20;
+   const FLOW_ICON_OPTS: PickerOption[] = (([
+     ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
+     ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],
+   ] as const)).map(([v, label]) => ({
+     v, label,
+     art: (
+       /* `insp-glyph` is the class `G` itself renders, so both rows' figures are
+          carried by the same box — not a second frame that happens to look alike. */
+       <svg className="insp-glyph" viewBox="0 0 26 18" width={26} height={18}
+         fill="none" stroke="currentColor" strokeWidth={2 / FLOW_GLYPH_SCALE}
+         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+         <g transform={`translate(13 9) scale(${FLOW_GLYPH_SCALE}) translate(-12 -12)`}>
+           {FLOW_ICON_PATHS[v]}
+         </g>
+       </svg>
+     ),
+   }));
   /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
   const BODY_OPTS: PickerOption[] = [
     {v: 'card', label: 'card', art: null},
