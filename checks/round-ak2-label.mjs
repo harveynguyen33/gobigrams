@@ -969,8 +969,12 @@ const MUTANTS = [
          'const ax = p.sourceX + (p.targetX - p.sourceX) * f - (p.sourceX + p.targetX) / 2 + p.labelX;']],
     kills: 'anchor: an unpinned label is bit-identical to the shipped expression'},
   {name: 'write-pins-when-centred',
-    m: [['return {labelOffset: {...CENTRED}, labelPinned: false};',
-         'return {labelOffset: {...CENTRED}, labelPinned: true};']],
+    /* RE-ANCHORED BY ROUND AM, AM-1: the centred return gained the `labelAnchor`
+       key (null for every ABSOLUTE write), so the mutation's `from` string is the
+       shipped line as AM wrote it. The CLAIM is untouched — a centred result must
+       still come back unpinned. */
+    m: [['return {labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: false};',
+         'return {labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: true};']],
     kills: 'write: a centred result DELETES the pin (pinned false)'},
   {name: 'write-absolute-not-relative',
     m: [['const labelOffset = {x: p.W.x - p.anchor.x, y: p.W.y - p.anchor.y};',

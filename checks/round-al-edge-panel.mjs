@@ -500,12 +500,18 @@ section('AL-4 — a first-created label centres, and editing an existing one nev
   const createEffect = (/useEffect\(\(\) => \{\s*if \(!createAt \|\| ro\) return;[\s\S]*?\}, \[createAt\?\.t\]\)/.exec(EDGE) ?? [''])[0];
   const noPointStored = !/setPendingCreate\(createAt\.at\)/.test(EDGE)
     && !/pendingCreate/.test(EDGE);
-  const writeOnEmpty = /d\.__onLabelWrite\?\.\(id, \{labelOffset: \{\.\.\.CENTRED\}, labelPinned: false\}/.test(EDGE);
+  /* RE-ANCHORED BY ROUND AM, AM-1: the commit's centred write gained the
+     `labelAnchor: null` key — the ABSOLUTE marker every create/reset write
+     carries. The CLAIM is unchanged: the empty commit stores the UNPINNED centred
+     state, and the written object is still exactly that state, spelled with the
+     round's own third key. */
+  const writeOnEmpty = /d\.__onLabelWrite\?\.\(id, \{labelAnchor: null, labelOffset: \{\.\.\.CENTRED\}, labelPinned: false\}/.test(EDGE);
   assert('al4.the-create-path-stores-the-UNPINNED-state-instead-of-a-click-offset',
     !!createEffect && noPointStored && writeOnEmpty,
     `the editor still opens from the double-click signal (${!!createEffect}), but the clicked FLOW POINT is no longer ` +
     `stored anywhere (no \`setPendingCreate(createAt.at)\`, no \`pendingCreate\` state at all = ${noPointStored}), and the ` +
-    `empty commit writes \`{labelOffset: {...CENTRED}, labelPinned: false}\` = ${writeOnEmpty}. That is the SAME state ` +
+    `empty commit writes \`{labelAnchor: null, labelOffset: {...CENTRED}, labelPinned: false}\` = ${writeOnEmpty} — ` +
+    `RE-ANCHORED by ROUND AM, AM-1, which added the \`labelAnchor\` key to every ABSOLUTE write. That is the SAME state ` +
     `\`Reset label position\` lands on and the same state a board that never carried the keys renders, so "created", ` +
     `"reset" and "never moved" are one stored value rather than three that look alike. The owner: "hiện nó đang văng tùm ` +
     `lum. chắc là nên với create lần đầu thì nên luôn nằm ở giữa nhé".`);
