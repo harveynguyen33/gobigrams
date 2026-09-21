@@ -1,4 +1,4 @@
-import {memo, useEffect, useMemo, useRef, useState} from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   BaseEdge, EdgeLabelRenderer,
   getBezierPath, getSmoothStepPath, getStraightPath,
@@ -21,6 +21,19 @@ import {
   bezierPath, straightPath,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
+/* ROUND AK, PASS 2 — the label's own rules, all pure, all executed by the
+   harness: the anchor + its 2-D offset (AK-10), the three plate states (AK-12),
+   the snap / clamp / guard rails (AK-14) and the reverse mirror (AK-15). */
+import {
+  HANDLE_CLEAR_PX, LABEL_HALF_H_PX, labelAnchor, labelBgClass, labelClearance,
+  labelHalfAlong, labelWrite, movedBy, nudgeAlongPath, pathPoints,
+  type LabelWrite,
+} from './edgeLabel';
+/* ROUND AK, PASS 2 — ONE gesture for both affordances on this edge. See the
+   file: it is the machinery `onBendDown` already owned (ROUND S/T/U), factored
+   out so the bend handle and the label can never both start from one
+   pointerdown. `GestureDown` is the shape a `claim`ed handler receives. */
+import {beginGesture, useEdgeGesture, type GestureDown} from './useEdgeGesture';
 
 /**
  * Inline SVG paths for the flow-icon animation. 24×24 viewBox, stroke geometry
@@ -89,13 +102,39 @@ const GoblinEdge = memo((props: EdgeProps) => {
   /** ROUND S — the pane this edge is drawn in: the drag converts pointer
    *  positions against its rect, and the element is found from the handle
    *  itself rather than from a prop, because an edge component is rendered by
-   *  React Flow and is handed no viewport reference. */
+   *  React Flow and is handed no viewport reference. ROUND AK: its rect is what
+   *  `useEdgeGesture.beginGesture` converts against, for BOTH affordances. */
   const paneRef = useRef<HTMLDivElement | null>(null);
+  /** ROUND AK, AK-11 — the LABEL element itself. Its measured box is what the
+   *  clamp clears an arrowhead with (the box's edge must clear, not its centre)
+   *  and what the bend handle is moved away from, so the two affordances cannot
+   *  share a point. Measured, never estimated: `getBoundingClientRect` in a
+   *  layout effect, divided by the zoom. */
+  const labelBox = useRef<HTMLDivElement | null>(null);
+  /** The measured half-box of the label, in SCREEN px — the clamp's and the
+   *  handle-nudge's input. A HALF-WIDTH and a HALF-HEIGHT, not one number: the
+   *  label is a BOX, and which of its two extents matters depends on the
+   *  direction of the path at the point it sits on (`labelHalfAlong` projects
+   *  the box onto that heading), so both are kept. Measured from the element
+   *  rather than from the string, because the width is whatever the user typed.
+   *  The height is the same for every label and `LABEL_HALF_H_PX` stands in for
+   *  it until the first measurement lands. */
+  const [labelHalfW, setLabelHalfW] = useState(0);
+  const [labelHalfH, setLabelHalfH] = useState(0);
   /** The live `[x, y, zoom]` — the same store value React Flow's own
    *  `screenToFlowPosition` reads, and the same one the label's counter-scale
    *  below needs. Subscribing here re-renders on pan/zoom only, exactly like
    *  every other edge on the canvas. */
   const t = useStore(s => s.transform);
+  /** ROUND AK, AK-10 — THE one gesture this edge can run. Both affordances claim
+   *  it, so one pointerdown can never start the bend and the label drag at once
+   *  (AK-11's first requirement). It is the machinery `onBendDown` already owned,
+   *  moved to `src/useEdgeGesture.ts` unchanged in behaviour. */
+  const gestures = useEdgeGesture();
+  /** The label's own cursor. `grabbing` once the gesture has passed its
+   *  threshold, exactly as the bend handle does — and NO hover state is
+   *  involved: this is set by the gesture, so it works on touch. */
+  const [labelCursor, setLabelCursor] = useState<'grab' | 'grabbing'>('grab');
 
   const d = (data ?? {}) as {
     shape?: string;
@@ -136,10 +175,65 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  is travelling (`dx`/`dy` in flow units), because the axis decision is
      *  draw.io's pointer rule and the handler owns the writer. */
     __onBend?: (id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => void;
+    /** ROUND AK, AK-10 — the FREE 2-D label position, in RELATIVE flow px,
+     *  applied ADDITIVELY to the anchor `labelAnchor` derives. ABSENT (not
+     *  `{0,0}`) is the default on purpose: a board that never moved its label
+     *  carries no key and renders exactly as it did.
+     *
+     *  RELATIVE, not absolute. Sirius Web and Aleph both store the ABSOLUTE
+     *  point and re-derive the fraction; ours is relative because the anchor is
+     *  already derived here (from the path generator's own label), so a relative
+     *  offset is the only shape that survives a node move, a re-route or a
+     *  resize without a rewrite. That is a design judgement, recorded as such in
+     *  the round's research (§7). */
+    labelOffset?: {x: number; y: number};
+    /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While FALSY the label
+     *  auto-centres exactly as it always did; once true, `labelOffset` wins.
+     *  Written by the drag, cleared by `Reset label position` (AK-14.1) and by
+     *  the snap-to-centre rail (AK-14.2) — which is why the snap and the reset
+     *  land on the SAME state instead of two that merely look alike. */
+    labelPinned?: boolean;
+    /** ROUND AK, AK-12 — the label plate, THREE STORED STATES (`None` is a real
+     *  value, not the absence of one). Rendered as a CLASS on `.edge-label`,
+     *  never as an inline SVG fill: React Flow's own `labelBgStyle` is an
+     *  SVG-`<rect>` API and this label is a DOM `<div>` through
+     *  `EdgeLabelRenderer`, so copying that prop verbatim would be wrong. */
+    labelBg?: 'none' | 'surface' | 'outline';
+    /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
+     *  `__onBend`, and its shape follows `__onBend`'s own lesson: the writer
+     *  takes the RESULT, not the pointer.
+     *
+     *  `__onBend` is handed the pointer's flow position and `App` re-derives the
+     *  rest, because the bend lives in the STORED keys and `App` owns them. The
+     *  label cannot work that way: what the label stores is `labelOffset` —
+     *  relative to the ANCHOR — and the anchor comes from the path generator's
+     *  own label, which only this component has. So the RAILS are applied here
+     *  too (`labelWrite`: snap, then clamp), because this is the only side that
+     *  holds the resolved path, the anchor and the measured box; `App` receives
+     *  the finished pair and merges it. That keeps ONE derivation of the
+     *  geometry instead of a second, divergent copy in `App`. */
+    __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
+    /** ROUND AK, AK-13 — the double-click-on-the-PATH signal, threaded per-edge
+     *  like `__edit` above but carrying a POSITION: a fresh timestamp AND the
+     *  flow point the click landed on. A double-click on a line with no label
+     *  has nothing to edit, so the editor has to be opened here (the element
+     *  does not exist yet) and the committed text has to know WHERE it was
+     *  created. `__edit` keeps its own meaning — the context menu's "Edit
+     *  label" on an EXISTING label — and is not overloaded. */
+    __editAt?: {at: Pt; t: number};
   };
 
   /** FB-L: one reader for the mode, used by both editor entry points. */
   const ro = !!d.readOnly;
+  /** The label's TEXT as rendered — the ONE reader every branch below uses, so
+   *  "is there a label?" is asked in exactly one place. Declared up here (rather
+   *  than beside the JSX) because the measured box and the handle's own position
+   *  both depend on it. */
+  const shown = typeof label === 'string' ? label : '';
+  /** Is a label PAINTED on this edge? The same three-way test the render gate at
+   *  the bottom uses — text, an open editor, or the C4 `technology` second line —
+   *  spelled once so the handle's clearance and the gate cannot disagree. */
+  const hasLabel = !!(shown || editing || d.techn);
 
   // F2: "Edit label" in the edge context menu pokes __edit — open the editor.
   const editSignal = d.__edit;
@@ -294,17 +388,16 @@ const GoblinEdge = memo((props: EdgeProps) => {
     [path, labelX, labelY] = getStraightPath(pathOpts);
   }
 
-  // The handle's own position: the path's midpoint, which is the label's own
-  // anchor and the point on the line the user grabs.
-  const handleAt = {x: labelX, y: labelY};
+  // The handle's own position: computed below, once the label's own geometry
+  // (its painted state, the resolved path and the measured box) is available.
 
   /** ROUND S/T — pointerdown on the midpoint handle, draw.io's mechanic.
    *
    *  ONE history entry at the START of the gesture (`App.onBend`), never per
-   *  move. `stopPropagation` keeps React Flow's own edge click handler out of
-   *  the gesture; the pointer is captured so a fast drag survives leaving the
-   *  14px disc, and the listeners live on `document` because this element is
-   *  re-rendered by every write the drag itself triggers.
+   *  move. The pointer is captured so a fast drag survives leaving the 14px
+   *  disc, and the listeners live on `document` because this element is
+   *  re-rendered by every write the drag itself triggers — both are now in
+   *  `useEdgeGesture`, which the LABEL also uses.
    *
    *  ROUND T — THE AXIS IS DECIDED FROM THE POINTER, ONCE. `dx`/`dy` accumulate
    *  from the gesture's own origin; the first move whose delta passes 3px starts
@@ -316,73 +409,248 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  `App` makes): `'h'`/`'v'` on `step`/`smoothstep` as before, `'free'` on
    *  `bezier`/`straight`, where there is no axis — both coordinates are written on
    *  every move and the cursor stays `grabbing` (no `col-resize`/`row-resize`,
-   *  because there is no axis to advertise). */
-  const onBendDown = (e: React.PointerEvent<HTMLDivElement>) => {
+   *  because there is no axis to advertise).
+   *
+   *  ROUND AK — the body below is `useEdgeGesture.beginGesture`; this handler is
+   *  now only the DECISIONS (which callback, which cursor, which lock). Claiming
+   *  happens through `gestures.claim`, which is what makes the label and the
+   *  handle mutually exclusive for one pointerdown. */
+  const onBendDown = gestures.claim((e: GestureDown) => {
     const cb = d.__onBend;
     if (!cb || !bendActive) return;
     e.stopPropagation();
     e.preventDefault();
-    const el = e.currentTarget;
-    el.setPointerCapture?.(e.pointerId);
     lockAxis.current = null;
     setDragCursor('grabbing');
-    cb(id, {x: 0, y: 0}, 'start', 0, 0);
-    /** Client → flow coordinates. The DOM rect is the PANE's (see the note by
-     *  the viewport `ref` in App), and RF's own `transform` is exactly the
-     *  `[x, y, zoom]` that maps flow coords into it, so this is RF's own
-     *  `screenToFlowPosition` arithmetic without needing the instance. */
-    const toFlow = (ev: PointerEvent): Pt | null => {
+    beginGesture({
+      el: e.currentTarget,
+      pane: paneRef.current,
+      transform: t,
+      pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      // this project's pre-existing jitter threshold, unchanged (ROUND T's
+      // LOCK_PX) — expressed through the SAME predicate the label uses, so the
+      // two affordances cannot disagree about what a drag is.
+      lock: LOCK_PX,
+      onStart: () => cb(id, {x: 0, y: 0}, 'start', 0, 0),
+      onMove: (p, dx, dy) => {
+        if (!lockAxis.current) {
+          // BELOW THE THRESHOLD NOTHING IS WRITTEN — `beginGesture` has already
+          // refused to report a sub-threshold move, so reaching here means the
+          // axis really is being chosen now.
+          lockAxis.current = bendAxisFor(kind, bGeo, dx, dy);
+          // the cursor only follows a REAL axis: on the free kinds the value is
+          // `'free'` and the handle keeps showing `grabbing`.
+          if (lockAxis.current !== 'free') {
+            setDragCursor(lockAxis.current === 'h' ? 'col-resize' : 'row-resize');
+          }
+        }
+        cb(id, p, 'move', dx, dy);
+      },
+      onEnd: (p) => {
+        const dragged = lockAxis.current !== null;
+        // the axis is per-gesture: clear it so the next drag decides again, and
+        // put the handle back to its resting cursor.
+        lockAxis.current = null;
+        setDragCursor('grab');
+        // A REAL drag gets an END report, so `App` can drop the stored waypoint
+        // when it was released back on the generator's own midpoint — the only
+        // way for the user to put an edge back to a clean routed look. A click
+        // on the handle (no axis ever locked) reports nothing, and `beginGesture`
+        // calls this only after a real move.
+        if (dragged) cb(id, p, 'end', 0, 0);
+      },
+    });
+  });
+
+  /* ROUND AK, AK-10 — POINTERDOWN ON THE LABEL ITSELF. This is the whole fix
+     for the owner's #1 complaint, and it is structural rather than stylistic:
+     the drag target and the text are ONE object, so no second affordance can
+     collide with the label's anchor — the collision the owner measured
+     (`handleAt` WAS the label's anchor by construction). The reference
+     implementation is Eclipse Sirius Web (MIT), `DraggableEdgeLabels.tsx`; its
+     `react-draggable` dependency is NOT taken, because the gesture below is this
+     project's own, shared with the bend handle.
+
+     `lock: 0` is Sirius Web's own click-vs-drag guard: a gesture whose total
+     delta is `{0,0}` is not a drag, so a plain click still selects the edge
+     (React Flow's own handler runs, because the label is inside the edge group)
+     and a double-click still opens the editor (AK-13). */
+  const onLabelDown = gestures.claim((e: GestureDown) => {
+    const cb = d.__onLabelWrite;
+    // review mode, no writer, or an OPEN EDITOR: the gesture is not offered. The
+    // editor owns its own pointer handling (text selection), so a drag must not
+    // hijack it.
+    if (!cb || ro || editing) return;
+    e.stopPropagation();
+    e.preventDefault();
+    setLabelCursor('grabbing');
+    /** The gesture's origin, in FLOW coordinates — read from the START event and
+     *  carried through the closure, which is what makes `W` the dragged point
+     *  rather than a delta. `beginGesture` converts the same way for its own
+     *  threshold, from the same pane rect and the same `transform`, so the two
+     *  agree by construction. A pane that cannot be measured yet yields null and
+     *  the gesture simply reports nothing rather than writing a bogus point. */
+    const toFlow = (ev: {clientX: number; clientY: number}): Pt | null => {
       const b = paneRef.current?.getBoundingClientRect();
       if (!b) return null;
       return {x: (ev.clientX - b.left - t[0]) / t[2], y: (ev.clientY - b.top - t[1]) / t[2]};
     };
-    const origin = toFlow(e.nativeEvent);
-    let last: Pt | null = origin;
-    const move = (ev: PointerEvent) => {
-      const p = toFlow(ev);
-      if (!p) return;
-      last = p;
-      const dx = origin ? p.x - origin.x : 0;
-      const dy = origin ? p.y - origin.y : 0;
-      if (!lockAxis.current) {
-        // BELOW THE THRESHOLD NOTHING IS WRITTEN. A sub-3px move is the jitter
-        // of a click, and writing it would store a key on an axis the gesture
-        // has not chosen yet — which `applyDrag` now PRESERVES, so it would
-        // survive as a real (tiny) bend on the axis the user never pulled.
-        if (Math.hypot(dx, dy) <= LOCK_PX) return;
-        lockAxis.current = bendAxisFor(kind, bGeo, dx, dy);
-        // the cursor only follows a REAL axis: on the free kinds the value is
-        // `'free'` and the handle keeps showing `grabbing`.
-        if (lockAxis.current !== 'free') {
-          setDragCursor(lockAxis.current === 'h' ? 'col-resize' : 'row-resize');
-        }
-      }
-      cb(id, p, 'move', dx, dy);
+    const origin = toFlow(e);
+    /** A pointer that never touched the pane reports nothing — and it must also
+     *  not open the gesture's history entry, so the claim is released by simply
+     *  returning before `beginGesture` runs. */
+    if (!origin) return;
+    const P_ = (p: Pt, phase: BendPhase) => {
+      const w = labelWrite({
+        W: p, anchor: L, pts: pathPts, zoom: t[2],
+        // the clearances already include the label box's own half-extent along
+        // the line (see the derivation above), which is what the range wants.
+        start: clearStart, end: clearEnd,
+      });
+      cb(id, w, phase);
     };
-    const up = (ev: PointerEvent) => {
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-      document.removeEventListener('pointercancel', up);
-      el.releasePointerCapture?.(ev.pointerId);
-      // A REAL drag gets an END report, so `App` can drop the stored waypoint
-      // when it was released back on the generator's own midpoint — the only
-      // way for the user to put an edge back to a clean routed look. A click on
-      // the handle (no axis ever locked) reports nothing.
-      const dragged = lockAxis.current !== null;
-      // the axis is per-gesture: clear it so the next drag decides again, and
-      // put the handle back to its resting cursor.
-      lockAxis.current = null;
-      setDragCursor('grab');
-      if (dragged && last) cb(id, last, 'end', 0, 0);
-    };
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-    document.addEventListener('pointercancel', up);
-  };
+    beginGesture({
+      el: e.currentTarget,
+      pane: paneRef.current,
+      transform: t,
+      pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      lock: 0,
+      /* ONE history entry, at the START — the same convention `onBend`
+         documents. The write is the UNPINNED state: a gesture that has not
+         moved yet has moved nothing, and `labelPinned: false` is bit-identical
+         to a board that never carried the keys. */
+      onStart: () => cb(id, {labelOffset: {x: 0, y: 0}, labelPinned: false}, 'start'),
+      onMove: p => P_(p, 'move'),
+      onEnd: p => {
+        setLabelCursor('grab');
+        /* THE END REPORT CARRIES THE FINAL WRITE, so what is STORED is the
+           released point with the rails applied. The auto-unpin is NOT a second
+           branch here: `labelWrite` already returns `{0, 0} / pinned: false`
+           when the released point snapped to the centre, so "let go near the
+           middle" and `Reset label position` land on exactly the same state
+           rather than two that merely look alike. */
+        P_(p, 'end');
+      },
+    });
+  });
 
-  const labelOffset = {center: 0.5, start: 0.25, end: 0.75}[d.offset ?? 'center'];
-  const lx = sourceX + (targetX - sourceX) * labelOffset + (labelX - (sourceX + targetX) / 2);
-  const ly = sourceY + (targetY - sourceY) * labelOffset + (labelY - (sourceY + targetY) / 2);
+  /** ROUND AK, AK-10 — the label's anchor with the free 2-D offset applied.
+   *  `labelAnchor` is the ONE implementation; it reproduces the shipped
+   *  `:383-385` expression operation for operation and adds the stored offset
+   *  only once `labelPinned` is set, so an untouched board resolves to the
+   *  identical number and no board on disk migrates. */
+  const L = labelAnchor({
+    sourceX, sourceY, targetX, targetY, labelX, labelY,
+    offset: d.offset, labelOffset: d.labelOffset, labelPinned: d.labelPinned,
+  });
+  const lx = L.x;
+  const ly = L.y;
+  /** The path as a polyline — the clamp's and the handle-nudge's input. Read
+   *  from the path ACTUALLY drawn, so a stored bend, a legacy `bend` fraction
+   *  and a generator default are all handled by construction. */
+  const pathPts = useMemo(() => pathPoints(path), [path]);
+  /** ROUND AK, AK-14.3 — DOES EACH END CARRY A GLYPH? The clamp's input, and
+   *  the ONE place the two ends' presence is decided.
+   *
+   *  THE MAPPING, and the trap it avoids: AK-5 renamed the UI controls
+   *  `start`/`end` but the STORAGE keys are still `markerStart`/`markerEnd`, and
+   *  the two ends are named for the ends of the LINE, not for the property. So
+   *  `hasEndGlyph` reads `markerEnd` and `hasHeadGlyph` reads `markerStart` —
+   *  getting that backwards would make the clamp clear the WRONG end (it would
+   *  reserve 20px for a bare end and let the label sit under a real arrowhead).
+   *
+   *  THE TWO SOURCES, both already here:
+   *    1. the marker PROP React Flow hands this component. It is derived in `App`
+   *       (`rfEdges`) and is NON-EMPTY for every marker kind — `markerFor` writes
+   *       `{type, color, width, height}` for the two arrow kinds, and `App`'s
+   *       `edgeMarkerUrl` writes `url('#…')` for a crow's foot. `GoblinEdge` is
+   *       handed the resolved URL, never the object, so presence is honestly
+   *       "this end has a glyph" whatever kind it is.
+   *    2. the RESOLVED MARKER URL, read from the property rather than from the
+   *       original object, which is why this works for all three kinds at once.
+   *
+   *  It is a PROPERTY read (`props.marker*`), never state: a marker change
+   *  re-renders the edge, so the clamp's inputs follow the panel with no extra
+   *  bookkeeping. */
+  const hasEndGlyph = !!props.markerEnd;
+  const hasHeadGlyph = !!props.markerStart;
+  /** The label's live box, in FLOW px. Measured from the element (never
+   *  estimated from the string length) and divided by the zoom, because the
+   *  label is counter-scaled by `1/t[2]` and its flow-space size therefore
+   *  depends on the zoom. `halfW` is a MEASUREMENT only (the label's width is
+   *  whatever the user typed, so no constant could stand for it and 0 is the
+   *  honest reading of "not measured yet"); `halfH` needs one only for the same
+   *  first frame, and it is the label's own `LABEL_HALF_H_PX`. */
+  const halfW = labelHalfW / (t[2] || 1);
+  const halfH = (labelHalfH || LABEL_HALF_H_PX) / (t[2] || 1);
+  /** AK-14.3 — the clearances. `labelClearance` is tldraw's own rule (padding on
+   *  an end that carries a glyph, 0 on an end that carries none) and
+   *  `labelHalfAlong` adds the LABEL BOX's own half-extent along the path — the
+   *  box's EDGE must clear the glyph, not its centre. The formula is
+   *  `edgeLabel`'s and is not restated here: this supplies its two inputs. */
+  const clearStart = labelClearance(hasEndGlyph) + labelHalfAlong(pathPts, L, halfW, halfH);
+  const clearEnd = labelClearance(hasHeadGlyph) + labelHalfAlong(pathPts, L, halfW, halfH);
+
+  /** ROUND AK, AK-13 — WHERE A NEW LABEL GOES WHEN IT IS CREATED AND NEVER
+   *  TYPED INTO. The double-click's own point, converted to an offset from the
+   *  resolved anchor, so an empty commit still leaves the label under the
+   *  pointer AND stores a relative value (the same shape a drag stores).
+   *
+   *  `null` outside a create signal, and it is read ONLY by the commit below —
+   *  the normal editor open (the element's own double-click, or the context
+   *  menu's "Edit label") leaves it null and therefore never writes a position. */
+  const createAt = d.__editAt;
+  const [pendingCreate, setPendingCreate] = useState<Pt | null>(null);
+
+  // F2/AK-13: the two editor entry points. `__edit` is the context menu's "Edit
+  // label" on an EXISTING label; `__editAt` is a double-click on the PATH, which
+  // carries the point the click landed on. `ro` is deliberately NOT a dependency
+  // of the second effect, for exactly the reason the first one gives: the signal
+  // is a persistent timestamp, so a mode change re-running the effect would pop
+  // the editor open the moment review mode is left.
+  useEffect(() => {
+    if (!createAt || ro) return;
+    setPendingCreate(createAt.at);
+    setDraft(shown);
+    setEditing(true);
+  }, [createAt?.t]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The painted label's own box, measured from the DOM at the zoom that is
+   *  live, and re-measured when the zoom changes (the label is counter-scaled by
+   *  `1/zoom`, so its FLOW size follows the zoom — the measurement has to as
+   *  well). Read from `getBoundingClientRect`, never estimated from the string:
+   *  the width is whatever the user typed. */
+  useEffect(() => {
+    const el = labelBox.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const z = t[2] || 1;
+    setLabelHalfW(r.width / 2 / z);
+    setLabelHalfH(r.height / 2 / z);
+  }, [shown, t, editing]);
+
+  /** The handle's own position. The path's midpoint — the label's own anchor and
+   *  the point on the line the user grabs — EXCEPT when a label is painted there,
+   *  where the two affordances would overlap.
+   *
+   *  ROUND AK, AK-11 — WHY IT IS NUDGED, AND WHY THAT IS THE SECOND LINE OF
+   *  DEFENCE RATHER THAN THE FIRST. The first is STRUCTURAL: both affordances run
+   *  through `useEdgeGesture`, whose `claim` closes the window on the first
+   *  pointerdown, so a shared point could never start two gestures anyway. The
+   *  nudge is the documented fallback — it keeps the two TAP RINGS from
+   *  overlapping, so the user never has to guess which one a tap will land on.
+   *
+   *  IT APPLIES ONLY WHEN A LABEL IS PAINTED. With no label there is nothing to
+   *  avoid, so the handle stays on the generator's own midpoint: that is the
+   *  pixel-parity rule this file obeys everywhere, and the reason selecting an
+   *  unlabelled edge renders exactly as it did before this pass. */
+  const handleAt = hasLabel
+    ? nudgeAlongPath({x: labelX, y: labelY}, pathPts, HANDLE_CLEAR_PX + halfW)
+    : {x: labelX, y: labelY};
 
   useEffect(() => {
     if (editing) window.setTimeout(() => input.current?.select(), 10);
@@ -391,15 +659,29 @@ const GoblinEdge = memo((props: EdgeProps) => {
   const commit = () => {
     const v = draft.trim();
     d.onCommitLabel?.(id, v);
+    /* ROUND AK, AK-13 — AN EMPTY COMMIT AT A CREATED LABEL STILL LEAVES IT WHERE
+       THE DOUBLE-CLICK PUT IT. The spec is explicit ("otherwise create the label
+       at the clicked position and commit at the default when left empty"), and
+       `labelWrite` is what turns the click's point into a stored, rail-checked
+       offset — the same writer the drag uses, so a created label and a dragged
+       one cannot land in two different states. A commit at an EXISTING label
+       leaves `pendingCreate` null and writes no position at all, so editing text
+       never moves the label. */
+    if (pendingCreate) {
+      d.__onLabelWrite?.(id, labelWrite({
+        W: pendingCreate, anchor: L, pts: pathPts, zoom: t[2],
+        start: clearStart, end: clearEnd,
+      }), 'end');
+      setPendingCreate(null);
+    }
     setEditing(false);
   };
 
   const cancel = () => {
     setDraft(typeof label === 'string' ? label : '');
+    setPendingCreate(null);
     setEditing(false);
   };
-
-  const shown = typeof label === 'string' ? label : '';
 
   // --- flow animation -----------------------------------------------------
   // "message being sent": dots/pulses travel along the exact edge path.
@@ -416,6 +698,31 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // K2: each edge gets its own random 0–1s start offset so parallel edges do
   // not animate in lockstep. Stable for the lifetime of the edge.
   const randomDelay = useMemo(() => Math.random(), []);
+
+  /* ROUND AK, AK-13 — DOUBLE-CLICKING THE LINE ITSELF is handled at the EDGE
+     GROUP, by React Flow's own `onEdgeDoubleClick` (see `App`). It is NOT wired
+     here, and the reason is structural rather than an omission:
+
+       * React Flow renders ONE `<g class="react-flow__edge">` per edge and puts
+         the double-click handler on it, so the library already covers the whole
+         edge — the authored stroke, and the 26px `interactionWidth` band
+         `BaseEdge` draws above it that a finger actually lands on. A handler on
+         the authored `<path>` alone would sit UNDER that band and, being painted
+         first, would rarely receive the event at all.
+       * The `pointer-events: visibleStroke` test on that group IS the hit-test
+         AK-13 asks for ("hit-test the double-click position against the edge's
+         own resolved path"). Re-deriving it in JS would be a second, divergent
+         copy of a rule the library owns and this app already depends on.
+       * The "inside an existing label's box" exclusion is done by the DOM, not
+         by arithmetic: the label is painted by `EdgeLabelRenderer` into
+         `.react-flow__edgelabel-renderer`, a SIBLING of the edge layer, so its
+         own `onDoubleClick` (above) catches that case and the event never
+         reaches the edge group. That is exactly the exclusion draw.io makes
+         before creating a new label.
+
+     What this component contributes is the OTHER half of AK-13: the editor that
+     the group's double-click opens (`__editAt` above), and the position the
+     commit stores when the label is created and left empty. */
 
   /** K2: stagger `i` of `n` payloads — random edge offset + even spacing. */
   const begin = (i: number) => `${(randomDelay + (flowDur / flowCount) * i).toFixed(3)}s`;
@@ -580,11 +887,20 @@ const GoblinEdge = memo((props: EdgeProps) => {
             />
           )}
           <div
-            className={`edge-label${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
+            className={`edge-label ${labelBgClass(d.labelBg)}${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
             data-edge-id={id}
+            ref={labelBox}
             style={{transform: `translate(-50%, -50%) translate(${lx}px, ${ly}px)`}}
+            onPointerDown={onLabelDown}
             onDoubleClick={e => {
               e.stopPropagation();
+              // AK-13 GUARD: the editor opens on the DOUBLE-CLICK, not on the
+              // first of its two pointerdowns. A drag that happens to end where
+              // it began is a gesture, not an edit (see `gestures.claim`), so
+              // this element's double-click is only honoured once no gesture
+              // ran — otherwise releasing a return-to-origin drag would open
+              // the editor the user never asked for.
+              if (gestures.isClaimed()) return;
               // FB-L: in review mode the label is readable, not editable — the
               // editor simply never opens. The label element itself is left in
               // place (and keeps its hover feedback).
