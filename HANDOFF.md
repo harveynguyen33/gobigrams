@@ -1,6 +1,108 @@
 # HANDOFF — Diagram Studio
 
-## ▶ ROUND AL — the edge panel re-shaped from Harvey's device test. DONE, all gates green. PENDING HARVEY'S REVIEW + DEVICE TEST.
+## ▶ ROUND AM — Harvey's five connection-line items. DONE, all gates green. PENDING HARVEY'S DEVICE TEST.
+
+**What it is:** five feedback items on the connection line, resolved as ONE round. Spec
+`ROUND-AM-SPEC.md`; the **approved** mockup (for AM-2…AM-5) is
+`/home/harvey/diagram-studio-research/mockup-am-edge-flow.html` — Harvey said "ok làm đi"
+2026-09-21 against it.
+
+**AM-1 — THE LABEL-DRAG BUG, and the root cause was measured, not guessed.** Harvey: *"khi nắm kéo
+text di chuyển, sau lần đầu, những lần sau nắm kéo thì cái text bị giật và ra xa con trỏ chuột 1
+khoảng"*. `GoblinEdge` computed the anchor `L` **during render** and `onLabelDown` closed over that
+render's value; `labelWrite({W, anchor: L})` returns `W − L`, which is a DELTA only while `L` is the
+anchor. Once `labelPinned` was true, `L` was the **painted point**, so the write became
+`pointer − painted` — the label FROZE under the finger and the next write teleported it by exactly
+the previous drag's distance. Reproduced by executing the shipped `src/edgeLabel.ts` under Node:
+drag 1 ends at {300,200} → painted {300,200}, error 0.0px (**looks perfect — a one-gesture harness
+would have passed the broken tree**); drag 2 ends at {400,250} → painted {200,150}, error **223.6px**,
+exactly drag 1's own distance. **Fix:** the gesture now writes a DELTA with an ANCHOR REBASE —
+`anchorWrite` (new, in `edgeLabel.ts`) reports `W − reference` where `reference` is the painted point
+in the incoming frame for a gesture's first write and the previous reported point thereafter, and
+`App.onLabelWrite` rebases the stored offset by the anchor's movement before accumulating. The
+renderer publishes the live anchor through an `anchorRef` effect, because React Flow's controlled flow
+means the closure's anchor is ALWAYS one render stale — a plain delta would still drift by exactly a
+node's movement, which AM1-b measures (31.6px shipped; 226.7px with the rebase deleted). `labelWrite`
+keeps its exact body as the ABSOLUTE form, used only by the create/centred/reset writes and now
+returning `labelAnchor: null`. Centred writes delete **all three** keys (`labelOffset`, `labelPinned`,
+`labelAnchor`), so "reset", "dragged exactly back" and "never moved" stay ONE stored state. **No
+migration, no board rewrite.**
+
+**AM-2 — the edge label gets a TEXT section.** `text` added to the EDGE section list, ordered
+`label → text → line → markers → [cardinality] → flow` (`src/inspector.ts`). Stored as
+`data.labelStyle` (the EDGE's own key, so it cannot overwrite a node's `textStyle`) and emitted by
+`edgeTextStyleVars` — the edge subset of the ONE `textStyleVars`, not a second vocabulary; it emits
+`--ts-scale` / `--ts-weight` / `--ts-font` and deliberately NOT align/vAlign/colour. SIZE / WEIGHT /
+FONT come from the shared `TEXT_*_OPTS`. **No ALIGN and no vAlign:** an edge label is an inline chip
+with no box to align inside — its position IS the drag. `.edge-label`'s three declarations became vars
+with **today's literals as the fallbacks** (`calc(11px * var(--ts-scale, 1))`, `var(--ts-weight, 600)`,
+`var(--ts-font, var(--mono))`), which is the parity guarantee: an untouched board emits no inline
+property and paints the identical bytes. **The `600` fallback is the load-bearing one** — every node row
+falls back to `400`, so copying that would have silently lightened every existing edge label.
+
+**AM-3 — the flow-glyph row draws its glyphs.** `FLOW_ICON_PATHS` MOVED out of `GoblinEdge.tsx` into
+`src/flowIcons.tsx`, a React-Flow-free leaf read by BOTH the edge renderer and the panel — AL-6's "reuses
+the same vocabulary" comment is now structural. `FLOW_ICON_OPTS` no longer passes `art: null`: the six
+chips are 30×30 squares carrying the glyph that will actually travel the line. No glyph path was touched.
+
+**AM-4 — the speed gets a real illustration.** `FlowRail`: a bead travelling a rail at the edge's ACTUAL
+`flowDuration`, so the picture IS the speed. It reads the same `value` prop the number prints, so it
+cannot disagree; it is `aria-hidden` and **decorative, never the source of truth**; and it obeys the
+project's own two motion switches (`prefers-reduced-motion` and `.ds-no-anim`).
+
+**AM-5 — count smaller, count + speed on ONE row, speed as a SLIDER.** `Stepper` gained an OPT-IN
+`compact` prop (default `false`, so no other caller re-flows) capping it at 96px; the four speed words
+became one `<input type="range">` over the renderer's own clamp (0.6…8s — all four old chip values
+4/2.4/1.4/0.8 live inside it, so nothing became unreachable) with the seconds printed beside it.
+**The display direction is INVERTED** (`sliderSeconds = SPEED_MAX + SPEED_MIN − position`), so dragging
+RIGHT is FASTER — the one place the inversion happens, and the printed number is always the real stored
+seconds. One gesture = ONE undo step (`coalesce` + a pointer/keyboard boundary latch, with `ev.repeat`
+guarded so a held arrow key cannot re-arm per repeat).
+
+**Commits (base `253a77e`, 11 total):** AM-1 → `6cb9f6c`, `954be91`, `303c655`, `ed89dc9`, `3c23b4c`,
+`1a819f1` · AM-2 → `50c8743` · AM-3 → `3fe4d4a` · AM-4+AM-5 → `05120ce`, `7add0ac` · the AM harness →
+`924ed03`. **Not yet pushed.**
+
+**Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **142** (ceiling 160, unchanged) ·
+**35/35 harnesses green** · new `checks/round-am-label-drag.mjs` **19/19** and
+`checks/round-am-edge-panel.mjs` **23/23**, each with its own negative control RED on the pinned
+pre-change tree (AM-1: 12/12 source probes RED at `253a77e` plus the pre-fix module loaded from the
+commit; AM-2…AM-5: 12/12 RED at `1a819f1`) · `boards/` untouched.
+
+**TWO HARNESSES WERE RE-ANCHORED, with the old claim kept beside the new one** — not quietly dropped:
+`round-aa-align-marquee-palette.mjs` `aa1.the-chip-glyph-rows-are-not-mistaken-for-half-rows` and
+`round-al-edge-panel.mjs` `al6` both asserted a chip row FOR `SPEED_OPTS`, which stopped being a chip
+row. Both now assert the same distinction with rows that still exist. `round-aa`'s REPLAY ALSO CRASHED
+(a `b.picks` read that only the working tree has), which killed its negative control instead of
+reporting it — fixed to read as `false` (probe RED) rather than throw. Also re-anchored by the coder:
+`package-p-inspector` (its curvature probe had an **unbounded slice** — its end anchor stopped existing
+when AL-6 moved that row, so `indexOf` returned −1 and the slice ran 18,684 chars to EOF, passing only
+by luck), and `round-s-edge-bend` (its "0 `type=range` in live source" became false for a reason
+unrelated to its subject).
+
+**⚠️ WHAT IS *NOT* VERIFIED — do not claim it is.** **No live gesture and no live edge-panel
+measurement exists.** This project's headless browser renders **ZERO edges** (nodes render, `minimap
+edges`=0), so every number above is a source measurement or a Node-executed return value. **The feel of
+the new drag, the slider, the rail and the glyph row is Harvey's device test.**
+
+### HARVEY — please test on your Mac (`http://192.168.33.200:5200/`)
+
+1. **The drag (AM-1)**: grab a line's text and drag it — it must stay UNDER the pointer, first drag and
+   every drag after. Then drag it somewhere, let go, and drag it AGAIN from the new spot: this is the
+   exact case that used to jump.
+2. **Text size (AM-2)**: select a line → the new **Text** section → S/M/L/XL + weight + font. An old
+   board's labels must look unchanged until you touch a control.
+3. **Flow glyph (AM-3)**: the six glyph chips now SHOW the picture (Letter/Package/File/Zap/Gear/DB).
+4. **Speed (AM-4/AM-5)**: a dot/dash/icon flow → **count + speed on one row**, speed is a slider that
+   prints the seconds; drag RIGHT = faster; the rail below animates at that speed.
+5. **Undo**: after a slider drag, ONE Ctrl+Z must undo the whole gesture, not one frame of it.
+
+**VAULT DEBT — ROUND AK, AL **and** AM together (3 rounds).** Do all three in ONE pass via `pkm`: a new
+ADR-031 section, one Change Log row, the Mermaid diagram update, and the Architecture MOC line.
+
+---
+
+## ▶ ROUND AL — the edge panel re-shaped from Harvey's device test. DONE. PENDING HIS DEVICE TEST.
 
 **What it is:** the round that AMENDS ROUND AK from his own device test. Spec `ROUND-AL-SPEC.md`;
 his verbatim complaints with a measured cause for each in `ROUND-AL-FEEDBACK.md`; the **approved**
