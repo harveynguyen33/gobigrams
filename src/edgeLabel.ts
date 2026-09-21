@@ -81,14 +81,14 @@
    {300,200}, error 0.0px; drag 2 finger {400,250} → painted {200,150}, error
    **223.6px**, which is exactly drag 1's own distance {200,100}.
 
-   THE FIX. The write carries the reference point it was computed against
-   (`labelAnchor` below) and the gesture states its own base offset, so the
-   pointer's displacement is what is stored rather than the pointer's position.
-   `anchorWrite` is that arithmetic; `GoblinEdge` supplies the reference point
-   TRACKED TO THE LIVE GEOMETRY, which is what makes a node moving during a drag
-   keep the label under the finger; `App` stores the pair, and a CENTRED write
-   still deletes all three keys so "reset", "dragged back to the centre" and
-   "never moved" stay ONE stored state (the invariant ROUND AK established).
+   THE FIX. The write carries the point it was reported against (`labelAnchor`)
+   and the gesture states its own base, so the pointer's MOVEMENT is what is
+   stored rather than the pointer's position: `anchorWrite`'s arithmetic makes
+   the anchor cancel, so a stale one cannot corrupt the drag, and the reported
+   anchor lets `App` rebase the stored offset by the same movement when the
+   geometry itself moves under the finger. `App` still deletes all three keys on
+   a CENTRED write, so "reset", "dragged back to the centre" and "never moved"
+   stay ONE stored state (the invariant ROUND AK established).
 
    ---------------------------------------------------------------------------
    HONEST LIMITS, recorded here rather than discovered later.
@@ -389,59 +389,61 @@ export function nearestOnPath(pts: Pt[], W: Pt): {pt: Pt; len: number; perp: Pt;
  *  measured from and what it started from, and the stored offset comes out as
  *  the finger's displacement rather than the finger's position.
  *
- *  THE CONTRACT, stated exactly, because the two ways it could be misread are
- *  both live bugs:
+ *  THE CONTRACT, stated exactly, because the ways it could be misread are live
+ *  bugs:
  *
- *    p = base ?? {0, 0}
- *    labelOffset = p + (W − anchor)      // the write's offset
+ *    b = base ?? {0, 0}
+ *    labelOffset = b + (W − anchor)      // this write's contribution
  *    labelAnchor = anchor                // the frame it was measured in
  *
- *  · `anchor` IS THE ANCHOR THE WRITE IS MEASURED AGAINST — the LIVE auto-centre
- *    anchor at the moment of the write (NOT the painted position, and NOT the
- *    anchor of some earlier render). `GoblinEdge` reads it from a ref published
- *    by every committed render, which is what makes it live.
- *  · `base` IS THE GESTURE'S BASE OFFSET, and it is handed over ALREADY
- *    RE-EXPRESSED in the write's frame — the renderer adds the frame shift and
- *    the grab correction (see `GoblinEdge.onLabelDown`, which is the only caller
- *    and spells both out). It is `{0,0}` in the common case, which is the shape
- *    the spec states as `base + (W − grabPoint)`: the pointer's displacement from
- *    where the finger landed, added to the offset the label was wearing.
+ *  · The ANCHOR CANCELS OUT of that sum, and that is the invariant worth
+ *    documenting: the caller passes `base = anchor − prev`, so the result is
+ *    `W − prev` — THE POINTER'S MOVEMENT since the last reported point — for ANY
+ *    anchor whatsoever. A stale anchor therefore cannot corrupt the drag, which
+ *    matters because React Flow's controlled flow means the `.edge-label` element
+ *    does NOT re-render between a pointer event and the React write, so the
+ *    handler's closure is always one render behind, in every gesture. `anchor`'s
+ *    remaining job is to be REPORTED (`labelAnchor`), so `App` can rebase the
+ *    stored offset when the geometry itself moves under the finger.
+ *  · `base` IS THE CALLER'S, not this function's business: `GoblinEdge` — the
+ *    only caller — passes `anchor − prev`, i.e. the negation of the anchor's
+ *    displacement from the last reported pointer point, which is what turns the
+ *    sum into the increment. The form is kept general rather than folded into a
+ *    `prev` parameter so the arithmetic stays visible at the call site and this
+ *    module keeps needing no notion of a gesture's history.
  *
- *  WHY THE FIX IS A REBASE AND NOT A PLAIN DELTA. React Flow's controlled flow
- *  means the `.edge-label` element does NOT re-render between a pointer event and
- *  the React write, so the handler's closure is always one render behind — in
- *  EVERY gesture, including the first. The old code therefore computed its write
- *  against a STALE anchor: harmlessly while that anchor was the anchor, and
- *  catastrophically once it was the painted position (the freeze-and-teleport
- *  above). The delta is exact for ANY reference point; the failure was that the
- *  reference point was the label's own painted position. `App` then rebases the
- *  stored offset by the anchor's movement when a node moves mid-gesture, so the
- *  two together track the finger instead of accumulating drift.
+ *  WHY A DELTA RATHER THAN AN ABSOLUTE POINT. The shipped code wrote
+ *  `W − painted`, where `painted` was the label's own rendered position: that is
+ *  the pointer's POSITION measured from a moving reference, so the label froze
+ *  under the finger and the next write teleported it by the previous drag's
+ *  distance. A pointer's MOVEMENT is the thing a drag means, and it is
+ *  independent of every reference point in the system.
+ *
+ *  STATED IN THE ROUND'S OWN TERMS: the spec's `base + (W − grabPoint)` is this
+ *  same quantity reached additively — the gesture's base offset is already
+ *  STORED, and `App` adds each write's increment to it, so the offset is
+ *  accumulated exactly once per write rather than rebuilt from a base on every
+ *  one. `App` also supplies the rebase half, once per write: see its merge.
  *
  *  WHY `labelAnchor: anchor` IS RETURNED RATHER THAN null: the write is RELATIVE
- *  in the sense that matters — it was measured against a point the geometry can
+ *  in the sense that matters — it was reported against a point the geometry can
  *  move, and `App` may correct the stored offset when its own record of that
  *  point disagrees with this one. A write that is genuinely ABSOLUTE (the
  *  centred/reset write, the create commit) passes null instead and is never
  *  rebased.
  *
- *  THE CENTRED BRANCH IS KEPT HERE TOO, for the same reason `labelWrite` gives:
- *  a gesture whose pointer has not moved from the base offset writes the
- *  UNPINNED state, so "grabbed and released without moving" stays the identical
- *  stored value as "reset" and "never moved". */
+ *  NO CENTRED BRANCH HERE, deliberately, and this is the one place the two
+ *  writers' shapes differ. `labelWrite` collapses a zero offset to the unpinned
+ *  state because its callers can only ever mean "put it back in the centre". An
+ *  increment cannot know that: the gesture's TOTAL is what decides, and that
+ *  total lives in `App` (which owns the stored offset). So this function returns
+ *  the increment and `App` collapses the result if the total is `{0,0}` — the
+ *  same stored state as reset and never-moved, reached additively. Collapsing
+ *  here would reset a dragged label whenever the finger happened to cross the
+ *  anchor, which AM1-d's probe forbids. */
 export function anchorWrite(p: {anchor: Pt; base: LabelOffset | null; W: Pt}): LabelWrite {
   const b = p.base ?? {x: 0, y: 0};
   const labelOffset = {x: b.x + (p.W.x - p.anchor.x), y: b.y + (p.W.y - p.anchor.y)};
-  /* NO CENTRED BRANCH HERE, deliberately, and this is the one place the two
-     writers' shapes differ. `labelWrite` collapses a zero offset to the unpinned
-     state because its callers can only ever mean "put it back in the centre".
-     A gesture cannot know that: its base offset lives in `App` (which owns the
-     freshest record of it), so the offset this function returns is the DELTA —
-     whether the RESULT is the centred state is decided where the base is added,
-     one call away, against the offset actually stored. Collapsing here would
-     reset a dragged label to the centre whenever the finger happened to return
-     to where it grabbed (AM1-d's own probe, which requires the pre-drag position
-     to come back EXACTLY, including a non-zero offset). */
   return {labelAnchor: p.anchor, labelOffset, labelPinned: true};
 }
 

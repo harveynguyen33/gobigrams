@@ -595,42 +595,46 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  not open the gesture's history entry, so the claim is released by simply
      *  returning before `beginGesture` runs. */
     if (!origin) return;
-    /* ROUND AM, AM-1 — THE GESTURE'S OWN BOOKKEEPING, frozen HERE.
+    /* ROUND AM, AM-1 — THE GESTURE'S REFERENCE POINT, and the one line that
+       turns the pointer's POSITION into a DISPLACEMENT.
 
-       `prev` is the last pointer point this gesture REPORTED, and it starts at
-       the point the finger landed on. The write is therefore the pointer's
-       INCREMENT (`W − prev`), which is what makes the label follow the finger:
-       the shipped code wrote the pointer's POSITION measured from a stale
-       reference, so the stored offset froze and then jumped.
+       THE TARGET. At every write the stored offset must place the label under
+       the finger: `offset = W − A_live`, where `A_live` is the auto-centre anchor
+       the geometry has at that moment (see `App`'s merge for the algebra, and the
+       harness for it measured). So what this gesture contributes is
+       `W − reference`, where `reference` is whatever point the accumulated stored
+       offset currently describes.
 
-       `anchorWrite`'s shape states this in the file's own vocabulary:
-       `anchor` is the LIVE auto-centre anchor and `base` is `anchor − prev`, so
-       the returned offset is `(anchor − prev) + (W − anchor) = W − prev` — THE
-       ANCHOR CANCELS, which is the honest invariant the round's spec asks to be
-       documented: the delta is exact for ANY anchor, so a stale one cannot
-       corrupt it, and the anchor's only job is to be REPORTED (`labelAnchor`) so
-       `App` can rebase the stored offset when the geometry itself moved.
+       THE REFERENCE, and why it changes once. `App` corrects the stored offset
+       from ITS recorded frame into the write's frame before adding the write, so
+       the reference this gesture must subtract is the label's painted point
+       EXPRESSED IN THAT INCOMING FRAME — the stored numbers read literally:
+       `(data.labelAnchor ?? A_live) + (data.labelOffset ?? 0)`. That holds for
+       the first write of every gesture, whether the label is pinned (the stored
+       frame and offset) or not (the live anchor, offset zero). For the SECOND
+       write onwards it has to be the previous reported point instead, because by
+       then `App` has already recorded this gesture's frame and added this
+       gesture's first write — and the algebra shows the two are the same number
+       once one write has landed, which is why `prev` starts `null` and is only
+       ever set to a point the gesture actually reported.
 
-       WHY THE INCREMENT AND NOT THE SPEC'S LITERAL `base + (W − origin)`. The
-       literal form, with `base` the offset in force at grab time, double-counts
-       that offset on every write AFTER the first once `App` adds the write to
-       the rebased stored value — measured: gesture 2 on a label pinned by
-       gesture 1 lands at `W1 + W2 − 2·anchor`, i.e. the label is off by the
-       FIRST drag's distance, which is the very defect this round fixes. With
-       the increment the total is `stored + Σ(increments)` = `stored + (W −
-       origin)`, which is the spec's own `base + (W − grabPoint)` reached
-       additively so that neither the first write nor the hundredth can
-       double-count. `App`'s rebase supplies the "base" half of the spec's
-       formula, and it is applied ONCE per write because the stored value is the
-       running total. */
-    let prev = origin;
+       `A_live` is read PER WRITE from the ref, so a node dragged under the finger
+       publishes a new anchor and this reference — recomputed on the gesture's
+       FIRST write — tracks it. That is what keeps the label under the pointer
+       when a node moves, rather than carrying it along with the node. */
+    let prev: Pt | null = null;
     /** ROUND AM, AM-1 — THE WRITE. `labelWrite` is GONE from this path: it is
-     *  the ABSOLUTE form, and a gesture is a displacement. The anchor is read
-     *  PER WRITE from the ref, so the frame reported is the live one even if a
-     *  node moves under the finger mid-gesture. */
+     *  the ABSOLUTE form, and a gesture is a displacement. `base` is
+     *  `A − reference`, so `anchorWrite` returns `W − reference` — and the
+     *  reported `labelAnchor` is the live anchor, the frame `App` corrects from. */
     const P_ = (p: Pt, phase: BendPhase) => {
       const A = anchorRef.current ?? anchor;
-      cb(id, anchorWrite({anchor: A, base: {x: A.x - prev.x, y: A.y - prev.y}, W: p}), phase);
+      const frame = d.labelAnchor ?? A;
+      const reference = prev ?? {
+        x: frame.x + (d.labelOffset?.x ?? 0),
+        y: frame.y + (d.labelOffset?.y ?? 0),
+      };
+      cb(id, anchorWrite({anchor: A, base: {x: A.x - reference.x, y: A.y - reference.y}, W: p}), phase);
       prev = p;
     };
     beginGesture({
