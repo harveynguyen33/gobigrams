@@ -116,17 +116,17 @@ console.log(`node: ${process.version}`);
 section('AK-12 — the label plate is THREE stored states, and each maps to a declared class');
 {
   const vals = M.LABEL_BG_VALUES;
-  assert('ak12.the-three-values-are-none-surface-outline-and-the-default-is-surface',
+  assert('ak12.the-three-values-are-none-surface-outline-and-the-default-is-NONE',
     Array.isArray(vals) && vals.length === 3
       && vals[0] === 'none' && vals[1] === 'surface' && vals[2] === 'outline'
-      && M.LABEL_BG_DEFAULT === 'surface',
+      && M.LABEL_BG_DEFAULT === 'none',
     `LABEL_BG_VALUES = ${JSON.stringify(vals)}, LABEL_BG_DEFAULT = ${JSON.stringify(M.LABEL_BG_DEFAULT)} — ` +
-    `\`None\` is a GENUINE STORED VALUE (decision D2), not the absence of one, so it is listed`);
+    `RE-ANCHORED by ROUND AL, AL-3 — the claim that MOVED is ONLY the default: OLD 'surface', NEW 'none', on the owner's instruction #3. The three stored states and their order are untouched.`);
 
   /* The tolerant read: anything unrecognised must resolve to the DEFAULT, never
      to a class the sheet does not declare (that would be an unstyled plate). */
   const unknown = [undefined, null, '', 'nope', 0, {}, 'SURFACE', 'None'];
-  const badUnknown = unknown.filter(v => M.labelBgOf(v) !== 'surface');
+  const badUnknown = unknown.filter(v => M.labelBgOf(v) !== M.LABEL_BG_DEFAULT);
   assert('ak12.an-unknown-value-resolves-to-the-default-never-to-an-unstyled-plate',
     badUnknown.length === 0,
     `${unknown.length} unrecognised inputs (` +
@@ -138,8 +138,8 @@ section('AK-12 — the label plate is THREE stored states, and each maps to a de
   const map = vals.map(v => `${JSON.stringify(v)} → ${M.labelBgClass(v)}`);
   assert('ak12.every-value-maps-to-its-own-lb-class',
     vals.every(v => M.labelBgClass(v) === `lb-${v}`)
-      && M.labelBgClass(undefined) === 'lb-surface'
-      && M.labelBgClass('bogus') === 'lb-surface',
+      && M.labelBgClass(undefined) === `lb-${M.LABEL_BG_DEFAULT}`
+      && M.labelBgClass('bogus') === `lb-${M.LABEL_BG_DEFAULT}`,
     `${map.join('  ·  ')}; unknown → ${M.labelBgClass('bogus')} — the CLASS is the mechanism ` +
     `(React Flow's \`labelBgStyle\` is EdgeText's SVG-<rect> API and this label is a DOM <div>)`);
 
@@ -627,7 +627,7 @@ section('AK-12/AK-14.1/AK-15 — the three controls are in the panel, in the rig
   const lineSec = secBodyOf(APP_C, 'line');
 
   const bgRow = /<label>background<\/label>/.test(labelSec)
-    && /options=\{LABEL_BG_OPTS\}/.test(labelSec)
+    && /chipRow\(LABEL_BG_OPTS, eLabelBg,/.test(labelSec)
     && /data: \{labelBg: v/.test(labelSec);
   const resetBtn = /Reset label position/.test(labelSec) && /onClick=\{resetLabelPos\}/.test(labelSec);
   const reverseBtn = /Reverse line direction/.test(lineSec) && /onClick=\{\(\) => reverseEdgeDir\(/.test(lineSec);
@@ -639,16 +639,18 @@ section('AK-12/AK-14.1/AK-15 — the three controls are in the panel, in the rig
     `The reset sits with the label (it moves the label) and the reverse with the line (it re-points the path) — ` +
     `which is also where draw.io ships it, in Arrange.`);
 
-  /* The control KIT, not a new control: still `ToggleRow`, and still zero native
-   * selects anywhere in the panel region. */
-  const usesKit = /<ToggleRow/.test(labelSec) && !/<select/.test(labelSec);
+  /* RE-ANCHORED by ROUND AL, AL-6 — the claim that moved is the CONTROL FAMILY,
+     not the invariant. OLD: the plate row was carried by `<ToggleRow/>`. NEW: it is
+     carried by the round's ONE chip system (`chipRow`), which is the same control kit
+     re-shaped — 30px, content-sized, wrapping. The invariant is unchanged: the row is
+     carried by an EXISTING shared control and the section invents no native `<select>`.
+     AL-3 additionally put a `text color` swatch row above it, from the same kit. */
+  const usesKit = /chipRow\(/.test(labelSec) && /swatchRow\(/.test(labelSec) && !/<select/.test(labelSec);
   assert('ak12.the-plate-row-uses-the-existing-control-kit',
     usesKit,
-    `the \`background\` row is carried by \`<ToggleRow/>\` (the existing segmented row) and the LABEL ` +
-    `section renders no native \`<select>\` — the plate control invents nothing`);
-
-  /* The label table's entries really are the canonical list, so the button text
-     cannot drift from the stored value. */
+    'the `background` row is carried by `chipRow` and the new `text color` row by `swatchRow` — ' +
+    'both from the round\'s existing control kit (RE-ANCHORED by AL-6 from <ToggleRow/>) — and the ' +
+    'LABEL section renders no native <select> — the plate control invents nothing');
   assert('ak12.the-option-table-is-built-from-the-canonical-value-list',
     /const LABEL_BG_OPTS: PickerOption\[\] = LABEL_BG_VALUES\.map/.test(APP_C),
     `\`LABEL_BG_OPTS\` is \`LABEL_BG_VALUES.map(…)\` — the SAME list \`labelBgClass\` resolves against, ` +
@@ -917,8 +919,7 @@ const MODULE_PROBES = {
       return w.labelPinned === true && Math.abs(w.labelOffset.x - 20) < 1e-9;
     },
   'plate: an unknown value resolves to the default':
-    m => m.labelBgOf('bogus') === 'surface' && m.labelBgClass('bogus') === 'lb-surface'
-      && m.labelBgClass('outline') === 'lb-outline',
+    m => m.labelBgOf('bogus') === m.LABEL_BG_DEFAULT && m.labelBgClass('bogus') === `lb-${m.LABEL_BG_DEFAULT}` && m.labelBgClass('outline') === 'lb-outline',
   'reverse: the ends and handles swap, the fraction mirrors':
     m => {
       const p = m.reverseEdgePatch({source: 'a', target: 'b', sourceHandle: 'r', targetHandle: 'l', data: {offset: 'start'}});
@@ -976,7 +977,7 @@ const MUTANTS = [
          'const labelOffset = {x: p.W.x, y: p.W.y};']],
     kills: 'write: a real move stores RELATIVE px'},
   {name: 'plate-not-tolerant',
-    m: [["return v === 'none' || v === 'outline' ? v : 'surface';", 'return v;']],
+    m: [["return v === 'surface' || v === 'outline' ? v : 'none';", 'return v;']],
     kills: 'plate: an unknown value resolves to the default'},
   {name: 'reverse-skips-handles',
     m: [['out.sourceHandle = e.targetHandle ?? null;', 'out.sourceHandle = e.sourceHandle ?? null;']],
