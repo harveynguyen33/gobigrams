@@ -206,6 +206,49 @@ export const ArtDash = ({kind}: {kind: 'solid' | 'dashed' | 'dotted'}) => (
   </G>
 );
 
+/** ROUND AL, AL-6 — the five FLOW states, drawn as what they DO to the line.
+ *  The `flow` row is a GLYPH row, so these are what its square chips carry
+ *  instead of the words the panel used to print. A glyph row built of squares is
+ *  even by construction, and it is also what brought the row from 90.9% of the
+ *  field down to ~69% — ten word-buttons on one line was the owner's "chen chúc".
+ *
+ *  `dots` and `pulse` share a rail line: dots shows three staggered beads, pulse
+ *  a bright segment sweeping it. `icon` shows the travelling chip in miniature. */
+export const ArtFlow = ({kind}: {kind: 'none' | 'dots' | 'dash' | 'pulse' | 'icon'}) => (
+  <G>
+    {kind === 'none' && (
+      <line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" opacity=".38" />
+    )}
+    {kind === 'dots' && (
+      <>
+        <circle cx="5" cy="9" r="2" fill="currentColor" />
+        <circle cx="13" cy="9" r="2" fill="currentColor" opacity=".6" />
+        <circle cx="21" cy="9" r="2" fill="currentColor" opacity=".32" />
+      </>
+    )}
+    {kind === 'dash' && (
+      <line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeDasharray="4 3" />
+    )}
+    {kind === 'pulse' && (
+      <>
+        <line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" opacity=".35" />
+        <line x1="9" y1="9" x2="17" y2="9" stroke="currentColor" strokeWidth="3.4"
+          strokeLinecap="round" />
+      </>
+    )}
+    {kind === 'icon' && (
+      <>
+        <line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" strokeWidth="1.6"
+          strokeLinecap="round" opacity=".5" />
+        <rect x="9" y="5" width="8" height="8" rx="1.8" fill="currentColor" />
+      </>
+    )}
+  </G>
+);
+
 /** The four path shapes `PATH_TYPES` (`App.tsx:109`) can produce. */
 export const ArtCurve = ({kind}: {kind: 'bezier' | 'smoothstep' | 'step' | 'straight'}) => (
   <G>

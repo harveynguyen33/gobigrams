@@ -52,7 +52,7 @@ import {
 } from './inspector';
 import {
   IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
-  ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtWidth,
+  ArtArrow, ArtCardinality, ArtCurve, ArtDash, ArtFlow, ArtWidth,
   type PickerOption,
 } from './InspectorPickers';
 /* PACKAGE-P §E — the Text section's data half. ONE import covers both targets:
@@ -3640,7 +3640,7 @@ export default function App() {
    *  own vocabulary rather than inventing a second one. */
   const FLOW_OPTS: PickerOption[] = ([
     ['none', 'None'], ['dots', 'Dots'], ['dash', 'Dash'], ['pulse', 'Pulse'], ['icon', 'Icon'],
-  ] as const).map(([v, label]) => ({v, label, art: null}));
+  ] as const).map(([v, label]) => ({v, label, art: <ArtFlow kind={v} />}));
   const FLOW_ICON_OPTS: PickerOption[] = ([
     ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
     ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],

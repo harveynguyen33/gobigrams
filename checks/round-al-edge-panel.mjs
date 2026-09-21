@@ -423,11 +423,20 @@ section('AL-3 — labelBg defaults to `none`, carries a canvas halo, and gains t
   const RF_CSS = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/style.css`, 'utf8');
   const RF_JS = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/esm/index.js`, 'utf8');
   const renderOrder = (() => {
-    const at = RF_JS.indexOf('EdgeRenderer,');
+    /* ROUND AL — the three layers are the THREE CHILDREN of `Viewport`, in
+     *  source order inside `jsxs(Viewport, { children: [ … ] })`. The first draft
+     *  searched `react-flow__nodes` from the `EdgeRenderer,` call site and got
+     *  -1: that string is not in this children array at all (the node layer is
+     *  named `NodeRenderer` here), so the probe reported a correct tree as a
+     *  failure. Search the children block for the three component names it
+     *  actually contains. Measured: EdgeRenderer 32 < edgelabel-renderer 794 <
+     *  NodeRenderer 822. */
+    const at = RF_JS.indexOf('jsxs(Viewport, { children: [');
     if (at < 0) return null;
-    const iEdges = RF_JS.indexOf('react-flow__edges', at);
-    const iLabel = RF_JS.indexOf('react-flow__edgelabel-renderer', at);
-    const iNodes = RF_JS.indexOf('react-flow__nodes', at);
+    const block = RF_JS.slice(at, at + 3000);
+    const iEdges = block.indexOf('EdgeRenderer');
+    const iLabel = block.indexOf('edgelabel-renderer');
+    const iNodes = block.indexOf('NodeRenderer');
     return {iEdges, iLabel, iNodes};
   })();
   const labelAfterEdges = !!renderOrder && renderOrder.iLabel > renderOrder.iEdges;
@@ -542,11 +551,12 @@ section('AL-5 — the two actions stay in the section that owns them, restyled a
    *  is the "a harness that fails a correct tree" defect this project already
    *  names. `fieldOfText` is the same slice, keyed on the button label. */
   const fieldOfText = (slice, text) => {
-    const i = slice.indexOf(`>${text}<`);
-    if (i < 0) return '';
-    const start = slice.lastIndexOf('<div className="field">', i);
-    const j = slice.indexOf('</div>', i);
-    return start < 0 ? '' : slice.slice(start, j < 0 ? undefined : j);
+    const i = slice.indexOf(`\n                    ${text}\n`);
+    const j = i < 0 ? slice.indexOf(text) : i;
+    if (j < 0) return '';
+    const start = slice.lastIndexOf('<div className="field">', j);
+    const close = slice.indexOf('</div>', j);
+    return start < 0 ? '' : slice.slice(start, close < 0 ? undefined : close);
   };
   const reset = fieldOfText(labelSec, 'Reset label position');
   const reverse = fieldOfText(lineSec, 'Reverse line direction');
@@ -628,7 +638,18 @@ section('AL-6 — ONE chip system: two shapes, one height, content-sized with wr
     lastCompoundMatches(r.sel, CHIP_ACT) && ancestorsMatch(r.sel, CHIPS) && /dashed/.test(r.decls)) ?? {decls: ''}).decls : '', 'border-style');
   const actColor = decl((RULES.find(r =>
     lastCompoundMatches(r.sel, CHIP_ACT) && ancestorsMatch(r.sel, CHIPS) && decl(r.decls, 'color') === 'var(--dim)') ?? {decls: ''}).decls, 'color');
-  const noActOn = !RULES.some(r => lastCompoundMatches(r.sel, [...CHIP_ACT, 'on']) && ancestorsMatch(r.sel, CHIPS));
+  /* ROUND AL — EXACT match, not subset. `lastCompoundMatches(sel, classes)` asks
+   *  "is every class of the last compound IN `classes`", which is TRUE for a
+   *  PREFIX: `.chip.on` passes for classes ['chip','act','on'] because chip⊂set
+   *  and on⊂set. That made this probe report a `.chip.act.on` rule that does not
+   *  exist (it matched `.chip.on` and bare `.chip`). The question here is the
+   *  opposite one — does a rule carry ALL THREE classes — so require exact set
+   *  equality of the last compound against the wanted set. */
+  const lastCompoundIs = (sel, classes) => {
+    const got = sel.split(/\s+/).pop().replace(/:.*$/, '').split('.').filter(Boolean);
+    return got.length === classes.length && classes.every(c => got.includes(c));
+  };
+  const noActOn = !RULES.some(r => lastCompoundIs(r.sel, [...CHIP_ACT, 'on']) && ancestorsMatch(r.sel, CHIPS));
   assert('al6.the-action-chip-is-DASHED-DIM-and-has-no-selected-state',
     actBorder === 'dashed' && actColor === 'var(--dim)' && noActOn,
     `\`.chip.act\` → \`border-style: ${actBorder}\` and \`color: ${actColor}\`; a \`.chip.act.on\` rule exists = ` +
@@ -771,7 +792,14 @@ print(json.dumps(out))
     /* the row WRAPS, so the "widest line" is the greedy first line, not the sum. */
     let line = 0, lines = 1, count = 0;
     for (const it of items) {
-      const w = kind === 'pill' ? textPx(it) + 2 * padInline + 2 * border : iconW + 2 * iconPad + 2 * border;
+      /* ROUND AL — an ICON chip declares `width: 30px`, and this app sets
+       * `box-sizing: border-box` globally (`*{box-sizing:border-box}`), so that
+       * 30px ALREADY includes the padding and the border: the painted box is 30.
+       * The first draft added `2*iconPad + 2*border` on top and measured the
+       * flow row at 90.9% — a PROBE BUG, since the mockup's own arithmetic gives
+       * 5 squares = 170px = 67.2% of the 253px field. A PILL has no declared
+       * width, so for pills the padding and border DO add to the text run. */
+      const w = kind === 'pill' ? textPx(it) + 2 * padInline + 2 * border : iconW;
       const add = count === 0 ? w : w + gap;
       if (line + add > FIELD + 0.01) { lines++; line = w; count = 1; }
       else { line += add; count++; }
@@ -872,7 +900,7 @@ if (pre) {
   const flowSecPre = secBodyOf(pre.APP, 'flow');
 
   const INVERTED = [
-    ['AL-1 the dashed halo and its rule are gone', () => !/\\.edge-sel-overlay/.test(pre.CSS)],
+    ['AL-1 the dashed halo and its rule are gone', () => !/\.edge-sel-overlay/.test(pre.CSS)],
     ['AL-1 the selection core is declared and drawn',
       () => /\.edge-sel-core\s*\{/.test(pre.CSS) && /className="edge-sel-core"/.test(pre.EDGE)],
     ['AL-1 an unselected edge passes its style through unchanged',
@@ -886,21 +914,31 @@ if (pre) {
     ['AL-3 the two colour rows exist',
       () => /<label>text color<\/label>/.test(labelSecPre) && /<label>background color<\/label>/.test(labelSecPre)],
     ['AL-4 the create path stores the unpinned state',
-      () => /labelOffset: \\{\\.\\.\\.CENTRED\\}, labelPinned: false\\}/.test(pre.EDGE)],
+      () => /labelOffset: \{\.\.\.CENTRED\}, labelPinned: false\}/.test(pre.EDGE)],
     ['AL-5 the actions are action chips',
       () => /className="chip act"/.test(pre.APP)],
     ['AL-6 the chip system exists at all',
-      () => /\\.chips\\s*\\{/.test(pre.CSS) && /\\.chip\\.ic\\s*\\{/.test(pre.CSS)],
+      () => /\.chips\s*\{/.test(pre.CSS) && /\.chip\.ic\s*\{/.test(pre.CSS)],
     ['AL-6 the text input is 30px tall',
-      () => new RegExp('[^}]*\\.field input[^{]*\\{[^}]*height:\\s*30px').test(pre.CSS)],
+      () => new RegExp('[^}]*\.field input[^{]*\{[^}]*height:\s*30px').test(pre.CSS)],
+    /* ROUND AL — probe the section that ACTUALLY carried the crowded row. The
+       first draft checked the LINE section, but ROUND AK had already split
+       width/style/curvature out there; the surviving shared `.field-row` was in
+       FLOW (count+speed side by side), which is the row the owner called
+       "Count Speed y chang". Wrong section = the probe stayed green on the
+       pre-change tree and proved nothing. */
     ['AL-6 the crowded rows are split',
-      () => !!fieldOf(lineSecPre, 'line style') && !!fieldOf(flowSecPre, 'count')
-        && !/<div className="field-row">/.test(lineSecPre)],
+      () => !/<div className="field-row">/.test(flowSecPre)],
     ['AL-6 every glyph row renders square chips',
       () => /\bchipRow\(/.test(pre.APP)],
-    ['AL-7 count is gated on a payload flow',
-      () => /eFlow === 'dots' \|\| eFlow === 'icon'/.test(flowSecPre)],
   ];
+  /* AL-7 IS A DELIBERATE EXCEPTION and is NOT part of the inverted set. ROUND AK
+     already gated count/speed, so AL-7's probe is GREEN on BOTH trees by design —
+     it asserts the gate is still there and still a separate axis, i.e. it guards
+     against REGRESSION, not against the pre-round code. Including it here made the
+     blanket "every probe is RED on the pre-change tree" assertion unsatisfiable.
+     It is asserted on its own, just below, rather than quietly dropped. */
+  const al7StillGated = /eFlow === 'dots' \|\| eFlow === 'icon'/.test(flowSecPre);
   const greenOnPre = [];
   for (const [id, probe] of INVERTED) {
     const ok = probe();
@@ -954,16 +992,34 @@ const loadMutant = async (name, src) => {
  *     spliced back in, so the DELETION assertions have something to detect. The
  *     text is taken from the pinned commit, i.e. the code the owner tested. */
 const preLib = commitFile(PRE_COMMIT, 'src/edgeLabel.ts');
-const railSnippets = ['snapToCentre', 'clampToRange', 'labelClearance', 'labelHalfAlong']
+/* ROUND AL — BOUNDED extraction. The first draft opened with a lazy
+   comment-plus-anything match, which is lazy but still starts at the FILE'S
+   FIRST comment, so each fragment came out ~17k chars and the splice never
+   produced a callable export (the mutant loaded with snapToCentre undefined and
+   the control could not fail). Cut from the doc comment IMMEDIATELY above the
+   declaration to the FIRST closing brace after it. */
+/* `LABEL_SNAP_PX` is a plain exported const in the pre-round file and
+   `snapToCentre` reads it, so it must travel with the rails or the restored copy
+   throws a ReferenceError on the first call instead of exercising the assertion. */
+const railSnippets = ['LABEL_SNAP_PX', 'snapToCentre', 'clampToRange', 'labelClearance', 'labelHalfAlong']
   .map(name => {
-    const re = new RegExp(`/\\*[\\s\\S]*?\\*/\\s*export (?:const|function) ${name}[\\s\\S]*?\\n\\}`, 'm');
-    const m = re.exec(preLib);
-    return m ? m[0] : '';
+    const at = preLib.search(new RegExp(`export (?:const|function) ${name}\\b`));
+    if (at < 0) return '';
+    const head = preLib.lastIndexOf('/**', at);
+    const start = head < 0 ? at : head;
+    const close = preLib.indexOf('\n}', at);
+    return close < 0 ? '' : preLib.slice(start, close + 2);
   });
-const restoredSrc = MODULE_SRC.replace(
-  '/* ===========================================================================\n   ROUND AK, AK-11 — the bend handle may not occupy the label\'s anchor.',
-  `${railSnippets.join('\n\n')}\n\n/* ===========================================================================\n   ROUND AK, AK-11 — the bend handle may not occupy the label's anchor.`,
-);
+/* ROUND AL — anchor on the IMPORT line, not on a comment that this round's own
+   edits renamed. The first draft keyed off `ROUND AK, AK-11 — the bend handle…`,
+   but the shipped file's banner reads `AK-11 — the bend handle…` (no prefix), so
+   `String.replace` matched nothing, the mutant was byte-identical to the shipped
+   file, and the control could not fail. Anchoring on `import type {Pt}` is stable:
+   every export here needs that type, so the spliced fragments land after it and
+   become real, callable exports. */
+const restoredSrc = `import type {Pt} from './edgeBend';\n\n`
+  + railSnippets.join('\n\n')
+  + MODULE_SRC.slice(MODULE_SRC.indexOf('import type {Pt}') + 'import type {Pt} from \'./edgeBend\';'.length);
 const restored = await loadMutant('restored', restoredSrc);
 const restoredOk = restored.mod.snapToCentre !== undefined && restored.mod.clampToRange !== undefined;
 const restoredSnapped = typeof restored.mod.snapToCentre === 'function'
