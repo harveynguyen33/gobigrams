@@ -28,6 +28,13 @@ import {
   applyDrag, bendAxisFor, dragPoint, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from './edgeBend';
+/* ROUND AK, PASS 2 — the label's own rules. `reverseEdgePatch` is AK-15's
+   mirror; `labelBgOf` is AK-12's tolerant reader (an unknown value resolves to
+   the shipped `surface`, never to an unstyled plate); `LabelWrite` is the shape
+   AK-10's drag writer carries. (`labelWrite` itself is applied by `GoblinEdge`,
+   the only side holding the resolved path, the anchor and the measured label
+   box — see `useEdgeGesture`'s sibling note.) */
+import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './edgeLabel';
 
 import DiagramNode, {type NodeKind} from './DiagramNode';
 import LabelNode, {type LabelKind} from './LabelNode';
@@ -240,6 +247,32 @@ type EdgeData = {
    *  Absent means "never dragged", and the edge stays on the generator. */
   bendX?: number;
   bendY?: number;
+  /** ROUND AK, AK-10 — the FREE 2-D label position, in RELATIVE flow px, added
+   *  to the anchor `GoblinEdge` derives. ABSENT (not `{0,0}`) is the default: a
+   *  board that never moved its label carries no key, and `onLabelWrite` below
+   *  DELETES both keys when the label is centred, so "reset", "snapped back" and
+   *  "never moved" are one stored state rather than three that merely render the
+   *  same. */
+  labelOffset?: {x: number; y: number};
+  /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While falsy the label
+   *  auto-centres; once true `labelOffset` wins. */
+  labelPinned?: boolean;
+  /** ROUND AK, AK-12 — the label plate: THREE STORED STATES, where `None` is a
+   *  genuine value rather than the absence of one. Rendered as a class on
+   *  `.edge-label` by the renderer; absent resolves to `surface` (today's look). */
+  labelBg?: 'none' | 'surface' | 'outline';
+  /** ROUND AK, AK-13 — the double-click-on-the-path signal, threaded per-edge
+   *  exactly like `__edit`: a fresh timestamp AND the flow point the click
+   *  landed on. A double-click on a line with no label has nothing to edit yet,
+   *  so the editor has to be opened by a signal (the element does not exist) and
+   *  the commit has to know where the label was created. */
+  __editAt?: {at: Pt; t: number};
+  /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
+   *  `__onBend`. It carries the FINISHED write, not the pointer: only the
+   *  renderer holds the resolved path, the anchor and the measured label box, so
+   *  the rails (`labelWrite`: snap, then clamp) are applied there and this merges
+   *  the result. */
+  __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
 };
 
 /* ---------------------------------------------------------------------------
@@ -2116,6 +2149,144 @@ export default function App() {
     }));
   }, [pushHistory, setEdges]);
 
+  /* ROUND AK, AK-10/AK-13 — THE LABEL DRAG AND THE CREATE-ON-DOUBLE-CLICK.
+
+     A DELIBERATE SIBLING OF `onBend` (above), and it keeps that function's two
+     load-bearing properties so the label never grows a second source of truth:
+
+       * `pushHistory()` ONCE, on `'start'` — the convention every gesture in this
+         file already documents. Never per move: a 200-event drag would bury the
+         user's older undo steps.
+       * it keys on the `id` the renderer hands back, NOT on `selEdgeId` — the
+         first move of a drag is also the move that selects the edge, so routing
+         through `updateEdge` would write to the WRONG edge (the same reason
+         `onBend` does not use it).
+
+     WHAT IT DOES NOT DO is re-derive geometry. `w` arrives finished — the
+     renderer applied `labelWrite` (snap, then clamp) because it is the only side
+     that holds the resolved path, the anchor and the measured label box. This
+     merges it.
+
+     THE MERGE IS MODE-DEPENDENT ON PURPOSE, and it is what keeps the stored
+     document honest: a CENTRED write (`labelPinned: false`) DELETES both keys
+     instead of storing `{0,0}`/`true`, so "snapped back", "reset" and "never
+     moved" are one stored state and a board cannot accumulate a key that means
+     nothing. */
+  const onLabelWrite = useCallback((id: string, w: LabelWrite, phase: BendPhase) => {
+    if (phase === 'start') {
+      pushHistory();
+      setSelEdgeId(id);
+      return;
+    }
+    setEdges(es => es.map(e => {
+      if (e.id !== id) return e;
+      const data = {...((e.data ?? {}) as EdgeData)};
+      if (!w.labelPinned) {
+        delete data.labelOffset;
+        delete data.labelPinned;
+      } else {
+        data.labelOffset = w.labelOffset;
+        data.labelPinned = true;
+      }
+      return {...e, data};
+    }));
+  }, [pushHistory, setEdges]);
+
+  /** ROUND AK, AK-13 — the double-click-on-the-path SIGNAL, written exactly as
+   *  the context menu's `editLabel` branch writes `__edit`: a fresh timestamp
+   *  plus the flow point the click landed on, threaded through the edge's own
+   *  `data`. Read-only is a no-op — the menu that also reaches it is already
+   *  inert in review mode, and this is the same defence in depth. */
+  const openLabelAt = useCallback((id: string, at: Pt) => {
+    if (readOnly) return;
+    setEdges(es => es.map(e => (e.id === id
+      ? {...e, data: {...((e.data ?? {}) as EdgeData), __editAt: {at, t: Date.now()}}}
+      : e)));
+  }, [readOnly, setEdges]);
+
+  /* ROUND AK, AK-13 — DOUBLE-CLICK ON THE EDGE PATH CREATES A LABEL THERE.
+
+     WHY REACT FLOW'S OWN `onEdgeDoubleClick` AND NOT A HANDLER ON THE PATH. The
+     library already renders one `<g class="react-flow__edge">` per edge with the
+     handler on it, and it already owns the hit-test AK-13 asks for: the group is
+     `pointer-events: visibleStroke`, so an event on it IS on the line, and
+     `BaseEdge`'s `interactionWidth` widens that to a 26px band a finger can
+     actually land on. A handler on the authored `<path>` would sit under that
+     band. And the "was it inside an existing label?" exclusion is done by the
+     DOM: the label is portalled into `.react-flow__edgelabel-renderer`, a
+     SIBLING of the edge layer, so its own double-click catches that case and the
+     event never reaches this handler — exactly draw.io's exclusion
+     (`Graph.insertTextForEvent` creates a label only when the double-click was
+     not on one).
+
+     WHAT IT WRITES IS ONLY THE SIGNAL. It does not touch the label text or the
+     position: `openLabelAt` stamps `__editAt` with the click's flow point, the
+     renderer opens its editor from it, and the position is stored by the COMMIT
+     if the user leaves the text empty. So a double-click that is immediately
+     cancelled writes nothing at all. */
+  const onEdgeDoubleClick = useCallback((e: React.MouseEvent, edge: Edge) => {
+    if (readOnly || !rf || !wrap.current) return;
+    const b = wrap.current.getBoundingClientRect();
+    // `screenToFlowPosition` is the authority this app uses for every
+    // client→flow conversion, so no second conversion is compiled into the
+    // renderer that could drift from these.
+    const at = rf.screenToFlowPosition({x: e.clientX - b.left, y: e.clientY - b.top});
+    openLabelAt(edge.id, at);
+  }, [readOnly, rf, openLabelAt]);
+
+  /** ROUND AK, AK-14.1 — `Reset label position`, ONE history step.
+   *
+   *  It clears BOTH keys rather than storing a centred offset, which is the same
+   *  state the snap-to-centre rail lands on — so the button and the gesture that
+   *  made it unnecessary end the label in one place. Lucidchart ("Reset line"),
+   *  Lucidspark and Miro all ship a reset; Miro had to add a SEPARATE touch
+   *  variant, which is the tell that a desktop-only idiom would not have done. */
+  const resetLabelPos = useCallback(() => {
+    if (!selEdgeId) return;
+    pushHistory();
+    setEdges(es => es.map(e => {
+      if (e.id !== selEdgeId) return e;
+      const data = {...((e.data ?? {}) as EdgeData)};
+      delete data.labelOffset;
+      delete data.labelPinned;
+      return {...e, data};
+    }));
+  }, [selEdgeId, pushHistory, setEdges]);
+
+  /** ROUND AK, AK-15 — `Reverse line direction`, draw.io's Arrange → Reverse:
+   *  "your connector ends and their labels will be swapped, but the path of the
+   *  connector will not be changed."
+   *
+   *  The patch comes from `edgeLabel.reverseEdgePatch` (pure, harnessed). It
+   *  returns ONLY the keys it owns — `source`/`target`, the two handles, and the
+   *  legacy `offset` fraction mirrored `o → 1−o` — and those are SPLIT here
+   *  because the two halves live at different depths on an edge:
+   *
+   *    * the top-level keys go straight onto the edge object;
+   *    * the `data` half is an explicit MERGE, never `replaceData`, so
+   *      `strokeKey`, `bendX`/`bendY`, `labelOffset`, `flow` and every sibling
+   *      survive by construction rather than by a copy that could drift.
+   *
+   *  IT DOES NOT GO THROUGH `updateEdge`, for the reason `onBend` gives: that is
+   *  keyed on `selEdgeId` and this is keyed on the edge whose BUTTON was pressed,
+   *  so a stale selection could reverse the wrong line. The handles travel with
+   *  their nodes, which is why `sourceHandle`/`targetHandle` must swap too — an
+   *  ERD edge's handles name a COLUMN, and swapping the ends without them would
+   *  attach the line to the wrong face of each box. */
+  const reverseEdgeDir = useCallback((id: string) => {
+    const cur = edgesRef.current.find(e => e.id === id);
+    if (!cur) return;
+    const patch = reverseEdgePatch(cur as any);
+    pushHistory();
+    setEdges(es => es.map(e => {
+      if (e.id !== id) return e;
+      const {data, ...top} = patch;
+      const out: any = {...e, ...top};
+      if (data !== undefined) out.data = {...((e.data ?? {}) as EdgeData), ...data};
+      return out as Edge;
+    }));
+  }, [pushHistory, setEdges]);
+
   /* ROUND S (2026-09-18) — the Text node's in-place editor commits here.
 
      A DELIBERATE SIBLING OF `update()` (App.tsx:1682), not a second
@@ -2173,6 +2344,13 @@ export default function App() {
           // — the edge renderer owns the handle and reports a pointer position;
           // the handler lives here because it writes `edges` state.
           __onBend: onBend,
+          /* ROUND AK — AK-10's label drag, threaded per-edge for the reason
+             above. `onLabelWrite` receives the FINISHED write: the renderer
+             applies `labelWrite`, because only it holds the resolved path, the
+             anchor and the measured label box. (AK-13's double-click is wired at
+             the EDGE GROUP, `onEdgeDoubleClick` below — React Flow owns that
+             handler and the hit-test with it.) */
+          __onLabelWrite: onLabelWrite,
           // FB-L: the edge renderer owns the label's inline editor, so the
           // review-mode flag has to reach it per-edge — same shape as the two
           // keys above. Read-only keeps the label readable; it never opens the
@@ -2181,7 +2359,7 @@ export default function App() {
         },
       };
     }),
-    [edges, onCommitLabel, readOnly, onBend],
+    [edges, onCommitLabel, readOnly, onBend, onLabelWrite],
   );
 
   /** L3c: the symbolic keys whose crow's-foot glyphs this board needs. Keyed by
@@ -3325,6 +3503,14 @@ export default function App() {
   const eFlowSpeed = (((selectedEdge?.data as any)?.flowDuration ?? 2.4) as number);
   const eFlowIcon = (((selectedEdge?.data as any)?.flowIcon ?? 'mail') as string);
   const ePathType = (Object.keys(PATH_TYPES) as PathType[]).find(k => PATH_TYPES[k] === selectedEdge?.type && k !== 'custom') ?? 'bezier';
+  /* ROUND AK, AK-12 — the label plate's readout, TOLERANT of an unknown value
+     (`labelBgOf` resolves anything unrecognised to `surface`, the shipped look),
+     so a hand-edited board cannot render an unstyled plate. */
+  const eLabelBg = labelBgOf((selectedEdge?.data as any)?.labelBg);
+  /* AK-14.1 — `Reset label position` is only meaningful once the label has
+     actually been moved, so the button is disabled on a centred label rather
+     than offering a step that would push a history entry and change nothing. */
+  const eLabelMoved = !!(selectedEdge?.data as any)?.labelPinned;
   /* ROUND AK, AK-3 — `eOffset` WAS HERE, and it is deleted with the field it
      fed. It was the `data.offset` readout for the `label position` row; with that
      row gone nothing reads it. The VALUE is untouched — `GoblinEdge.tsx:383`
@@ -3378,6 +3564,17 @@ export default function App() {
     {v: '1.4', label: 'fast', art: null},
     {v: '0.8', label: 'very fast', art: null},
   ];
+  /* ROUND AK, AK-12 — THE LABEL PLATE'S THREE STATES. `LABEL_BG_VALUES` is the
+     canonical list (it is what the renderer's `labelBgClass` resolves against),
+     and each entry's label is its own name capitalised, so the stored value and
+     the button text cannot drift apart. Three options ≤ the cited flat-row
+     threshold of 4 (AK-6 note), so this is a segmented row like the rest.
+     `None` is a GENUINE STORED VALUE here, not the absence of one — which is why
+     the table lists it rather than leaving the row with two entries and a
+     "default" the user cannot return to. */
+  const LABEL_BG_OPTS: PickerOption[] = LABEL_BG_VALUES.map(v => ({
+    v, label: v === 'none' ? 'None' : v === 'surface' ? 'Surface' : 'Outline', art: null,
+  }));
   /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
   const BODY_OPTS: PickerOption[] = [
     {v: 'card', label: 'card', art: null},
@@ -4800,6 +4997,10 @@ export default function App() {
             if (readOnly) return;
             setCtx({kind: 'edge', id: edge.id, x: e.clientX, y: e.clientY});
           }}
+          /* ROUND AK, AK-13 — a double-click on the connector creates a label at
+             that point (or, when it landed on the existing label, the label's own
+             handler has already caught it — see `onEdgeDoubleClick`). */
+          onEdgeDoubleClick={onEdgeDoubleClick}
           onPaneContextMenu={(e) => {
             e.preventDefault();
             // Part B: the pane menu is inert in review mode too. It is not a
@@ -5025,6 +5226,54 @@ export default function App() {
                     `start`/`end` renders exactly as it did — this deletes the
                     CONTROL, not the value. (`pass 2 / AK-10 replaces the preset
                     with the free 2-D drag the field was duplicating.) */}
+
+                {/* ROUND AK, AK-12 — THE LABEL PLATE, TWO ROWS: the control and
+                    the reset.
+
+                    THE CONTROL IS A FLAT 3-OPTION ROW, not a popover: three
+                    options ≤ the cited threshold of 4 (the AK-6 note above), and
+                    the kit's `ToggleRow` is the existing control — no new
+                    component was invented. `None` is a real stored value here
+                    (decision D2), which is why the table lists it rather than
+                    expressing "no plate" as the absence of the key.
+
+                    WHY A CLASS AND NOT A COLOUR. The renderer writes
+                    `labelBgClass(...)` onto `.edge-label`, so the three states
+                    are three rules in the sheet — no hex enters either file, and
+                    a theme change repaints all three for free. React Flow's own
+                    `labelBgStyle` would have been the wrong mechanism: it is
+                    `EdgeText`'s SVG-`<rect>` API, and this label is a DOM `<div>`
+                    through `EdgeLabelRenderer`. */}
+                <div className="field">
+                  <label>background</label>
+                  <ToggleRow
+                    value={eLabelBg}
+                    onChange={v => updateEdge({data: {labelBg: v as any}})}
+                    options={LABEL_BG_OPTS}
+                    title="Label background"
+                  />
+                </div>
+                {/* ROUND AK, AK-14.1 — `Reset label position`, ONE history step,
+                    and a BUTTON rather than a right-click or a double-tap. Those
+                    are desktop idioms: the double-tap already means "edit label"
+                    after AK-13, and Miro had to add a separate touch variant of
+                    its own reset, which is the tell that the desktop form does
+                    not travel. Disabled while the label is already centred —
+                    there is nothing to reset, and a step that changes nothing
+                    must not push a history entry (`onCommitLabel`'s rule). */}
+                <div className="field">
+                  <button
+                    type="button"
+                    className="mbtn"
+                    disabled={!eLabelMoved}
+                    title={eLabelMoved
+                      ? 'Put the label back on the line’s centre (one undo step)'
+                      : 'The label is already centred'}
+                    onClick={resetLabelPos}
+                  >
+                    Reset label position
+                  </button>
+                </div>
               </>); return null; })()}
               {(() => { secBody('line', <>
                 <div className="field">
@@ -5105,6 +5354,25 @@ export default function App() {
                     options={CURVE_OPTS}
                     title="Curvature"
                   />
+                </div>
+                {/* ROUND AK, AK-15 — `Reverse line direction` CLOSES THE `line`
+                    SECTION, which is where draw.io ships it (Arrange → Reverse)
+                    and where the path's own controls live: it re-points the path,
+                    it does not move the label. Its labels swap WITH the ends —
+                    the legacy fraction is mirrored `o → 1−o` so a label sitting
+                    a quarter of the way along stays a quarter of the way along —
+                    and the two handles travel with their nodes. All of that is
+                    `edgeLabel.reverseEdgePatch`, exercised by the harness, so the
+                    rule is not restated here. */}
+                <div className="field">
+                  <button
+                    type="button"
+                    className="mbtn"
+                    title="Swap the two ends: the labels swap with them, the path does not change"
+                    onClick={() => reverseEdgeDir(selectedEdge!.id)}
+                  >
+                    Reverse line direction
+                  </button>
                 </div>
               </>); return null; })()}
               {(() => { secBody('markers', <>

@@ -1323,12 +1323,19 @@ body {
 .note-title { font-weight: 650; }
 
 /* ---------- editable edge label ---------- */
+/* ROUND AK, AK-10 — the label is now the DRAG TARGET, so `cursor` is `grab` at
+   rest and `grabbing` while the pointer is down, and `touch-action: none` is
+   required for the same reason the bend handle needs it: without it the browser's
+   own scrolling/panning gesture wins the pointer on a touch device and the drag
+   never starts. `:active` (pointer down) carries the affordance, because hover
+   does not exist on touch. */
 .edge-label {
   position: absolute; pointer-events: all;
   font-family: var(--mono); font-size: 11px; font-weight: 600;
   color: var(--fg); background: var(--surface);
   border: 1px solid transparent; border-radius: 5px;
-  padding: 1px 6px; cursor: text; white-space: nowrap;
+  padding: 1px 6px; cursor: grab; white-space: nowrap;
+  touch-action: none;
 }
 /* ROUND AK, AK-1 — THE HOVER-ONLY LABEL STATE IS DELETED, WITH ITS REASON.
    DELETED HERE: `.edge-label:hover { border-color: var(--border-strong);
@@ -1340,6 +1347,41 @@ body {
    documented affordance, which AK-2 leaves in place while deleting the sidebar
    hint that used to spell it out. */
 .edge-label.selected { border-color: var(--sel); color: var(--sel); }
+
+/* ROUND AK, AK-10/AK-12 — the label's DRAG state: `:active` (pointer down) is
+   the affordance, and the `::after` ring is the TAP TARGET. The ring is deleted
+   while the editor is open, because an `::after` covering the box would swallow
+   the pointer inside the `<input>` and break text selection.
+   `.edge-bend-handle::after` is the same technique.
+   (Review mode needs nothing here: the existing
+   `.ds-flow-wrap.ds-read-only .edge-label { cursor: default }` rule is (0,3,0)
+   and already beats `.edge-label:active`, so a duplicate would only be a second
+   place to keep in step.) */
+.edge-label:active { cursor: grabbing; }
+.edge-label::after { content: ''; position: absolute; inset: -6px; }
+.edge-label.editing::after { content: none; }
+
+/* ROUND AK, AK-12 — THE THREE PLATE STATES, as CLASSES the renderer writes
+   (`edgeLabel.labelBgClass`). NOT an inline `fill`: React Flow's `labelBgStyle`
+   is `EdgeText`'s SVG-`<rect>` API and this label is a DOM `<div>` through
+   `EdgeLabelRenderer`, so the mechanism is CSS `background`.
+
+     `none`    — no plate at all (draw.io's own default, measured at
+                 `rgba(0,0,0,0)`).
+     `surface` — today's look, and therefore the DEFAULT, so a board that never
+                 touched the control renders exactly as it did. It is also the
+                 base rule's own value, restated here so all three states are
+                 declared together and none is implied by the base.
+     `outline` — the line is hidden behind the glyphs without a box: no fill, and
+                 an edge in a token that already exists (tldraw's technique; the
+                 colour is `--border-strong` rather than `--surface` because on
+                 the dark theme `--surface` would be a border nobody can see).
+
+   NO NEW HEX: `transparent` is a keyword and both colours are tokens. */
+.edge-label.lb-none { background: transparent; }
+.edge-label.lb-surface { background: var(--surface); }
+.edge-label.lb-outline { background: transparent; border-color: var(--border-strong); }
+
 .edge-label-input {
   font-family: var(--mono); font-size: 11px; font-weight: 600;
   background: var(--elevated); color: var(--fg);
@@ -2390,6 +2432,13 @@ kbd {
   padding: 5px 8px; cursor: pointer; transition: all .12s;
 }
 .mbtn:hover { border-color: var(--sel); color: var(--sel); }
+/* ROUND AK, AK-14.1 — a `.mbtn` used as a plain sidebar BUTTON (the label reset)
+   has a genuine disabled state: it is offered only while the label has actually
+   been moved, so it must read as unavailable rather than as a button that does
+   nothing. The panel already has this vocabulary on `.tbtn:disabled`; this is the
+   same treatment for the other button family. */
+.mbtn:disabled { opacity: .45; cursor: not-allowed; }
+.mbtn:disabled:hover { border-color: var(--border-strong); color: var(--fg); }
 .mbtn.danger:hover { border-color: var(--acc); color: var(--acc); }
 /* ---------- floating selection action bar ---------- */
 .sel-bar {
