@@ -62,7 +62,7 @@ const FIXTURE = {
   approvalEdgesLen: 2716,
   approvalNodes: 14,
   approvalEdges: 10,
-  hexLiterals: 142,
+  hexLiterals: 144,
   shapeUnionIds: 25,
   templates: 4,
 };

@@ -4210,7 +4210,7 @@ export default function App() {
    *
    *  THE CUSTOM CELL IS A 12TH CELL, AFTER THE ELEVEN KEYS, and only when the
    *  caller opts in: 12 cells is a clean 6 x 2 in the six-column grid. It is
-   *  `aria-label`led "Custom colour" because its content is an input with no
+   *  `aria-label`led "Custom color" because its content is an input with no
    *  other name, and it carries `.on` when NO key is lit AND a literal is
    *  stored — i.e. when the custom colour is the one in force. */
   const swatchRow = (
@@ -4237,11 +4237,11 @@ export default function App() {
              gradient stands, so an untouched row is byte-identical to one that
              never had this cell's colour set. */
           style={custom.value ? {background: custom.value} : undefined}
-          title={custom.value ?? 'Custom colour'}
+          title={custom.value ?? 'Custom color'}
         >
           <input
             type="color"
-            aria-label="Custom colour"
+            aria-label="Custom color"
             /* the input must SHOW the stored literal or the OS picker opens on
                its own default; `#000000` is the fallback most engines use when no
                value is given, so it is named rather than left implicit. */

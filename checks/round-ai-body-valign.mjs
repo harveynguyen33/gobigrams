@@ -317,7 +317,7 @@ assert('ai2-7.the-body-value-is-still-in-the-DATA-MODEL-and-both-branches-still-
    =========================================================================== */
 const HEX = (STYLES_RAW.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 assert('ai-0.this-round-adds-no-colour',
-  HEX === 142,
+  HEX === 144,
   `src/styles.css holds ${HEX} hex literals; the fix is a keyword (\`height: 100%\`) and a predicate, so the count is unmoved`);
 
 console.log('\n  ── SECTION F: the same assertions against the PRE-FIX tree, in memory ──');

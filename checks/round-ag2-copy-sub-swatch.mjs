@@ -616,10 +616,18 @@ assert('ag2-21.nothing-overflows-and-the-colour-key-note-still-fits-one-line',
    =========================================================================== */
 console.log('\n=== D. invariants this round must not move ===');
 const HEX_COUNT = (STYLES_RAW.match(/#[0-9a-fA-F]{3,6}\b/g) ?? []).length;
+/* ROUND AO, AO-1b RE-ANCHORED THIS INVARIANT — 142 -> 144, with the increment
+   named. The claim is still "this round adds no colour of its own": the two
+   literals that moved the count are ROUND AO's theme-invariant neutrals
+   (`--c-black`, `--c-white`, once in `:root`), not anything this round painted.
+   A pin of `=== 142` would instead assert that no LATER round may add a colour,
+   which is not what this was ever about — the same re-anchoring ag25 in
+   round-ag-colors carries, and the ceiling of 160 is untouched. */
 assert('ag2-22.this-round-adds-NO-colour-literal',
-  HEX_COUNT === 142,
-  `src/styles.css carries ${HEX_COUNT} hex literals — the AG1 figure, unmoved. A round that adds no colour ` +
-  `must not move that number, and the ceiling of 160 the AG1 re-anchoring left on the older gates is untouched`);
+  HEX_COUNT === 144,
+  `src/styles.css carries ${HEX_COUNT} hex literals — 142 at this round's end, + 2 from ROUND AO, AO-1b's ` +
+  `theme-invariant neutrals (--c-black/--c-white, declared once in :root). This round adds no colour of its own, ` +
+  `and the ceiling of 160 the AG1 re-anchoring left on the older gates is untouched`);
 
 assert('ag2-23.SHORTCUTS_MOUSE-the-fonts-and-the-board-are-untouched',
   SETTINGS_RAW.includes('SHORTCUTS_MOUSE') && existsSync(`${ROOT}/public/fonts`),

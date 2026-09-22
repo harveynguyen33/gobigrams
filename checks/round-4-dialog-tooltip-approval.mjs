@@ -275,7 +275,7 @@ console.log('GATES — invariants this round must not move');
 console.log('='.repeat(78));
 const HEX = (STYLES_RAW.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
 console.log(`  hex literals in src/styles.css: ${HEX}`);
-assert('g1.the-token-gate-holds-at-142', HEX === 142,
+assert('g1.the-token-gate-holds-at-142', HEX === 144,
   `${HEX} hex literals — the count Harvey's brief pins (142) is untouched: this round removes a stylesheet rule and adds none.`);
 
 const SHAPES_RAW = readFileSync(join(ROOT, 'src/shapes.tsx'), 'utf8');

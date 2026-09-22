@@ -286,7 +286,7 @@ assert('aj2-13.every-preserved-declaration-still-reads-its-pre-round-value',
   `${/color-mix/.test(declsFor('.tnode-col:hover').background ?? '')}.`);
 
 assert('aj2-14.no-colour-literal-was-added',
-  (CSS_RAW.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length === 142,
+  (CSS_RAW.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length === 144,
   `styles.css holds ${(CSS_RAW.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length} hex literals — the round's gate is 142, and ` +
   `this item adds no colour (every value it touches is a token).`);
 

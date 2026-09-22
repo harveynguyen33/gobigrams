@@ -569,7 +569,7 @@ ok(!/theme: *'/.test(PRESETS.slice(PRESETS.indexOf("id: 'architecture'"), PRESET
    measured count — the assertion is now "no literal was added", not "we are under
    a raised cap". */
 const literals = (OUR_CSS.match(/#[0-9a-fA-F]{3,6}/g) ?? []).length;
-const HEX_LIMIT = 142;   // the measured count at ROUND AI; ROUND AJ adds none
+const HEX_LIMIT = 144;   // 142 at ROUND AI/AJ + 2 (ROUND AO, AO-1b: --c-black/--c-white, once in :root)
 ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
    `${literals} <= ${HEX_LIMIT} (the count ROUND AJ inherited; the old ceiling of 160 came back down)`);
 

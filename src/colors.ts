@@ -36,7 +36,18 @@ export const COLOR_VAR: Record<ColorKey, string> = {
 
 /** The dark-layer hexes — the legacy board format and the export fallback.
  *  These are the DARK-theme values verbatim: that was already true for the six
- *  original keys, and the three added in ROUND AG1 keep the rule. */
+ *  original keys, and the three added in ROUND AG1 keep the rule.
+ *
+ *  ROUND AO, AO-1b — the two NEUTRALS JOIN, and the rule is why. This map is
+ *  `Record<ColorKey, string>`: it is the literal fallback for EVERY key, and the
+ *  theme-invariant pair is no exception (black IS the dark value of `black`). Its
+ *  readers are the colour harness (which executes every key's fallback through
+ *  `keyForHex`) and the export path, so a missing entry is not cosmetic: before
+ *  this line `keyForHex(COLORS.black)` read `undefined.toLowerCase()` and threw,
+ *  which took the whole colours module down inside the harness. The pair keeps the
+ *  `COLORS`/`LEGACY_HEX` split intact: an entry HERE is a fallback, an entry THERE
+ *  would be a migration — and a migration for a value that never shipped is what
+ *  AO-1b refuses (see below). */
 export const COLORS = {
   accent: '#f54e00',
   green: '#4ade80',
@@ -47,6 +58,8 @@ export const COLORS = {
   red: '#ff6b6b',
   blue: '#7aa2ff',
   pink: '#f783ac',
+  black: '#000000',
+  white: '#ffffff',
 } as const;
 
 /** Legacy board JSON carries these literals — map them back onto keys on load.

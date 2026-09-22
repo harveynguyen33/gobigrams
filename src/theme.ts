@@ -117,4 +117,13 @@ export const EXPORT_TOKENS = [
   '--acc', '--acc-soft', '--sel', '--sel-soft', '--green', '--red', '--danger', '--card',
   '--c-accent', '--c-green', '--c-cyan', '--c-violet', '--c-amber', '--c-slate',
   '--c-red', '--c-blue', '--c-pink',
+  /* ROUND AO, AO-1b — the two theme-invariant neutrals. They are emitted by the
+     same `COLOR_KEYS`-driven rows as the nine hues, so a node or edge painted
+     `black`/`white` serialises a `var(--c-black)` into the exported SVG exactly
+     like the others. Leaving them out of this list would inline nothing for them
+     and the standalone file would fall back to the SVG's own default — a wrong
+     colour in the one place the user is most likely to send onward. Declared once
+     in `:root` (they are not per-theme), so `readToken` resolves the same value in
+     every theme. */
+  '--c-black', '--c-white',
 ] as const;
