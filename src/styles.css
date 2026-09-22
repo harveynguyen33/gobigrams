@@ -1458,6 +1458,22 @@ body {
    `--sel`, the same token and the same 1px border it always was. */
 .edge-label.selected { border-color: var(--sel); }
 
+/* ROUND AO, AO-3 — THE DEFENSIVE HALF OF THE NUB FIX, AND WHY IT IS HERE.
+   The render gate in `src/GoblinEdge.tsx` now wraps the label in `hasLabel`, so
+   an unlabelled selected edge no longer renders this element at all — and that
+   wrap is the FIX. This rule is the BELT: an empty label can never paint again
+   even if a future path re-introduces one, which is the exact defect Harvey saw
+   (a 17px-wide, 5px-tall bordered box around the bend circle's midpoint).
+
+   WHY IT CANNOT TOUCH A LABEL THAT HAS CONTENT: `:empty` matches an element with
+   no child NODES — not even a text node. So a text-bearing label does NOT match
+   it (it has a text child), an EDITING label does NOT match it (it contains the
+   `<input>`), and a `techn` label does NOT match it (it contains a `<small>`).
+   The only element this can ever hide is the one with nothing in it, which is
+   precisely the artifact. The harness asserts both halves: an empty label matches
+   `:empty`, a text-bearing label does not and still measures at full size. */
+.edge-label:empty { display: none; }
+
 /* ROUND AK, AK-10/AK-12 — the label's DRAG state: `:active` (pointer down) is
    the affordance, and the `::after` ring is the TAP TARGET. The ring is deleted
    while the editor is open, because an `::after` covering the box would swallow

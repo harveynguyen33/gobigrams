@@ -1075,6 +1075,45 @@ const GoblinEdge = memo((props: EdgeProps) => {
               onPointerDown={onBendDown}
             />
           )}
+          {/* ROUND AO, AO-3 — THE EMPTY LABEL BOX IS GONE, AND THE BLOCK GATE IS
+              LEFT ALONE.
+
+              WHAT HARVEY SAW ("1 điểm nhô ra 2 bên thay vì vòng tròn only"): a
+              1px `--sel` border of a 17-25px wide box sticking out ~5px each side
+              of the 14px bend circle, at the exact midpoint of a selected `step`
+              edge with no label. It is NOT a marker and NOT a corner artifact.
+
+              THE CAUSE, MEASURED. The block below opens on
+              `shown || editing || d.techn || bendDraggable`, and selecting an edge
+              turns on `bendDraggable` so the HANDLE can appear. The label `<div>`
+              was then rendered UNCONDITIONALLY inside that block, so an unlabelled
+              selected edge got an empty-but-bordered label: with no text it
+              collapses to ~5px tall but keeps a 17px width floor (`padding: 1px 6px`
+              plus its border), and it still carried `.selected`, so it PAINTED the
+              border. Unselected, the same empty box is invisible (no border) —
+              which is exactly why the artifact only appeared on selection, matching
+              the report.
+
+              THE FIX IS THE GUARD, NOT THE GATE. `hasLabel` — `!!(shown || editing
+              || d.techn)`, declared once near the top of this component — is the
+              precise "has something to show" test, and `handleAt` already keys off
+              it. Wrapping the label in `{hasLabel && (…)}` removes the empty box
+              while the block STAYS open for `bendDraggable`: the handle is the
+              affordance that must survive, and it renders from its own
+              `{bendDraggable && (…)}` above, independently of this element.
+
+              `handleAt` NEEDS NO CHANGE, and this was verified rather than
+              "fixed": it already reads `hasLabel ? nudgeAlongPath(…, HANDLE_CLEAR_PX
+              + halfW) : {x: labelX, y: labelY}`, and `hasLabel` already EXCLUDES
+              `bendDraggable`. So an unlabelled selected edge already takes the
+              un-nudged branch and the handle already sits exactly on the path
+              midpoint with nothing to avoid — the definition was correct all along
+              and only the render gate let the empty label into the DOM.
+
+              PARITY. An unlabelled UNSELECTED edge is byte-identical before and
+              after: `bendDraggable` is false, so the block gate was already
+              `hasLabel` (false) and nothing rendered. Asserted. */}
+          {hasLabel && (
           <div
             className={`edge-label ${labelBgClass(d.labelBg)}${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
             data-edge-id={id}
@@ -1177,6 +1216,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
               </>
             )}
           </div>
+          )}
         </EdgeLabelRenderer>
       )}
     </>
