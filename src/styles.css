@@ -4958,7 +4958,13 @@ kbd {
    ========================================================================= */
 
 .rm { margin-top: 16px; }
-.rm-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* One column, always. The Settings pane is at most ~520px wide (the desktop
+   modal is 720px minus the 190px vertical nav), so three side-by-side columns
+   squeeze each card to ~145px and wrap a title over two lines. The phone tier
+   already stacked; the pane is not wide enough at ANY tier for three columns,
+   so this is the one layout and the phone override is gone rather than kept as
+   a second number meaning the same thing. */
+.rm-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .rm-col { min-width: 0; padding-left: 9px; border-left: 2px solid var(--border); }
 .rm-colhead {
   display: flex; align-items: center; gap: 7px; margin: 0 0 9px;
@@ -5001,8 +5007,7 @@ kbd {
 .rm-ship-when { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
 .rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: 10px; color: var(--dim2); }
 
-/* The one per-tier rule the block needs: below the phone breakpoint three
-   columns of cards are unreadable, so they stack in DOM order (Now → Next →
-   Exploring). Same tier hook the template gallery and the inspector use. */
-.app[data-form-factor="phone"] .rm-cols { grid-template-columns: minmax(0, 1fr); }
+/* The only per-tier rule this block needs: the shipped list IS three columns at
+   a wide pane, so it stacks below the phone breakpoint. Same tier hook the
+   template gallery and the inspector use. */
 .app[data-form-factor="phone"] .rm-shipped { grid-template-columns: minmax(0, 1fr); }
