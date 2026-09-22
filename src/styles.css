@@ -63,6 +63,29 @@
   --c-red: #ff6b6b;
   --c-blue: #7aa2ff;
   --c-pink: #f783ac;
+  /* ROUND AO, AO-1b — THE TWO NEUTRALS, AND WHY THEY LIVE HERE AND NOWHERE ELSE.
+     The palette was nine HUES with no black and no white ("looks like black/white
+     (normal colours) are missing"); `slate` is the nearest neutral and it is a
+     blue-grey. Black and white are THEME-INVARIANT BY DEFINITION — black is black
+     in every theme — so they are declared ONCE, in the `:root` block, and by no
+     `[data-theme=…]` block. The cascade is safe precisely because `:root` matches
+     the `<html>` element under every theme and no theme block re-declares either
+     name: `:root`'s value is the only declaration and wins everywhere. Declaring
+     them five times would invite five ways for them to drift.
+
+     THEY JOIN `COLOR_KEYS`, and that is the deliberate part. Joining is what makes
+     them "normal colours": they appear on every colour row (node, edge stroke,
+     Text, edge label text/background, table, bulk) and in the palette's shape
+     previews, all through the one `COLOR_KEYS.map`. Stored symbolically, they
+     survive a theme change exactly like the other nine.
+
+     HONEST CONSEQUENCE, NOT A BUG TO FIX LATER: a fully black node is invisible on
+     the dark canvas, and a fully white node on the light/paper canvas. That is
+     inherent to a theme-invariant neutral pair and it is the user's choice. Tinting
+     either token to "fix" it would break the invariance, which is the whole point
+     of the pair. */
+  --c-black: #000000;
+  --c-white: #ffffff;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }

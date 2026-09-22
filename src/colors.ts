@@ -13,17 +13,25 @@
  */
 
 export type ColorKey =
-  | 'accent' | 'green' | 'cyan' | 'violet' | 'amber' | 'slate' | 'red' | 'blue' | 'pink';
+  | 'accent' | 'green' | 'cyan' | 'violet' | 'amber' | 'slate' | 'red' | 'blue' | 'pink'
+  | 'black' | 'white';
 
 export const COLOR_KEYS: ColorKey[] = [
   'accent', 'green', 'cyan', 'violet', 'amber', 'slate', 'red', 'blue', 'pink',
+  'black', 'white',
 ];
 
-/** Layer-2 tokens: the shape accents, declared per theme in styles.css. */
+/** Layer-2 tokens: the shape accents, declared per theme in styles.css.
+ *  `black` and `white` are the two THEME-INVARIANT members (ROUND AO, AO-1b) —
+ *  declared once in `:root` and by no `[data-theme=…]` block, because black is
+ *  black in every theme. They are here so that "no neutral in the palette" stops
+ *  being a special case: every `COLOR_KEYS.map` surface (the seven colour rows,
+ *  the shape previews, the payload tints) gains them with no second mechanism. */
 export const COLOR_VAR: Record<ColorKey, string> = {
   accent: 'var(--c-accent)', green: 'var(--c-green)', cyan: 'var(--c-cyan)',
   violet: 'var(--c-violet)', amber: 'var(--c-amber)', slate: 'var(--c-slate)',
   red: 'var(--c-red)', blue: 'var(--c-blue)', pink: 'var(--c-pink)',
+  black: 'var(--c-black)', white: 'var(--c-white)',
 };
 
 /** The dark-layer hexes — the legacy board format and the export fallback.
@@ -43,7 +51,11 @@ export const COLORS = {
 
 /** Legacy board JSON carries these literals — map them back onto keys on load.
  *  Only the ORIGINAL six ever shipped, so no new key is added here: a board
- *  written before ROUND AG1 has never seen a `red`/`blue`/`pink` literal. */
+ *  written before ROUND AG1 has never seen a `red`/`blue`/`pink` literal.
+ *  ROUND AO, AO-1b adds NOTHING here either, and deliberately: `#000000` /
+ *  `#ffffff` were never a legacy stored value, so there is no board that needs
+ *  mapping back. Adding them would make `keyForHex('#000000')` return `'black'`,
+ *  i.e. invent a migration for a format that never existed. */
 export const LEGACY_HEX: Record<string, ColorKey> = {
   '#f54e00': 'accent',
   '#4ade80': 'green',
