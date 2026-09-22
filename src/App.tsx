@@ -72,7 +72,7 @@ import {
   type TextVAlign,
 } from './textStyle';
 import {
-  PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch,
+  PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch, edgeColorLiteralPatch,
   LAYOUTS, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset, type PathId,
 } from './presets';
@@ -2226,11 +2226,31 @@ export default function App() {
 
   /** Set stroke colour everywhere it is baked in (path + both markers). */
   /** L1 — the edge colour is stored as a KEY, so the path stroke, both markers
-   *  and the payload filters all recolour with the theme. */
+   *  and the payload filters all recolour with the theme.
+   *
+   *  ROUND AO, AO-1c — IT ALSO CLEARS A LITERAL, WHICH IS THE "BACK TO A THEME
+   *  COLOUR" PATH. `edgeColorPatch` does not mention `data.color`, so a literal
+   *  chosen earlier would survive the spread and keep winning nothing — the key
+   *  wins `resolveColor`'s precedence, so the stroke would look right — but the
+   *  STALE literal would still be on the edge, and `edgeColorLiteralPatch` would
+   *  later read it back into the custom cell as if it were current. Clearing it
+   *  here is what makes the two writers exact inverses rather than two writers
+   *  that happen to agree on the colour. */
   const setEdgeColor = useCallback((key: ColorKey) => {
     const e = edgesRef.current.find(x => x.id === selEdgeId);
     if (!e) return;
-    updateEdge(edgeColorPatch(key, {markerEnd: e.markerEnd, markerStart: e.markerStart}));
+    const patch = edgeColorPatch(key, {markerEnd: e.markerEnd, markerStart: e.markerStart});
+    patch.data = {...patch.data, color: undefined};
+    updateEdge(patch);
+  }, [selEdgeId, updateEdge]);
+
+  /** ROUND AO, AO-1c — the custom picker's edge writer: store the literal, drop
+   *  the symbolic key, recolour the path and both markers with it. See
+   *  `edgeColorLiteralPatch` for why each key is written or cleared. */
+  const setEdgeColorLiteral = useCallback((hex: string) => {
+    const e = edgesRef.current.find(x => x.id === selEdgeId);
+    if (!e) return;
+    updateEdge(edgeColorLiteralPatch(hex, {markerEnd: e.markerEnd, markerStart: e.markerStart}));
   }, [selEdgeId, updateEdge]);
 
   const onCommitLabel = useCallback((id: string, label: string) => {
@@ -4171,10 +4191,35 @@ export default function App() {
    *  cho đẹp"). Six columns is `(253 - 5x7) / 6 = 36.3px` against the same 26px
    *  height, near-square and still a >= 36px tap target. One modifier, so all
    *  seven call sites moved at once — deliberately: two cell sizes in one panel
-   *  would read as a mistake. The FULL reasoning lives beside the rule. */
-  const swatchRow = (current: ColorKey | null, onPick: (k: ColorKey) => void, custom?: string) => (
+   *  would read as a mistake. The FULL reasoning lives beside the rule.
+   *
+   *  ROUND AO, AO-1c — THE THIRD PARAMETER IS NOW REAL, AND IT IS ONE OBJECT.
+   *  `custom` used to be `custom?: string`, a hook no call site ever passed; it
+   *  was the leftover of a custom-colour row that was never built. It is now
+   *  `custom?: {value, onPick}` — the picked literal (so the cell can paint it
+   *  and read as "on") plus the writer. ONE object rather than two positional
+   *  parameters because the pair is only ever meaningful together: a `value`
+   *  with no `onPick` would be a cell that paints a colour and cannot set one.
+   *
+   *  WHY THE SIGNATURE STAYS `swatchRow(current, onPick)`-COMPATIBLE. The
+   *  parameter is OPTIONAL AND LAST, so the six call sites that do not offer a
+   *  literal — Text `text color`, edge `text color`, edge `background color`,
+   *  the bulk multi-select row, and the two that predate it — keep the exact
+   *  call they had. Only the three rows where a literal is already legal (node
+   *  Style `color`, edge `stroke color`, table `color`) pass it.
+   *
+   *  THE CUSTOM CELL IS A 12TH CELL, AFTER THE ELEVEN KEYS, and only when the
+   *  caller opts in: 12 cells is a clean 6 x 2 in the six-column grid. It is
+   *  `aria-label`led "Custom colour" because its content is an input with no
+   *  other name, and it carries `.on` when NO key is lit AND a literal is
+   *  stored — i.e. when the custom colour is the one in force. */
+  const swatchRow = (
+    current: ColorKey | null,
+    onPick: (k: ColorKey) => void,
+    custom?: {value?: string; onPick: (hex: string) => void},
+  ) => (
     <div className="swatches swatch6">
-      {COLOR_KEYS.map((k, i) => (
+      {COLOR_KEYS.map(k => (
         <div
           key={k}
           className={`swatch${current === k ? ' on' : ''}`}
@@ -4182,10 +4227,29 @@ export default function App() {
           data-color-key={k}
           title={k}
           onClick={() => onPick(k)}
-        >
-          {!current && !custom && i === 0 ? null : null}
-        </div>
+        />
       ))}
+      {custom && (
+        <div
+          className={`swatch-custom${!current && custom.value ? ' on' : ''}`}
+          data-custom="1"
+          /* the picked literal paints the cell; with none stored the class's own
+             gradient stands, so an untouched row is byte-identical to one that
+             never had this cell's colour set. */
+          style={custom.value ? {background: custom.value} : undefined}
+          title={custom.value ?? 'Custom colour'}
+        >
+          <input
+            type="color"
+            aria-label="Custom colour"
+            /* the input must SHOW the stored literal or the OS picker opens on
+               its own default; `#000000` is the fallback most engines use when no
+               value is given, so it is named rather than left implicit. */
+            value={custom.value ?? '#000000'}
+            onChange={e => custom.onPick(e.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -5782,7 +5846,17 @@ export default function App() {
               {(() => { secBody('line', <>
                 <div className="field">
                   <label>stroke color</label>
-                  {swatchRow(eStrokeKey, setEdgeColor)}
+                  {swatchRow(
+                    eStrokeKey,
+                    setEdgeColor,
+                    /* ROUND AO, AO-1c — the edge literal, stored on `data.color`
+                       with `strokeKey` cleared and BOTH markers recoloured to the
+                       literal (see `edgeColorLiteralPatch`). `resolveColorKey`
+                       returns `null` for an arbitrary hex, so no hue lights and the
+                       custom cell takes the ring. A literal cannot follow a theme —
+                       that is stated in the code, not worked around. */
+                    {value: (selectedEdge?.data as any)?.color, onPick: setEdgeColorLiteral},
+                  )}
                 </div>
                 {/* ROUND AK, AK-6 — ONE FULL-WIDTH FLAT ROW PER CONTROL.
 
@@ -6141,7 +6215,15 @@ export default function App() {
               </div>
               <div className="field">
                 <label>color (symbolic key)</label>
-                {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
+                {swatchRow(
+                  resolveColorKey(selected.data as any),
+                  k => update({colorKey: k, color: undefined} as any),
+                  /* ROUND AO, AO-1c — a table node takes a literal exactly like a
+                     goblin node does: same two keys, same inverse write. The label
+                     above still says "symbolic key" because the KEY is what follows
+                     a theme; the custom cell is the documented escape hatch from it. */
+                  {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
+                )}
               </div>
               </>); return null; })()}
               {(() => { secBody('columns', <>
@@ -6392,7 +6474,23 @@ export default function App() {
                 )}
                 <div className="field">
                   <label>color</label>
-                  {swatchRow(resolveColorKey(selected.data as any), k => update({colorKey: k, color: undefined} as any))}
+                  {swatchRow(
+                    resolveColorKey(selected.data as any),
+                    k => update({colorKey: k, color: undefined} as any),
+                    /* ROUND AO, AO-1c — THE LITERAL PATH, THE EXACT INVERSE OF THE
+                       KEY WRITE ABOVE. Picking a custom hex CLEARS the symbolic key
+                       and stores `color`. `resolveColor` then returns the literal
+                       (`isColorKey(colorKey)` is false, so it falls through to the
+                       `d.color` branch) and `resolveColorKey` returns `null` for an
+                       arbitrary hex, so no hue swatch lights and the custom cell
+                       takes the `.on` ring instead. Picking any KEY afterwards runs
+                       the key write, which clears `color` — that is the whole
+                       "back to a theme colour" path, so no separate reset control
+                       is needed. THEME HONESTY: a literal cannot follow a theme; a
+                       custom colour stays exactly as chosen across a theme switch,
+                       which is the honest consequence of choosing one. */
+                    {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
+                  )}
                 </div>
                 {/* ROUND AD, ITEM 5(a) — OPTION B'S LABEL. Harvey kept the
                     editor's semantic colour grouping, on the condition that the

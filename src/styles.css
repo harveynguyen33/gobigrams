@@ -2241,6 +2241,59 @@ body {
    move. */
 .swatches.swatch6 { gap: 7px; --cell: calc((100% - 35px) / 6); }
 .swatches.swatch6 .swatch { flex: 0 0 var(--cell); min-width: 0; height: 26px; }
+
+/* ===========================================================================
+   ROUND AO, AO-1c — THE CUSTOM-COLOUR CELL, AND THE NATIVE INPUT UNDER IT.
+
+   WHAT THE OWNER ASKED FOR ("khi chọn custom, nó sẽ dễ dàng cho user"): a way to
+   pick a colour that is not one of the eleven keys. The data model has accepted a
+   literal hex on `data.color` since PACKAGE-L, and NOTHING IN THE UI COULD REACH
+   IT — the seventh shape of this project's "capability exists but is never
+   surfaced" defect class.
+
+   NATIVE INPUT, STYLED TRIGGER. The cell is a designed swatch; underneath it sits
+   an `<input type="color">` at `inset: 0; opacity: 0`. A click anywhere on the cell
+   therefore lands ON THE INPUT and the OS opens its own picker (HSV area, hex
+   field, eyedropper). This is what the mature tools do — Figma, draw.io and
+   Excalidraw all put a native colour input behind a designed trigger rather than
+   building a full HSV wheel — and it is the whole answer to "easy for the user":
+   the picker, the eyedropper, the touch UI and the hex field all come for free and
+   cannot drift from the platform. The alternative (a bespoke wheel) is its own
+   round. It is also the house rule against raw browser chrome (SKILL.md): the
+   user sees the designed cell, never a bare `<input>`.
+
+   THE TRIGGER IS TOKENS ONLY — no new hex, which is why the sheet's literal count
+   does not move. Two declarations do the work: the rest state is a `conic-gradient`
+   of the six ORIGINAL `--c-*` accents, i.e. the palette the row already carries,
+   spelling "every colour"; and the picked state overrides `background` with the
+   stored literal, which is INLINE (a `style` attribute on the element) and
+   therefore not a literal in this file at all. `--cell` gives the cell the same
+   flex basis as a key swatch, and it inherits `border-radius` / `border` / the
+   `.on` ring from `.swatch`, so the custom cell is the SAME control one colour
+   wider — not a second control that could drift from it.
+
+   `position: relative` is load-bearing: the input is absolutely positioned
+   against this element. `overflow: hidden` clips the input to the rounded corners
+   so the cell's own radius survives the hit area. */
+.swatch-custom {
+  position: relative; overflow: hidden;
+  flex: 0 0 var(--cell); min-width: 0; height: 26px;
+  border-radius: 7px; cursor: pointer;
+  border: 2px solid transparent; transition: transform .1s;
+  background: conic-gradient(var(--c-accent), var(--c-amber), var(--c-green),
+    var(--c-cyan), var(--c-blue), var(--c-violet), var(--c-accent));
+}
+.swatch-custom:hover { transform: scale(1.1); }
+.swatch-custom.on { border-color: var(--sel); }
+/* The hit target IS the input, so it must cover the cell exactly and be
+   invisible: `opacity: 0` keeps it clickable (unlike `visibility: hidden` or
+   `display: none`, either of which would stop the OS picker from opening) and
+   `border: 0; padding: 0` keeps the native chrome from poking out at the edges. */
+.swatch-custom input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; padding: 0; margin: 0;
+  cursor: pointer; appearance: none; -webkit-appearance: none;
+}
 .empty {
   color: var(--dim); font-size: 12px; font-family: var(--mono);
   text-align: center; padding: 24px 10px; line-height: 1.6;

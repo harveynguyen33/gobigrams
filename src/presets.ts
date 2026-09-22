@@ -206,6 +206,31 @@ export function edgeColorPatch(key: ColorKey, existing?: {markerEnd?: any; marke
   return patch;
 }
 
+/** ROUND AO, AO-1c — the LITERAL twin of `edgeColorPatch`, for the custom picker.
+ *  THE EXACT INVERSE of the key patch above, key by key:
+ *    · `strokeKey` is set to `undefined` rather than left alone, so the symbolic
+ *      key cannot keep winning `resolveColor`'s precedence check and silently
+ *      override the colour the user just chose;
+ *    · `data.color` carries the literal, which is the branch `resolveColor` falls
+ *      through to when no key is set;
+ *    · the path stroke and BOTH markers take the literal directly, because they
+ *      are baked values (a marker's `color` is not a CSS variable and cannot
+ *      follow a theme);
+ *    · and `bendX`/`bendY`/`bend` are deliberately NOT touched — the edge's route
+ *      and its colour are independent, and the existing writers already own those.
+ *  THE THEME HONESTY IS THE POINT OF THE SHAPE: a literal is stored on the edge
+ *  and stays exactly as chosen across a theme switch. Picking a KEY afterwards
+ *  runs `edgeColorPatch`, which rewrites `stroke` with `var(--c-*)` and the
+ *  markers' `color` with the key's var — but it does NOT clear `data.color`,
+ *  because that key is not in its patch. `App.setEdgeColor` therefore clears it
+ *  explicitly; see the note there. */
+export function edgeColorLiteralPatch(hex: string, existing?: {markerEnd?: any; markerStart?: any}) {
+  const patch: any = {style: {stroke: hex}, data: {color: hex, strokeKey: undefined}};
+  if (existing?.markerEnd?.type) patch.markerEnd = {...existing.markerEnd, color: hex};
+  if (existing?.markerStart?.type) patch.markerStart = {...existing.markerStart, color: hex};
+  return patch;
+}
+
 /* ===========================================================================
    L3b — C4 element table. ZERO new shapes: eight of the nine C4 primitives
    already exist, and the ninth (`external`) is already a dashed rect.
