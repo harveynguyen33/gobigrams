@@ -1,5 +1,86 @@
 # HANDOFF — Diagram Studio
 
+## ▶ PACKAGE-R — Roadmap surface in Settings → About. DONE, gates green, VERIFIED LIVE, PUSHED. PENDING HARVEY'S DEVICE TEST.
+
+**What it is:** a Roadmap surface that tells a user what the tool does today, what is being built
+next, and what is only an idea. Reached from **Settings → About**. Studio-only — links nowhere
+outside the app. Spec `PACKAGE-R-SPEC.md`; mockup approved by Harvey (`/tmp/ds-roadmap-mockup/roadmap-v2.html`,
+served during review).
+
+**HARVEY'S FOUR DECISIONS (2026-09-22):** (1) belongs to diagram-studio only and lives INSIDE the
+studio · (2) scope = diagram-studio only · (3) format = the modern common pattern, decided from
+research · (4) **NO staleness warning** — the page stays silent when out of date (he was shown the
+counter-evidence and kept this choice; the quiet `last reviewed` line is in scope per §6 of the spec).
+
+**THE RESEARCH CHANGED THE DESIGN — it did not merely confirm it.** Six roadmaps opened live
+(`/home/harvey/.hermes/cache/scratch/public-roadmap-research.md`):
+- 🔴 **"Now / Next / Later" is a TOOL layout, not an observed convention** — NO live page uses those
+  headings. Real sets: `Active/Planned/Launched` (obsidian.md) · `Concept/Alpha/Beta` (posthog) ·
+  `Triage/Planned/In progress` (zed.dev) · `Soon™` (immich) · `in design/exploring` (GitHub README).
+  → shipped labels are **Now / Next / Exploring**.
+- **No-dates is the majority** (4/6). ProdPad: dated columns *"turn every date into a commitment…
+  those commitments break."*
+- 🔴 **The mechanical reason no-dates is non-negotiable: pruning a DATED roadmap reads as
+  cancellation; pruning an UNDATED one reads as completion.** Live proof: cal.com renders
+  *"Overdue by 4 month(s)"*; GitHub's Nov-2024 mass-deprecation of ~40 stale items drew *"Ya'll left
+  it sit for several years"* → public apology.
+- **Status is never colour-only** (a11y SC 1.4.1) — 0/4 surveyed roadmaps did it; ours carries a
+  TEXT label per column with the dot `aria-hidden`.
+- **Tooling ranked for a single owner:** typed file in the repo (#1) > Strapi > GitHub
+  Issues/Milestones (opts you into publishing slippage; no `Access-Control-Allow-Origin`) > SaaS.
+  → `src/roadmap.ts`.
+- **"Does a public roadmap help?" is UNPROVEN** — no rigorous study found. Counter-evidence:
+  ~12 live products' `/roadmap` now 404; Ghost deleted its roadmap after a 4-year unfulfilled promise.
+
+**Implementation.** `src/roadmap.ts` (NEW, pure) — 7 items (2 now / 3 next / 2 later) + 8 shipped
+rows + `ROADMAP_REVIEWED`. `RoadmapBlock` inside `AboutPane()` (`src/Settings.tsx`), between
+`settings-rows` and `settings-note`, reusing the pane's own `Row` vocabulary + `settings-*` classes.
+CSS in a `.rm*` namespace, token-only, **ZERO new hex**. `checks/package-r-roadmap.mjs` (NEW):
+23 PASS + a replay RED on `c018656` + 10 mutation-based negative controls.
+**Seed content is REAL** — now/next from `PACKAGE-M2-ROADMAP.md` §3/§4, `Rotation for shapes` from
+this file, the 8 shipped rows from git log.
+
+**🔴 THE LAYOUT FIX — AND THE LESSON WORTH CARRYING.** The first cut put the three columns
+side-by-side and stacked them only on the PHONE tier. Measured live on the real pane: the desktop
+modal is 720px **minus a 190px vertical nav**, so `grid-template-columns` resolved to **`147px
+147px 147px`** — each card 136px with a 116px text column, wrapping the title to **TWO** lines
+(28px) and the description to **SIX** (95px). **DESKTOP was the WORST tier while PHONE was the
+BEST** — because phone stacked. Harvey chose option A (stack everywhere). After: `466px ×1`, title
+**1 line**, desc **2 lines**, at desktop/tablet/phone. The phone-only `.rm-cols` override was
+**DELETED, not kept as a second number meaning the same thing**; the shipped list keeps its own
+phone rule because it genuinely is three columns when wide.
+**The generalisable lesson: a harness can be fully GREEN while the layout is wrong.** tsc=0,
+build=0, 38/38 harnesses, 23/23 new assertions — all green, and desktop was unreadable. Only live
+DOM measurement with the REAL container width caught it. And **a spec written from a 980px mockup
+must state the real pane width**, or the coder builds the spec correctly and the result is still
+bad. That was MY spec defect, not the coder's.
+
+**Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **144** (ceiling 160, unchanged) ·
+**38/38 harnesses green** · new harness **23 PASS / 0 FAIL** with replay RED on `c018656` ·
+live DOM at 1280/768/360: 3 headings with TEXT labels (`Now 2`/`Next 3`/`Exploring 2`), 7 items,
+8 shipped rows, 1 reviewed line, confidence chips carrying the WORD, **zero `<a href>`**, doc
+overflow 0/0, worst child overflow 0px · `boards/` **byte-identical (sha256, all 5)** · push
+verified with a **FRESH CLONE** (head `419bd83`, roadmap.ts + harness present, hex 144).
+**Cross-pane regression used a REAL MOUSE CLICK** — a JS `.click()` probe reads FALSE here (React
+needs a real event) and made the nav look broken.
+
+**Commits:** `9532cf9` (data model) · `2cae936` (RoadmapBlock + token-only CSS) · `4676ee3`
+(harness + spec) · `419bd83` (the one-column layout fix). **Pushed** `1808799..419bd83`.
+
+**VAULT: DONE.** ADR-031 gained `## PACKAGE-R — Roadmap surface (Settings → About)` (215,120 B, one
+Mermaid block, 1 H1) before `## Verification`; Change Log gained a decision row + a service row under
+`## 2026-09-22`; the Architecture MOC ADR-031 line extended. System Architecture deliberately
+UNCHANGED (no topology/flow) — and that reason is stated inside the ADR section. `verify.sh`:
+**43 passed / 0 failed** (orchestrator re-run).
+
+### HARVEY — please test on your Mac (`http://192.168.33.200:5200/`)
+
+1. **Settings → About** — the roadmap should read as ONE column, Now → Next → Exploring, then the
+   shipped list. Titles should sit on one line.
+2. Does the single column read better than three squeezed columns would have? (That was the choice.)
+3. Is the `last reviewed 2026-09-22` line the right weight — noticeable but quiet?
+4. Anything in the seed content that is factually wrong or says something you would not promise?
+
 ## ▶ ROUND AO — Harvey's 3rd device test: colour cells, the neutrals, the custom picker, the pair gap, the nub. DONE, gates green, VERIFIED LIVE. PENDING HIS DEVICE TEST.
 
 **What it is:** four items from Harvey's third device test (he went away and asked for the whole thing done
