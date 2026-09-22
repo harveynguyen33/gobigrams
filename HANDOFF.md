@@ -1,5 +1,67 @@
 # HANDOFF — Diagram Studio
 
+## ▶ ROUND AO — Harvey's 3rd device test: colour cells, the neutrals, the custom picker, the pair gap, the nub. DONE, gates green, VERIFIED LIVE. PENDING HIS DEVICE TEST.
+
+**What it is:** four items from Harvey's third device test (he went away and asked for the whole thing done
+autonomously). Spec `ROUND-AO-SPEC.md` (22,013 B) + the evidence file `ROUND-AO-DIAGNOSIS.md` (11,485 B),
+both COMMITTED before any code. Base `e4a3e14`. Head `c018656` (7 commits).
+
+**THE DIAGNOSIS WAS THE VALUABLE PART, and one item contradicted its own obvious reading.**
+
+- **AO-3 — the "nub" on a selected step edge is NOT a marker and NOT a corner artifact.** Harvey: *"phần
+  giữa hay có 1 điểm nhô ra 2 bên thay vì vòng tròn only"*. Measured live: the midpoint of a selected edge
+  with NO label holds the round `.edge-bend-handle` (14×14, radius 50%) and, ON TOP and WIDER, an EMPTY
+  `.edge-label` box (17×5 at one zoom, 25×7 at another) that still carries `.selected` — so it paints a 1px
+  `--sel` border ~5px out each side of the circle. Cause: the render gate `(shown || editing || d.techn ||
+  bendDraggable)` opens the block for the HANDLE when an edge is selected, and the label `<div>` was rendered
+  UNCONDITIONALLY inside it. Unselected, the empty box is invisible (no border) — which is exactly why it
+  only appeared on selection. **NEGATIVE CONTROL that named it: hide only the label, live → the circle alone
+  remains.** Fix: wrap the label in `{hasLabel && …}` (`hasLabel` already `!!(shown || editing || d.techn)` and
+  already excludes `bendDraggable`, so `handleAt` needed NO change) + a defensive `.edge-label:empty`.
+- **AO-1a/1b/1c — the colour work.** Cells were **80×26px** (a third of the 253px panel each, `swatch3`),
+  now **36×26** in a 6-column grid (`swatch6`, `--cell: calc((100% - 35px)/6)`). The palette was nine HUES
+  with no black and no white; two theme-invariant neutrals now join ONCE in `:root`. The custom picker: the
+  colour model ALREADY accepted a literal hex (`data.color`, `resolveColor` returns it), `resolveColorKey`
+  already returned `null` for an arbitrary hex, and `swatchRow` had an UNUSED third parameter — but there was
+  no UI reaching any of it. Now a 12th cell (11 keys + 1) holds an `<input type="color">` at `opacity: 0`
+  over a designed trigger, so a tap opens the OS picker. Picker on node/edge-stroke/table colour only; the
+  Text and label rows stay key-only.
+- **AO-2 — the flow-glyph row sat 0px under the count/speed pair.** `.pair .field { margin: 0 }` (0,2,0) beats
+  `.field { margin-bottom: 13px }` (0,1,0), correctly zeroing the pair's children — but the `.pair` ELEMENT
+  never got the section's rhythm back. Live: pair bottom y=1379, glyph field top y=1379. Fix `margin-bottom:
+  13px` on `.pair` (one call site). **Verified live after: gap 0px → 13px.**
+
+**Gates (orchestrator-measured):** `tsc`=0 · `build`=0 · hex **144** (ceiling 160; +2 = the two neutrals) ·
+**37/37 harnesses green** · new `checks/round-ao-colour-and-nub.mjs` **23 PASS / 0 FAIL** with its REPLAY
+**9/9 RED on `e4a3e14`** · **all four items re-measured LIVE after the fix** (cells 36px with black+white+custom
+present; pair gap 13px; selected unlabelled step edge = handle only) · `boards/` byte-identical (sha256).
+
+**FOUR DEFECTS THE HARNESS FOUND — none visible in the five item commits.** The coder hit its iteration
+budget (150/150) after committing all five items but before the harness, so the round was finished by hand;
+writing the harness and running the required BY-HAND sweep is what surfaced these:
+1. AO-1b left `COLORS` (the `Record<ColorKey,string>` literal fallback) WITHOUT the neutrals →
+   `keyForHex(COLORS.black)` read `undefined.toLowerCase()` and THREW, taking the whole colours module down
+   inside `round-ag-colors` (4 assertions lost).
+2. AO-1b left `--c-black`/`--c-white` out of `EXPORT_TOKENS` → an exported standalone SVG would not inline
+   them and a black/white node would export a WRONG colour.
+3. AO-1c spelled its own label **"Custom colour"** while ROUND AG2/AG4 had removed every British spelling
+   from user-visible copy. Three strings; caught by `round-ag2`.
+4. The two neutrals are theme-invariant and declared ONCE in `:root`, but the colour harness read each
+   theme's block ONLY → it reported them as 8 missing declarations and produced `NaN` contrast. Fixed by
+   modelling the cascade (`:root` + block) in `themePalette`.
+Plus SIX hex-ratchet pins re-anchored 142 → 144 (each with the increment named, per the standard's
+stale-number rule), and the two readability floors (ag16/ag17) restricted BY NAME to the nine hue keys — a
+neutral has no hue to read and `white` on white is 1.00 by definition, not a defect.
+
+**⚠️ PROCESS NOTE — the brief said "the dev server is already running"; it was NOT.** The coder measured no
+listener on 5200 (`ERR_CONNECTION_REFUSED`) and started one itself because the spec REQUIRED a live-DOM
+assertion. It also left its own second server (127.0.0.1) and a probe board (`AO-PROBE-CODER`) behind; both
+were cleaned up by PID and by exact id, and Harvey's six boards re-verified byte-identical. **Do not trust a
+brief's claim that a server is up — check the port.**
+
+**Not verified:** nothing live-measured remains outstanding; the coder's own probe infrastructure was removed
+rather than kept. Harvey's device test IS outstanding (the five checks below).
+
 ## ▶ ROUND AN — Harvey's 2nd device test of the edge panel (6 items). DONE, gates green. PENDING HIS DEVICE TEST.
 
 **What it is:** six items from Harvey's second device test, resolved as ONE round. Spec `ROUND-AN-SPEC.md`
