@@ -6034,7 +6034,16 @@ export default function App() {
                   ONE HISTORY ENTRY PER DRAG: `onGestureStart` pushes once (the
                   latch in `updateEdge`'s `coalesce` option — the same rule
                   `src/resizeHistory.ts` records for the resize grip), and every
-                  `input` after it coalesces into that entry. */}
+                  `input` after it coalesces into that entry.
+
+                  ROUND AO, AO-2 — AND IT PAYS THE 13px NOW. Collapsing two rows
+                  into one is what created the defect this round: the pair is the
+                  only row in the panel that is NOT a `.field`, so it never got
+                  `.field`'s `margin-bottom: 13px` and the `flow glyph` row below it
+                  started at the pair's own bottom edge — measured, a 0px box gap.
+                  `.pair` carries the 13px itself now (see the rule in
+                  `src/styles.css`); the pair's own children still lose theirs, which
+                  is correct, the pair supplies that layout. */}
               {(eFlow === 'dots' || eFlow === 'icon') && (
                 <div className="pair">
                   <div className="field">

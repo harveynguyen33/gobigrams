@@ -1938,8 +1938,28 @@ body {
    at its compact width and the slider taking the rest. `align-items: flex-end`
    lines the two controls up on their bottom edge, so the slider's 30px box and
    the stepper's 30px box sit on one line rather than centred against the
-   taller label+control pair. */
-.pair { display: flex; gap: 8px; align-items: flex-end; }
+   taller label+control pair.
+
+   ROUND AO, AO-2 — THE PAIR NOW PAYS THE 13px IT OWES THE STACK. Measured live,
+   before this: the pair's box ended at y=1379 and the `flow glyph` field began at
+   y=1379 — a 0px gap between the boxes, about 2px of ink, which is the crowding
+   Harvey reported. THE CAUSE. `.pair .field { margin: 0 }` is (0,2,0) and beats
+   `.field { margin-bottom: 13px }` (0,1,0), so the two fields INSIDE the pair
+   correctly lose their margin — the pair supplies its own layout — but the PAIR
+   ELEMENT ITSELF carried no bottom margin, so it participated in the section's
+   stacking rhythm not at all. It was the only row in the panel that opted out of
+   both the 13px rhythm and the pair's own `gap`.
+
+   WHY 13px. It is the value `.field` gives every other row in the section, i.e.
+   exactly the 13px the collapsed pair owes the stack.
+
+   WHY IT CANNOT LEAK. `.pair` has ONE call site (`src/App.tsx`, the count/speed
+   row), so the rule reaches exactly one row. `.pair .field { margin: 0 }` targets
+   the pair's CHILDREN, not the pair, so it cannot zero this declaration — and no
+   `.field` outside a `.pair` is reachable by either selector, so the section's
+   other rows are untouched. Same cascade discipline ROUND AG2/AA used when they
+   measured the `.swatches` vs `.insp-seg` gaps. */
+.pair { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 13px; }
 .pair .field { margin: 0; }
 .pair .grow { flex: 1; min-width: 0; }
 
