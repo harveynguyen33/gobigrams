@@ -4934,3 +4934,75 @@ kbd {
 .app[data-form-factor="phone"] .tg-glyph:nth-child(n + 5) { display: none; }
 .app[data-form-factor="phone"] .tg-more-wide { display: none; }
 .app[data-form-factor="phone"] .tg-more-phone { display: inline; }
+
+/* ============================================================================
+   PACKAGE-R — the ROADMAP BLOCK, rendered by Settings → About.
+
+   Placement is the pane, not a surface of its own: the block goes after the
+   read-only rows and before the Boards note in `AboutPane()`.
+
+   THE LOAD-BEARING RULE IS A11Y, NOT LAYOUT. Status is carried by the heading
+   TEXT; `.rm-dot` is supporting decoration only and would be removed by a
+   screen reader without losing anything. The confidence chip carries the WORD
+   too, so a dropped item is a label change and not a cancellation.
+
+   EVERY colour below is a `var(--token)` — this block adds ZERO hex literals,
+   which is what keeps the sheet's hex ratchet at its ceiling. Nothing here is
+   tinted with a literal or a `color-mix`, so the block re-colours with the
+   five themes for free.
+
+   `minmax(0, 1fr)` and `min-width: 0` are deliberate: a grid child defaults to
+   `min-width: auto`, and one long unbroken `what` would then push the modal's
+   pane wider than its client width. At the phone tier the three columns stack,
+   so the block can never contribute horizontal overflow at 360/768/1280.
+   ========================================================================= */
+
+.rm { margin-top: 16px; }
+.rm-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.rm-col { min-width: 0; padding-left: 9px; border-left: 2px solid var(--border); }
+.rm-colhead {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 9px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--fg);
+}
+.rm-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+.rm-dot.now { background: var(--acc); }
+.rm-dot.next { background: var(--sel); }
+.rm-dot.later { background: var(--dim2); }
+.rm-collabel { flex: 1; min-width: 0; }
+.rm-colcount { flex: none; font-family: var(--mono); font-size: 10px; color: var(--dim2); }
+.rm-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.rm-item {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 8px 9px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--elevated);
+}
+.rm-title { font-size: 11.5px; color: var(--fg); }
+.rm-desc { font-size: 10.5px; line-height: 1.5; color: var(--dim); }
+.rm-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1px; }
+.rm-chip {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--dim);
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 1px 5px; white-space: nowrap;
+}
+.rm-chip-conf.committed { color: var(--green); border-color: var(--green); }
+.rm-chip-conf.exploring { color: var(--sel); border-color: var(--sel); }
+.rm-foot { margin: 9px 0 0; font-size: 10px; font-style: italic; color: var(--dim2); }
+.rm-shipped-h {
+  margin: 20px 2px 6px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+}
+.rm-shipped { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 16px; }
+.rm-ship-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 10.5px; }
+.rm-ship-label { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
+.rm-ship-what { flex: 1; min-width: 0; color: var(--fg); }
+.rm-ship-when { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
+.rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: 10px; color: var(--dim2); }
+
+/* The one per-tier rule the block needs: below the phone breakpoint three
+   columns of cards are unreadable, so they stack in DOM order (Now → Next →
+   Exploring). Same tier hook the template gallery and the inspector use. */
+.app[data-form-factor="phone"] .rm-cols { grid-template-columns: minmax(0, 1fr); }
+.app[data-form-factor="phone"] .rm-shipped { grid-template-columns: minmax(0, 1fr); }

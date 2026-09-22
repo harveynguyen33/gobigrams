@@ -6,6 +6,9 @@ import {type Mode, type ThemeName} from './theme';
    labels. Imported rather than re-declared: the control, the persisted value
    and the React Flow prop must resolve through ONE definition. */
 import {MARQUEE_OPTS, type MarqueeMode} from './marqueeMode';
+/* PACKAGE-R — the roadmap surface's data. A pure, React-free module: the block
+   further down this file is its only reader in the app. */
+import {ROADMAP, SHIPPED, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from './roadmap';
 
 /**
  * M2 — the Settings dialog.
@@ -401,6 +404,72 @@ function KeyboardPane() {
   );
 }
 
+/* PACKAGE-R — the three columns, in render order (Now → Next → Exploring).
+ *  `label` is the HEADING TEXT and is the thing that carries status: the dot is
+ *  `aria-hidden` supporting decoration, so the block is still fully readable by
+ *  colour-blind and screen-reader users with the dots removed. `foot` is the one
+ *  italic line under each column. `status` is the stored key from roadmap.ts. */
+const RM_COLS: {status: RoadmapStatus; label: string; foot: string}[] = [
+  {status: 'now',   label: 'Now',       foot: 'Being worked on right now.'},
+  {status: 'next',  label: 'Next',      foot: 'Planned, not started.'},
+  {status: 'later', label: 'Exploring', foot: 'Under consideration — may not ship.'},
+];
+
+/**
+ * PACKAGE-R — the roadmap block.
+ *
+ * Every column heading is TEXT, every item carries the confidence WORD and the
+ * area tag, so no status is encoded by colour alone (a11y SC 1.4.1). The block
+ * is real DOM text and links nowhere outside the app.
+ */
+function RoadmapBlock() {
+  return (
+    <div className="rm">
+      <div className="settings-group">Roadmap</div>
+      <div className="rm-cols">
+        {RM_COLS.map((c) => {
+          const items = ROADMAP.filter((i) => i.status === c.status);
+          return (
+            <div className="rm-col" key={c.status}>
+              <h3 className="rm-colhead">
+                {/* decoration only — the label beside it is the status */}
+                <span className={`rm-dot ${c.status}`} aria-hidden="true" />
+                <span className="rm-collabel">{c.label}</span>
+                <span className="rm-colcount">{items.length}</span>
+              </h3>
+              <ul className="rm-items">
+                {items.map((it: RoadmapItem) => (
+                  <li className="rm-item" key={it.title}>
+                    <span className="rm-title">{it.title}</span>
+                    <span className="rm-desc">{it.desc}</span>
+                    <span className="rm-chips">
+                      <span className={`rm-chip rm-chip-conf ${it.confidence}`}>{it.confidence}</span>
+                      <span className="rm-chip">{it.area}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="rm-foot">{c.foot}</p>
+            </div>
+          );
+        })}
+      </div>
+      <h3 className="rm-shipped-h">Shipped</h3>
+      <ul className="rm-shipped">
+        {SHIPPED.map((s) => (
+          <li className="rm-ship-row" key={s.label}>
+            <span className="rm-ship-label">{s.label}</span>
+            <span className="rm-ship-what">{s.what}</span>
+            <span className="rm-ship-when">{s.when}</span>
+          </li>
+        ))}
+      </ul>
+      {/* one honest line of provenance — not a warning, not a badge */}
+      <p className="rm-reviewed">last reviewed {ROADMAP_REVIEWED}</p>
+    </div>
+  );
+}
+
 function AboutPane() {
   return (
     <>
@@ -417,6 +486,7 @@ function AboutPane() {
           <span className="settings-state">open source</span>
         </Row>
       </div>
+      <RoadmapBlock />
       <div className="settings-note">
         Boards are plain JSON files kept next to the app — nothing leaves your machine.
         <br />
