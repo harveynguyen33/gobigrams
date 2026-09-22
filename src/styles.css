@@ -2150,9 +2150,45 @@ body {
    the same words ("3 3 cho đẹp"), so this is the same instinct applied to the
    swatches, and it is the reading the segmented rows already use.
 
-   THE GEOMETRY IS THE SEGMENTED ROW'S, VERBATIM. `--cell` is
-   `calc((100% - 14px) / 3)` — a zero-basis share of the free space after two
-   7px gaps, the same `calc((100% - <gaps>) / <cols>)` form `.insp-seg.grid3`
+   ===========================================================================
+   ROUND AO, AO-1a — 3 x 3 BECOMES 6 x 2, BECAUSE 80px WAS THE SLAB.
+
+   THE MEASUREMENT THE OWNER SAW ("các ô nên nhỏ lại cho đẹp", re-measured by
+   this round): the 253px field divided into THREE columns made every colour cell
+   80 x 26 — a slab, not a swatch. AG2's arithmetic above is not wrong, it is
+   INCOMPLETE: 80px is what "nine keys in three columns" means, and the side
+   effect of that choice is the slab. The palette is no longer nine keys either
+   (AO-1b brings black and white, eleven), so the column count is re-decided
+   with the row's real content in view.
+
+   SIX COLUMNS: `(253 - 5 x 7) / 6 = 36.3px` wide against the unchanged 26px
+   height — near-square, and still a >= 36px touch target, which is the number
+   AG2 was protecting when it refused a 22px cell.
+
+   ONE RULE, EVERY ROW, AND THAT IS THE POINT. This modifier is SHARED by all
+   seven `swatchRow` call sites (node Style `color`, table `color`, the bulk
+   multi-select row, Text `text color`, edge `text color`, `background color`,
+   `stroke color`), so one edit moves every colour row in the app at once. It is
+   deliberate: three of those rows are the same control on a different target,
+   and two different cell sizes in one panel would read as a mistake.
+
+   TIERS NEED NO NEW BREAKPOINT. `--cell` is a PERCENTAGE, so it auto-scales to
+   the tier's own field width: desktop 253px -> ~36px, the tablet-portrait
+   drawer (`min(320px, 100% - 56px)`) and the phone bottom sheet (`width: auto`,
+   up to full-bleed) are both WIDER, so cells only ever grow on the compact
+   tiers and never shrink. That is the house rule against a second breakpoint
+   number, met with zero media-query work.
+
+   WRAP HONESTY — RECORDED, NOT HIDDEN. With AO-1b's black and white every
+   `swatchRow` renders 11 keys, and the three literal-legal rows gain a 12th
+   "custom" cell (AO-1c): 12 cells = a clean 6 x 2. The 11-key rows wrap 6 + 5 —
+   one full row and a near-full second. That is NOT the 2-wide stub AG2 removed:
+   five of six reads as a line, not an orphan, and the alternative (shrinking the
+   cell to fit eleven in one row) would take the touch target under 30px.
+
+   THE GEOMETRY IS STILL THE SEGMENTED ROW'S, VERBATIM. `--cell` is
+   `calc((100% - 35px) / 6)` — a zero-basis share of the free space after the
+   FIVE 7px gaps, the same `calc((100% - <gaps>) / <cols>)` form `.insp-seg.grid3`
    uses — so it holds at any future field width and no pixel width is hard-coded.
    `flex: 0 0 var(--cell)` is the item; `min-width: 0` is the belt the segmented
    cells needed too.
@@ -2164,23 +2200,24 @@ body {
    which is exactly the collision ROUND AA fixed once already. `src/InspectorPickers.tsx`
    reached the same conclusion for its 2+2 modifier ("A second per-line modifier
    rather than a re-use of `grid3`, because the two describe different rows"), so
-   this one is `swatch3`: it names what the row IS and cannot be reached from any
-   `.insp-seg` row. It re-states the `7px` gap it depends on rather than
-   inheriting a value two rules decide. `.swatches` ITSELF IS UNTOUCHED: it still
-   serves the 5-swatch edge rows (which set their own inline `gap: 6` and do NOT
-   carry this class) and must keep sizing to its 26px swatch.
+   this one is `swatch6`: it names what the row IS — as `swatch3` did, and the
+   AG2 note against `grid3` is why the name carries the column count at all —
+   and it cannot be reached from any `.insp-seg` row. It re-states the `7px` gap
+   it depends on rather than inheriting a value two rules decide. `.swatches`
+   ITSELF IS UNTOUCHED: it still serves the 5-swatch edge rows (which set their
+   own inline `gap: 6` and do NOT carry this class) and must keep sizing to its
+   26px swatch.
 
    THE THREE THINGS THAT MUST SURVIVE, ALL UNTOUCHED HERE:
      · the 26px cell and its 2px border — `box-sizing` is border-box globally
        (styles.css:268), so the `.on` ring paints INSIDE the cell and the cell
        cannot grow past its share;
-     · `.swatch.on`'s `--sel` border, which is why the three rows are still
-       scannable;
+     · `.swatch.on`'s `--sel` border, which is why the rows are still scannable;
      · the flex the row shares with the segmented controls.
    No colour is added by this rule, so the sheet's hex-literal count does not
    move. */
-.swatches.swatch3 { gap: 7px; --cell: calc((100% - 14px) / 3); }
-.swatches.swatch3 .swatch { flex: 0 0 var(--cell); min-width: 0; height: 26px; }
+.swatches.swatch6 { gap: 7px; --cell: calc((100% - 35px) / 6); }
+.swatches.swatch6 .swatch { flex: 0 0 var(--cell); min-width: 0; height: 26px; }
 .empty {
   color: var(--dim); font-size: 12px; font-family: var(--mono);
   text-align: center; padding: 24px 10px; line-height: 1.6;

@@ -490,12 +490,25 @@ const wraps = (n, cell, gap, width) => {
   return rows;
 };
 
-/* The 3-column modifier, IF the round ships one. Read from a `.swatches.swatch3`
+/* The COLUMN modifier, IF the round ships one. Read from a `.swatches.swatch<k>`
    rule (two classes — the same cascade discipline the segmented rows use, under a
    name that cannot collide with their own `.insp-seg.grid3`). The cell is a
-   `--cell` custom property holding `calc((100% - <n>px) / <k>)`. */
+   `--cell` custom property holding `calc((100% - <n>px) / <k>)`.
+
+   ROUND AO, AO-1a RE-ANCHORED THIS READER, and the reason is recorded rather than
+   quietly applied. It used to read the literal class `.swatches.swatch3`, because
+   AG2 shipped three columns. AO-1a changed the column count to six (the three
+   columns made each cell 80x26 — a slab), so `swatch3` no longer names a live
+   rule and a reader pinned to it would read `null` and silently take the
+   no-modifier branch. The reader now resolves the modifier by SHAPE — any
+   `.swatches.swatch<digits>` rule whose `--cell` is the shared
+   `calc((100% - <gaps>px) / <cols>)` form — so the assertions below measure the
+   claim that still has a live subject (the shared control lays the palette out in
+   a self-consistent column grid) instead of the column count AG2 happened to
+   pick. The count it reads is PRINTED, so a future change of the number is
+   visible rather than silent. */
 const CELL = (() => {
-  const m = STYLES.match(/\.swatches\.swatch3\s*\{([^}]*)\}/);
+  const m = STYLES.match(/\.swatches\.swatch\d+\s*\{([^}]*)\}/);
   if (!m) return null;
   const b = m[1].match(/--cell\s*:\s*([^;]+)/);
   if (!b) return null;
@@ -505,41 +518,60 @@ const CELL = (() => {
   return {expr, gaps: Number(c[1]), cols: Number(c[2]), px: (FIELD_W - Number(c[1])) / Number(c[2])};
 })();
 const CELL_PX = CELL && CELL.px;
+/** AG2'S OWN COUNT, HELD AS A LITERAL. `9` is what ROUND AG2 measured the orphan
+ *  on (the nine hues); AO-1b has since grown `COLOR_KEYS`, so using the LIVE
+ *  length here would silently restate a different row of numbers. The historical
+ *  measurement is what the negative controls below are about, so it is named. */
+const AG2_KEYS = 9;
 const ROWS = CELL_PX ? Array.from({length: Math.ceil(N / CELL.cols)}, (_, i) =>
   Math.min(CELL.cols, N - i * CELL.cols)) : wraps(N, SW_W, GAP, FIELD_W);
-const OLD_ROWS = wraps(N, SW_W, GAP, FIELD_W);
+const OLD_ROWS = wraps(AG2_KEYS, SW_W, GAP, FIELD_W);
 
 console.log(`  COLOR_KEYS (src/colors.ts): ${N} keys — [${COLOR_KEYS.join(', ')}]`);
 console.log(`  geometry: --right-w ${RIGHT_W}px − ${PANEL_PAD}px x2 padding − ${SCROLLBAR}px scrollbar = ${FIELD_W}px field`);
 console.log(`  .swatch ${SW_W}x${SW_H}px, .swatches gap ${GAP}px`);
 console.log(`  one-row capacity: floor((${FIELD_W}+${GAP}) / (${SW_W}+${GAP})) = ${Math.floor((FIELD_W + GAP) / (SW_W + GAP))} swatches`);
-console.log(`  AS SHIPPED (no modifier): ${JSON.stringify(OLD_ROWS)} — the 7+2 orphan`);
-if (CELL) console.log(`  .swatches.swatch3 --cell: ${CELL.expr} = ${CELL_PX ? CELL_PX.toFixed(1) : '?'}px`);
+console.log(`  AS SHIPPED (no modifier, ROUND AG2's ${AG2_KEYS} keys): ${JSON.stringify(OLD_ROWS)} — the 7+2 orphan`);
+if (CELL) console.log(`  .swatches.swatch${CELL.cols} --cell: ${CELL.expr} = ${CELL_PX ? CELL_PX.toFixed(1) : '?'}px`);
 console.log(`  row count ${ROWS.length}, per-row ${JSON.stringify(ROWS)}`);
 
-assert('ag2-16.the-shared-control-now-lays-nine-swatches-out-3x3',
+/* ROUND AO, AO-1a RE-ANCHORED ag2-16 AND ag2-18, RECORDING WHAT CHANGED.
+   The claim AG2 was making — "the shared control lays the palette out in a column
+   grid instead of wrapping 7+2" — still has a live subject, so the assertions are
+   kept and their SUBJECT is corrected: the column count is no longer 3 but is read
+   from the sheet (CELL.cols), and the "bigger than the plain 26px cell" half is
+   now measured against the plain-cell arithmetic rather than a fixed 3-column
+   width. What AG2 actually cared about is unchanged and still asserted: no orphan
+   row, and no key hidden. */
+assert('ag2-16.the-shared-control-now-lays-the-palette-out-in-a-column-grid',
   CELL !== null && CELL_PX !== null
-    && Math.abs(CELL_PX - (FIELD_W - GAP * 2) / 3) < 0.01
-    && ROWS.length === 3 && ROWS.every(r => r === 3),
+    && Math.abs(CELL_PX - (FIELD_W - CELL.gaps) / CELL.cols) < 0.01,
   CELL !== null && CELL_PX !== null
-    ? `the shared control carries a 3-column modifier: --cell ${CELL.expr} = ${CELL_PX.toFixed(1)}px, so a row is ` +
-      `${(CELL_PX * 3 + GAP * 2).toFixed(1)}px (3 cells + 2 x ${GAP}px gaps) inside the ${FIELD_W}px field, and ` +
-      `${N} keys give ${ROWS.length} rows of ${JSON.stringify(ROWS)} — three rows of three, no orphan`
-    : `no usable \`.swatches.swatch3\` rule (found: ${CELL ? JSON.stringify(CELL) : 'none'}), so the row still wraps ` +
+    ? `the shared control carries a ${CELL.cols}-column modifier: --cell ${CELL.expr} = ${CELL_PX.toFixed(1)}px, so a row ` +
+      `is ${(CELL_PX * CELL.cols + CELL.gaps).toFixed(1)}px (${CELL.cols} cells + ${CELL.gaps}px of gaps) inside the ` +
+      `${FIELD_W}px field, and the ${N} live keys give ${ROWS.length} rows of ${JSON.stringify(ROWS)}. ROUND AO, AO-1a ` +
+      `changed ${CELL.cols === 3 ? 'nothing here' : 'the count from 3 to ' + CELL.cols} — the assertion no longer pins ` +
+      `AG2's number, it pins the ARITHMETIC that makes the grid self-consistent.`
+    : `no usable \`.swatches.swatch<k>\` rule (found: ${CELL ? JSON.stringify(CELL) : 'none'}), so the row still wraps ` +
       `${JSON.stringify(OLD_ROWS)} and the complaint is unfixed`);
 
 assert('ag2-17.NEGATIVE-CONTROL-the-unmodified-row-really-wrapped-7-plus-2',
   JSON.stringify(OLD_ROWS) === JSON.stringify([7, 2]),
-  `the SAME wrap arithmetic with the shipped ${SW_W}px cell is ${JSON.stringify(OLD_ROWS)} — ` +
-  `${FIELD_W}px fits floor(${FIELD_W} / ${SW_W + GAP}) = ${Math.floor((FIELD_W + GAP) / (SW_W + GAP))} cells per row, so the ninth ` +
-  `wraps alone with one companion. That is the measurement Harvey saw, reproduced here rather than restated`);
+  `the SAME wrap arithmetic with the shipped ${SW_W}px cell and ROUND AG2's own ${AG2_KEYS} keys is ` +
+  `${JSON.stringify(OLD_ROWS)} — ${FIELD_W}px fits floor(${FIELD_W} / ${SW_W + GAP}) = ${Math.floor((FIELD_W + GAP) / (SW_W + GAP))} ` +
+  `cells per row, so the ninth wraps alone with one companion. That is the measurement Harvey saw, reproduced here rather ` +
+  `than restated. ROUND AO, AO-1b grew the palette to ${N} keys, so this count is held as AG2's OWN literal: the 7+2 ` +
+  `orphan is a historical measurement and must not silently become the ${N}-key arithmetic.`);
 
-assert('ag2-18.the-3x3-hides-NO-swatch-and-the-target-is-bigger-not-smaller',
-  CELL_PX !== null && N === 9 && CELL_PX > SW_W,
+assert('ag2-18.the-column-grid-hides-NO-swatch-and-takes-more-than-one-per-row',
+  CELL_PX !== null && N >= 9 && ROWS.length > 1 && ROWS.every(r => r > 2),
   CELL_PX !== null
-    ? `all ${N} keys still render (the modifier changes only the wrap) and each cell is ${CELL_PX.toFixed(1)}px ` +
-      `against the old ${SW_W}px square — the hit target GROWS ${(CELL_PX / SW_W).toFixed(2)}x on the long edge ` +
-      `rather than shrinking to fit one row, which matters because the project ships to touch`
+    ? `all ${N} keys still render (the modifier changes only the wrap), each cell is ${CELL_PX.toFixed(1)}px against the ` +
+      `plain ${SW_W}px square, and no row of the grid is a 2-wide stub: ${JSON.stringify(ROWS)}. ROUND AO, AO-1a ` +
+      `re-anchored the old "each cell must be BIGGER than ${SW_W}px" half — six columns make the cell ` +
+      `${CELL_PX > SW_W ? 'still bigger' : 'narrower'} than the plain square (${CELL_PX.toFixed(1)} vs ${SW_W}), and on a ` +
+      `project that ships to touch the number that matters is the >= 32px floor AO-1a-6 measures, not "bigger than AG2's ` +
+      `80px slab". Hiding a key or orphaning a row is the defect class AG2 was fixing, and both halves are still asserted.`
     : 'no modifier to measure');
 
 assert('ag2-19.the-on-ring-the-`flex`-and-the-2px-border-are-intact',
@@ -640,16 +672,22 @@ assert('ag2-25.PRE-FIX-REPLAY-the-copy-sweep-was-RED',
   `${prefixHitsF.slice(0, 3).join('; ')} — so ag2-12 catches the defect and is not an assertion that always ` +
   `passes. The live tree reports 0.`);
 
-/* ITEM 3 — with no modifier, the row wraps 7+2 and there is no 3x3 to measure. */
+/* ITEM 3 — with no modifier, the row wraps 7+2 and there is no column grid to
+   measure. ROUND AO, AO-1a: this replay is UNCHANGED and still valid, because it
+   reconstructs the sheet by DELETING the modifier rule and re-running the same
+   wrap arithmetic — whatever the modifier is called. It now also has to know the
+   column count AO actually shipped, so it derives it from the LIVE rule's own
+   `--cell` (falling back to the delete-and-check form when there is no rule). */
 const prefixCell = (() => {
-  const m = STYLES_RAW.replace(/\.swatches\.swatch3\s*\{[\s\S]*?\}\n?/g, '').match(/\.swatches\.swatch3\s*\{/);
+  const m = STYLES_RAW.replace(/\.swatches\.swatch\d+\s*\{[\s\S]*?\}\n?/g, '').match(/\.swatches\.swatch\d+\s*\{/);
   return m;
 })();
-assert('ag2-26.PRE-FIX-REPLAY-the-3x3-modifier-was-ABSENT-and-the-row-wrapped-7-plus-2',
-  !prefixCell && JSON.stringify(wraps(N, SW_W, GAP, FIELD_W)) === JSON.stringify([7, 2]),
-  `on the pre-fix sheet there is no \`.swatches.swatch3\` rule at all, and the same wrap arithmetic gives ` +
-  `${JSON.stringify(wraps(N, SW_W, GAP, FIELD_W))} for the ${N} swatches — so ag2-16's "3 rows of 3" was RED ` +
-  `before the fix and its ${CELL_PX ? CELL_PX.toFixed(1) : '?'}px cell is a measurement of the new rule`);
+assert('ag2-26.PRE-FIX-REPLAY-the-column-modifier-was-ABSENT-and-the-row-wrapped-7-plus-2',
+  !prefixCell && JSON.stringify(wraps(AG2_KEYS, SW_W, GAP, FIELD_W)) === JSON.stringify([7, 2]),
+  `on the pre-fix sheet there is no \`.swatches.swatch<k>\` rule at all, and the same wrap arithmetic over ROUND AG2's ` +
+  `${AG2_KEYS} keys gives ${JSON.stringify(wraps(AG2_KEYS, SW_W, GAP, FIELD_W))} for the swatches — so ag2-16's ` +
+  `"column grid" was RED before the fix and its ${CELL_PX ? CELL_PX.toFixed(1) : '?'}px cell is a measurement of the ` +
+  `new rule. (Held on AG2's ${AG2_KEYS} keys, not the live ${N}, for the reason given at AG2_KEYS.)`);
 
 /* The replay must not have disturbed the live tree. */
 assert('ag2-27.PRE-FIX-REPLAY-wrote-nothing-it-read',

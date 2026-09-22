@@ -4157,16 +4157,23 @@ export default function App() {
    *  `var(--c-*)` token, so the swatch itself recolours with the theme. Picking
    *  one stores the key (not a hex), which is what makes light mode work.
    *
-   *  ROUND AG2, ITEM 3 — `swatch3` lays the NINE keys out three rows of three.
-   *  This is the SHARED control: every one of its call sites renders the same
-   *  nine keys, so the orphan row the ninth key produced is fixed once, here,
-   *  rather than at the two rows that were noticed. The class is `swatch3`, NOT
-   *  `grid3`: that name is the segmented font row's modifier
-   *  (`.insp-seg.grid3`), and `.swatches` and `.insp-seg` are the same element
-   *  there, so sharing the name would move the font row's gap. Measured in the
-   *  `.swatches.swatch3` block in `src/styles.css`. */
+   *  ROUND AG2, ITEM 3 — the shared row lays the keys out in a fixed number of
+   *  columns. This is the SHARED control: every one of its call sites renders
+   *  the same keys, so a wrap problem is fixed once, here, rather than at the
+   *  two rows that were noticed. The class is `swatch6`, NOT `grid3`: that name
+   *  is the segmented font row's modifier (`.insp-seg.grid3`), and `.swatches`
+   *  and `.insp-seg` are the same element there, so sharing the name would move
+   *  the font row's gap. Measured in the `.swatches.swatch6` block in
+   *  `src/styles.css`.
+   *
+   *  ROUND AO, AO-1a — SIX COLUMNS, NOT THREE. AG2 shipped `swatch3` and the
+   *  three columns made every colour cell 80 x 26: a slab ("các ô nên nhỏ lại
+   *  cho đẹp"). Six columns is `(253 - 5x7) / 6 = 36.3px` against the same 26px
+   *  height, near-square and still a >= 36px tap target. One modifier, so all
+   *  seven call sites moved at once — deliberately: two cell sizes in one panel
+   *  would read as a mistake. The FULL reasoning lives beside the rule. */
   const swatchRow = (current: ColorKey | null, onPick: (k: ColorKey) => void, custom?: string) => (
-    <div className="swatches swatch3">
+    <div className="swatches swatch6">
       {COLOR_KEYS.map((k, i) => (
         <div
           key={k}
