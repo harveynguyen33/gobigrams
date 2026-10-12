@@ -208,7 +208,10 @@ for (const [f, needle] of [
   ['GoblinEdge.tsx', '[path, labelX, labelY] = straightPath(bGeo, W)'],
   ['GoblinEdge.tsx', '[path, labelX, labelY] = bezierPath(bGeo, W)'],
   ['App.tsx', "if (phase === 'start')"],
-  ['App.tsx', 'const axis = bendAxisFor(e.type, geo, dx, dy)'],
+  /* AUDIT-11 re-anchor: the axis derivation grew a locked-axis branch (the
+     'end' report carries dx=dy=0, which bendAxisFor resolves to 'h'). The
+     derivation still comes from bendAxisFor — in both arms. */
+  ['App.tsx', "bendAxisFor(e.type, geo, dx, dy)"],
   ['App.tsx', 'BEND_SNAP_PX'],
   ['App.tsx', 'delete out.bendX'],
 ]) {

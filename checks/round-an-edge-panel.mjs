@@ -355,12 +355,16 @@ section('AN-5 — undo and redo keep the selection');
 
   /* The SNAPSHOT keeps `selected: false`: the fix is that the LIVE selection
      survives, not that a stale one is replayed. */
-  const snapshotClean = /edges: edgesRef\.current\.map\(e => \(\{\.\.\.e, selected: false\}\)\)/.test(APP)
+  /* AUDIT-8 re-anchor: the edge arm now ALSO copies `data` one level (the node
+     arm always did) — history entries must not alias live edge objects. The
+     `selected: false` normalisation is unchanged and still asserted. */
+  const snapshotClean = /edges: edgesRef\.current\.map\(e => \(\{\.\.\.e, data: \{\.\.\.\(e\.data as any\)\}, selected: false\}\)\)/.test(APP)
     && /data: \{\.\.\.\(n\.data as any\)\}, selected: false,/.test(APP);
   assert('an5.the-snapshot-still-normalises-selected-false',
     snapshotClean,
-    `\`snapshot()\` still maps every edge to \`{...e, selected: false}\` and every node to \`selected: false\` = ` +
-    `${snapshotClean}. Left in place deliberately: history must never replay a selection captured twenty edits ago. ` +
+    `\`snapshot()\` maps every edge to \`{...e, data: {...}, selected: false}\` (AUDIT-8 added the data copy ` +
+    `so entries cannot alias live edge objects) and every node to \`selected: false\` = ${snapshotClean}. ` +
+    `Left in place deliberately: history must never replay a selection captured twenty edits ago. ` +
     `The fix is the LIVE selection surviving the restore, and this probe is what stops a later round "simplifying" ` +
     `the fix into the snapshot, which would reintroduce stale-selection replay instead of curing the defect.`);
 }

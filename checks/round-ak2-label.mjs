@@ -665,15 +665,23 @@ section('AK-12/AK-14.1/AK-15 — the three controls are in the panel, in the rig
     `\`resetLabelPos\` pushes history ${pushes}× and deletes both \`labelOffset\` and \`labelPinned\` ` +
     `(${deletesBoth}) — ONE undo step, landing on the same state the snap-to-centre rail reaches`);
 
-  /* AK-10: ONE history entry per gesture, at the START. */
+  /* AK-10: ONE history entry per gesture. ROUND AQ-DEFERRED / AUDIT-10
+     re-anchor: the entry moved from the 'start' branch to the FIRST 'move' —
+     'start' fires on every pointerdown (even a plain click that moves nothing),
+     and a click pushing an undo entry that changed nothing made the next
+     Ctrl+Z feel dead. Still exactly ONE push per gesture; a click pushes none. */
   const writeBody = (/const onLabelWrite = useCallback\([\s\S]*?\}, \[pushHistory, setEdges\]\)/.exec(APP_C) ?? [''])[0];
   const startBranch = /if \(phase === 'start'\) \{\s*pushHistory\(\);/.test(writeBody);
+  const moveOnce = /phase === 'move' && !labelGesturePushed\.current\) \{\s*labelGesturePushed\.current = true;\s*pushHistory\(\);/.test(writeBody);
   const pushesInWrite = (writeBody.match(/pushHistory\(\)/g) ?? []).length;
   assert('ak10.the-drag-pushes-history-ONCE-and-only-at-the-START-phase',
-    startBranch && pushesInWrite === 1,
-    `\`onLabelWrite\` pushes history ${pushesInWrite}× and it is inside the \`'start'\` branch ` +
-    `(${startBranch}) — the convention every gesture in this file documents, and the mistake this ` +
-    `project already paid for with the resize latch`);
+    !startBranch && moveOnce && pushesInWrite === 1,
+    `\`onLabelWrite\` pushes history ${pushesInWrite}×, first-move-gated (${moveOnce}), ` +
+    `start-branch pushes (${startBranch}) — AUDIT-10 moved the entry off the pointerdown so a ` +
+    `plain click writes no history; still exactly one entry per real drag`);
+  assert('ak10.a-click-writes-no-history (the AUDIT-10 contract)',
+    !startBranch,
+    'the \'start\' branch must NOT push — it fires on every pointerdown, clicks included');
 
   /* A CENTRED write DELETES the keys rather than storing zeros — which is what
      makes reset / snap / never-moved one state. */

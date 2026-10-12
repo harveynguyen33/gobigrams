@@ -10,6 +10,34 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AUDIT FIXES — all 15 interaction findings fixed (3 real bugs, 6 latent, 6 smells). DONE, 39/39 harnesses GREEN. PENDING HARVEY'S DEVICE TEST.
+
+From `AUDIT-INTERACTIONS-2026-10-12.json`. One commit per concern group:
+
+**REAL bugs:**
+- **AUDIT-1** — paste/duplicate remaps `parentId` through idMap (ghost children of the original group gone; unpasted-parent children leave the group).
+- **AUDIT-2+3** — onConnect: twin check + pushHistory + id mint hoisted OUT of the setEdges updater (×N bump now undoable; StrictMode double-push gone).
+**Latent:**
+- **AUDIT-4** — prefers-reduced-motion folds into useAnimationGating (override still wins) → SMIL beads gated.
+- **AUDIT-5** — return-to-origin dblclick guard: the claim latch was self-releasing before dblclick; the gesture hook now stamps `noteDrag()` on real moves and the dblclick refuses within 400ms.
+- **AUDIT-6** — beginGesture accepts a transform GETTER; both GoblinEdge gestures pass `() => storeApi.getState().transform` (mid-gesture ctrl-zoom no longer skews writes).
+- **AUDIT-7** — all 5 client→flow sites pass RAW client coords (screenToFlowPosition subtracts its own rect; the manual wrap subtraction double-subtracted). The favourite/shape wrap-centre fallbacks now centre correctly.
+- **AUDIT-8** — snapshot() copies edge `data` one level (matches the node arm; enforced, not implicit).
+- **AUDIT-9** — pre-AM-1 pinned labels (no stored anchor) adopt the live anchor on first touch; no teleport.
+**Smells:**
+- **AUDIT-10** — bend/label gesture history moves from 'start' to first 'move' (a plain click no longer pushes a phantom undo entry). ak10 re-anchored + a new click-writes-no-history probe.
+- **AUDIT-11** — bend 'end' reuses the LOCKED axis (dx=dy=0 resolved to 'h' and could store a spurious bendX on vertical drags).
+- **AUDIT-12** — reparent/release no longer pushes a second history entry (one gesture = one undo; proximity keeps its own — it's a distinct edge creation).
+- **AUDIT-13** — connectEnd with no touch coordinates bails instead of hit-testing (0,0).
+- **AUDIT-14** — addNodeByLabel's default insert centres on the wrap (was raw 480,300 client).
+- **AUDIT-15** — CustomShapeNode comment corrected: no aspect lock; the <img> letterboxes (object-fit contain).
+- **AUDIT-16** — readOnlyRef guards onConnect/onConnectEnd: an in-flight connection drag dropped after toggling read-only no longer creates an edge.
+
+**Re-anchored harnesses:** ak10 (history-at-first-move + new click probe), an5 (snapshot data copy), round-s-edge-bend (axis derivation form).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **39/39 GREEN** · boards clean.
+
 ## ▶ ROUND AQ — type scale + spacing scale consolidation. DONE, all 39 harnesses GREEN. PENDING HARVEY'S DEVICE TEST.
 
 **AQ-1 — the type scale (8 steps).** New `--fs-*` tokens on :root (--fs-2xs 9px →
