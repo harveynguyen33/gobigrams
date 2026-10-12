@@ -389,8 +389,11 @@ section('AN-6a — the selected label keeps the authored colour');
      label never matched the deleted rule, and the base rule's own declarations are
      untouched. Printed as a separate PASS with its NOTE so it is not read as a
      kill — the item's kill is the assertion above. */
+  /* ROUND AQ re-anchor: the 11px literal is now var(--fs-sm) — same resolved
+     value (11px), pinned by round-aq-scales. */
   const unselectedSame = authored && base.background === 'var(--surface)'
-    && base['font-size'] === 'calc(11px * var(--ts-scale, 1))';
+    && (base['font-size'] === 'calc(11px * var(--ts-scale, 1))'
+      || base['font-size'] === 'calc(var(--fs-sm) * var(--ts-scale, 1))');
   note('an6.unselected-label-parity — GREEN ON BOTH TREES BY CONSTRUCTION (it asserts nothing changed).');
   assert('an6.an-UNSELECTED-label-still-paints-the-pre-change-declarations',
     unselectedSame,

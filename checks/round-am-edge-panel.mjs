@@ -197,7 +197,10 @@ section('AM-2 — the edge label gains a TEXT section');
    *     each is now a var with THAT literal as its fallback — and the weight is
    *     the load-bearing one, because every NODE row falls back to 400. */
   const labelRule = /\.edge-label\s*\{([^}]*)\}/.exec(STYLES)?.[1] ?? '';
-  const sizeOk = /font-size:\s*calc\(11px\s*\*\s*var\(--ts-scale,\s*1\)\)/.test(labelRule);
+  /* ROUND AQ re-anchor: 11px joined the type scale — calc(var(--fs-sm) * scale)
+     resolves to exactly the same 11px at scale 1 (--fs-sm: 11px, pinned by the
+     round-aq-scales ratchet). */
+  const sizeOk = /font-size:\s*calc\((?:11px|var\(--fs-sm\))\s*\*\s*var\(--ts-scale,\s*1\)\)/.test(labelRule);
   const weightOk = /font-weight:\s*var\(--ts-weight,\s*600\)/.test(labelRule);
   const familyOk = /font-family:\s*var\(--ts-font,\s*var\(--mono\)\)/.test(labelRule);
   /* resolve them the way the browser would, with nothing stored */
