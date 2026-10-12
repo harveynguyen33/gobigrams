@@ -46,9 +46,13 @@ const CustomShapeNode = memo(({data, selected}: NodeProps) => {
   return (
     <div className={`custom-shape-node${selected ? ' selected' : ''}`} data-shape-title={d.title}>
       {selected && (
-        /* §8.3 — the same four clamps the import path enforces, applied again to
-           the live resize: 32 px floor, 512 px ceiling, and `aspect:'fixed'` so
-           the artwork can never be distorted. */
+        /* §8.3 — the same clamps the import path enforces, applied again to
+           the live resize: a 32 px floor and a 512 px ceiling on BOTH axes.
+           AUDIT-15 correction: the resizer carries NO aspect lock — the node box
+           can take any ratio. The artwork itself cannot distort (the <img>
+           below is object-fit: contain, so it letterboxes inside the box), but
+           a reader trusting the old "aspect:'fixed'" comment would not have
+           re-verified that. */
         <NodeResizer
           minWidth={SHAPE_MIN_PX}
           minHeight={SHAPE_MIN_PX}

@@ -361,7 +361,21 @@ export function useAnimationGating(nodeCount: number) {
     }
   });
 
-  const auto = nodeCount <= LARGE_GRAPH_NODE_THRESHOLD;
+  /* AUDIT-4 — the OS reduce-motion setting is the one gate CSS cannot express
+     for the SMIL payload beads (they live in attributes, not styles). Folding
+     it into the effective flag lands .ds-no-anim on the wrapper for those
+     users, same as the 30-node gate. The override still wins: a user who
+     EXPLICITLY toggled motion on has stated a preference louder than the OS. */
+  const [osReduced] = useState(() => {
+    try {
+      return typeof matchMedia === 'function'
+        && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  });
+
+  const auto = nodeCount <= LARGE_GRAPH_NODE_THRESHOLD && !osReduced;
   const animate = override ?? auto;
 
   const toggle = useCallback(() => {

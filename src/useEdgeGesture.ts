@@ -93,8 +93,18 @@ export function useEdgeGesture() {
    *  component instance, which is per edge, which is the scope that matters —
    *  two affordances of the SAME edge. */
   const claimed = useRef(false);
+  /* AUDIT-5 — the claim latch self-releases on the next macrotask, so by the
+     time the SECOND pointerup of a double-click fires, `isClaimed()` is always
+     false and the AK-13 return-to-origin guard was dead code. A REAL drag is
+     the thing to remember: `noteDrag()` stamps here when a gesture reports an
+     actual move (past the lock threshold), and `msSinceDrag()` lets the
+     double-click handler refuse an editor that immediately follows a drag. */
+  const lastDragAt = useRef(0);
 
   return {
+    noteDrag() { lastDragAt.current = Date.now(); },
+    msSinceDrag: () => (lastDragAt.current ? Date.now() - lastDragAt.current : Infinity),
+
     /** Wrap a pointerdown handler. `run` is called only if the gesture was
      *  claimed, so the claim and the work can never come apart. */
     claim(run: (e: GestureDown) => void) {
@@ -122,7 +132,12 @@ export function useEdgeGesture() {
 export function beginGesture(args: {
   el: Element;
   pane: HTMLElement | null;
-  transform: [number, number, number];
+  /* AUDIT-6 — a transform VALUE is read once, at pointerdown; a ctrl-wheel zoom
+     mid-gesture then made every subsequent toFlow divide by the stale zoom and
+     the written point jumped by the zoom ratio. Pass a GETTER (`() => t`) and
+     the transform is read fresh on every move. The tuple form is still accepted
+     (callers that hold a genuinely constant transform). */
+  transform: [number, number, number] | (() => [number, number, number]);
   pointerId: number;
   clientX: number;
   clientY: number;
@@ -131,7 +146,9 @@ export function beginGesture(args: {
   onMove: (p: Pt, dx: number, dy: number) => void;
   onEnd: (p: Pt) => void;
 }) {
-  const {el, pane, transform, pointerId, lock, onStart, onMove, onEnd} = args;
+  const {el, pane, pointerId, lock, onStart, onMove, onEnd} = args;
+  const transformOf = (): [number, number, number] =>
+    typeof args.transform === 'function' ? args.transform() : args.transform;
   el.setPointerCapture?.(pointerId);
   onStart();
 
@@ -144,7 +161,7 @@ export function beginGesture(args: {
   const toFlow = (ev: {clientX: number; clientY: number}): Pt | null => {
     const b = pane?.getBoundingClientRect();
     if (!b) return null;
-    const t = transform;
+    const t = transformOf();
     return {x: (ev.clientX - b.left - t[0]) / t[2], y: (ev.clientY - b.top - t[1]) / t[2]};
   };
 

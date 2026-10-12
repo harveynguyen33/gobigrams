@@ -3,6 +3,7 @@ import {
   BaseEdge, EdgeLabelRenderer,
   getBezierPath, getSmoothStepPath, getStraightPath,
   useStore,
+  useStoreApi,
   type EdgeProps,
 } from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from './colors';
@@ -122,6 +123,10 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  below needs. Subscribing here re-renders on pan/zoom only, exactly like
    *  every other edge on the canvas. */
   const t = useStore(s => s.transform);
+  /* AUDIT-6 — the LIVE transform for in-flight gestures: `t` above is the value
+     at render time; a zoom that lands mid-gesture updates the store and this
+     getter reads it fresh on every move (see beginGesture's transform getter). */
+  const storeApi = useStoreApi();
   /** ROUND AK, AK-10 — THE one gesture this edge can run. Both affordances claim
    *  it, so one pointerdown can never start the bend and the label drag at once
    *  (AK-11's first requirement). It is the machinery `onBendDown` already owned,
@@ -523,7 +528,9 @@ const GoblinEdge = memo((props: EdgeProps) => {
     beginGesture({
       el: e.currentTarget,
       pane: paneRef.current,
-      transform: t,
+      /* AUDIT-6 — a getter, not the captured tuple: the store may update (ctrl-wheel zoom) while the
+         pointer capture holds the gesture, and the stale zoom made every subsequent toFlow jump by the ratio. */
+      transform: () => storeApi.getState().transform,
       pointerId: e.pointerId,
       clientX: e.clientX,
       clientY: e.clientY,
@@ -537,6 +544,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
           // BELOW THE THRESHOLD NOTHING IS WRITTEN — `beginGesture` has already
           // refused to report a sub-threshold move, so reaching here means the
           // axis really is being chosen now.
+          gestures.noteDrag(); /* AUDIT-5: a real drag happened — dblclick must not open the editor right after */
           lockAxis.current = bendAxisFor(kind, bGeo, dx, dy);
           // the cursor only follows a REAL axis: on the free kinds the value is
           // `'free'` and the handle keeps showing `grabbing`.
@@ -645,7 +653,9 @@ const GoblinEdge = memo((props: EdgeProps) => {
     beginGesture({
       el: e.currentTarget,
       pane: paneRef.current,
-      transform: t,
+      /* AUDIT-6 — a getter, not the captured tuple: the store may update (ctrl-wheel zoom) while the
+         pointer capture holds the gesture, and the stale zoom made every subsequent toFlow jump by the ratio. */
+      transform: () => storeApi.getState().transform,
       pointerId: e.pointerId,
       clientX: e.clientX,
       clientY: e.clientY,
@@ -661,7 +671,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
          moved yet has moved nothing, and `labelPinned: false` is bit-identical
          to a board that never carried the keys. */
       onStart: () => cb(id, {labelAnchor: null, labelOffset: {x: 0, y: 0}, labelPinned: false}, 'start'),
-      onMove: p => P_(p, 'move'),
+      onMove: p => { gestures.noteDrag(); /* AUDIT-5: real move — see the bend twin */ P_(p, 'move'); },
       onEnd: p => {
         setLabelCursor('grab');
         /* THE END REPORT CARRIES THE FINAL WRITE, so what is STORED is the
@@ -1182,11 +1192,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
               e.stopPropagation();
               // AK-13 GUARD: the editor opens on the DOUBLE-CLICK, not on the
               // first of its two pointerdowns. A drag that happens to end where
-              // it began is a gesture, not an edit (see `gestures.claim`), so
-              // this element's double-click is only honoured once no gesture
-              // ran — otherwise releasing a return-to-origin drag would open
-              // the editor the user never asked for.
-              if (gestures.isClaimed()) return;
+              // it began is a gesture, not an edit. (AUDIT-5: the old check
+              // read `gestures.isClaimed()`, but the claim latch self-releases
+              // on the next macrotask — long before the second pointerup — so
+              // the guard never fired. The gesture hook now stamps when a drag
+              // really moved; an editor opening within 400ms of that drag is
+              // the return-to-origin case this guard exists for.)
+              if (gestures.msSinceDrag() < 400) return;
               // FB-L: in review mode the label is readable, not editable — the
               // editor simply never opens. The label element itself is left in
               // place (and keeps its hover feedback).

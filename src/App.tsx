@@ -758,6 +758,11 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(() => {
     try { return localStorage.getItem(READ_ONLY_KEY) === '1'; } catch { return false; }
   });
+  /* AUDIT-16 — the ref mirrors `readOnly` so a handler that STARTED before the
+     toggle (an in-flight connection drag) can still see the mode change when
+     its drop lands; the state alone is a stale closure in that window. */
+  const readOnlyRef = useRef(false);
+  readOnlyRef.current = readOnly; // kept in sync every render (cheap, always right)
 
   // ---- PACKAGE-K: hover choreography, interaction perf guard, layout
   //      transition, animation gating. All four work on React Flow's own DOM
@@ -1182,7 +1187,11 @@ export default function App() {
       const saved = await boards.saveBoard({
         id: board.id, name: board.name,
         nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        edges: edgesRef.current.map(e => ({...e, selected: false})),
+        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
+       Every current edge writer replaces `data` wholesale, so the alias was
+       harmless; the copy makes that invariant ENFORCED rather than implicit —
+       a future in-place patch of edge.data can no longer rewrite history. */
+    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
         preset: presetId,
         // The `legend` key is PERSISTED data (`BoardDoc.legend`) even though the
         // on-canvas renderer is gone: it is written back from the loaded doc so a
@@ -1508,7 +1517,11 @@ export default function App() {
       const saved = await boards.saveBoard({
         id: curBoard.id, name,
         nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        edges: edgesRef.current.map(e => ({...e, selected: false})),
+        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
+       Every current edge writer replaces `data` wholesale, so the alias was
+       harmless; the copy makes that invariant ENFORCED rather than implicit —
+       a future in-place patch of edge.data can no longer rewrite history. */
+    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
         preset: presetId, legend: curBoard.legend,
       });
       setCurBoard(c => c ? {...c, name: saved.name, updatedAt: saved.updatedAt} : c);
@@ -1528,7 +1541,11 @@ export default function App() {
       const saved = await boards.saveBoard({
         id: doc.id, name,
         nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        edges: edgesRef.current.map(e => ({...e, selected: false})),
+        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
+       Every current edge writer replaces `data` wholesale, so the alias was
+       harmless; the copy makes that invariant ENFORCED rather than implicit —
+       a future in-place patch of edge.data can no longer rewrite history. */
+    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
         preset: presetId, legend: curBoard.legend,
       });
       setBoardList(await boards.listBoards());
@@ -1642,7 +1659,11 @@ export default function App() {
     nodes: nodesRef.current.map(n => ({
       ...n, position: {...n.position}, data: {...(n.data as any)}, selected: false,
     })),
-    edges: edgesRef.current.map(e => ({...e, selected: false})),
+    /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
+       Every current edge writer replaces `data` wholesale, so the alias was
+       harmless; the copy makes that invariant ENFORCED rather than implicit —
+       a future in-place patch of edge.data can no longer rewrite history. */
+    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
   }), []);
 
   /** Record the current state before a mutation. Capped at MAX_HISTORY entries. */
@@ -1747,6 +1768,19 @@ export default function App() {
         data: {...(n.data as any)},
       };
     });
+    /* AUDIT-1 — group membership is an ID REFERENCE too: remap `parentId`
+       through the same idMap used for edges. A pasted child whose group was
+       NOT pasted drops out of the group (parentId deleted) instead of staying
+       a ghost child of the ORIGINAL group; a pasted subgroup re-parents to the
+       pasted parent. `extent: 'parent'` only makes sense with a live parent. */
+    for (const nn of newNodes) {
+      const pid = (nn as any).parentId as string | undefined;
+      if (pid) {
+        const mapped = idMap.get(pid);
+        if (mapped) (nn as any).parentId = mapped;
+        else { delete (nn as any).parentId; delete (nn as any).extent; }
+      }
+    }
     const newEdges: Edge[] = cb.edges.map(e => ({
       ...e, id: `e${idc++}`, source: idMap.get(e.source)!, target: idMap.get(e.target)!, selected: false,
     }));
@@ -1817,8 +1851,11 @@ export default function App() {
   const ctxAction = useCallback((action: CtxAction, target: CtxTarget) => {
     if (action === 'addNode' && target.kind === 'pane') {
       if (rf && wrap.current) {
-        const b = wrap.current.getBoundingClientRect();
-        setSearchPos(rf.screenToFlowPosition({x: target.x - b.left, y: target.y - b.top}));
+        /* AUDIT-7 — raw client coords: screenToFlowPosition already subtracts
+           the .react-flow domNode rect internally; subtracting the wrap rect
+           here too double-subtracted by (wrap - rf), zero only while the two
+           rects coincide. */
+        setSearchPos(rf.screenToFlowPosition({x: target.x, y: target.y}));
       } else setSearchPos({x: 200, y: 200});
       return;
     }
@@ -2036,7 +2073,10 @@ export default function App() {
 
     if (hit && dragged.parentId !== hit.id) {
       const hp = absMap.get(hit.id)!;
-      pushHistory();
+      /* AUDIT-12 — no second push: onNodeDragStartAll already snapshotted the
+         pre-gesture state, and the adoption is part of the SAME perceived
+         gesture ("move it into the group"). Two pushes made the gesture cost
+         two undos. The drag-start entry restores position AND membership. */
       setNodes(ns2 => {
         const cur = ns2.find(n => n.id === dragged.id);
         if (!cur) return ns2;
@@ -2056,7 +2096,7 @@ export default function App() {
       flash(`Added to group “${(hit.data as any)?.title ?? hit.id}”`);
     } else if (!hit && dragged.parentId) {
       // dragged out of its group — keep the absolute position, drop the parent
-      pushHistory();
+      /* AUDIT-12 — same collapse: the drag-start entry covers this. */
       setNodes(ns2 => {
         const cur = ns2.find(n => n.id === dragged.id);
         if (!cur) return ns2;
@@ -2098,18 +2138,28 @@ export default function App() {
   // silently added a shape nobody asked for. Only a drop that lands ON an
   // existing node still connects.
   const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+    /* AUDIT-16 — a connection drag in flight when readOnly is toggled must not
+       complete: the drop still fires, so bail before any target search. */
+    if (readOnlyRef.current) { pendingDrop.current = null; return; }
     const c = pendingDrop.current;
     pendingDrop.current = null;
     setGuides({vertical: null, horizontal: null});
-    const clientX = 'clientX' in event ? event.clientX : (event as TouchEvent).changedTouches?.[0]?.clientX ?? 0;
-    const clientY = 'clientY' in event ? event.clientY : (event as TouchEvent).changedTouches?.[0]?.clientY ?? 0;
+    /* AUDIT-13 — no coordinates, no hit-test: a TouchEvent with an empty
+       changedTouches list used to fall back to (0,0), hit-testing the viewport
+       corner and possibly mis-connecting to a node parked there. Bail instead —
+       the gesture just ends without a target, which is what a dropped touch is. */
+    const hasPoint = 'clientX' in event
+      || (event as TouchEvent).changedTouches?.length
+    if (!hasPoint) return;
+    const clientX = 'clientX' in event ? event.clientX : (event as TouchEvent).changedTouches[0].clientX;
+    const clientY = 'clientY' in event ? event.clientY : (event as TouchEvent).changedTouches[0].clientY;
     // Only when the drop was NOT on a valid handle and we know the source.
     if (!c || !rf || !wrap.current) return;
     if (connectionState?.isValid) return;
     const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
     if (el?.closest('.react-flow__handle')) return;
-    const b = wrap.current.getBoundingClientRect();
-    const p = rf.screenToFlowPosition({x: clientX - b.left, y: clientY - b.top});
+    /* AUDIT-7 — raw client coords (see the ctx addNode note above). */
+    const p = rf.screenToFlowPosition({x: clientX, y: clientY});
     // pick target: a node under the drop point — there is no longer a fallback
     // branch, so no node is ever created from a drop.
     const ns = nodesRef.current;
@@ -2138,6 +2188,8 @@ export default function App() {
   // D4: a second connection between the same ordered pair of nodes is not a
   // duplicate edge — it bumps a "×N" count on the existing one instead.
   const onConnect = useCallback((c: Connection) => {
+    /* AUDIT-16 — readOnly may have flipped after this gesture began. */
+    if (readOnlyRef.current) { flash('Read-only: connection dropped'); return; }
     // G — direction guard. The 4-point scheme makes every handle a SOURCE, so
     // React Flow already builds the connection the way the user drew it; this
     // normalises it anyway, because the one thing that must never come back is
@@ -2164,24 +2216,32 @@ export default function App() {
       };
     }
     tickTask('edge');
-    setEdges(es => {
-      const twin = es.find(e =>
-        e.source === c.source && e.target === c.target &&
-        !(e.sourceHandle || e.targetHandle));
-      if (twin) {
-        const cur = ((twin.data as any)?.parallel ?? 1) as number;
-        const next = cur + 1;
-        return es.map(e => e.id === twin.id
-          ? {...e, data: {...((e.data ?? {}) as EdgeData), parallel: next}, label: `×${next}`}
-          : e);
-      }
-      pushHistory();
-      // L3c: on an ERD board a connection between two columns is a relationship
-      // between those columns — carry the handles through.
-      return addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, `e${idc++}`, {
-        sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
-      }), es);
-    });
+    /* AUDIT-2 + AUDIT-3 — the twin check, pushHistory and the id mint all moved
+       OUT of the setEdges updater. Two reasons, both measured:
+       (a) AUDIT-2: the twin-bump branch never pushed history, so Ctrl+Z after a
+           ×N bump skipped the whole gesture;
+       (b) AUDIT-3: an updater must be pure — React StrictMode double-invokes it
+           in dev, and pushHistory + idc++ inside it produced TWO history entries
+           and two burnt ids per connection. All three now run once, here, from
+           edgesRef (the live pre-mutation state), like every other writer. */
+    const twin = edgesRef.current.find(e =>
+      e.source === c.source && e.target === c.target &&
+      !(e.sourceHandle || e.targetHandle));
+    pushHistory();
+    if (twin) {
+      const cur = ((twin.data as any)?.parallel ?? 1) as number;
+      const next = cur + 1;
+      setEdges(es => es.map(e => e.id === twin.id
+        ? {...e, data: {...((e.data ?? {}) as EdgeData), parallel: next}, label: `×${next}`}
+        : e));
+      return;
+    }
+    // L3c: on an ERD board a connection between two columns is a relationship
+    // between those columns — carry the handles through.
+    const newId = `e${idc++}`;
+    setEdges(es => addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, newId, {
+      sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
+    }), es));
   }, [tickTask, pushHistory, setEdges, preset, defaultPath]);
 
   // ---- F7: connection rules applied to every new connection ----
@@ -2310,6 +2370,18 @@ export default function App() {
     setSelEdgeId(id);
   }, [tickTask, pushHistory, setEdges]);
 
+  /* AUDIT-10 — the history entry for a bend/label gesture moves from 'start'
+     to the FIRST 'move'. beginGesture fires 'start' on every pointerdown (even
+     a plain click, which moves nothing), so a stray click pushed an undo entry
+     that changed nothing and made the next Ctrl+Z feel dead. Now the entry is
+     pushed by the first reported move: a click still selects, a drag pushes
+     exactly one entry, same as before. The ref lives at component level (a hook
+     inside a callback is illegal). */
+  const bendGesturePushed = useRef(false);
+  /* AUDIT-11 — the axis the gesture LOCKED (set on first real move, cleared on
+     end). The 'end' report carries dx=dy=0, which bendAxisFor resolves to 'h'
+     unconditionally — a vertical drag then stored a spurious bendX. */
+  const bendGestureAxis = useRef<'h' | 'v' | 'free' | null>(null);
   /** ROUND S/T — the midpoint drag, draw.io's mechanic.
    *
    *  `'start'` records ONE history entry and selects the edge, exactly like
@@ -2341,11 +2413,16 @@ export default function App() {
    *  It deliberately does NOT route through `updateEdge`: that is keyed on
    *  `selEdgeId`, so on the very first move (the one that selects the edge) it
    *  would write to the WRONG edge. */
-  const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
+    const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
     if (phase === 'start') {
-      pushHistory();
+      bendGesturePushed.current = false;
+      bendGestureAxis.current = null;
       setSelEdgeId(id);
       return;
+    }
+    if (phase === 'move' && !bendGesturePushed.current) {
+      bendGesturePushed.current = true;
+      pushHistory();
     }
     setEdges(es => es.map(e => {
       if (e.id !== id) return e;
@@ -2354,9 +2431,16 @@ export default function App() {
       const data = (e.data ?? {}) as EdgeData;
       const base = edgeDrawnMid(e, nodesRef.current);
       if (!base) return e;
-      const axis = bendAxisFor(e.type, geo, dx, dy);
+      /* AUDIT-11 — the LOCKED axis. 'move' records it; 'end' carries dx=dy=0,
+         which bendAxisFor would resolve to 'h' unconditionally — a vertical
+         drag then stored a spurious bendX from the pointer's final-x tremor. */
+      if (phase === 'move') bendGestureAxis.current = bendAxisFor(e.type, geo, dx, dy);
+      const axis = phase === 'end' && bendGestureAxis.current
+        ? bendGestureAxis.current
+        : bendAxisFor(e.type, geo, dx, dy);
       const put: Pt = dragPoint(axis, W, base);
       if (phase === 'end') {
+        bendGestureAxis.current = null;
         const pm = plainMidpoint(geo);
         if (Math.hypot(put.x - pm.x, put.y - pm.y) <= BEND_SNAP_PX) {
           const out = {...data};
@@ -2420,11 +2504,18 @@ export default function App() {
      this round — three situations, one stored state. A gesture that ENDS at the
      centre lands there through the same door: the total it writes is `{0,0}`,
      which is the pinned-but-empty case collapsed below. */
+  /* AUDIT-10 twin — same deferral as onBend above: the label gesture's history
+     entry lands on the first 'move', not on the pointerdown 'start'. */
+  const labelGesturePushed = useRef(false);
   const onLabelWrite = useCallback((id: string, w: LabelWrite, phase: BendPhase) => {
     if (phase === 'start') {
-      pushHistory();
+      labelGesturePushed.current = false;
       setSelEdgeId(id);
       return;
+    }
+    if (phase === 'move' && !labelGesturePushed.current) {
+      labelGesturePushed.current = true;
+      pushHistory();
     }
     setEdges(es => es.map(e => {
       if (e.id !== id) return e;
@@ -2450,7 +2541,18 @@ export default function App() {
         return {...e, data};
       }
       const stored = data.labelOffset;
-      const storedAnchor = data.labelAnchor;
+      let storedAnchor = data.labelAnchor;
+      /* AUDIT-9 — migration-on-first-touch. Boards pinned before ROUND AM-1
+         carry labelOffset + labelPinned but NO labelAnchor. Without an anchor
+         the rebase below was skipped, and the first drag teleported the label
+         by whatever the geometry had drifted since the pin. One-time fix: if a
+         pinned offset arrives with no stored anchor, treat the LIVE anchor as
+         the one it was measured from (no rebase — the drift is absorbed), and
+         this gesture plus every later one rebases correctly. */
+      if (stored && !storedAnchor) {
+        storedAnchor = {x: w.labelAnchor.x, y: w.labelAnchor.y};
+        data.labelAnchor = {x: w.labelAnchor.x, y: w.labelAnchor.y};
+      }
       const frameMoved = stored && storedAnchor
         && (storedAnchor.x !== w.labelAnchor.x || storedAnchor.y !== w.labelAnchor.y);
       const corrected = frameMoved
@@ -2546,11 +2648,12 @@ export default function App() {
      cancelled writes nothing at all. */
   const onEdgeDoubleClick = useCallback((e: React.MouseEvent, edge: Edge) => {
     if (readOnly || !rf || !wrap.current) return;
-    const b = wrap.current.getBoundingClientRect();
     // `screenToFlowPosition` is the authority this app uses for every
     // client→flow conversion, so no second conversion is compiled into the
-    // renderer that could drift from these.
-    const at = rf.screenToFlowPosition({x: e.clientX - b.left, y: e.clientY - b.top});
+    // renderer that could drift from these. (AUDIT-7 — raw client coords: the
+    // function subtracts the domNode rect itself; the manual wrap-rect
+    // subtraction here double-subtracted.)
+    const at = rf.screenToFlowPosition({x: e.clientX, y: e.clientY});
     openLabelAt(edge.id, at);
   }, [readOnly, rf, openLabelAt]);
 
@@ -2772,7 +2875,14 @@ export default function App() {
     const item = LIBRARY.find(p => p.label === label);
     if (!item) return;
     const id = `n${idc++}`;
-    const p = pos ?? (rf ? rf.screenToFlowPosition({x: 480, y: 300}) : {x: 480, y: 300});
+    /* AUDIT-14 — the no-position default centres on the WRAP (a client coord:
+       rect.left + half), so with the palette open the insert lands at the
+       canvas centre like every sibling path, not 480 client px from the
+       viewport origin (~248 flow px off). */
+    const wr3 = wrap.current?.getBoundingClientRect();
+    const p = pos ?? (rf && wr3
+      ? rf.screenToFlowPosition({x: wr3.left + wr3.width / 2, y: wr3.top + wr3.height / 2})
+      : {x: 480, y: 300});
     pushHistory();
     tickTask('node');
 
@@ -3129,11 +3239,10 @@ export default function App() {
     tickTask('node');
     // §6.5 step 2 — SNAP TO THE GRID, unconditionally: the drop point is the
     // only thing that decides where this lands, so it is the thing quantised.
-    const raw = pos ?? (rf
-      ? rf.screenToFlowPosition({
-        x: (wrap.current?.clientWidth ?? 900) / 2,
-        y: (wrap.current?.clientHeight ?? 600) / 2,
-      })
+    /* AUDIT-7 — wrap-centre as a CLIENT coord (see the favourite twin above). */
+    const wr2 = wrap.current?.getBoundingClientRect();
+    const raw = pos ?? (rf && wr2
+      ? rf.screenToFlowPosition({x: wr2.left + wr2.width / 2, y: wr2.top + wr2.height / 2})
       : {x: 480, y: 300});
     const p = {x: Math.round(raw.x / gridSize) * gridSize, y: Math.round(raw.y / gridSize) * gridSize};
     // §6.5 step 3 — RE-GENERATE THE ID. Never a stored one.
@@ -3421,6 +3530,7 @@ export default function App() {
   const toggleReadOnly = useCallback(() => {
     const next = !readOnly;
     setReadOnly(next);
+    readOnlyRef.current = next; /* AUDIT-16 — visible to in-flight gestures immediately */
     try { localStorage.setItem(READ_ONLY_KEY, next ? '1' : '0'); } catch { /* ignore */ }
     if (next) {
       // Entering the mode must not leave a stale ring or node
