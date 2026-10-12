@@ -1,0 +1,168 @@
+# Thin loader — the ONLY file a consumer repo keeps under .forgejo/workflows/.
+#
+# How it works (Forgejo v15/v16 has NO reusable workflows / workflow_call):
+#   1. Fetch the canonical review definition (engine/review-job.yml) and the
+#      profile env file (profiles/<REVIEW_PROFILE>.env) from the kit repo's
+#      raw endpoint at run time.
+#   2. Source the profile env file → exports LANGUAGE_HINT etc. for the
+#      engine (a profile is JUST env vars the engine consumes).
+#   3. Execute the fetched engine YAML's steps inline: `forgejo-cli`-style
+#      expression references (${{ ... }}) inside review-job.yml are evaluated
+#      by the runner because the loader embeds the fetched steps into the
+#      job via a generated composite — emulated here by exporting the same
+#      env names and running the same step scripts (see ENGINE EXEC below).
+#
+# REPRODUCIBILITY (pin by SHA): set repo variable AI_REVIEW_KIT_REF to a
+#   commit SHA (e.g. 9fe6e86...) to fetch that exact kit revision:
+#     .../raw/branch/main/engine/review-job.yml?ref=<sha>
+#   Default: branch main → the loader auto-updates with the kit.
+#   (The ?ref= query works on Forgejo raw URLs for branches, tags and SHAs.)
+#
+# This repo is the trusted base; this workflow never checks out PR code, so
+# pull_request_target is safe here AND ensures secrets are available even for
+# fork PRs (plain pull_request hides secrets from fork heads).
+name: ai-review
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+env:
+  # Kit revision to fetch: set to a commit SHA to pin, leave unset for main.
+  AI_REVIEW_KIT_REF: ${{ vars.AI_REVIEW_KIT_REF || 'main' }}
+  # Profile name (profile file = profiles/<name>.env in the kit).
+  REVIEW_PROFILE: ${{ vars.REVIEW_PROFILE || 'default' }}
+
+concurrency:
+  group: ai-review-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # ai-review label: only the pve2-runner LXC advertises it, so the job can
+    # only land where the runner-local patched image exists.
+    runs-on: ai-review
+    timeout-minutes: 25
+    # Reviews must never block merging on tool flakiness.
+    continue-on-error: true
+    container:
+      image: ai-code-review:glm
+    steps:
+      - name: Fetch engine + profile from ai-review-kit
+        env:
+          # Scoped token for kit raw fetch; falls back to the bot token.
+          KIT_TOKEN: ${{ secrets.FORGEJO_REVIEW_TOKEN || secrets.AI_REVIEW_BOT_TOKEN }}
+          KIT_BASE: http://192.168.33.210:3000
+          KIT_REPO: harvey/ai-review-kit
+        run: |
+          set -eu
+          REF="${AI_REVIEW_KIT_REF}"
+          mkdir -p /tmp/ai-review-kit
+          fetch() { # fetch <kit-path> <dest>
+            code=$(curl -sL -o "$2" -w '%{http_code}' \
+              -H "Authorization: token ${KIT_TOKEN}" \
+              "${KIT_BASE}/${KIT_REPO}/raw/branch/main/$1?ref=${REF}") || code=000
+            # Fail LOUD on a missing engine/profile — never silently no-op.
+            if [ "$code" != "200" ]; then
+              echo "::error::Failed to fetch kit file '$1' (ref=${REF}): HTTP ${code}"
+              exit 1
+            fi
+          }
+          fetch "engine/review-job.yml" /tmp/ai-review-kit/review-job.yml
+          fetch "profiles/${REVIEW_PROFILE}.env" "/tmp/ai-review-kit/profile.env"
+          echo "engine: $(head -1 /tmp/ai-review-kit/review-job.yml)"
+          echo "profile: ${REVIEW_PROFILE} ($(grep -c '=' /tmp/ai-review-kit/profile.env) vars)"
+
+      - name: Load profile env (REVIEW_PROFILE)
+        run: |
+          set -eu
+          # A profile is just KEY=VALUE lines the engine consumes; export each.
+          set -a
+          # shellcheck disable=SC1091
+          . /tmp/ai-review-kit/profile.env
+          set +a
+          echo "Loaded profile ${REVIEW_PROFILE}: LANGUAGE_HINT=${LANGUAGE_HINT:-unset}"
+
+      - name: AI code review (engine step 1)
+        env:
+          # Dedicated least-privilege bot token (issue-comment write) for --post;
+          # never expose the default automation token under pull_request_target.
+          FORGEJO_TOKEN: ${{ secrets.AI_REVIEW_BOT_TOKEN }}
+          # Injection-proofing: context values pass through env, never
+          # interpolated directly into the run script.
+          GOB_REPO: ${{ github.repository }}
+          GOB_PR: ${{ github.event.number }}
+          # ---- provider selection (mirrors engine/review-job.yml) ----
+          AI_VENDOR: glm
+          AI_PROVIDER: openai
+          # glm-4.6 is the only coding-plan model measured to honor OpenAI tool
+          # calling (required for ai-code-review's structured output).
+          AI_MODEL: glm-4.6
+          # glm-4.6 spends long reasoning bursts; defaults (90s) time out.
+          LLM_TIMEOUT: 480
+          LLM_MAX_RETRIES: 2
+          # Disable the synthesis pass: it uses a hardcoded "fast" model name
+          # (gpt-5-nano) that z.ai rejects with "Unknown Model" (code 1211).
+          ENABLE_PROJECT_CONTEXT: "false"
+          INCLUDE_MR_SUMMARY: "false"
+          OPENAI_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+          # Canonical key secret; GLM_API_KEY is the legacy alias.
+          AI_API_KEY: ${{ secrets.LLM_API_KEY || secrets.GLM_API_KEY }}
+          # ---- profile-provided (sourced in the previous step) ----
+          # LANGUAGE_HINT / TEAM_CONTEXT_FILE come from the sourced profile.env
+          # and stay exported for this step.
+        run: |
+          set -eu
+          set -a; . /tmp/ai-review-kit/profile.env; set +a
+          ai-code-review --platform forgejo \
+            --project-id "$GOB_REPO" \
+            --max-chars 40000 \
+            --pr-number "$GOB_PR" \
+            --post
+
+      - name: Notify on ISSUES verdict (ntfy) (engine step 2)
+        if: always()
+        continue-on-error: true
+        env:
+          FORGEJO_TOKEN: ${{ secrets.AI_REVIEW_BOT_TOKEN }}
+          GOB_REPO: ${{ github.repository }}
+          GOB_PR: ${{ github.event.number }}
+          GOB_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pulls/${{ github.event.number }}
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          FORGEJO_API_BASE: ${{ secrets.REVIEW_API_BASE }}
+        run: |
+          set -eu
+          [ -n "$NTFY_URL" ] && [ -n "$NTFY_TOPIC" ] || { echo "ntfy not configured; skipping"; exit 0; }
+          VERDICT="UNKNOWN"
+          TOP_ISSUE=""
+          API_BASE="${FORGEJO_API_BASE:-$(echo "$GOB_PR_URL" | grep -oE '^[a-z]+://[^/]+')}"
+          # awk RS MUST be "},{"id": (with the colon): a trailing } degrades to
+          # one-record mode and re-reads the OLDEST review comment (the
+          # stale-verdict bug fixed 2026-10-11 in kit engine/review-job.yml).
+          COMMENTS=$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" \
+            "${API_BASE}/api/v1/repos/${GOB_REPO}/issues/${GOB_PR}/comments" 2>/dev/null || true)
+          BODY=$(echo "$COMMENTS" | awk 'BEGIN{RS="},{\"id\":"}
+            /## AI Code Review/ {
+              if (match($0, /"body":"((\\.|[^"\\])*)"/, m)) { print m[1] }
+            }' | tail -1 | awk '{gsub(/\\n/,"\n"); gsub(/\\"/,"\""); gsub(/\\\\/,"\\"); print}')
+          if [ -n "$BODY" ]; then
+            if echo "$BODY" | grep -qE '^- \*\*(Major|Critical)\b'; then
+              VERDICT="ISSUES"
+            fi
+            PRI=$(echo "$BODY" | sed -n '/\*\*Priority Issues:/,/Minor Suggestions\|^### /p' | grep -cE '^[[:space:]]{2,}- ' || true)
+            if [ "${PRI:-0}" -gt 0 ]; then VERDICT="ISSUES"; fi
+            if [ "$VERDICT" != "ISSUES" ]; then VERDICT="PASS"; fi
+            TOP_ISSUE=$(echo "$BODY" | sed -n '/\*\*Priority Issues:/,/Minor Suggestions\|^### /p' | grep -E '^[[:space:]]{2,}- ' | head -1 | sed 's/^[[:space:]]*-[[:space:]]*//')
+          else
+            VERDICT="NO_COMMENT"
+          fi
+          echo "verdict: $VERDICT"
+          [ "$VERDICT" = "ISSUES" ] || exit 0
+          TITLE="AI Review: ISSUES on ${GOB_REPO}#${GOB_PR}"
+          curl -sf -X POST -H "Title: ${TITLE}" \
+            ${NTFY_TOKEN:+-H "Authorization: Bearer $NTFY_TOKEN"} \
+            -H "Tags: warning,robot" \
+            -H "Actions: view, Open PR, ${GOB_PR_URL}, clear=true" \
+            -d "${TOP_ISSUE:-Review found issues} — ${GOB_PR_URL}" \
+            "${NTFY_URL}/${NTFY_TOPIC}"
