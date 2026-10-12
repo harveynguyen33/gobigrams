@@ -695,8 +695,8 @@ body {
 .pal-item.pal-dimmed { opacity: .45; }
 .pal-item.pal-dimmed:hover { opacity: .8; }
 .lib-no-match {
-  padding: 10px 4px; font-size: 12px; color: var(--dim2); font-family: var(--mono);
-}
+  padding: 10px 4px; font-size: 12px; color: var(--dim); font-family: var(--mono);
+} /* AP-1: was --dim2 (3.12:1 on surface) — real text needs 4.5:1 */
 
 .lib-cats { display: flex; flex-direction: column; gap: 8px; }
 .lib-cat-head {
@@ -713,8 +713,8 @@ body {
 .lib-cat-name { flex: 1; text-align: left; }
 .lib-cat-n {
   font-size: 9.5px; padding: 1px 5px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border); color: var(--dim2);
-}
+  background: var(--surface); border: 1px solid var(--border); color: var(--dim);
+} /* AP-1: was --dim2 (3.12:1) — a text badge, not a placeholder */
 .lib-cat .palette { margin-top: 6px; }
 
 /* star / pin control on every palette row (PACKAGE-N §6.3).
@@ -724,7 +724,7 @@ body {
    `auto` absorbs whatever width the label block happens to take. */
 .pal-star {
   flex: none; margin-left: auto;
-  width: 22px; height: 22px; padding: 0;
+  width: 24px; height: 24px; padding: 0; /* AP-2: 22 -> 24px hit target; glyph unchanged */
   display: grid; place-items: center;
   font: inherit; font-size: 14px; line-height: 1;
   cursor: pointer; border-radius: 6px;
@@ -774,8 +774,11 @@ body {
    press for the insert, so the tile's own hit area is not reduced. */
 .fav-tile { position: relative; }
 .fav-remove {
-  position: absolute; top: 2px; right: 2px;
-  width: 16px; height: 16px; border-radius: 50%;
+  position: absolute; top: -4px; right: -4px;
+  width: 24px; height: 24px; border-radius: 50%;
+  /* AP-2: 16px box -> 24px receiving box (24px minimum hit target); the visual
+     anchor is unchanged because the offset moves the box out by the same 8px
+     the box grew. Glyph stays 11px. */
   display: grid; place-items: center;
   font-family: var(--mono); font-size: 11px; line-height: 1;
   color: var(--dim); background: var(--surface); border: 1px solid var(--border);
@@ -3664,7 +3667,7 @@ kbd {
 .gesture-token { border: none; background: none; padding: 0; }
 .settings-state { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
 .settings-state.on { color: var(--green); }
-.settings-state.off { color: var(--dim2); }
+.settings-state.off { color: var(--dim); } /* AP-1: was --dim2 (3.12:1) — real status text */
 /* M2 — the Editor pane's Board preset is a REAL control (everything else in the
    dialog is still a readout). Same look as the nav search field, so the one
    honest control reads as a control. */
