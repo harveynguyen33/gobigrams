@@ -126,6 +126,7 @@ import {
  *  the shape `LIBRARY` above: that one is the 34-element constant, this one is
  *  the user's own starred document on disk. */
 import {type FavouriteNode} from './library';
+import {loadPref, savePref} from './prefs';
 import * as library from './library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
@@ -794,14 +795,41 @@ export default function App() {
    *  tooltip. Owned here (session-scoped like `snap`); the toolbar keeps the
    *  on/off toggle and Settings → Canvas owns the number, so neither is a
    *  duplicate control. Never written to a board. */
-  const [gridSize, setGridSize] = useState(16);
+  /* PACKAGE-S §S-1 — the pitch persists (was session-only, which made the
+     Settings choice a lie across reloads). Lazy-init reads; the first visit
+     writes nothing until the user picks (prefs.ts contract). */
+  const [gridSize, setGridSize] = useState(() => loadPref('grid-size', 16));
+  // ---- PACKAGE-S §S-2 — export defaults (persisted; defaults = today's behaviour) ----
+  const [pngScale, setPngScale] = useState(() => loadPref('png-scale', 2));
+  const onPngScale = useCallback((n: number) => {
+    if (![1, 2, 3].includes(n)) return;
+    setPngScale(n);
+    savePref('png-scale', n);
+  }, []);
+  const [pngPad, setPngPad] = useState(() => loadPref('png-pad', 48));
+  const onPngPad = useCallback((n: number) => {
+    if (![24, 48, 96].includes(n)) return;
+    setPngPad(n);
+    savePref('png-pad', n);
+  }, []);
+  // ---- PACKAGE-S §S-3 — autosave control (default ON = today's behaviour) ----
+  const [autosave, setAutosave] = useState(() => loadPref('autosave', true));
+  const onAutosave = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setAutosave(prev => {
+      const next = typeof v === 'function' ? (v as (p: boolean) => boolean)(prev) : v;
+      savePref('autosave', next);
+      return next;
+    });
+  }, []);
   /** The only way the pitch is set: non-finite input (cleared / partial field)
    *  is ignored — the last valid value stands — and anything finite is clamped
    *  to [4, 64] and rounded to the nearest 4px step, so `snapGrid`,
    *  `Background`'s gap and the rounding math can never disagree or go NaN. */
   const onGridSize = useCallback((n: number) => {
     if (!Number.isFinite(n)) return;
-    setGridSize(Math.min(64, Math.max(4, Math.round(n / 4) * 4)));
+    const next = Math.min(64, Math.max(4, Math.round(n / 4) * 4));
+    setGridSize(next);
+    savePref('grid-size', next);
   }, []);
   // ---- export dropdown open? ----
   const [pop, setPop] = useState(false);
@@ -833,7 +861,15 @@ export default function App() {
   // ---- F3: helper lines ----
   const [guides, setGuides] = useState<HelperGuides>({vertical: null, horizontal: null});
   /** Alignment guides + snap on drop. ON by default (auto-align); toggled from the toolbar. */
-  const [alignGuides, setAlignGuides] = useState(true);
+  /* PACKAGE-S §S-1 — persisted like its Canvas-pane neighbours. */
+  const [alignGuides, setAlignGuidesState] = useState(() => loadPref('align-guides', true));
+  const setAlignGuides = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setAlignGuidesState(prev => {
+      const next = typeof v === 'function' ? (v as (p: boolean) => boolean)(prev) : v;
+      savePref('align-guides', next);
+      return next;
+    });
+  }, []);
   const helperDrag = useRef(false);
   // ---- F7: connection rules ----
   const [noCycles, setNoCycles] = useState(false);
@@ -1076,6 +1112,9 @@ export default function App() {
   }, [suggestTheme]);
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  /* PACKAGE-S §S-3 — with autosave OFF this flips true on the first unflushed
+     change and false on flush; with autosave ON it is always false (never shown). */
+  const [dirty, setDirty] = useState(false);
   /** Mirror of curBoard for save paths (I6): flushSave reads through this ref
    *  so it does not need curBoard in its dependency array. */
   const curBoardRef = useRef<BoardDoc | null>(curBoard);
@@ -1132,6 +1171,7 @@ export default function App() {
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
 
   const flushSave = useCallback(async () => {
+    setDirty(false); /* PACKAGE-S §S-3 */
     const board = curBoardRef.current;
     if (!board) return;
     window.clearTimeout(saveTimer.current);
@@ -1173,6 +1213,13 @@ export default function App() {
   const boardId = curBoard?.id;
   useEffect(() => {
     if (!boardId) return;
+    /* PACKAGE-S §S-3 — autosave OFF: nothing is scheduled; the change is DIRTY
+       until Save / Cmd+S flushes. The dirty marker is the only signal. */
+    if (!autosave) {
+      setDirty(true);
+      return;
+    }
+    setDirty(false);
     if (skipAutosave.current > 0) {
       skipAutosave.current -= 1;
       return;
@@ -1180,7 +1227,7 @@ export default function App() {
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => { void flushSave(); }, 800);
     return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, boardId, flushSave]);
+  }, [nodes, edges, boardId, flushSave, autosave]);
 
   const refreshBoards = useCallback(async () => {
     try {
@@ -3633,7 +3680,7 @@ export default function App() {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf) return;
     const b = (rf as any).getNodesBounds(nodes);
-    const pad = 48;
+    const pad = pngPad; /* PACKAGE-S §S-2 — the user's export padding */
     const w = Math.ceil((b.width ?? 800) + pad * 2);
     const h = Math.ceil((b.height ?? 400) + pad * 2);
     const clone = el.cloneNode(true) as HTMLElement;
@@ -3688,7 +3735,7 @@ export default function App() {
     if (!el || !rf || !nodes.length) return;
     tickTask('export');
     const b = (rf as any).getNodesBounds(nodes) as {x: number; y: number; width: number; height: number};
-    const pad = 48;
+    const pad = pngPad; /* PACKAGE-S §S-2 — the user's export padding */
     const imageWidth = Math.ceil((b.width ?? 800) + pad * 2);
     const imageHeight = Math.ceil((b.height ?? 400) + pad * 2);
     const transform = `translate(${pad - (b.x ?? 0)}px, ${pad - (b.y ?? 0)}px) scale(1)`;
@@ -3703,7 +3750,7 @@ export default function App() {
           backgroundColor: readToken('--bg', '#0b0b0d'),
           width: imageWidth,
           height: imageHeight,
-          pixelRatio: 2,
+          pixelRatio: pngScale, /* PACKAGE-S §S-2 — the user's export scale */
           skipFonts: true, // avoid cross-origin stylesheet fetches (I4)
           style: {width: `${imageWidth}px`, height: `${imageHeight}px`, transform},
         }),
@@ -4531,7 +4578,7 @@ export default function App() {
   overlayRef.current = overlay;
   // A rotation or a tier change closes whatever was open: a drawer cannot stay
   // open across a layout that no longer has drawers.
-  useEffect(() => { setOverlay(null); }, [overlayMode]);
+  useEffect(() => { setOverlay(null); }, [overlayMode, pngScale, pngPad]);
   // Escape closes the overlay FIRST and stops there, so it does not also fall
   // through to the app's own "deselect" Escape (capture phase + stopPropagation).
   useEffect(() => {
@@ -4841,7 +4888,7 @@ export default function App() {
             )}
           </div>
           <div className={`save-ind${saveState === 'saving' ? ' busy' : ''}${saveState === 'error' ? ' err' : ''}`} aria-live="polite">
-            {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : saveState === 'error' ? 'save failed' : ''}
+            {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : saveState === 'error' ? 'save failed' : (dirty && !autosave ? 'unsaved' : '')}
           </div>
         </div>
         <div className="panel-body">
@@ -5250,7 +5297,7 @@ export default function App() {
                 <button className="pop-item" title="Download this board as JSON" onClick={() => { setPop(false); exportJson(); }}>
                   <FileJson size={14} /> Export JSON
                 </button>
-                <button className="pop-item primary" title="Export diagram as PNG (2x)" onClick={() => { setPop(false); exportPng(); }}>
+                <button className="pop-item primary" title="Export diagram as PNG at your saved scale (Settings → Canvas)" onClick={() => { setPop(false); exportPng(); }}>
                   <Image size={14} /> Export PNG
                 </button>
                 <button className="pop-item" title="Export diagram as SVG" onClick={() => { setPop(false); exportSvg(); }}>
@@ -5454,6 +5501,12 @@ export default function App() {
           onHighlight={toggleHighlight}
           marquee={marqueeMode}
           onMarquee={setMarqueeMode}
+          pngScale={pngScale}
+          onPngScale={onPngScale}
+          pngPad={pngPad}
+          onPngPad={onPngPad}
+          autosave={autosave}
+          onAutosave={onAutosave}
           returnFocusTo={settingsBtnRef}
         />
 

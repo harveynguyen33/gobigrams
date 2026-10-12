@@ -65,6 +65,14 @@ type Props = {
   onGridSize: (n: number) => void;
   alignGuides: boolean;
   onAlignGuides: React.Dispatch<React.SetStateAction<boolean>>;
+  /** PACKAGE-S §S-2 — export defaults (persisted in App via prefs.ts). */
+  pngScale: number;
+  onPngScale: (n: number) => void;
+  pngPad: number;
+  onPngPad: (n: number) => void;
+  /** PACKAGE-S §S-3 — the autosave control (default ON). */
+  autosave: boolean;
+  onAutosave: React.Dispatch<React.SetStateAction<boolean>>;
   /** effective motion flag (`animate === true` means motion is ON) — the row
    *  reads "Reduce motion", i.e. the inverse. The setter is useAnimationGating's
    *  existing toggle, so the persisted override stays in one place. */
@@ -278,8 +286,8 @@ function AppearancePane(props: Pick<Props, 'mode' | 'onMode' | 'resolved'>) {
 
 function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
-  marquee, onMarquee,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee'>) {
+  marquee, onMarquee, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -291,6 +299,30 @@ function CanvasPane({
             options={gridSizeOptions(gridSize)}
             value={gridSize}
             onPick={onGridSize}
+          />
+        </Row>
+        {/* PACKAGE-S §S-3 — the autosave control. Default ON = the historical
+            behaviour; OFF stops the debounced write and the save indicator shows
+            `unsaved` until Save / Cmd+S flushes. */}
+        <Row label="Autosave" hint="write the board automatically as you work; off means you save with Cmd+S and the indicator shows when work is unsaved">
+          <Toggle label="Autosave" value={autosave} onToggle={() => onAutosave(v => !v)} />
+        </Row>
+        {/* PACKAGE-S §S-2 — export defaults. Defaults (2x / 48) are today's
+            hard-coded values, so a user who never opens Settings sees no change. */}
+        <Row label="PNG export scale" hint="resolution multiplier for Export PNG: 1x fastest and smallest, 3x sharpest">
+          <Segmented
+            label="PNG export scale"
+            options={['1x', '2x', '3x']}
+            value={`${pngScale}x`}
+            onPick={(v) => onPngScale(parseInt(v, 10))}
+          />
+        </Row>
+        <Row label="Export padding" hint="empty space around the diagram in the exported image, in pixels">
+          <Segmented
+            label="Export padding"
+            options={['24', '48', '96']}
+            value={String(pngPad)}
+            onPick={(v) => onPngPad(parseInt(v, 10))}
           />
         </Row>
         <Row label="Alignment guides" hint="dashed guides appear when a node lines up with a neighbour that is close by">
@@ -506,6 +538,8 @@ export default function Settings({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate,
   highlight, onHighlight,
   marquee, onMarquee,
+  pngScale, onPngScale, pngPad, onPngPad,
+  autosave, onAutosave,
   returnFocusTo,
 }: Props) {
   const [cat, setCat] = useState<SettingsCat>('appearance');
@@ -601,6 +635,12 @@ export default function Settings({
           onHighlight={onHighlight}
           marquee={marquee}
           onMarquee={onMarquee}
+          pngScale={pngScale}
+          onPngScale={onPngScale}
+          pngPad={pngPad}
+          onPngPad={onPngPad}
+          autosave={autosave}
+          onAutosave={onAutosave}
         />
       );
       case 'connections': return (
