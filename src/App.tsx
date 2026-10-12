@@ -2,7 +2,7 @@ import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap, Panel, addEdge, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
 import {toPng} from 'html-to-image';
@@ -125,6 +125,7 @@ import {
 /** PACKAGE-N pass 3 — the USER library client (§6 favourites / §7 store). NOT
  *  the shape `LIBRARY` above: that one is the 34-element constant, this one is
  *  the user's own starred document on disk. */
+import {type FavouriteNode} from './library';
 import * as library from './library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
@@ -1159,7 +1160,7 @@ export default function App() {
         ? {...b, updatedAt: saved.updatedAt, nodeCount: saved.nodes.length, edgeCount: saved.edges.length}
         : b));
       window.setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2000);
-    } catch (err: any) {
+    } catch (err) {
       setSaveState('error');
       flash(`Save failed: ${err?.message ?? 'unknown error'}`);
     }
@@ -1184,7 +1185,7 @@ export default function App() {
   const refreshBoards = useCallback(async () => {
     try {
       setBoardList(await boards.listBoards());
-    } catch (err: any) {
+    } catch (err) {
       flash(`Boards API error: ${err?.message ?? 'unknown'}`);
     }
   }, [flash]);
@@ -1211,7 +1212,7 @@ export default function App() {
           list = await boards.listBoards();
         } else {
           const want = list.find(b => b.id === lastId) ?? list[0];
-          target = await boards.getBoard(want.id).catch(async (e: any) => {
+          target = await boards.getBoard(want.id).catch(async (e) => {
             // stale/missing last-open board — fall back to the newest board
             if (list.length > 1) return boards.getBoard(list[0].id);
             throw e;
@@ -1220,7 +1221,7 @@ export default function App() {
         if (!target) return;
         setBoardList(list);
         applyBoard(target);
-      } catch (err: any) {
+      } catch (err) {
         // The load failed (no boards API, bad payload). There is no board to
         // render, so release the canvas: `boardLoaded` lets the empty-state panel
         // back in, which is the honest thing to show for a canvas with no board.
@@ -1349,7 +1350,7 @@ export default function App() {
         applyBoard({...doc, nodes, edges, preset: pid});
         tickTask('board');
         flash(`Created ${getPreset(pid).label} board “${name}”`);
-      } catch (err: any) {
+      } catch (err) {
         flash(`New board failed: ${err?.message ?? 'unknown'}`);
       }
     })();
@@ -1444,7 +1445,7 @@ export default function App() {
       setBoardsOpen(false);
       applyBoard(doc);
       flash(`Opened “${doc.name}”`);
-    } catch (err: any) {
+    } catch (err) {
       flash(`Open board failed: ${err?.message ?? 'unknown'}`);
     }
   }, [curBoard, flushSave, applyBoard, flash]);
@@ -1466,7 +1467,7 @@ export default function App() {
       setCurBoard(c => c ? {...c, name: saved.name, updatedAt: saved.updatedAt} : c);
       setBoardList(l => l.map(b => b.id === curBoard.id ? {...b, name: saved.name, updatedAt: saved.updatedAt} : b));
       flash(`Renamed to “${name}”`);
-    } catch (err: any) {
+    } catch (err) {
       flash(`Rename failed: ${err?.message ?? 'unknown'}`);
     }
   }, [curBoard, flushSave, flash, presetId]);
@@ -1486,7 +1487,7 @@ export default function App() {
       setBoardList(await boards.listBoards());
       applyBoard(saved);
       flash(`Duplicated to “${name}”`);
-    } catch (err: any) {
+    } catch (err) {
       flash(`Duplicate failed: ${err?.message ?? 'unknown'}`);
     }
   }, [curBoard, flushSave, applyBoard, flash]);
@@ -1511,7 +1512,7 @@ export default function App() {
         applyBoard({...doc, nodes: [], edges: []});
       }
       flash('Board deleted');
-    } catch (err: any) {
+    } catch (err) {
       flash(`Delete failed: ${err?.message ?? 'unknown'}`);
     }
   }, [curBoard, applyBoard, flash]);
@@ -2049,7 +2050,7 @@ export default function App() {
   // the drop point and wire it up. That is gone on purpose: a missed drop
   // silently added a shape nobody asked for. Only a drop that lands ON an
   // existing node still connects.
-  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionState: any) => {
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
     const c = pendingDrop.current;
     pendingDrop.current = null;
     setGuides({vertical: null, horizontal: null});
@@ -2215,7 +2216,7 @@ export default function App() {
       const {style, markerEnd, markerStart, data, ...rest} = patch;
       // markerEnd/markerStart: honour an explicit `none` (undefined) by REMOVING the key,
       // so the arrow head actually disappears — check for key presence, not value.
-      const out: any = {...e, ...rest};
+      const out = {...e, ...rest} as Edge;
       if (style !== undefined) out.style = {...(e.style ?? {}), ...style};
       if ('markerEnd' in patch) { if (markerEnd === undefined) delete out.markerEnd; else out.markerEnd = markerEnd; }
       if ('markerStart' in patch) { if (markerStart === undefined) delete out.markerStart; else out.markerStart = markerStart; }
@@ -2240,7 +2241,7 @@ export default function App() {
     const e = edgesRef.current.find(x => x.id === selEdgeId);
     if (!e) return;
     const patch = edgeColorPatch(key, {markerEnd: e.markerEnd, markerStart: e.markerStart});
-    patch.data = {...patch.data, color: undefined};
+    patch.data = {...patch.data, color: undefined} as typeof patch.data;
     updateEdge(patch);
   }, [selEdgeId, updateEdge]);
 
@@ -2560,7 +2561,7 @@ export default function App() {
     setEdges(es => es.map(e => {
       if (e.id !== id) return e;
       const {data, ...top} = patch;
-      const out: any = {...e, ...top};
+      const out = {...e, ...top} as Edge;
       if (data !== undefined) out.data = {...((e.data ?? {}) as EdgeData), ...data};
       return out as Edge;
     }));
@@ -3004,7 +3005,7 @@ export default function App() {
     pushHistory();
     tickTask('node');
     const idMap = new Map<string, string>();
-    const stored = fav.nodes as any[];
+    const stored = fav.nodes as FavouriteNode[];
     /* §6.5 step 1 — RE-CENTRE. `__rel` is a node's offset from the favourite's
        own top-left, so the group's BOUNDING BOX CENTRE is what lands on the
        drop point: the offsets are kept exact (the internal layout is the one
@@ -3038,7 +3039,9 @@ export default function App() {
       // A selection copy stores no board id at all, so `__src` is its only
       // reference; `storedNode.id` covers a hand-written library file that did
       // keep one.
-      idMap.set(storedNode.__src ?? storedNode.id ?? String(i), id);
+      // `FavouriteNode` is `Record<string, unknown>`: the reference fields are unknown
+      // until narrowed. `String()` is the honest key-maker (the old code relied on `any`).
+      idMap.set(String(storedNode.__src ?? storedNode.id ?? i), id);
       return {
         id,
         type: (storedNode.type ?? 'goblin') as string,
@@ -3051,7 +3054,7 @@ export default function App() {
       } as Node;
     });
 
-    const newEdges: Edge[] = (fav.edges ?? []).map((se: any) => {
+    const newEdges: Edge[] = (fav.edges ?? []).map((se: Edge) => {
       const {selected: _sel, ...rest} = se;
       void _sel;
       const src = idMap.get(se.source) ?? idMap.get(String(se.source));
@@ -3437,7 +3440,7 @@ export default function App() {
         }
         return;
       }
-      // H1: any other overlay on screen owns the keyboard. While the onboarding
+      // H1: every other overlay on screen owns the keyboard. While the onboarding
       // tour, the help popover, a board menu or the insert palette is open, an
       // app shortcut must not fire behind it — a stray ⌘Z during the tour would
       // undo the newcomer's own work, and `?` would stack the cheat sheet on top
@@ -3728,10 +3731,10 @@ export default function App() {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text());
-      const okNodes = Array.isArray(parsed?.nodes) && parsed.nodes.every((n: any) =>
+      const okNodes = Array.isArray(parsed?.nodes) && parsed.nodes.every((n: {id?: string; type?: string; position?: {x: number; y: number}}) =>
         n && typeof n.id === 'string' && n.position &&
         typeof n.position.x === 'number' && typeof n.position.y === 'number');
-      const okEdges = Array.isArray(parsed?.edges) && parsed.edges.every((ed: any) =>
+      const okEdges = Array.isArray(parsed?.edges) && parsed.edges.every((ed: {id?: string; source?: string; target?: string}) =>
         ed && typeof ed.id === 'string' && typeof ed.source === 'string' && typeof ed.target === 'string');
       if (!okNodes || !okEdges) {
         flash('Import failed: invalid diagram JSON');

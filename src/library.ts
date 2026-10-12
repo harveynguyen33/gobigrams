@@ -11,6 +11,8 @@
  * server owns the envelope (`type`/`version`/`source`/`updatedAt`); the client
  * sends only the payload arrays.
  */
+import {type Edge, type Node} from '@xyflow/react';
+
 import {type PaletteItem} from './palette';
 import {type CustomShape} from './customShape';
 
@@ -192,7 +194,7 @@ export function toggleFavouriteItem(list: Favourite[], item: PaletteItem): Favou
  *
  *  Deep-copying matters: the stored payload must not alias live canvas state
  *  (a later drag would silently rewrite the favourite). */
-export function favouriteFromSelection(nodes: any[], edges: any[]): Favourite {
+export function favouriteFromSelection(nodes: Node[], edges: Edge[]): Favourite {
   const ids = new Set(nodes.map(n => n.id));
   const minX = Math.min(...nodes.map(n => n.position?.x ?? 0));
   const minY = Math.min(...nodes.map(n => n.position?.y ?? 0));
@@ -205,7 +207,7 @@ export function favouriteFromSelection(nodes: any[], edges: any[]): Favourite {
   const localOf = new Map<string, string>();
   nodes.forEach((n, i) => localOf.set(n.id, `s${i}`));
 
-  const strip = (n: any): FavouriteNode => {
+  const strip = (n: Node): FavouriteNode => {
     /* Everything React Flow owns about a node ON THE CANVAS goes: the board
        `id` (AC #16 / §6.5 #3 — reusing it can collide with the board it is
        pasted into), the geometry (`position`), the view state (`selected`,

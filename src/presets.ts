@@ -1,4 +1,5 @@
 import {MarkerType, type Edge, type Node} from '@xyflow/react';
+import type {EdgeMarkerType} from '@xyflow/system';
 import {COLOR_VAR, type ColorKey} from './colors';
 import {PALETTE, type DiagramType, type PaletteCategory, type PaletteItem} from './palette';
 import {type Shape, FLOWCHART_EXTRA_SHAPES} from './shapes';
@@ -198,11 +199,14 @@ export function makeEdge(source: string, target: string, e: EdgeDefaults, id: st
 /** Edge patch for the inspector's colour swatches: symbolic key everywhere it
  *  is baked in (path stroke + both markers), which is what makes a recolour
  *  survive a theme change. */
-export function edgeColorPatch(key: ColorKey, existing?: {markerEnd?: any; markerStart?: any}) {
+export function edgeColorPatch(key: ColorKey, existing?: {markerEnd?: EdgeMarkerType; markerStart?: EdgeMarkerType}) {
   const color = COLOR_VAR[key];
-  const patch: any = {style: {stroke: color}, data: {strokeKey: key}};
-  if (existing?.markerEnd?.type) patch.markerEnd = {...existing.markerEnd, color};
-  if (existing?.markerStart?.type) patch.markerStart = {...existing.markerStart, color};
+  const patch: {style: {stroke: string}; data: {strokeKey: ColorKey}; markerEnd?: EdgeMarkerType; markerStart?: EdgeMarkerType} =
+    {style: {stroke: color}, data: {strokeKey: key}};
+  /* EdgeMarkerType is `string | EdgeMarker`; only the OBJECT form carries a colour to
+     recolour — a bare string marker (e.g. 'arrow') is left untouched. */
+  if (typeof existing?.markerEnd === 'object') patch.markerEnd = {...existing.markerEnd, color};
+  if (typeof existing?.markerStart === 'object') patch.markerStart = {...existing.markerStart, color};
   return patch;
 }
 
@@ -224,10 +228,11 @@ export function edgeColorPatch(key: ColorKey, existing?: {markerEnd?: any; marke
  *  markers' `color` with the key's var — but it does NOT clear `data.color`,
  *  because that key is not in its patch. `App.setEdgeColor` therefore clears it
  *  explicitly; see the note there. */
-export function edgeColorLiteralPatch(hex: string, existing?: {markerEnd?: any; markerStart?: any}) {
-  const patch: any = {style: {stroke: hex}, data: {color: hex, strokeKey: undefined}};
-  if (existing?.markerEnd?.type) patch.markerEnd = {...existing.markerEnd, color: hex};
-  if (existing?.markerStart?.type) patch.markerStart = {...existing.markerStart, color: hex};
+export function edgeColorLiteralPatch(hex: string, existing?: {markerEnd?: EdgeMarkerType; markerStart?: EdgeMarkerType}) {
+  const patch: {style: {stroke: string}; data: {color: string; strokeKey: undefined}; markerEnd?: EdgeMarkerType; markerStart?: EdgeMarkerType} =
+    {style: {stroke: hex}, data: {color: hex, strokeKey: undefined}};
+  if (typeof existing?.markerEnd === 'object') patch.markerEnd = {...existing.markerEnd, color: hex};
+  if (typeof existing?.markerStart === 'object') patch.markerStart = {...existing.markerStart, color: hex};
   return patch;
 }
 

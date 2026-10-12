@@ -160,7 +160,7 @@ export default function Tooltip({label, side = 'bottom', delay = 350, children}:
   useEffect(() => clear, [clear]);
 
   const child = isValidElement(children) ? children : <span>{String(children)}</span>;
-  const trigger = cloneElement(child as React.ReactElement<any>, {
+  const trigger = cloneElement(child as React.ReactElement<Record<string, unknown>>, {
     ref: (el: HTMLElement | null) => {
       triggerRef.current = el;
       // preserve an existing ref on the child if there was one
