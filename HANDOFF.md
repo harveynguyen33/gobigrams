@@ -8,6 +8,36 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 `docs/GUIDE.md`-shaped prose at the bottom of this file and in the newest round section.
 
 
+
+## ▶ PACKAGE-S — Settings completion: persisted prefs, export defaults, autosave control. DONE, gates green. PENDING HARVEY'S DEVICE TEST.
+
+**S-1 — persisted prefs.** New `src/prefs.ts` (one load/save pair, `diagram-studio:pref:`
+prefix, JSON values, try/catch-and-ignore, lazy-init writes nothing until an explicit
+pick). Wired: `gridSize` (was `useState(16)` — reset every reload, making the Settings
+choice a lie) and `alignGuides`. `animate`/`highlight`/`marquee` already persisted via
+their own hooks — verified during recon, untouched.
+
+**S-2 — export defaults.** PNG scale (1x/2x/3x, default 2x = today) and export padding
+(24/48/96, default 48 = today) as Segmented controls in Settings → Canvas; `exportPng()`
+consumes both; the menu item's hard-coded "(2x)" title dropped.
+
+**S-3 — autosave control.** Toggle in Canvas, default ON = today's behaviour. OFF stops
+the debounced write; the save indicator shows `unsaved` (dirty flag set on change,
+cleared on flush) and Save/Cmd+S still works through the existing `flushSave`.
+
+**Roadmap:** package 6 + 7 added to SHIPPED (newest-first), the Settings Now item
+re-worded. `round-ab` untouched; `package-r` re-anchored (r4 pin→floor ratchet, r10
+expect-order += package 7/6).
+
+**ERD templates: SKIPPED this round** (Harvey: "tạm thời skip. tôi làm sau").
+
+New harness `checks/package-s-settings.mjs`: 14/0 — prefs.ts EXECUTED against a stubbed
+localStorage (round-trip, malformed, throwing), the App/Settings wiring probed at
+source, replay RED on `5daf3b5` (9 failed there).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · package-r 23/0 (re-anchored) ·
+boards/ clean.
+
 ## ▶ ROUND AP — design polish (contrast, hit targets) + BN-01 narrowed. DONE, gates green. PENDING HARVEY'S DEVICE TEST.
 
 **AP-1 — `--dim2` no longer paints real text.** Measured 3.12:1 on `--surface` (below
