@@ -1,0 +1,18 @@
+# manifest/categories.tsv — the auxiliary category inventory (DATA, never code).
+# The reader is the AGENT following the init brief's "external categories" section; no
+# gobstack executable line reads this file. init vendors it to .gob/engine/categories.tsv
+# (hash-pinned in installed.json like every other engine file), so the target's copy is
+# pinned to this repo of origin.
+# Columns:
+#   category  the composition category (a stable name the brief and decisions cite)
+#   pack      the external pack name
+#   source    the upstream repository (the URL `added_by` records on install)
+#   license   the upstream license (a row with a pending/unknown license must not be listed)
+#   provides  what the pack would add, as skills/docs/checklists — never pre-built payloads
+#   fits_when the predicate the AGENT evaluates against THIS repo (data, not code: the
+#             agent is the adjudicator because it can read the repo; gobstack's code cannot)
+# Rows are appended only with a verified upstream license and a real fetchable source.
+category	pack	source	license	provides	fits_when
+process-skills	superpowers	https://github.com/obra/superpowers	MIT	TDD, systematic-debugging, brainstorming, writing-plans loops; all as SKILL.md packs	repo does feature/bugfix work and wants battle-tested process skills
+spec-first	spec-kit	https://github.com/github/spec-kit	MIT	spec.md/plan.md/tasks.md checklists + SDD flow; pairs with an LX-* row that checks spec-before-change	repo is spec-driven or multi-session feature work dominates
+roles-workflows	BMAD-METHOD	https://github.com/bmad-code-org/BMAD-METHOD	MIT	role/workflow docs (PM/architect/dev loops) for repo-level planning ceremony	repo is greenfield/product-shaped with planning phases

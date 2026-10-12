@@ -1,0 +1,8 @@
+# .gob/boundary-waivers — write routes that deliberately do NOT validate input (SC-05).
+#
+# One repo-relative path per line, with the reason after a '#'. A waiver is a DECISION recorded
+# where the row can read it; it is not a silence. SC-05 prints the waiver count on its gate line
+# so the debt is visible on every run.
+#
+# example:
+# src/app/api/webhook/route.ts   # signed by the provider's HMAC, verified in lib/hmac.ts

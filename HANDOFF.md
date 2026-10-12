@@ -1,5 +1,43 @@
 # HANDOFF — Diagram Studio
 
+## START HERE
+
+Read the newest `## ▶` section below — it is the current state of the repo. The gob
+config lives in `AGENTS.md`; the gate is `npx tsc --noEmit && npx vite build`.
+Conventions (demo board restore, English artifacts, per-round spec files) are in
+`docs/GUIDE.md`-shaped prose at the bottom of this file and in the newest round section.
+
+## State
+
+main @ 0bde816 on Forgejo (`origin`), mirrored to GitHub. gobstack 0.6.0-beta.1 installed
+2026-10-12. PACKAGE-R + ROUND AO pushed, PENDING HARVEY'S DEVICE TEST — nothing queued
+beyond that.
+
+## Gates
+
+- commit (tsc_build): `npx tsc --noEmit && npx vite build` = exit 0, measured 2026-10-12 on 0bde816.
+- todo_ceiling: 0 repo TODOs (excl. node_modules), measured 2026-10-12 on 0bde816, ceiling 160.
+- harnesses: 38 check files; the touched ones re-run per round (latest full tally in the
+  PACKAGE-R section).
+
+## NEXT
+
+1. Harvey device-tests PACKAGE-R (roadmap pane) + ROUND AO (colour grid, neutrals,
+   custom picker, pair gap, nub) on his Mac.
+2. gobstack first round: nothing queued — the harness is installed, the next round rides
+   the existing spec → build → verify flow.
+
+## NOT VERIFIED
+
+- PACKAGE-R + AO on a real device (Harvey's Mac) — desktop-only review so far.
+- Tablet/phone breakpoints: never measured; the app is desktop-first.
+- The `.gob/` harness rules were verified once at install (18 passed / 4 failed before the
+  config fixes) — first full green run still owed.
+
+---
+# Historical session log (newest first)
+
+
 ## ▶ PACKAGE-R — Roadmap surface in Settings → About. DONE, gates green, VERIFIED LIVE, PUSHED. PENDING HARVEY'S DEVICE TEST.
 
 **What it is:** a Roadmap surface that tells a user what the tool does today, what is being built

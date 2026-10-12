@@ -16,3 +16,17 @@ dist/
 .env
 .env.local
 *.local
+
+# >>> goblin-stack >>>
+# goblin-stack runtime state (gates write these; they are not fixture)
+.gob/last-gate-line
+.gob/.ds-report
+.gob/ratchet-last
+# the secret family (SC-02): each is one `git add` away from a live credential
+.env
+.env.*
+*.pem
+*.key
+# declared runtime_data (DS-01 hashes them around every gate run)
+.gob/state.json
+# <<< goblin-stack <<<

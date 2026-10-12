@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# goblin-bans — run the ban table. Dune rule 2: forbidden must fail mechanically.
+#
+# Usage:
+#   goblin-bans [--only <id[,id...]>] [--list]
+#
+# The table is .goblin/manifest/bans.tsv (installed) or manifest/bans.tsv (a checkout).
+# Each row's `detect` column is a real command, run from the repo root, that
+#   0  the tree is clean
+#   1  the ban is violated - the exit code alone decides; stdout, when any, names the lines
+#   2  the check could not run (FAIL CLOSED - a missing tool is never a silent pass)
+# A ban RUNS when its `applies_when` cell selects it. A ban named in the DISABLE
+# list `bans_disabled:` (default empty) is SKIPPED with that reason, naming the key. A ban whose
+# `applies_when` does not select it is NOT APPLICABLE: it is reported as a SKIP with that reason,
+# never silently green (a ban that does not apply must be visible as such). A missing or empty ban
+# table is exit 2.
+#
+# `applies_when` has TWO forms (a ban is applicable only when the repo actually HAS the stack it
+# polices — a false green is the one failure this product must never produce):
+#   * a GLOB list (`**/*.ts **/*.tsx`): the ban applies when at least one REAL file in the repo
+#     matches any glob (the harness's own .gob/.hermes dirs are not source and are excluded);
+#   * a PREDICATE (`dep:<pkg>[,<pkg>...]`, e.g. `dep:electron`): the ban applies only when the
+#     repo's package.json names EVERY listed package under `dependencies` or `devDependencies`.
+#     With no package.json, or without the package, the ban reports itself NOT APPLICABLE. This is
+#     what stops the four electron bans from running (and vacuously passing) on a repo that has no
+#     electron at all: the shipped checks/*.mjs is the HARNESS's own file, not the repo's stack.
+#
+# A narrow, explicit exception (Dune rule 5) reaches the probe through its environment, so it can
+# change the VERDICT and not only the printed detail: GOBLIN_BANS_ID (the ban) and
+# GOBLIN_BANS_EXEMPT (its `bans_exempt:` path prefixes) let the probe drop exempted hits before it
+# chooses its exit code, and `// BAN-OK(<id>): <reason>` clears one offending line. See
+# bans/README.md, "Narrow exceptions".
+#
+# Exit codes:
+#   0  every selected ban passed or skipped
+#   1  at least one selected ban FAILED
+#   2  the ban table is missing, empty or unreadable (fail closed)
+#   3  every selected ban was SKIPPED (only when exactly one ban is selected)
+#
+# No npm, no jq, no yq, no network. bash/git/awk/sed/grep only.
+
+set -uo pipefail
+
+GOBLIN_BANS_VERSION="0.6.0-beta.1"
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=goblin-lib.sh
+. "$SELF_DIR/goblin-lib.sh"
+
+ONLY=""
+LIST=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --only) ONLY="${2:-}"; shift 2 ;;
+    --list) LIST=1; shift ;;
+    -h|--help)
+      sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) g_err "unknown option: $1"; exit 2 ;;
+  esac
+done
+
+# ---- root resolution (the installed config is the target's own marker) --------
+find_installed_root() {
+  local d="$PWD"
+  while :; do
+    if [ -f "$d/AGENTS.md" ] && grep -q "^$GOB_AGENTS_BEGIN" "$d/AGENTS.md" 2>/dev/null; then printf '%s\n' "$d"; return 0; fi
+    [ "$d" = "/" ] && return 1
+    d=$(dirname "$d")
+  done
+}
+ROOT=$(find_installed_root) || ROOT=""
+if [ -z "$ROOT" ]; then
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  [ -n "$ROOT" ] || ROOT="$PWD"
+fi
+
+CONFIG="$ROOT/AGENTS.md"
+if [ -f "$ROOT/.gob/manifest/bans.tsv" ]; then
+  BANS="$ROOT/.gob/manifest/bans.tsv"
+else
+  BANS="$SELF_DIR/../manifest/bans.tsv"
+fi
+
+# Fail closed: no table, or a table with no data rows, is exit 2 - never a silent pass.
+if [ ! -f "$BANS" ]; then
+  g_err "no ban table at $BANS - the ban list cannot be empty and still enforce anything"
+  exit 2
+fi
+if [ "$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$BANS")" -eq 0 ]; then
+  g_err "the ban table $BANS holds no bans - an empty list enforces nothing (fail closed)"
+  exit 2
+fi
+
+if [ "$LIST" -eq 1 ]; then
+  awk -F'\t' 'NR>1 && $1!="" {printf "%-7s %s\n", $1, $2}' "$BANS"
+  exit 0
+fi
+
+# ---- the config: which bans this project turns OFF, and its narrow exceptions --
+# A ban's selection is its `applies_when` glob, and nothing else (below). The ONLY config knob
+# is an explicit DISABLE list, `bans_disabled:` (default empty): a ban named there is skipped
+# with that reason. There is no allow-list — a ban is on whenever a real file matches its glob.
+DISABLED=""
+if [ -f "$CONFIG" ]; then
+  DISABLED=$(g_agents_list "$CONFIG" bans_disabled | tr '\n' ' ')
+fi
+disabled() {
+  [ -z "$DISABLED" ] && return 1
+  for e in $DISABLED; do [ "$e" = "$1" ] && return 0; done
+  return 1
+}
+
+# bans_exempt: a list of "- <ID> <path>" items (Dune rule 5: narrow, explicit, reviewed).
+# W5-1: the exemption must reach the PROBE. Filtering the probe's stdout after it has already
+# chosen its exit code cannot change the verdict, and the exit code is the signal (V3-2) - so the
+# old stdout filter made every exemption DECORATIVE: a real violation inside an exempted path was
+# a permanent FAIL with no remedy (measured rc 0 at 72490f0 -> rc 1 at 7fec08f). The engine now
+# exports GOBLIN_BANS_ID and GOBLIN_BANS_EXEMPT and each shipped probe filters the FILE LIST
+# before it judges (bans/README.md, "Narrow exceptions"). A probe that ignores the variables
+# keeps the old behaviour, which fails CLOSED, never open.
+exempt_paths() { # exempt_paths <id> -> path prefixes, one per line
+  [ -f "$CONFIG" ] || return 0
+  # v2 shape: one flat `[BN-01 src, BN-02 app]` array — item 1 is the ban id, item 2 its
+  # path prefix (g_agents_list splits on the commas, so an item keeps its inner space).
+  g_agents_list "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
+}
+
+only_selected() {
+  [ -z "$ONLY" ] && return 0
+  case ",$ONLY," in *",$1,"*) return 0 ;; esac
+  return 1
+}
+
+# package_dep <pkg> -> 0 when $ROOT/package.json names <pkg> under `dependencies` or
+# `devDependencies`. No jq/node: an awk state machine tracks brace depth inside those two objects
+# (and only those two — `peerDependencies`/`optionalDependencies` do not count) and looks for the
+# quoted key. A missing package.json, or a package named elsewhere (a script, a comment), is a
+# NON-match — the ban's stack is absent.
+package_dep() {
+  local pkg="$1" f="$ROOT/package.json"
+  [ -f "$f" ] || return 1
+  awk -v pkg="$pkg" '
+    {
+      line = $0
+      if (inobj) {
+        if (index(line, "\"" pkg "\"")) found = 1
+        n = length(line)
+        for (i = 1; i <= n; i++) { c = substr(line, i, 1); if (c == "{") d++; else if (c == "}") d-- }
+        if (d <= 0) inobj = 0
+        next
+      }
+      if (line ~ /"(dev)?[Dd]ependencies"[[:space:]]*:[[:space:]]*\{/) {
+        inobj = 1; d = 0
+        n = length(line)
+        for (i = 1; i <= n; i++) { c = substr(line, i, 1); if (c == "{") d++; else if (c == "}") d-- }
+        if (index(line, "\"" pkg "\"")) found = 1
+        if (d <= 0) inobj = 0
+      }
+    }
+    END { exit !found }
+  ' "$f"
+}
+
+# applies <applies_when> -> 0 when the ban applies. On a 1, sets APPLIES_WHY to the reason the ban
+# is NOT APPLICABLE (a ban that does not apply must say so, never sit silently green). Two forms:
+#   * dep:<pkg>[,<pkg>...]  — the repo's package.json names every listed package (dependencies or
+#     devDependencies). The electron bans use this so they never run on a repo with no electron,
+#     where the harness's own shipped checks/*.mjs would otherwise match a glob and pass vacuously.
+#   * a GLOB list — at least one REAL file in the repo matches any glob (globstar; the harness's
+#     own .gob/.hermes dirs are excluded so a ban cannot claim applicability from the payload
+#     goblin-stack itself wrote).
+applies() {
+  local cell="$1" g
+  APPLIES_WHY=""
+  case "$cell" in
+    dep:*)
+      local pkgs="${cell#dep:}" miss="" p
+      for p in $(printf '%s' "$pkgs" | tr ',' ' '); do
+        package_dep "$p" || miss="$miss $p"
+      done
+      [ -z "$miss" ] && return 0
+      if [ ! -f "$ROOT/package.json" ]; then
+        APPLIES_WHY="not applicable: no package.json, so nothing declares $pkgs"
+      else
+        APPLIES_WHY="not applicable: package.json does not name${miss} in dependencies or devDependencies"
+      fi
+      return 1 ;;
+  esac
+  for g in $cell; do
+    ( cd "$ROOT" 2>/dev/null || exit 1
+      shopt -s globstar nullglob dotglob
+      for f in $g; do
+        case "$f" in .git/*|.gob/*|.hermes/*|*/node_modules/*) continue ;; esac
+        [ -e "$f" ] && exit 0
+      done
+      exit 1 ) && return 0
+  done
+  APPLIES_WHY="not applicable: no file matches applies_when: $cell"
+  return 1
+}
+
+# ---- run ---------------------------------------------------------------------
+PASS=0; FAIL=0; SKIP=0; SEL=0
+while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source applies_when; do
+  [ "$id" = "id" ] && continue
+  [ -n "$id" ] || continue
+  only_selected "$id" || continue
+  SEL=$((SEL + 1))
+
+  # The DISABLE list is the only config knob (default empty). A ban named there is skipped with
+  # the key named; otherwise the glob alone decides whether it applies.
+  if disabled "$id"; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (disabled in bans_disabled: - remove $id from the bans_disabled: list in AGENTS.md to turn it on)"
+    continue
+  fi
+  # applies_when self-selects the ban: a ban whose cell does not select it is reported
+  # NOT APPLICABLE (a SKIP with that reason), never silently green. applies() sets APPLIES_WHY
+  # to the reason (glob form: no matching file; predicate form: package.json does not name the dep).
+  if ! applies "$applies_when"; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban ($APPLIES_WHY)"
+    continue
+  fi
+
+  # The exemption is pushed into the probe (see exempt_paths above): the probe filters the file
+  # list and exits 0 when nothing outside the exempted paths is hit. The exit code stays the only
+  # signal - stdout, when any, still names the offending lines the probe did NOT exempt.
+  ex=$(exempt_paths "$id")
+  out=$( cd "$ROOT" && GOBLIN_BANS_ID="$id" GOBLIN_BANS_EXEMPT="$ex" bash -c "$detect" 2>&1 ); rc=$?
+  case "$rc" in
+    0)
+      if [ -n "$out" ]; then
+        FAIL=$((FAIL + 1))
+        g_fail "$id" "$ban -> $replacement"
+        printf '%s\n' "$out" | sed 's/^/        /'
+      else
+        PASS=$((PASS + 1)); g_pass "$id" "$ban"
+      fi ;;
+    1)
+      # Exit 1 IS the documented signal that the ban is violated (this file's header and
+      # bans/README.md). Judging by whether stdout happened to be empty made the engine
+      # FAIL-OPEN: a detect that reports a violation through its exit code alone was read as
+      # clean. The exit code decides; stdout only adds detail (V3-2).
+      FAIL=$((FAIL + 1))
+      g_fail "$id" "$ban -> $replacement"
+      if [ -n "$out" ]; then
+        printf '%s\n' "$out" | sed 's/^/        /'
+      else
+        printf '        (reported violated by exit 1 with no detail on stdout)\n'
+      fi ;;
+    3)
+      SKIP=$((SKIP + 1))
+      g_skip "$id" "$ban (${out:-skipped})" ;;
+    *)
+      FAIL=$((FAIL + 1))
+      g_fail "$id" "$ban (the check could not run - exit $rc, fail closed)"
+      printf '%s\n' "$out" | sed 's/^/        /' ;;
+  esac
+done < "$BANS"
+
+printf '      %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIP"
+[ "$FAIL" -gt 0 ] && exit 1
+if [ "$SEL" -eq 1 ] && [ "$SKIP" -eq 1 ]; then exit 3; fi
+exit 0

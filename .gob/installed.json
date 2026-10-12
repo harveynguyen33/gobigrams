@@ -1,0 +1,33 @@
+{
+  "version": "0.6.0-beta.1",
+  "source_sha": "1f9c206a72359268f0fed1b6ffa0de2aa1e26d71",
+  "installed_at": "2026-10-12T13:04:33Z",
+  "options": {"skills": "no", "archive": false, "parts": "all"},
+  "files": {
+    ".gob/bin/goblin-verify": "8e3ce0ae727807d864fe0e6ac4a2b609f94fa14fef512aae2c5160a589db0060",
+    ".gob/bin/goblin-lib.sh": "e9a6b8b2cf8bfb595505dba1f259dceb21cd37da8c49a1e66d7485183482cfac",
+    ".gob/manifest/enforcement.tsv": "178093205fc5932b90095940f1ec2d37105a7d38fc675038c2f3c8c5b4ac7890",
+    ".gob/manifest/library.tsv": "b547abef2118ee2aca367e8bbec7f4539ed77431d6b00f59b8b067a68362e9f1",
+    ".gob/manifest/glossary.tsv": "10d844b898534d6bd25fdca928c04e8c1e360673f877327291b7fd06dfddc3e2",
+    ".gob/engine/categories.tsv": "c2a6fff87828e1ec12455021239228170b16091a672ef997f7e8a4ce9164734f",
+    ".gob/manifest/bans.tsv": "2a13b554abb73d813305febd1d93936b8b58a553d323a090af4af8870a9462ba",
+    ".gob/bin/goblin-bans": "9d87538515ee350cd236355c923873b3777887babb150f83452dd1b813fffe9e",
+    ".gob/bans/README.md": "2553ce4174aec03aa324c78d73d1d61c45e4ab9f0289c277cf8e291cd9861c3f",
+    ".gob/bans/grep-ban.sh": "2267bbf02354904695d2f311df1d05075a16875c75102203d620977efd0bcb91",
+    ".gob/bans/layer-check.sh": "cc4fec7efe88c9a555b6e0c5c27e2024aed9f4b80a6c442c167aaf3d227df1e4",
+    ".gob/skills/goblin-handoff/SKILL.md": "32779c3a8b20f5bc5bf15160fd4e71f6c130a08c3e27930fac166507bb119f93",
+    ".gob/skills/goblin-verify-author/SKILL.md": "4375a840a739de9654f9ad152102731601248b601400c9dd7d6607524334836a",
+    ".gob/skills/goblin-feature-map/SKILL.md": "72db5dce9471bbf5eaa0d0ed8b0aece4d001f44352f9f8e7c866bebf34e98bdb",
+    ".gob/skills/practice/SKILL.md": "6421ffc8bb21cc53cfa0fbd2a2308e1fb000b4558f5b9a9cd9e937eba60fee82",
+    ".gob/skills/goblin-bootstrap/SKILL.md": "1c87a6adc0465e320316b9317aefe75e6a6a8f62531ba7460663cdc3dcc375fc",
+    "checks/gate.sh": "ac7a412bd0bc7cded37f60acfb78106fcb87ca57314b2d4971aca34d41cf5a5c",
+    "checks/assert.mjs": "e90343dad82530de9d465cc7ae15e265e6ec17d97717986629fac4639db61114"
+  },
+  "owned": {
+    "AGENTS.md": "25329b73370f893df689051b4f0d1f2f354e3c6b32f763f28fc21e63251ccdf2",
+    ".gob/boundary-waivers": "cd6382c34c49546f9bd678b253ee4d8601073206fd0160ab4fc96ea095a70a73"
+  },
+  "refused": {
+    "HANDOFF.md": "c382bf00d79c483b58fd10e8f0930a6cc3d2e36ad24a11fbf57b449b9543a076"
+  }
+}
