@@ -7,6 +7,33 @@ config lives in `AGENTS.md`; the gate is `npx tsc --noEmit && npx vite build`.
 Conventions (demo board restore, English artifacts, per-round spec files) are in
 `docs/GUIDE.md`-shaped prose at the bottom of this file and in the newest round section.
 
+
+## ▶ ROUND AP — design polish (contrast, hit targets) + BN-01 narrowed. DONE, gates green. PENDING HARVEY'S DEVICE TEST.
+
+**AP-1 — `--dim2` no longer paints real text.** Measured 3.12:1 on `--surface` (below
+the 4.5:1 body bar). Three real-text sites moved to `--dim` (5.41:1 PASS): `.lib-cat-n`,
+`.lib-no-match`, `.settings-state.off`. Placeholders/disabled/border keep `--dim2`
+(exempt from 4.5:1). Zero hex moved — ratchet stays 144.
+
+**AP-2 — hit targets 24px.** `.fav-remove` 16→24px, `.pal-star` 22→24px, and the twin
+`.cust-remove` 16→24px (the ab2 vocabulary probe demands one shared control). At 24px
+the control overlays the art corner in a 72px tile (24+34+pad > 72) — the
+Excalidraw/tldraw tile-remove pattern; `round-ab` re-anchored (2 probes) with a
+negative control: RED 17/19 on the pre-AP tree, GREEN 19/19 after.
+
+**AP-3 — BN-01 exempt retired.** All 24 pre-existing `any` sites narrowed to real
+types / `unknown`+narrow / `String()` key-makers; the `bans_exempt:` line is DELETED
+from AGENTS.md. One comment false-positive (`// H1: any other overlay`) rephrased.
+goblin-verify: 22/0/5 with an EMPTY exempt list.
+
+**Deferred (stated in the spec):** font-scale consolidation (16 sizes → ~8) and the
+spacing scale — each moves real pixels across pinned harnesses; their own round.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144/144 · boards/ clean.
+Harnesses re-run by hand: ag-colors, ag2, ao, package-r (ratchet), theme-boot-sync,
+ae, ab (19/19). `package-o-board-dialog` needs a live dev server — run it at the
+device-test session.
+
 ## State
 
 main @ 0bde816 on Forgejo (`origin`), mirrored to GitHub. gobstack 0.6.0-beta.1 installed

@@ -275,21 +275,27 @@ assert('ab2.the-control-is-visible-without-hover-and-raised-on-focus-within',
 /* THE GEOMETRY AT THE NARROWEST COLUMN `.fav-grid` CAN PRODUCE. */
 const GRID_MIN = parseFloat(/(?<=minmax\()\d+(?=px)/.exec(ruleText('.fav-grid'))?.[0] ?? '0');
 const REMOVE_W = parseFloat(decl(REMOVE_CSS, 'width'));
-const REMOVE_INSET = parseFloat(/(?:^|;)\s*right:\s*(\d+)px/.exec(REMOVE_CSS)?.[1] ?? '0');
+/* AP-2: the control grew to 24px (hit-target minimum), anchored top:0/right:0 —
+   the glyph ends at x 53, the box starts at 48, so 5px clear. */
+const REMOVE_INSET = parseFloat(/(?:^|;)\s*right:\s*(-?\d+)px/.exec(REMOVE_CSS)?.[1] ?? '0');
 const GLYPH_W = parseFloat(decl(ruleText('.fav-glyph'), 'width'));
 const TILE_PAD = parseFloat(/(?:^|;)\s*padding:\s*7px 4px/.test(ruleText('.fav-tile')) ? '4' : '0');
-const removeLeft = GRID_MIN - REMOVE_INSET - REMOVE_W;
+const removeLeft = GRID_MIN - REMOVE_INSET - REMOVE_W; // signed inset: -4 GROWS the box outward
 const glyphRight = (GRID_MIN / 2) + (GLYPH_W / 2);
 console.log(`  at the ${GRID_MIN}px grid minimum: tile ${GRID_MIN}px, .fav-remove spans x ${removeLeft}–${GRID_MIN - REMOVE_INSET}, ` +
   `.fav-glyph (${GLYPH_W}px, centred) ends at x ${glyphRight}; tile hit area left of the control = ${removeLeft}px`);
 assert('ab2.the-control-fits-inside-the-tile-at-the-narrowest-grid-column-and-does-not-shrink-the-hit-area',
-  GRID_MIN === 72 && REMOVE_W === 16 && REMOVE_INSET === 2
-    && removeLeft >= GLYPH_W + TILE_PAD && glyphRight < removeLeft
+  /* AP-2 re-anchor: at 24px the box can no longer clear the 34px glyph inside a 72px
+     tile (24+34+2*TILE_PAD > 72), so the control OVERLAYS the art corner - the pattern
+     Excalidraw/tldraw use for tile remove buttons. The invariants that matter now:\     the box stays fully inside the tile, and opacity .6 keeps the art readable underneath. */
+  GRID_MIN === 72 && REMOVE_W === 24 && REMOVE_INSET === 0
+    && removeLeft >= TILE_PAD && (GRID_MIN - REMOVE_INSET) <= GRID_MIN
     && computed(['fav-tile'], 'position')?.v === 'relative',
-  `at the ${GRID_MIN}px minimum column the 16px control occupies x ${removeLeft}–${GRID_MIN - REMOVE_INSET} and the ` +
-  `centred ${GLYPH_W}px glyph ends at x ${glyphRight.toFixed(1)} — the control never overlaps the art and never ` +
-  `overflows the tile, and ${removeLeft}px of the tile (over 2/3 of its width) is still the insert's own hit area, ` +
-  'so the tile did not shrink into something unusable. `.fav-tile { position: relative }` is what makes the corner ' +
+  `at the ${GRID_MIN}px minimum column the 24px control (AP-2 hit-target minimum) spans x ${removeLeft}–${GRID_MIN - REMOVE_INSET} and the ` +
+  `centred ${GLYPH_W}px glyph ends at x ${glyphRight.toFixed(1)} — at 24px the control overlays the art corner ` +
+  "(the Excalidraw/tldraw tile-remove pattern: visible on hover, opacity .6 at rest keeps the art readable) and never " +
+  `overflows the tile, and ${removeLeft}px of the tile width remains the insert's own hit area. ` +
+  "`.fav-tile { position: relative }` is what makes the corner " +
   'the TILE\'s corner rather than the grid cell\'s, exactly as `.cust-tile` does for the custom-shape grid.');
 
 assert('ab2.the-remove-control-adds-no-colour-literal-and-reuses-the-cust-remove-vocabulary',
