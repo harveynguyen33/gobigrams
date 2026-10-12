@@ -9,6 +9,37 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ ROUND AQ — type scale + spacing scale consolidation. DONE, all 39 harnesses GREEN. PENDING HARVEY'S DEVICE TEST.
+
+**AQ-1 — the type scale (8 steps).** New `--fs-*` tokens on :root (--fs-2xs 9px →
+--fs-display 26px; NAMED `--fs-*`, NOT `--ts-*` — that namespace is the per-node
+textStyle feature and a collision broke package-p's pairing probe on day one). All 168
+font-size declarations + 17 calc-scaled consumers consume the tokens; raw px font-size
+outside the token block is forbidden (ratchet). Half-steps collapsed: 9.5→10, 10.5→11,
+11.5→12, 12.5→12, 13.5→13, 14.5/15→14, 20→16.
+
+**AQ-2 — the spacing scale.** 152 padding/margin/gap numbers consolidated onto the
+17-step allowed set (1..5..40). Survivors with reasons: **5px** (coupled to
+.insp-seg.grid3's calc((100% - 10px)/3) basis + the aa1 one-gap equality), **7px/9px**
+(load-bearing in measured control arithmetic), **13px** (AO-2's named rhythm + the ab1
+equality + .field margin). Negative margins are geometry — out of scope. Transform via
+`scripts/aq-transform.mjs` (postcss — a real parser; the first regex attempt corrupted
+comments and calc() math and was reverted).
+
+**Re-anchors (each its own reason):** package-p (154/154 — fallback sweep now sees
+tokens), round-aj (11.5→12 documented bump), round-am/an (edge-label 11px literal →
+var(--fs-sm), same resolved value), round-al (85% headroom → 100% + zero-overflow hard
+gate; the chip label grew, headroom cost printed), round-aa (one-gap equality restored
+at 5px).
+
+**Found + fixed en route:** the transform initially desynced .insp-seg.grid3's gap from
+its flex-basis calc (gap 4 vs basis -10px) — caught by package-p's arithmetic, restored
+to the coupled 5px.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **39/39 harnesses GREEN** · boards clean.
+Dev server on :5200 for the review batch.
+
 ## ▶ PACKAGE-S — Settings completion: persisted prefs, export defaults, autosave control. DONE, gates green. PENDING HARVEY'S DEVICE TEST.
 
 **S-1 — persisted prefs.** New `src/prefs.ts` (one load/save pair, `diagram-studio:pref:`
