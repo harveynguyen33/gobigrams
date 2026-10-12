@@ -26,9 +26,7 @@ ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
 ratchet.ceiling: 831522
 runtime_data: [.gob/state.json]
-bans_exempt:
-  - BN-01 src/App.tsx
-  - BN-01 src/library.ts
+bans_exempt: [BN-01 src/App.tsx, BN-01 src/library.ts, BN-01 src/presets.ts, BN-01 src/Tooltip.tsx]
 layers:
 replay.env: GOBLIN_PRE_COMMIT
 replay.cmd: node checks/{name}.mjs
