@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Diagram Studio — ROUND AM mockup (edge: text size · flow glyph · speed)</title>
+<style>
+:root{
+  --bg:#0b0b0d; --surface:#131316; --elevated:#1a1b1f; --border:#26272c;
+  --border-strong:#33343a; --fg:#e8e8ea; --dim:#8a8a92; --dim2:#63636b;
+  --acc:#f54e00; --sel:#3b82f6; --sel-soft:rgba(59,130,246,.14);
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:13px;padding:28px 24px 60px}
+h1{font-size:15px;font-weight:700;margin:0 0 4px;letter-spacing:.02em}
+h2{font-size:12px;font-weight:700;margin:34px 0 12px;color:var(--acc);text-transform:uppercase;letter-spacing:.1em}
+p.note{color:var(--dim);font-size:12px;margin:0 0 20px;line-height:1.6;max-width:1000px}
+.cols{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.panel{width:288px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px 18px;flex:none}
+.panel h3{font-size:12px;font-weight:700;margin:0 0 14px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.panel.now h3{color:var(--dim2)}
+.panel.new{border-color:var(--border-strong);box-shadow:0 0 0 1px rgba(59,130,246,.18)}
+.panel.new h3{color:var(--sel)}
+.field{margin:0 0 12px}
+.field > label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:0 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 11px;background:var(--elevated);
+  color:var(--fg);border:1px solid var(--border);border-radius:999px;font-family:var(--mono);font-size:11px;
+  line-height:1;cursor:pointer;white-space:nowrap;transition:border-color .14s,color .14s,background .14s}
+.chip:hover{border-color:var(--border-strong)}
+.chip.on{border-color:var(--sel);color:var(--sel);background:var(--sel-soft)}
+.chip.ic{padding:5px;width:30px;height:30px;min-height:30px;justify-content:center;border-radius:7px}
+.chip svg{width:15px;height:15px;flex:0 0 15px}
+.chip.act{color:var(--dim);background:transparent;border-style:dashed}
+.row{display:flex;gap:8px;align-items:flex-end}
+.insp-stepper{display:flex;align-items:center;border:1px solid var(--border);border-radius:7px;background:var(--elevated);overflow:hidden}
+.insp-step-btn{width:34px;height:30px;flex:none;background:transparent;border:0;color:var(--fg);font-family:var(--mono);font-size:15px;line-height:1;cursor:pointer}
+.insp-step-btn:hover{color:var(--sel)}
+.insp-step-val{min-width:34px;text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--fg);
+  border-left:1px solid var(--border);border-right:1px solid var(--border);min-height:30px;display:flex;align-items:center;justify-content:center}
+/* compact stepper = AM-5 */
+.insp-stepper.compact{width:96px}
+.insp-stepper.compact .insp-step-val{flex:1}
+/* the row where count + speed share a line */
+.pair{display:flex;gap:8px;align-items:flex-end}
+.pair .field{margin:0}
+.grow{flex:1;min-width:0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;cursor:pointer;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--border)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--sel);border:0;margin-top:-5px}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--border)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:var(--sel)}
+.speedwrap{display:flex;align-items:center;gap:6px}
+.speedval{font-size:11px;color:var(--dim);min-width:44px;text-align:right}
+.hint{font-size:10.5px;color:var(--dim2);margin:4px 0 0}
+/* ---------- the demo rail: what each flow state DOES ---------- */
+.rail{position:relative;height:44px;border:1px solid var(--border);border-radius:8px;background:var(--bg);
+  display:flex;align-items:center;padding:0 14px;margin:0 0 8px}
+.rail .line{position:absolute;left:14px;right:14px;height:2px;background:var(--border-strong);border-radius:1px}
+.rail.solid .line{opacity:.38}
+.rail .dot{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--sel);top:50%;margin-top:-3.5px}
+.rail .payload{position:absolute;width:24px;height:20px;top:50%;margin-top:-10px;border-radius:5px;
+  background:var(--elevated);border:1.6px solid var(--sel);display:flex;align-items:center;justify-content:center}
+.rail .payload svg{width:13px;height:13px;stroke:var(--sel);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.rail .sweep{position:absolute;top:50%;height:3.4px;margin-top:-1.7px;border-radius:2px;background:var(--sel);opacity:.9}
+.raillabel{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim2);margin:0 0 12px}
+/* the payload travels left→right; duration set per rail inline */
+@keyframes travel{from{left:14px}to{left:calc(100% - 38px)}}
+@keyframes sweep{from{left:14px}to{left:calc(100% - 36px)}}
+.travel{animation:travel linear infinite}
+.sweeprun{animation:sweep linear infinite}
+.dashline{position:absolute;left:14px;right:14px;height:2px;background:repeating-linear-gradient(90deg,var(--sel) 0 5px,transparent 5px 11px);
+  animation:dashmove linear infinite;opacity:.85}
+@keyframes dashmove{from{background-position-x:0}to{background-position-x:-22px}}
+.pulsline{position:absolute;left:14px;right:14px;height:2px;background:var(--border-strong);border-radius:1px}
+.pulsline::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--sel),transparent);
+  animation:pulsemove linear infinite;border-radius:1px}
+@keyframes pulsemove{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+/* text-size preview for AM-2 */
+.txtprev{border:1px dashed var(--border-strong);border-radius:8px;background:var(--bg);padding:16px 14px;text-align:center;margin:0 0 12px}
+.txtprev .elabel{display:inline-block;background:transparent;color:var(--fg);font-family:var(--mono);font-weight:600;
+  padding:2px 8px;text-shadow:0 1px 0 var(--bg),0 -1px 0 var(--bg),1px 0 0 var(--bg),-1px 0 0 var(--bg)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin:6px 0 0}
+.legend b{color:var(--fg);font-weight:700}
+table.keys{border-collapse:collapse;margin-top:8px;font-size:11.5px}
+table.keys td{border:1px solid var(--border);padding:5px 10px;color:var(--dim)}
+table.keys td:first-child{color:var(--fg)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<h1>ROUND AM — connection line (edge): text size · flow glyph · speed · count</h1>
+<p class="note">
+  So sánh <b>HIỆN TẠI</b> (bên trái, đúng như panel đang chạy) với <b>ĐỀ XUẤT</b> (bên phải).
+  Chips, kích thước và animation ở đây dùng lại đúng token + đúng hiệu ứng của app, nên bạn nhìn là biết build ra sao.
+  Bug #1 (kéo text) đã được fix riêng và đang build — mockup này cho 4 mục còn lại.
+</p>
+
+<h2>1 · Flow glyph (AM-3) — chữ → icon minh hoạ</h2>
+<div class="cols">
+  <div class="panel now">
+    <h3>Hiện tại</h3>
+    <div class="field"><label>flow glyph</label>
+      <div class="chips">
+        <button class="chip on">Letter</button><button class="chip">Package</button>
+        <button class="chip">File</button><button class="chip">Zap</button>
+        <button class="chip">Gear</button><button class="chip">DB</button>
+      </div>
+      <p class="hint">6 nút chữ — không thấy glyph nào, phải bấm mới biết nó là hình gì.</p>
+    </div>
+  </div>
+  <div class="panel new">
+    <h3>Đề xuất</h3>
+    <div class="field"><label>flow glyph</label>
+      <div class="chips">
+        <button class="chip ic on" title="Letter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></button>
+        <button class="chip ic" title="Package">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></button>
+        <button class="chip ic" title="File">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></button>
+        <button class="chip ic" title="Zap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></button>
+        <button class="chip ic" title="Gear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M2 12h3m14 0h3M4.9 19.1 7 17m10-10 2.1-2.1"/></svg></button>
+        <button class="chip ic" title="DB">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></button>
+      </div>
+      <p class="hint">Đúng 6 lựa chọn đó, nhưng là 6 ô vuông mang chính glyph sẽ chạy trên line — cùng một hàng với các glyph row khác (flow, markers, curvature).</p>
+    </div>
+    <div class="field"><label>flow</label>
+      <div class="chips">
+        <button class="chip ic" title="None"><svg viewBox="0 0 24 18"><line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".38"/></svg></button>
+        <button class="chip ic on" title="Dots"><svg viewBox="0 0 24 18"><circle cx="5" cy="9" r="2" fill="currentColor"/><circle cx="13" cy="9" r="2" fill="currentColor" opacity=".6"/><circle cx="21" cy="9" r="2" fill="currentColor" opacity=".32"/></svg></button>
+        <button class="chip ic" title="Dash"><svg viewBox="0 0 24 18"><line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 3"/></svg></button>
+        <button class="chip ic" title="Pulse"><svg viewBox="0 0 24 18"><line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".35"/><line x1="9" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg></button>
+        <button class="chip ic" title="Icon"><svg viewBox="0 0 24 18"><line x1="2" y1="9" x2="24" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/><rect x="9" y="5" width="8" height="8" rx="1.8" fill="currentColor"/></svg></button>
+      </div>
+      <p class="hint">(row <code>flow</code> giữ nguyên — đã là glyph từ ROUND AL; ở đây để bạn thấy glyph row nào cũng cùng một hệ.)</p>
+    </div>
+  </div>
+</div>
+
+<h2>2 · Speed (AM-4) — minh hoạ thật, chạy đúng tốc độ đang chọn</h2>
+<p class="note">
+  Rail dưới đây chạy <b>đúng <code>flowDuration</code> thật của app</b> (4s / 2.4s / 1.4s / 0.8s mỗi vòng) — nên hình
+  minh hoạ là chính tốc độ, không phải một chữ mô tả tốc độ. Slider kéo sang phải = nhanh hơn, và con số bên cạnh
+  là số giây thật đang lưu.
+</p>
+<div class="panel new" style="width:560px">
+  <h3>Đề xuất</h3>
+  <div class="rail"><span class="line"></span>
+    <span class="dot travel" style="animation-duration:4s"></span>
+    <span class="dot travel" style="animation-duration:4s;animation-delay:1.33s"></span>
+    <span class="dot travel" style="animation-duration:4s;animation-delay:2.66s"></span>
+  </div>
+  <div class="raillabel"><span>4.0s — chậm</span><span>1 vòng của bead = 1 lần gửi</span></div>
+
+  <div class="rail"><span class="line"></span>
+    <span class="dot travel" style="animation-duration:2.4s"></span>
+    <span class="dot travel" style="animation-duration:2.4s;animation-delay:.8s"></span>
+    <span class="dot travel" style="animation-duration:2.4s;animation-delay:1.6s"></span>
+  </div>
+  <div class="raillabel"><span>2.4s — bình thường (default)</span></div>
+
+  <div class="rail"><span class="line"></span>
+    <span class="dot travel" style="animation-duration:1.4s"></span>
+    <span class="dot travel" style="animation-duration:1.4s;animation-delay:.47s"></span>
+    <span class="dot travel" style="animation-duration:1.4s;animation-delay:.94s"></span>
+  </div>
+  <div class="raillabel"><span>1.4s — nhanh</span></div>
+
+  <div class="rail"><span class="line"></span>
+    <span class="dot travel" style="animation-duration:.8s"></span>
+    <span class="dot travel" style="animation-duration:.8s;animation-delay:.27s"></span>
+    <span class="dot travel" style="animation-duration:.8s;animation-delay:.53s"></span>
+  </div>
+  <div class="raillabel"><span>0.8s — rất nhanh</span></div>
+
+  <div class="field" style="margin-top:16px"><label>speed — slider thật (kéo thử)</label>
+    <div class="speedwrap grow">
+      <input type="range" min="0.6" max="8" step="0.1" value="2.4" id="sp">
+      <span class="speedval" id="spv">2.4s</span>
+    </div>
+    <p class="hint">Miền giá trị giống hệt hiện tại (0.6s → 8s; 4 chip cũ là 4 / 2.4 / 1.4 / 0.8 — vẫn nằm trong đó).
+      Kéo phải = nhanh hơn. Một lần kéo = một bước undo.</p>
+  </div>
+  <div class="rail"><span class="line"></span><span class="dot travel" id="livedot" style="animation-duration:2.4s"></span></div>
+  <div class="raillabel"><span>rail này chạy theo đúng giá trị bạn đang kéo ở trên</span></div>
+</div>
+
+<h2>3 · Count nhỏ lại + Speed cùng một hàng (AM-5)</h2>
+<div class="cols">
+  <div class="panel now">
+    <h3>Hiện tại</h3>
+    <div class="field"><label>count</label>
+      <div class="insp-stepper"><button class="insp-step-btn">−</button><span class="insp-step-val">3</span><button class="insp-step-btn">+</button></div>
+    </div>
+    <div class="field"><label>speed</label>
+      <div class="chips"><button class="chip">slow</button><button class="chip on">normal</button><button class="chip">fast</button><button class="chip">very fast</button></div>
+    </div>
+    <p class="hint">Count chiếm cả hàng 253px cho một số 1..6; speed là 4 nút chữ — 2 hàng riêng, tổng ~100px chiều cao.</p>
+  </div>
+  <div class="panel new">
+    <h3>Đề xuất</h3>
+    <div class="pair">
+      <div class="field"><label>count</label>
+        <div class="insp-stepper compact"><button class="insp-step-btn">−</button><span class="insp-step-val">3</span><button class="insp-step-btn">+</button></div>
+      </div>
+      <div class="field grow"><label>speed</label>
+        <div class="speedwrap"><input type="range" min="0.6" max="8" step="0.1" value="2.4" id="sp2"><span class="speedval" id="spv2">2.4s</span></div>
+      </div>
+    </div>
+    <p class="hint">Cùng một hàng. Count nhỏ lại (96px thay vì full width), speed thành thanh kéo — nhanh/chậm liền mạch
+      thay vì 4 nấc cứng. Cao ~44px thay vì ~100px.</p>
+  </div>
+</div>
+
+<h2>4 · Text size cho label của line (AM-2)</h2>
+<p class="note">
+  Label của đường nối hiện chỉ có <b>màu chữ / màu nền / plate</b> — không chỉnh được cỡ chữ như Text thường.
+  Đề xuất: thêm mục <b>Text</b> đúng như Text của node (SIZE · WEIGHT · FONT), dùng chung một hệ với node,
+  nên board cũ vẫn render y như cũ. <b>Không</b> thêm ALIGN/vAlign: label line là một chip trôi trên line, vị trí của nó
+  chính là cái kéo — không có khung để canh trong đó.
+</p>
+<div class="cols">
+  <div class="panel now">
+    <h3>Hiện tại</h3>
+    <div class="field"><label>text color</label>
+      <div class="chips"><button class="chip ic on"><span style="width:13px;height:13px;border-radius:3px;background:var(--fg);display:block"></span></button>
+      <button class="chip ic"><span style="width:13px;height:13px;border-radius:3px;background:var(--acc);display:block"></span></button>
+      <button class="chip ic"><span style="width:13px;height:13px;border-radius:3px;background:#7aa2ff;display:block"></span></button></div>
+    </div>
+    <div class="field"><label>background</label>
+      <div class="chips"><button class="chip on">None</button><button class="chip">Surface</button><button class="chip">Outline</button></div>
+    </div>
+    <div class="field"><label>plate</label>
+      <div class="chips"><button class="chip act">Reset label position</button></div>
+    </div>
+  </div>
+  <div class="panel new">
+    <h3>Đề xuất — thêm mục TEXT (§ như node)</h3>
+    <div class="txtprev"><span class="elabel" id="prev" style="font-size:11px">ĐƠN HÀNG</span></div>
+    <div class="field"><label>size</label>
+      <div class="chips"><button class="chip" onclick="setScale(.85,this)">S</button><button class="chip on" onclick="setScale(1,this)">M</button><button class="chip" onclick="setScale(1.15,this)">L</button><button class="chip" onclick="setScale(1.3,this)">XL</button></div>
+    </div>
+    <div class="field"><label>weight</label>
+      <div class="chips"><button class="chip on" onclick="setW(600,this)">Regular</button><button class="chip" onclick="setW(700,this)">Bold</button></div>
+    </div>
+    <div class="field"><label>font</label>
+      <div class="chips"><button class="chip on">JetBrains</button><button class="chip">Inter</button><button class="chip">Plex</button><button class="chip">Shantell</button><button class="chip">Lexend</button><button class="chip">BeVietnam</button></div>
+    </div>
+    <div class="field"><label>text color</label>
+      <div class="chips"><button class="chip ic on"><span style="width:13px;height:13px;border-radius:3px;background:var(--fg);display:block"></span></button>
+      <button class="chip ic"><span style="width:13px;height:13px;border-radius:3px;background:var(--acc);display:block"></span></button>
+      <button class="chip ic"><span style="width:13px;height:13px;border-radius:3px;background:#7aa2ff;display:block"></span></button></div>
+      <p class="hint">màu chữ giữ nguyên ở mục LABEL — không nhân đôi control.</p>
+    </div>
+  </div>
+</div>
+
+<h2>Chốt lại 4 điểm cần bạn xác nhận</h2>
+<table class="keys">
+  <tr><td>AM-2</td><td>Thêm mục <b>Text</b> cho label line: SIZE + WEIGHT + FONT, dùng chung hệ với node. Không ALIGN/vAlign. Đúng ý?</td></tr>
+  <tr><td>AM-3</td><td>Flow glyph: 6 ô vuông mang glyph (Letter/Package/File/Zap/Gear/DB). Đúng bộ glyph này chứ?</td></tr>
+  <tr><td>AM-4</td><td>Speed: 4 nút chữ → <b>slider + rail minh hoạ chạy đúng tốc độ</b>. Miền 0.6→8s (kéo phải = nhanh hơn).</td></tr>
+  <tr><td>AM-5</td><td>Count nhỏ lại + <b>count và speed cùng một hàng</b>.</td></tr>
+</table>
+<p class="note" style="margin-top:18px">
+  Nếu bạn muốn giữ 4 nút chữ cho speed thay vì slider, hoặc muốn đổi bộ glyph — nói là tôi đổi mockup rồi mới build.
+  Còn "go" thì tôi build cả 4 (mỗi mục một commit, verify tsc+build+harness như mọi round).
+</p>
+
+<script>
+function setScale(s, el){ document.getElementById('prev').style.fontSize = (11*s)+'px';
+  el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
+function setW(w, el){ document.getElementById('prev').style.fontWeight = w;
+  el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
+function wire(sp, spv, dot){
+  const upd = () => { const v = Number(sp.value);
+    spv.textContent = v.toFixed(1)+'s';
+    if (dot) dot.style.animationDuration = v+'s';
+    document.querySelectorAll('.rail .dot.travel').forEach(d=>{ if(d.id==='livedot') return; });
+  };
+  sp.addEventListener('input', upd); upd();
+}
+wire(document.getElementById('sp'), document.getElementById('spv'), document.getElementById('livedot'));
+wire(document.getElementById('sp2'), document.getElementById('spv2'), null);
+</script>
+</body>
+</html>
