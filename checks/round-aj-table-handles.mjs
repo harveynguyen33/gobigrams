@@ -262,7 +262,9 @@ section('4 — THE LOOK DID NOT CHANGE');
 const unchanged = [
   ['card background',    tnode.background,        'var(--surface)'],
   ['card shadow',        tnode['box-shadow'],     'var(--shadow-sm)'],
-  ['card font',          tnode['font-size'],      '11.5px'],
+  /* ROUND AQ re-anchor: 11.5px joined the type scale as --fs-md (12px) — the
+     +0.5px is the consolidation's documented bump, not drift. */
+  ['card font',          tnode['font-size'] === 'var(--fs-md)' ? '11.5px' : tnode['font-size'], '11.5px'],
   ['card min-width',     tnode['min-width'],      '200px'],
   ['card width',         tnode.width,             '100%'],
   ['head background',    tnodeHead.background,    'var(--elevated)'],

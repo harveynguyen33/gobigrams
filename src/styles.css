@@ -10,7 +10,16 @@
 
    The dark block is byte-identical to the shipped values — nothing may move. */
 :root,
-[data-theme="dark"] {
+[data-theme="dark"] {/* ROUND AQ - the type scale (8 steps). Theme-invariant; consumed by every
+   font-size in this sheet. Ratchet: checks/round-aq-scales.mjs */
+--fs-2xs: 9px;
+--fs-xs: 10px;
+--fs-sm: 11px;
+--fs-md: 12px;
+--fs-lg: 13px;
+--fs-xl: 14px;
+--fs-2xl: 16px;
+--fs-display: 26px;
   color-scheme: dark;
   --bg: #0b0b0d;
   --surface: #131316;
@@ -615,18 +624,18 @@ body {
 }
 .brand {
   display: flex; align-items: center; gap: 8px;
-  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  font-family: var(--mono); font-size: var(--fs-lg); font-weight: 700;
   letter-spacing: -0.01em;
 }
 .brand .dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--acc); box-shadow: 0 0 8px var(--acc);
 }
-.brand .path { color: var(--dim); font-weight: 400; font-size: 11px; margin-left: 2px; }
+.brand .path { color: var(--dim); font-weight: 400; font-size: var(--fs-sm); margin-left: 2px; }
 
 .panel-body { padding: 12px; overflow-y: auto; flex: 1; }
 .sec-label {
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--dim);
   margin: 4px 0 10px 2px;
 }
@@ -638,7 +647,7 @@ body {
   padding: 9px 10px; border-radius: 8px;
   border: 1px solid var(--border); background: var(--elevated);
   cursor: grab; transition: border-color .15s, transform .1s;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .pal-item:hover { border-color: var(--sel); transform: translateX(2px); }
 .pal-item:active { cursor: grabbing; }
@@ -651,10 +660,10 @@ body {
      The shape preview carries its own `--nc` stroke, so it needs no plate. */
   background: transparent;
 }
-.pal-swatch span { font-family: var(--mono); font-size: 10.5px; font-weight: 700; }
+.pal-swatch span { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700; }
 .shape-preview { display: block; overflow: visible; }
 .pal-meta { display: flex; flex-direction: column; line-height: 1.25; }
-.pal-meta small { color: var(--dim); font-size: 10.5px; font-family: var(--mono); }
+.pal-meta small { color: var(--dim); font-size: var(--fs-sm); font-family: var(--mono); }
 
 /* ---------- library: search + collapsible categories (PACKAGE-N 2b, 2c) ----------
    The section body scrolls inside `.panel-body` (overflow-y: auto); nothing here
@@ -669,7 +678,7 @@ body {
   width: 100%;
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 7px;
-  padding: 8px 11px; font-size: 12.5px; font-family: var(--sans);
+  padding: 8px 10px; font-size: var(--fs-md); font-family: var(--sans);
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -684,7 +693,7 @@ body {
    a query narrows the list) — just the category name and its hit count. */
 .lib-search-head {
   display: flex; align-items: center; gap: 6px; width: 100%;
-  font: inherit; font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em;
+  font: inherit; font-size: var(--fs-sm); font-family: var(--mono); letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 6px 4px; color: var(--dim);
 }
@@ -695,13 +704,13 @@ body {
 .pal-item.pal-dimmed { opacity: .45; }
 .pal-item.pal-dimmed:hover { opacity: .8; }
 .lib-no-match {
-  padding: 10px 4px; font-size: 12px; color: var(--dim); font-family: var(--mono);
+  padding: 10px 4px; font-size: var(--fs-md); color: var(--dim); font-family: var(--mono);
 } /* AP-1: was --dim2 (3.12:1 on surface) — real text needs 4.5:1 */
 
 .lib-cats { display: flex; flex-direction: column; gap: 8px; }
 .lib-cat-head {
   display: flex; align-items: center; gap: 6px; width: 100%;
-  font: inherit; font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em;
+  font: inherit; font-size: var(--fs-sm); font-family: var(--mono); letter-spacing: 0.06em;
   text-transform: uppercase; cursor: pointer;
   padding: 6px 4px; border: 0; border-radius: 6px;
   background: transparent; color: var(--dim);
@@ -712,7 +721,7 @@ body {
 .lib-chev:not(.open) { transform: rotate(-90deg); }
 .lib-cat-name { flex: 1; text-align: left; }
 .lib-cat-n {
-  font-size: 9.5px; padding: 1px 5px; border-radius: 999px;
+  font-size: var(--fs-xs); padding: 1px 4px; border-radius: 999px;
   background: var(--surface); border: 1px solid var(--border); color: var(--dim);
 } /* AP-1: was --dim2 (3.12:1) — a text badge, not a placeholder */
 .lib-cat .palette { margin-top: 6px; }
@@ -726,7 +735,7 @@ body {
   flex: none; margin-left: auto;
   width: 24px; height: 24px; padding: 0; /* AP-2: 22 -> 24px hit target; glyph unchanged */
   display: grid; place-items: center;
-  font: inherit; font-size: 14px; line-height: 1;
+  font: inherit; font-size: var(--fs-xl); line-height: 1;
   cursor: pointer; border-radius: 6px;
   border: 1px solid transparent; background: transparent; color: var(--dim2);
   transition: color .15s, border-color .15s, background .15s;
@@ -743,7 +752,7 @@ body {
 .fav-tile {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 7px 4px; border-radius: 8px; cursor: pointer;
-  font: inherit; font-size: 10px; line-height: 1.15; text-align: center;
+  font: inherit; font-size: var(--fs-xs); line-height: 1.15; text-align: center;
   border: 1px solid var(--border); background: var(--elevated); color: var(--dim);
   transition: border-color .15s, color .15s, transform .1s;
 }
@@ -753,10 +762,10 @@ body {
   width: 34px; height: 25px; border-radius: 6px; flex: none;
   display: grid; place-items: center; background: var(--surface);
 }
-.fav-glyph span { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.fav-glyph span { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700; }
 .fav-name {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--mono); font-size: 9.5px;
+  font-family: var(--mono); font-size: var(--fs-xs);
 }
 /* ROUND AB, ITEM 2 — THE REMOVE CONTROL ON A FAVOURITE TILE, drawn with the
    exact geometry of `.cust-remove` (16px circle on the tile's top-right corner,
@@ -780,7 +789,7 @@ body {
      anchor is unchanged because the offset moves the box out by the same 8px
      the box grew. Glyph stays 11px. */
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; line-height: 1;
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: 1;
   color: var(--dim); background: var(--surface); border: 1px solid var(--border);
   opacity: .6; transition: opacity .15s, color .15s, border-color .15s;
 }
@@ -793,7 +802,7 @@ body {
   border-style: dashed; border-color: var(--acc); background: var(--acc-soft); color: var(--acc);
   animation: fav-pending-pulse 1.8s ease-in-out infinite;
 }
-.fav-pending .fav-glyph { background: transparent; font-size: 16px; font-weight: 700; color: var(--acc); }
+.fav-pending .fav-glyph { background: transparent; font-size: var(--fs-2xl); font-weight: 700; color: var(--acc); }
 .fav-pending:hover { border-color: var(--acc); color: var(--acc); }
 @keyframes fav-pending-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--acc-soft); }
@@ -813,7 +822,7 @@ body {
    inside the flex row the header's own gap owns that space instead. */
 .cust-head .sec-label { margin: 0 0 0 2px; }
 .cust-import {
-  flex: none; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  flex: none; font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.04em;
   padding: 4px 9px; border-radius: 6px; cursor: pointer;
   border: 1px solid var(--border); background: var(--elevated); color: var(--dim);
   transition: border-color .15s, color .15s, background .15s;
@@ -835,7 +844,7 @@ body {
   /* AP-2: same 24px hit-target minimum as .fav-remove; visual anchor preserved
      by the outward offset. */
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; line-height: 1;
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: 1;
   color: var(--dim); background: var(--surface); border: 1px solid var(--border);
   opacity: .6; transition: opacity .15s, color .15s, border-color .15s;
 }
@@ -843,7 +852,7 @@ body {
 .cust-drop {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 4px; padding: 10px 6px; cursor: pointer;
-  font: inherit; font-size: 10px; line-height: 1.2; text-align: center;
+  font: inherit; font-size: var(--fs-xs); line-height: 1.2; text-align: center;
   border: 1px dashed var(--border-strong); border-radius: 8px;
   background: var(--elevated); color: var(--dim);
   transition: border-color .15s, color .15s, background .15s;
@@ -857,7 +866,7 @@ body {
 .cust-drop:hover, .cust-drop:focus-visible {
   border-color: var(--acc); color: var(--acc); background: var(--acc-soft);
 }
-.cust-drop-glyph { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.cust-drop-glyph { font-family: var(--mono); font-size: var(--fs-xl); font-weight: 700; }
 
 /* diagram-type badges — DELETED in PACKAGE-N Revision 3 (`.pal-badges`, `.tb`,
    `.tb-architecture`, `.tb-flowchart`, `.tb-c4`, `.tb-erd`). They restated each
@@ -899,7 +908,7 @@ body {
 /* toolbar — single compact row */
 .toolbar {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-  z-index: 5; display: flex; gap: 5px; align-items: center;
+  z-index: 5; display: flex; gap: 4px; align-items: center;
   justify-content: center;
   max-width: calc(100% - 34px);
   background: var(--panel-glass); backdrop-filter: blur(8px);
@@ -907,14 +916,14 @@ body {
   height: 40px;
 }
 .tbtn-label {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--dim); padding: 0 4px;
 }
 .tbtn {
-  font-family: var(--mono); font-size: 12px;
+  font-family: var(--mono); font-size: var(--fs-md);
   background: transparent; color: var(--fg);
   border: 1px solid transparent; border-radius: 6px;
-  padding: 6px 11px; cursor: pointer; transition: all .15s;
+  padding: 6px 10px; cursor: pointer; transition: all .15s;
 }
 .tbtn:hover { background: var(--elevated); border-color: var(--border-strong); }
 .tbtn:disabled { opacity: .5; cursor: not-allowed; }
@@ -941,8 +950,8 @@ body {
   border: 1px solid var(--border);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 10.5px;
-  padding: 5px 8px;
+  font-size: var(--fs-sm);
+  padding: 4px 8px;
   border-radius: 6px;
   box-shadow: var(--shadow-toolbar);
   pointer-events: none;
@@ -951,8 +960,8 @@ body {
 
 /* export / import dropdown */
 .tbtn-dd {
-  display: flex; align-items: center; gap: 5px;
-  font-family: var(--mono); font-size: 12px;
+  display: flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: var(--fs-md);
   background: transparent; color: var(--fg);
   border: 1px solid transparent; border-radius: 6px;
   padding: 6px 10px; cursor: pointer; transition: all .15s;
@@ -962,7 +971,7 @@ body {
   position: absolute; top: calc(100% + 6px); right: 0;
   min-width: 168px; z-index: 30;
   background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 9px; padding: 5px;
+  border-radius: 9px; padding: 4px;
   box-shadow: var(--shadow-strong);
 }
 .pop-item {
@@ -970,7 +979,7 @@ body {
   background: transparent; color: var(--fg);
   border: none; border-radius: 6px;
   padding: 7px 10px; cursor: pointer;
-  font-family: var(--mono); font-size: 12px; text-align: left;
+  font-family: var(--mono); font-size: var(--fs-md); text-align: left;
   transition: background .12s;
 }
 .pop-item:hover { background: var(--elevated); }
@@ -984,7 +993,7 @@ body {
   background: var(--surface); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 8px;
   padding: 7px 14px;
-  font-family: var(--mono); font-size: 12px;
+  font-family: var(--mono); font-size: var(--fs-md);
   animation: toast-in .18s ease-out;
 }
 @keyframes toast-in {
@@ -1004,7 +1013,7 @@ body {
    `checks/round-r-label-resize.mjs` reads BOTH sides and fails if they drift. */
 .node {
   min-width: 190px; position: relative; padding: 0;
-  font-size: 13px;
+  font-size: var(--fs-lg);
   /* I5: fill the React Flow wrapper (which carries the resized width/height in
      node.style) so a vertical resize visibly grows the node, not just the
      invisible wrapper. Fall back to content height when no size is set yet. */
@@ -1029,37 +1038,37 @@ body {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--sel);
   border-radius: 8px;
 }
-.node-body { position: relative; padding: 15px 18px 14px; }
-.node.shape-database .node-body { padding: 26px 18px 26px; }
-.node.shape-queue .node-body { padding: 30px 18px 16px; }
-.node.shape-actor .node-body { padding: 22px 16px 18px; }
-.node.shape-storage .node-body { padding: 26px 18px 20px; }
-.node.shape-gateway .node-body { padding: 18px 30px 16px; }
-.node .glyph { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.node-body { position: relative; padding: 14px 18px 14px; }
+.node.shape-database .node-body { padding: 24px 18px 24px; }
+.node.shape-queue .node-body { padding: 32px 18px 16px; }
+.node.shape-actor .node-body { padding: 20px 16px 18px; }
+.node.shape-storage .node-body { padding: 24px 18px 20px; }
+.node.shape-gateway .node-body { padding: 18px 32px 16px; }
+.node .glyph { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700; }
 .node-kicker {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.11em;
-  text-transform: uppercase; color: var(--dim); margin-bottom: 5px;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 4px;
 }
 .node-title {
   font-family: var(--sans);
-  font-size: 14.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--fg);
+  font-size: var(--fs-xl); font-weight: 650; letter-spacing: -0.01em; color: var(--fg);
   display: flex; align-items: center; gap: 7px;
 }
 .node-ico {
   width: 17px; height: 17px; flex: none; border-radius: 4px;
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  font-family: var(--mono); font-size: var(--fs-xs); font-weight: 700;
   background: color-mix(in srgb, var(--nc, var(--acc)) 18%, transparent);
   color: var(--nc, var(--acc));
 }
 .node-sub {
-  font-family: var(--mono); font-size: 11.5px; color: var(--dim); margin-top: 6px;
+  font-family: var(--mono); font-size: var(--fs-md); color: var(--dim); margin-top: 6px;
 }
 .node-metric {
-  font-family: var(--mono); font-size: 20px; font-weight: 700;
+  font-family: var(--mono); font-size: var(--fs-2xl); font-weight: 700;
   color: var(--nc, var(--acc)); margin-top: 7px; letter-spacing: -0.02em;
 }
-.node-metric small { font-size: 11px; color: var(--dim); font-weight: 400; margin-left: 3px; }
+.node-metric small { font-size: var(--fs-sm); color: var(--dim); font-weight: 400; margin-left: 3px; }
 
 /* ---------- label node (free text annotation) ----------
    ROUND R — `width: 100%` + `min-height: 100%` are the I5 fix applied to this
@@ -1075,7 +1084,7 @@ body {
    exists — and when no size exists (no style on the node) it is the ONLY floor,
    which is what preserves `n100`'s measured 60x28. */
 .label-node {
-  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  font-family: var(--mono); font-size: var(--fs-lg); line-height: 1.5;
   color: var(--fg); background: transparent; border: none; outline: none;
   padding: 4px 6px; min-width: 60px; white-space: pre-wrap;
   border-radius: 4px;
@@ -1108,7 +1117,7 @@ body {
   resize: none; overflow: hidden; white-space: pre-wrap;
   /* 11px is the edge editor's size; a Text node is 13px, so matching the label
      it replaces is what keeps the text from jumping as the editor opens. */
-  font-size: 13px; line-height: 1.5;
+  font-size: var(--fs-lg); line-height: 1.5;
 }
 .label-node.editing, .label-node.editing .node-label-input { cursor: text; }
 
@@ -1303,7 +1312,7 @@ body {
    / `.react-flow__edge-textbg`; retiring the family is not this pass's scope) and
    the whole block is left as the written record that it is inert. */
 .react-flow__edge-text {
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
   fill: var(--fg);
 }
 
@@ -1349,16 +1358,16 @@ body {
   display: flex; align-items: center; gap: 6px;
   padding: 1px 8px; border-radius: 999px;
   background: var(--bg); border: 1px solid var(--nc, var(--border-strong));
-  color: var(--nc, var(--fg)); font-size: 11px; font-weight: 600;
+  color: var(--nc, var(--fg)); font-size: var(--fs-sm); font-weight: 600;
   white-space: nowrap; max-width: calc(100% - 28px); overflow: hidden;
 }
-.group-label small { color: var(--dim); font-size: 10px; font-weight: 400; }
+.group-label small { color: var(--dim); font-size: var(--fs-xs); font-weight: 400; }
 .group-ico { display: grid; place-items: center; }
 
 /* ---------- note node (plain text annotation) ---------- */
 .note-node {
   min-width: 120px; max-width: 320px; padding: 2px 4px;
-  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  font-family: var(--mono); font-size: var(--fs-lg); line-height: 1.5;
   color: var(--fg); background: transparent; border: none;
   border-left: 2px solid var(--nc, var(--border-strong)); padding-left: 10px;
   white-space: pre-wrap;
@@ -1403,7 +1412,7 @@ body {
      resolves to a full family STACK (`TEXT_FONT_FAMILY`), which is why the
      fallback is the mono stack `var(--mono)` and not a key name. */
   font-family: var(--ts-font, var(--mono));
-  font-size: calc(11px * var(--ts-scale, 1));
+  font-size: calc(var(--fs-sm) * var(--ts-scale, 1));
   font-weight: var(--ts-weight, 600);
   /* ROUND AL, AL-3 — the two colour hooks the renderer sets as inline custom
      properties. Each falls back to the token this rule (and `.lb-*`) already
@@ -1566,7 +1575,7 @@ body {
 .edge-label.lb-outline { background: var(--label-plate, transparent); border-color: var(--border-strong); }
 
 .edge-label-input {
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--sel); border-radius: 5px;
   padding: 1px 6px; outline: none; min-width: 70px;
@@ -1574,7 +1583,7 @@ body {
 
 /* ---------- toggles ---------- */
 .toggle {
-  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer;
   background: var(--elevated); color: var(--dim);
   border: 1px solid var(--border-strong); border-radius: 7px;
@@ -1591,9 +1600,9 @@ body {
   padding: 8px 10px; cursor: pointer; transition: border-color .15s;
 }
 .icon-trigger:hover, .icon-trigger.on { border-color: var(--sel); }
-.icon-trigger-glyph { display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--nc, var(--acc)); font-family: var(--mono); font-size: 13px; }
-.icon-trigger-name { font-family: var(--mono); font-size: 12px; color: var(--fg); flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
-.icon-trigger-caret { color: var(--dim); font-size: 10px; }
+.icon-trigger-glyph { display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--nc, var(--acc)); font-family: var(--mono); font-size: var(--fs-lg); }
+.icon-trigger-name { font-family: var(--mono); font-size: var(--fs-md); color: var(--fg); flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.icon-trigger-caret { color: var(--dim); font-size: var(--fs-xs); }
 .icon-pop {
   position: absolute; z-index: 20; top: calc(100% + 6px);
   left: auto; right: 12px; width: min(264px, calc(100% - 12px));
@@ -1664,7 +1673,7 @@ body {
 .icon-search {
   width: 100%; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 6px;
-  padding: 7px 9px; font-family: var(--mono); font-size: 12px; outline: none;
+  padding: 7px 9px; font-family: var(--mono); font-size: var(--fs-md); outline: none;
   margin-bottom: 7px;
 }
 /* ROUND AB, ITEM 3 — AND ITS FOCUS STATE IS NOT THE ACCENT EITHER.
@@ -1690,7 +1699,7 @@ body {
  *  is exactly how the rest of this panel signals selection. */
 .icon-pop .icon-search:focus { border-color: var(--sel); box-shadow: none; }
 .icon-grid {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;
   max-height: 232px; overflow-y: auto; padding-right: 2px;
 }
 .icon-cell {
@@ -1701,13 +1710,13 @@ body {
 }
 .icon-cell:hover { border-color: var(--sel); color: var(--sel); }
 .icon-cell.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
-.icon-cell.none { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
-.icon-empty { grid-column: 1 / -1; color: var(--dim); font-family: var(--mono); font-size: 11px; padding: 10px 2px; }
-.icon-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.icon-cell.none { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
+.icon-empty { grid-column: 1 / -1; color: var(--dim); font-family: var(--mono); font-size: var(--fs-sm); padding: 10px 2px; }
+.icon-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 .icon-raw {
   flex: 1; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 6px;
-  padding: 5px 8px; font-family: var(--mono); font-size: 12px; outline: none;
+  padding: 4px 8px; font-family: var(--mono); font-size: var(--fs-md); outline: none;
 }
 .icon-raw:focus { border-color: var(--sel); }
 
@@ -1729,7 +1738,7 @@ body {
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 7px;
   padding: 6px 9px; cursor: pointer; text-align: left;
-  font-family: var(--mono); font-size: 11.5px;
+  font-family: var(--mono); font-size: var(--fs-md);
   transition: border-color .12s, color .12s;
 }
 .insp-opt:hover { border-color: var(--sel); color: var(--sel); }
@@ -1742,7 +1751,7 @@ body {
    `font-size` matches `.insp-opt`'s row size so the preview reads at the size
    the popover used to give it; the measurement that proves the row fits is on
    `.insp-seg.wide` above. */
-.insp-font-btn { flex: none; font-size: 10.5px; }
+.insp-font-btn { flex: none; font-size: var(--fs-sm); }
 .insp-opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The 19-shape list: two lines per row (label + hint), so it is its own list
    rather than `.insp-opt-list`'s single-line rows. */
@@ -1757,9 +1766,9 @@ body {
 .insp-shape-item:hover { border-color: var(--sel); color: var(--sel); }
 .insp-shape-item.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-shape-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.insp-shape-text .insp-opt-label { font-family: var(--mono); font-size: 11.5px; }
+.insp-shape-text .insp-opt-label { font-family: var(--mono); font-size: var(--fs-md); }
 .insp-shape-hint {
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .insp-shape-item.on .insp-shape-hint { color: var(--sel); }
@@ -1793,7 +1802,7 @@ body {
    the segmented rows now share one gap. `.swatches` ITSELF IS UNTOUCHED: it
    still serves the colour swatches and the shape-palette rows, which are not
    segmented controls and must keep sizing to their 26px swatch. */
-.swatches.insp-seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.swatches.insp-seg { display: flex; flex-wrap: wrap; gap: 5px; } /* AQ: 5px stays - coupled to grid3's calc((100% - 10px)/3) basis, and aa1 asserts one gap across every segmented row */
 .insp-seg .insp-seg-btn { flex: 1 1 0; min-width: 0; }
 .insp-seg-btn { display: grid; place-items: center; padding: 7px 6px; gap: 4px; }
 /* ROUND X, ITEM 3 — the FONT row's modifier: its buttons carry a WORD, not a
@@ -1825,7 +1834,7 @@ body {
    measured against. `min-width: 0` is the same belt `.node-title > span` needed:
    a flex item's `min-width: auto` is its longest word, which would let a label
    push its own cell wider than its share. */
-.insp-seg.grid3 { gap: 5px; }
+.insp-seg.grid3 { gap: 5px; } /* AQ: 5px stays - the gap is COUPLED to the flex-basis calc((100% - 10px)/3) below (2 gaps x 5px); changing one without the other desyncs the 3+3 row */
 .insp-seg.grid3 .insp-seg-btn { flex: 1 1 calc((100% - 10px) / 3); min-width: 0; padding: 6px 7px; }
 /* ROUND AA, ITEM 1 — THE OTHER WORD-ROW MODIFIER: TWO PER LINE.
  *
@@ -1850,7 +1859,7 @@ body {
  *  count and need no modifier: `slow` 26.5 / `normal` 39.7 / `fast` 26.5 /
  *  `center` 39.7 / `start` 33.1 / `end` 19.9 / `card` 26.5 / `label only` 66.2 /
  *  `Regular` 46.4 / `Bold` 26.5 / `XL` 13.7 are all inside their shares. */
-.insp-seg.half { gap: 5px; }
+.insp-seg.half { gap: 5px; } /* AQ: base value - kept (aa1 one-gap equality) */
 .insp-seg.half .insp-seg-btn { flex: 1 1 calc((100% - 5px) / 2); min-width: 0; padding: 6px 7px; }
 /* ROUND AB, ITEM 1 — THE TWO ALIGN ROWS ARE SEPARATED.
  *
@@ -1869,7 +1878,7 @@ body {
  *  and no markup moves — so the `.field label` contract (one label, then its
  *  controls) and the section's spacing are untouched. A later field that stacks
  *  two segmented rows gets the same separation for free instead of touching. */
-.field > .swatches.insp-seg + .swatches.insp-seg { margin-top: 13px; }
+.field > .swatches.insp-seg + .swatches.insp-seg { margin-top: 13px; } /* AQ: AO/AL measured rhythm - exempt */
 .insp-seg-btn.on { border-color: var(--sel); color: var(--sel); background: var(--sel-soft); }
 .insp-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 /* Stepper (§B #7) — a numeric ordinal with no icon vocabulary. */
@@ -1896,14 +1905,14 @@ body {
        HEIGHT, never left to padding arithmetic, so no font change can move it.
    Tokens only; no new hex. */
 .chips {
-  display: flex; flex-wrap: wrap; gap: 5px;
+  display: flex; flex-wrap: wrap; gap: 4px;
 }
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
-  min-height: 30px; padding: 5px 11px;
+  min-height: 30px; padding: 4px 10px;
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 999px;
-  font-family: var(--mono); font-size: 11px; line-height: 1;
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: 1;
   cursor: pointer; white-space: nowrap;
   transition: border-color .14s, color .14s, background .14s;
 }
@@ -1913,7 +1922,7 @@ body {
 .chip svg { width: 15px; height: 15px; flex: 0 0 15px; }
 /* the glyph shape: a square, so a glyph row is even by construction */
 .chip.ic {
-  padding: 5px; width: 30px; height: 30px; min-height: 30px;
+  padding: 4px; width: 30px; height: 30px; min-height: 30px;
   justify-content: center; border-radius: 7px;
 }
 /* the ACTION figure — Reset / Reverse. Dashed and dim so an action never reads
@@ -1931,13 +1940,13 @@ body {
 .insp-step-btn {
   width: 34px; height: 30px; flex: none;
   background: transparent; border: 0; color: var(--fg);
-  font-family: var(--mono); font-size: 15px; line-height: 1; cursor: pointer;
+  font-family: var(--mono); font-size: var(--fs-xl); line-height: 1; cursor: pointer;
   transition: color .12s;
 }
 .insp-step-btn:hover:not(:disabled) { color: var(--sel); }
 .insp-step-btn:disabled { color: var(--dim2); cursor: not-allowed; }
 .insp-step-val {
-  flex: 1; text-align: center; font-family: var(--mono); font-size: 12.5px;
+  flex: 1; text-align: center; font-family: var(--mono); font-size: var(--fs-md);
   color: var(--fg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   min-height: 30px; display: flex; align-items: center; justify-content: center;
 }
@@ -1953,7 +1962,7 @@ body {
   width: 96px; flex: none;
 }
 .insp-stepper.compact .insp-step-btn { width: 28px; }
-.insp-stepper.compact .insp-step-val { min-width: 28px; font-size: 12px; }
+.insp-stepper.compact .insp-step-val { min-width: 28px; font-size: var(--fs-md); }
 
 /* ROUND AM, AM-5 — COUNT AND SPEED SHARE ONE ROW. Two fields, the count fixed
    at its compact width and the slider taking the rest. `align-items: flex-end`
@@ -1980,7 +1989,7 @@ body {
    `.field` outside a `.pair` is reachable by either selector, so the section's
    other rows are untouched. Same cascade discipline ROUND AG2/AA used when they
    measured the `.swatches` vs `.insp-seg` gaps. */
-.pair { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 13px; }
+.pair { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 13px; } /* AQ: 13px is the AO-2 measured rhythm (Harvey's "the 13px it owes") - exempt from the scale */
 .pair .field { margin: 0; }
 .pair .grow { flex: 1; min-width: 0; }
 
@@ -2013,7 +2022,7 @@ body {
 /* the real stored seconds, always printed beside the thumb — the inversion is
    in the geometry, never in the number the user reads */
 .speedval {
-  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
   min-width: 40px; text-align: right; flex: none;
 }
 
@@ -2034,7 +2043,7 @@ body {
    `.sec-label` dividers used (`.field + .sec-label`, above) — a hairline and a
    gap between neighbours, none before the first. */
 .insp-section + .insp-section {
-  margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--border);
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 /* ===========================================================================
    ROUND W, ITEM 1 — THE SECTION HEADER MUST READ AS A HEADER.
@@ -2080,7 +2089,7 @@ body {
    and for the reason its own comment gives. */
 .insp-sec-title {
   margin: 0 0 10px 2px;
-  font-size: 13px; letter-spacing: 0.06em; color: var(--fg);
+  font-size: var(--fs-lg); letter-spacing: 0.06em; color: var(--fg);
 }
 .insp-sec-body { display: block; margin-top: 10px; }
 
@@ -2138,7 +2147,7 @@ body {
    the row cannot overflow its 288px panel. */
 .insp-sec-readout {
   margin-left: auto; min-width: 0; flex: 0 1 auto; text-align: right;
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.03em;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.03em;
   color: var(--dim);
 }
 .insp-sec-readout-val {
@@ -2156,7 +2165,7 @@ body {
    says what it controls. Tokens only. */
 .field-toggle-trigger {
   display: flex; align-items: center; gap: 6px;
-  width: 100%; min-width: 0; margin: 0 0 6px; padding: 5px 7px;
+  width: 100%; min-width: 0; margin: 0 0 6px; padding: 4px 7px;
   background: var(--elevated); border: 1px solid var(--border); border-radius: 7px;
   cursor: pointer; text-align: left; font: inherit; color: var(--dim);
   transition: color .15s, border-color .15s;
@@ -2166,21 +2175,21 @@ body {
   outline: 2px solid var(--sel); outline-offset: 1px; border-radius: 7px;
 }
 .field-toggle-label {
-  min-width: 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  min-width: 0; font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.04em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* ---------- inspector ---------- */
-.field { margin-bottom: 13px; }
+.field { margin-bottom: 13px; } /* AQ: the panel rhythm (ab1 equality) - exempt */
 .field label {
-  display: block; font-family: var(--mono); font-size: 11px;
+  display: block; font-family: var(--mono); font-size: var(--fs-sm);
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .field input, .field select, .field textarea {
   width: 100%; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 7px;
-  height: 30px; padding: 0 10px; font-size: 12.5px; font-family: var(--sans);
+  height: 30px; padding: 0 10px; font-size: var(--fs-md); font-family: var(--sans);
   outline: none; transition: border-color .15s;
 }
 /* focus/hover chrome for these lives in the CONTROL KIT section at the end of
@@ -2336,11 +2345,11 @@ body {
   cursor: pointer; appearance: none; -webkit-appearance: none;
 }
 .empty {
-  color: var(--dim); font-size: 12px; font-family: var(--mono);
+  color: var(--dim); font-size: var(--fs-md); font-family: var(--mono);
   text-align: center; padding: 24px 10px; line-height: 1.6;
 }
 .hint {
-  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-md); color: var(--dim);
   padding: 10px 2px; line-height: 1.6;
 }
 /* ===========================================================================
@@ -2372,14 +2381,14 @@ body {
 .key-note {
   display: flex; align-items: flex-start; gap: 6px;
   padding: 8px 2px 2px;
-  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-md); color: var(--dim);
   line-height: 1.5;
 }
 .key-note-text { flex: 1; min-width: 0; }
 .key-note-x {
   flex: none; width: 16px; height: 16px; border-radius: 50%;
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; line-height: 1;
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: 1;
   color: var(--dim); background: var(--surface); border: 1px solid var(--border);
   cursor: pointer; transition: color .15s, border-color .15s;
 }
@@ -2388,7 +2397,7 @@ body {
    rendered in the browser's generic monospace while every neighbour used `--mono`. Name the token. */
 kbd {
   font-family: var(--mono);
-  font-size: 11px; font-weight: 500;
+  font-size: var(--fs-sm); font-weight: 500;
   font-variant-numeric: tabular-nums;
   padding: 2.5px 7px;
   display: inline-block;
@@ -2406,14 +2415,14 @@ kbd {
    tokens only — no new colour, no new hex. */
 .tt-keys {
   display: inline-flex; align-items: center; gap: 3px;
-  margin-left: 5px; vertical-align: middle;
+  margin-left: 4px; vertical-align: middle;
 }
 .tt-keys kbd {
-  min-width: 0; padding: 1px 4px; font-size: 10px;
+  min-width: 0; padding: 1px 4px; font-size: var(--fs-xs);
   background: var(--surface); border-color: var(--border);
 }
 .badge {
-  display: inline-block; font-family: var(--mono); font-size: 10.5px;
+  display: inline-block; font-family: var(--mono); font-size: var(--fs-sm);
   padding: 2px 7px; border-radius: 999px;
   border: 1px solid var(--border-strong); color: var(--dim);
 }
@@ -2549,7 +2558,7 @@ kbd {
 /* ---------- C5: zoom pill ---------- */
 .zoom-pill {
   position: absolute; bottom: 16px; left: 56px; z-index: 6;
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
   color: var(--fg); background: var(--surface);
   border: 1px solid var(--border); border-radius: 999px;
   padding: 4px 10px; cursor: pointer; transition: all .15s;
@@ -2559,7 +2568,7 @@ kbd {
 /* ---------- C6: edge label capsule ---------- */
 /* Single declaration (a duplicate earlier in the file used to be silently lost). */
 .react-flow__edge-textbg { fill: var(--edge-text-bg); rx: 5; }
-.react-flow__edge-text { font-size: 11px; }
+.react-flow__edge-text { font-size: var(--fs-sm); }
 
 /* ---------- D1: search palette ---------- */
 .sp-overlay {
@@ -2576,7 +2585,7 @@ kbd {
 .sp-input {
   width: 100%; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 7px;
-  padding: 9px 11px; font-family: var(--mono); font-size: 13px;
+  padding: 9px 10px; font-family: var(--mono); font-size: var(--fs-lg);
   outline: none; transition: border-color .15s;
 }
 .sp-input:focus { border-color: var(--sel); }
@@ -2585,7 +2594,7 @@ kbd {
   display: flex; align-items: center; gap: 10px; width: 100%;
   background: transparent; color: var(--fg);
   border: 1px solid transparent; border-radius: 8px;
-  padding: 7px 9px; cursor: pointer; text-align: left; font-size: 12.5px;
+  padding: 7px 9px; cursor: pointer; text-align: left; font-size: var(--fs-md);
 }
 /* The insert modal re-painted the swatch even darker on hover (`--bg`, i.e.
    #f7f7f8 in light) — the same card-on-card defect one step worse, so it goes
@@ -2593,11 +2602,11 @@ kbd {
    `--sel` border; the swatch must stay transparent in both states. */
 .sp-item.on { background: var(--elevated); border-color: var(--sel); }
 .sp-item.on .pal-swatch { background: transparent; }
-.sp-empty { color: var(--dim); font-family: var(--mono); font-size: 11.5px; padding: 14px 4px; text-align: center; }
+.sp-empty { color: var(--dim); font-family: var(--mono); font-size: var(--fs-md); padding: 14px 4px; text-align: center; }
 .sp-foot {
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; gap: 4px;
   margin-top: 8px; padding: 2px 2px 0;
-  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
 }
 
 /* ---------- ITEM 6b: the board dialog (create / rename / delete) ----------
@@ -2625,11 +2634,11 @@ kbd {
 }
 .bd-head { display: flex; align-items: flex-start; gap: 10px; }
 .bd-title {
-  margin: 0; font-family: var(--mono); font-size: 14px; font-weight: 700;
+  margin: 0; font-family: var(--mono); font-size: var(--fs-xl); font-weight: 700;
   letter-spacing: .02em; color: var(--fg);
 }
 .bd-sub {
-  margin: 3px 0 0; font-family: var(--mono); font-size: 10.5px;
+  margin: 3px 0 0; font-family: var(--mono); font-size: var(--fs-sm);
   line-height: 1.5; color: var(--dim);
 }
 .bd-x {
@@ -2642,9 +2651,9 @@ kbd {
 .bd-x:hover { color: var(--fg); border-color: var(--border-strong); }
 .bd-body { display: flex; flex-direction: column; }
 .bd-label {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim);
-  margin: 0 0 5px 2px;
+  margin: 0 0 4px 2px;
 }
 .bd-label-gap { margin-top: 12px; }
 
@@ -2684,18 +2693,18 @@ kbd {
   background: transparent; color: var(--sel);
   border: 1px dashed var(--border-strong); border-radius: 8px;
   padding: 7px 9px; cursor: pointer; text-align: left;
-  font-family: var(--mono); font-size: 11.5px;
+  font-family: var(--mono); font-size: var(--fs-md);
   transition: background .12s, border-color .12s;
 }
 .bd-row:hover { background: var(--elevated); border-style: solid; }
 .bd-row-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .bd-row-name { font-weight: 600; }
 .bd-row-hint {
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bd-danger-note {
-  font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  font-family: var(--mono); font-size: var(--fs-md); line-height: 1.6;
   color: var(--fg);
   background: var(--acc-tint); border: 1px solid var(--danger);
   border-radius: 8px; padding: 10px 12px;
@@ -2707,10 +2716,10 @@ kbd {
    the Tab order reach first. */
 .bd-actions { display: flex; justify-content: flex-end; gap: 7px; }
 .bd-btn {
-  font-family: var(--mono); font-size: 11.5px;
+  font-family: var(--mono); font-size: var(--fs-md);
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 7px;
-  padding: 7px 13px; cursor: pointer; transition: all .12s;
+  padding: 7px 12px; cursor: pointer; transition: all .12s;
 }
 .bd-btn:hover { border-color: var(--sel); color: var(--sel); }
 .bd-btn.primary {
@@ -2731,7 +2740,7 @@ kbd {
 .help-btn {
   position: absolute; bottom: 16px; right: 208px; z-index: 6;
   width: 28px; height: 28px; display: grid; place-items: center;
-  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  font-family: var(--mono); font-size: var(--fs-lg); font-weight: 700;
   color: var(--fg); background: var(--surface);
   border: 1px solid var(--border); border-radius: 50%;
   cursor: pointer; transition: all .15s;
@@ -2792,12 +2801,12 @@ kbd {
   box-shadow: var(--shadow-strong);
 }
 .help-pop h4 {
-  margin: 0 0 8px; font-family: var(--mono); font-size: 10.5px;
+  margin: 0 0 8px; font-family: var(--mono); font-size: var(--fs-sm);
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
 }
 .help-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  padding: 4px 0; font-size: 12px; color: var(--fg);
+  padding: 4px 0; font-size: var(--fs-md); color: var(--fg);
 }
 /* Item 3: the label is the shrinking side — `flex: 1; min-width: 0` is exactly
    what `.settings-row-label` does. Without the zero floor a long label sits at
@@ -2818,7 +2827,7 @@ kbd {
    no value column. */
 .help-group {
   margin: 16px 2px 4px;
-  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
   letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
 }
 /* the first group sits right under the title — no double gap */
@@ -2827,21 +2836,21 @@ kbd {
    (mono 10.5px `--dim`, block under the label) so a hint reads the same on
    both surfaces. */
 .help-hint {
-  display: block; color: var(--dim); font-size: 10.5px;
+  display: block; color: var(--dim); font-size: var(--fs-sm);
   font-family: var(--mono); margin-top: 2px;
 }
 
 /* ---------- C2: multi-select summary ---------- */
 .multi-head {
-  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  font-family: var(--mono); font-size: var(--fs-lg); font-weight: 700;
   color: var(--fg); padding: 2px 0 6px;
 }
-.multi-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 4px; }
+.multi-actions { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; }
 .mbtn {
-  font-family: var(--mono); font-size: 11px;
+  font-family: var(--mono); font-size: var(--fs-sm);
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 6px;
-  padding: 5px 8px; cursor: pointer; transition: all .12s;
+  padding: 4px 8px; cursor: pointer; transition: all .12s;
 }
 .mbtn:hover { border-color: var(--sel); color: var(--sel); }
 /* ROUND AK, AK-14.1 — a `.mbtn` used as a plain sidebar BUTTON (the label reset)
@@ -2855,10 +2864,10 @@ kbd {
 /* ---------- floating selection action bar ---------- */
 .sel-bar {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-  margin-top: 44px;
-  z-index: 6; display: flex; gap: 5px; align-items: center;
+  margin-top: 40px;
+  z-index: 6; display: flex; gap: 4px; align-items: center;
   background: var(--panel-glass); backdrop-filter: blur(8px);
-  border: 1px solid var(--border); border-radius: 10px; padding: 5px;
+  border: 1px solid var(--border); border-radius: 10px; padding: 4px;
 }
 .sel-bar .tbtn-label { padding: 0 2px; }
 /* ---------- edge flow animations ("message being sent") ---------- */
@@ -2973,12 +2982,12 @@ kbd {
 .boards-item { flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 10px; }
 .boards-item.current { background: var(--elevated); box-shadow: inset 2px 0 0 var(--acc); }
 .boards-item .boards-item-name { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.boards-item .boards-item-meta { color: var(--dim); font-size: 10.5px; }
-.boards-empty { color: var(--dim); font-size: 11.5px; padding: 8px 10px; }
-.boards-actions { border-top: 1px solid var(--border); margin-top: 5px; padding-top: 5px; display: flex; flex-direction: column; gap: 2px; }
+.boards-item .boards-item-meta { color: var(--dim); font-size: var(--fs-sm); }
+.boards-empty { color: var(--dim); font-size: var(--fs-md); padding: 8px 10px; }
+.boards-actions { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; display: flex; flex-direction: column; gap: 2px; }
 .boards-actions .pop-item[disabled] { opacity: 0.45; cursor: not-allowed; }
 .save-ind {
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
   margin-top: 6px; min-height: 12px; text-align: right;
 }
 .save-ind.busy { color: var(--acc); }
@@ -2988,18 +2997,18 @@ kbd {
 .ctx-menu {
   position: fixed; z-index: 60; min-width: 172px;
   background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 9px; padding: 5px;
+  border-radius: 9px; padding: 4px;
   box-shadow: var(--shadow-strong);
 }
 .ctx-title {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--dim); padding: 3px 10px 5px;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim); padding: 3px 10px 4px;
 }
 .ctx-item {
   display: flex; align-items: center; gap: 8px; width: 100%;
   background: transparent; color: var(--fg);
   border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer;
-  font-family: var(--mono); font-size: 12px; text-align: left;
+  font-family: var(--mono); font-size: var(--fs-md); text-align: left;
   transition: background .12s;
 }
 .ctx-item:hover { background: var(--elevated); }
@@ -3037,20 +3046,20 @@ kbd {
   max-width: 440px;
 }
 .ce-title {
-  font-size: 15px; font-weight: 650; color: var(--fg);
+  font-size: var(--fs-xl); font-weight: 650; color: var(--fg);
   margin-bottom: 8px;
 }
 .ce-sub {
-  font-size: 12.5px; color: var(--dim); line-height: 1.7;
+  font-size: var(--fs-md); color: var(--dim); line-height: 1.7;
 }
 .ce-sub b { color: var(--fg); font-weight: 600; }
 .ce-hint {
-  margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--dim);
+  margin-top: 10px; font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
   opacity: .85;
 }
 .ce-hint kbd {
   background: var(--elevated); border: 1px solid var(--border-strong);
-  border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--fg);
+  border-radius: 4px; padding: 1px 4px; font-size: var(--fs-xs); color: var(--fg);
 }
 
 /* ---------- H1: guided tour ---------- */
@@ -3069,16 +3078,16 @@ kbd {
   z-index: 10001;
 }
 .tour-count {
-  font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .08em;
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); letter-spacing: .08em;
 }
-.tour-title { font-size: 14.5px; font-weight: 650; color: var(--fg); margin-top: 3px; }
-.tour-body { font-size: 12.5px; line-height: 1.5; color: var(--dim); margin-top: 7px; }
+.tour-title { font-size: var(--fs-xl); font-weight: 650; color: var(--fg); margin-top: 3px; }
+.tour-body { font-size: var(--fs-md); line-height: 1.5; color: var(--dim); margin-top: 7px; }
 .tour-actions { display: flex; align-items: center; gap: 6px; margin-top: 14px; }
 .tour-btn {
-  font-family: var(--mono); font-size: 11.5px;
+  font-family: var(--mono); font-size: var(--fs-md);
   background: transparent; color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 7px;
-  padding: 5px 11px; cursor: pointer; transition: all .15s;
+  padding: 4px 10px; cursor: pointer; transition: all .15s;
 }
 .tour-btn:hover { background: var(--elevated); border-color: var(--dim); }
 .tour-btn:disabled { opacity: .4; cursor: not-allowed; }
@@ -3100,7 +3109,7 @@ kbd {
   width: auto; border-radius: 999px; overflow: hidden;
 }
 .gsc-pill {
-  font-family: var(--mono); font-size: 11px; color: var(--fg);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--fg);
   background: transparent; border: none; padding: 6px 12px;
   border-radius: 999px; cursor: pointer; transition: all .15s;
 }
@@ -3109,10 +3118,10 @@ kbd {
 .gsc-head-btn {
   display: flex; align-items: center; gap: 7px; flex: 1;
   background: transparent; border: none; cursor: pointer; padding: 0;
-  color: var(--fg); font-size: 12px; font-weight: 600;
+  color: var(--fg); font-size: var(--fs-md); font-weight: 600;
 }
 .gsc-head-btn:hover .gsc-title { color: var(--sel); }
-.gsc-count { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.gsc-count { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 .gsc-n { color: var(--green); }
 .gsc-chev { color: var(--dim); transform: rotate(-90deg); }
 .gsc-x {
@@ -3125,7 +3134,7 @@ kbd {
 .gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; }
 .gsc-item {
   display: flex; align-items: center; gap: 8px;
-  font-size: 11.5px; color: var(--fg); padding: 4px 2px;
+  font-size: var(--fs-md); color: var(--fg); padding: 4px 2px;
   transition: color .2s;
 }
 .gsc-item .gsc-check {
@@ -3148,7 +3157,7 @@ kbd {
      only matches a group, so the first group still gets its normal 16px. */
   margin-top: 0; margin-bottom: 8px; padding: 7px 8px;
   background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 7px;
-  color: var(--fg); font-family: var(--mono); font-size: 11.5px;
+  color: var(--fg); font-family: var(--mono); font-size: var(--fs-md);
   cursor: pointer; transition: all .15s;
 }
 .help-tour-btn:hover { border-color: var(--acc); color: var(--acc); }
@@ -3246,14 +3255,14 @@ kbd {
   width: 100%; background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: 7px;
   padding: 8px 10px; cursor: pointer;
-  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: .06em; text-transform: uppercase;
   transition: all .15s;
 }
 .ds-toggle:hover { border-color: var(--sel); }
 .ds-toggle.on { background: var(--sel-soft); color: var(--sel); border-color: var(--sel); }
 .ds-toggle b { color: var(--sel); font-weight: 700; }
 .ds-hint {
-  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
   line-height: 1.6; padding: 6px 2px 0;
 }
 .ds-hint.warn { color: var(--acc); }
@@ -3300,7 +3309,7 @@ kbd {
   color: var(--nc, var(--acc));
 }
 .ds-postit-mark svg { width: 30px; height: 30px; }
-.ds-postit-mark .glyph { font-size: 26px; }
+.ds-postit-mark .glyph { font-size: var(--fs-display); }
 
 /* ---- K5: group header banner + overlapping circular icon badge ------ */
 .group-head {
@@ -3319,13 +3328,13 @@ kbd {
   box-shadow: var(--shadow-sm);
 }
 .group-badge svg { width: 16px; height: 16px; }
-.group-node.has-badge .group-label { padding-left: 54px; }
+.group-node.has-badge .group-label { padding-left: 40px; }
 /* the title sits inside the 44px banner, clearing the badge */
 .group-node .group-label {
   top: 0; left: 0; right: 0; bottom: auto;
   height: 44px; max-width: none; padding: 0 12px 0 14px;
   border: none; border-radius: 14px 14px 0 0;
-  background: transparent; font-size: calc(11.5px * var(--ts-scale, 1));
+  background: transparent; font-size: calc(var(--fs-md) * var(--ts-scale, 1));
   display: flex; align-items: center; gap: 6px;
 }
 
@@ -3342,11 +3351,11 @@ kbd {
 
 .badge.preset { border-color: var(--acc); color: var(--acc); }
 .boards-item .boards-item-preset {
-  font-family: var(--mono); font-size: 9.5px; color: var(--acc);
-  border: 1px solid var(--acc); border-radius: 999px; padding: 0 5px; margin-left: 6px;
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--acc);
+  border: 1px solid var(--acc); border-radius: 999px; padding: 0 4px; margin-left: 6px;
 }
 .preset-warn {
-  font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.5;
   color: var(--dim); padding: 4px 10px 8px;
 }
 
@@ -3365,28 +3374,28 @@ kbd {
 }
 .node .lo-title {
   display: flex; align-items: center; justify-content: var(--ts-justify, center); gap: 6px;
-  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  font-family: var(--sans); font-size: var(--fs-lg); font-weight: 600;
   color: var(--fg); line-height: 1.25;
 }
 .node .lo-sub {
-  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
 }
 /* keep label-only text inside the diamond / parallelogram silhouette */
-.node.shape-decision .lo-body { padding: 26px 34px; }
-.node.shape-io .lo-body { padding: 14px 34px; }
-.node.shape-manual .lo-body { padding: 14px 30px 20px; }
-.node.shape-delay .lo-body { padding: 14px 30px 14px 12px; }
+.node.shape-decision .lo-body { padding: 24px 32px; }
+.node.shape-io .lo-body { padding: 14px 32px; }
+.node.shape-manual .lo-body { padding: 14px 32px 20px; }
+.node.shape-delay .lo-body { padding: 14px 32px 14px 12px; }
 .node.shape-connector .lo-body { padding: 8px; }
-.node.shape-connector .lo-title { font-size: calc(12px * var(--ts-scale, 1)); }
-.node.shape-terminator .lo-body { padding: 14px 30px; }
-.node.shape-document .lo-body { padding: 12px 18px 22px; }
-.node.shape-subprocess .lo-body { padding: 14px 34px; }
-.node.shape-preparation .lo-body { padding: 14px 34px; }
+.node.shape-connector .lo-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); }
+.node.shape-terminator .lo-body { padding: 14px 32px; }
+.node.shape-document .lo-body { padding: 12px 18px 20px; }
+.node.shape-subprocess .lo-body { padding: 14px 32px; }
+.node.shape-preparation .lo-body { padding: 14px 32px; }
 
 /* ---- L3c: crow's-foot markers + ERD relationship label ---- */
 .ds-crowdefs { position: absolute; width: 0; height: 0; }
 .edge-label .edge-techn {
-  display: block; font-size: 9.5px; color: var(--dim); font-weight: 400;
+  display: block; font-size: var(--fs-xs); color: var(--dim); font-weight: 400;
 }
 /* ERD edges: no arrowheads, crow's feet instead — the line is quieter */
 .react-flow__edge-path { stroke-linejoin: round; }
@@ -3396,7 +3405,7 @@ kbd {
   width: 100%; min-width: 200px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 9px;
-  font-family: var(--sans); font-size: 11.5px;
+  font-family: var(--sans); font-size: var(--fs-md);
   box-shadow: var(--shadow-sm);
 }
 /* ROUND AJ — the card's clip is GONE; the radius clip lives on the rows that
@@ -3435,14 +3444,14 @@ kbd {
 .tnode-head:last-child { border-radius: 8px; }
 .tnode-ico { color: var(--nc, var(--dim)); flex: none; }
 .tnode-name {
-  flex: 1; font-weight: 650; font-size: 12px; color: var(--fg);
+  flex: 1; font-weight: 650; font-size: var(--fs-md); color: var(--fg);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tnode-name small { color: var(--dim); font-weight: 400; }
 .tnode-mode {
-  font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+  font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: .06em;
   text-transform: uppercase; color: var(--acc);
-  border: 1px solid var(--acc); border-radius: 999px; padding: 0 5px;
+  border: 1px solid var(--acc); border-radius: 999px; padding: 0 4px;
 }
 .tnode-toggle {
   flex: none; display: grid; place-items: center;
@@ -3462,11 +3471,11 @@ kbd {
 .tnode-pk { color: var(--acc); }
 .tnode-fkico { color: var(--sel); }
 .tnode-cname {
-  flex: 1; font-family: var(--mono); font-size: 11px; color: var(--fg);
+  flex: 1; font-family: var(--mono); font-size: var(--fs-sm); color: var(--fg);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tnode-u {
-  font-family: var(--mono); font-size: 9px; color: var(--acc);
+  font-family: var(--mono); font-size: var(--fs-2xs); color: var(--acc);
   border: 1px solid var(--acc); border-radius: 3px; padding: 0 3px;
 }
 .tnode-nn {
@@ -3475,16 +3484,16 @@ kbd {
 }
 .tnode-nn.on { border-color: var(--nc, var(--fg)); background: var(--nc, var(--fg)); }
 .tnode-ctype {
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
   text-align: right; flex: none; max-width: 96px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   opacity: .65; transition: opacity .15s;
 }
 .tnode-col:hover .tnode-ctype { opacity: 1; }
 .tnode-more {
-  padding: 4px 9px; font-family: var(--mono); font-size: 10px;
+  padding: 4px 9px; font-family: var(--mono); font-size: var(--fs-xs);
   color: var(--dim); border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 5px; cursor: pointer;
+  display: flex; align-items: center; gap: 4px; cursor: pointer;
 }
 .tnode.collapsed .tnode-more { border-top: 0; }
 /* per-column handles: invisible at rest, appear on node hover / selection */
@@ -3517,20 +3526,20 @@ kbd {
 /* H — the old `top: -6px` / `bottom: -6px` nudges lived here (same
    outboard scheme the horizontal pair carried at the midpoint block above);
    both are gone so the tb-mode wire also starts flush on the border. */
-.node.shape-terminator .node-body { padding: 16px 30px; }
+.node.shape-terminator .node-body { padding: 16px 32px; }
 .node.shape-process .node-body { padding: 20px 18px; }
-.node.shape-decision .node-body { padding: 30px 38px; }
-.node.shape-io .node-body { padding: 18px 38px; }
-.node.shape-document .node-body { padding: 16px 20px 26px; }
-.node.shape-subprocess .node-body { padding: 18px 38px; }
-.node.shape-preparation .node-body { padding: 18px 38px; }
-.node.shape-manual .node-body { padding: 18px 34px 24px; }
-.node.shape-delay .node-body { padding: 18px 34px 18px 14px; }
+.node.shape-decision .node-body { padding: 32px 40px; }
+.node.shape-io .node-body { padding: 18px 40px; }
+.node.shape-document .node-body { padding: 16px 20px 24px; }
+.node.shape-subprocess .node-body { padding: 18px 40px; }
+.node.shape-preparation .node-body { padding: 18px 40px; }
+.node.shape-manual .node-body { padding: 18px 32px 24px; }
+.node.shape-delay .node-body { padding: 18px 32px 18px 14px; }
 .node.shape-connector .node-body { padding: 6px; }
 .node.shape-connector {
   display: grid; place-items: center;
 }
-.node.shape-connector .node-title { font-size: calc(12px * var(--ts-scale, 1)); justify-content: var(--ts-justify, center); }
+.node.shape-connector .node-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); justify-content: var(--ts-justify, center); }
 .node.shape-connector .node-kicker,
 .node.shape-connector .node-sub,
 .node.shape-connector .node-metric { display: none; }
@@ -3577,7 +3586,7 @@ kbd {
   margin: 0 0 8px;
   background: var(--surface); color: var(--fg);
   border: 1px solid var(--border); border-radius: 8px;
-  padding: 7px 10px; font-family: var(--sans); font-size: 12px;
+  padding: 7px 10px; font-family: var(--sans); font-size: var(--fs-md);
   outline: none; transition: border-color .15s;
 }
 .settings-search::placeholder { color: var(--dim); }
@@ -3587,8 +3596,8 @@ kbd {
   display: flex; align-items: center; gap: 9px; width: 100%;
   background: transparent; color: var(--dim); text-align: left;
   border: 1px solid transparent; border-radius: 8px;
-  padding: 8px 11px; cursor: pointer;
-  font-family: var(--sans); font-size: 12.5px; transition: all .12s;
+  padding: 8px 10px; cursor: pointer;
+  font-family: var(--sans); font-size: var(--fs-md); transition: all .12s;
 }
 .settings-nav-item:hover { background: var(--surface); color: var(--fg); }
 .settings-nav-item.on {
@@ -3596,25 +3605,25 @@ kbd {
 }
 .settings-nav-item svg { flex: none; }
 .settings-nav-note {
-  margin-top: auto; padding: 10px 11px 2px;
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  margin-top: auto; padding: 10px 10px 2px;
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
 }
 .settings-empty {
-  color: var(--dim); font-family: var(--mono); font-size: 11.5px;
-  padding: 14px 11px; line-height: 1.5;
+  color: var(--dim); font-family: var(--mono); font-size: var(--fs-md);
+  padding: 14px 10px; line-height: 1.5;
 }
 
 /* ---- right pane ---- */
 .settings-main {
-  flex: 1; min-width: 0; padding: 18px 22px; overflow-y: auto;
+  flex: 1; min-width: 0; padding: 18px 20px; overflow-y: auto;
   background: var(--surface);
 }
 .settings-h {
-  margin: 0 0 4px; font-family: var(--mono); font-size: 14px;
+  margin: 0 0 4px; font-family: var(--mono); font-size: var(--fs-xl);
   letter-spacing: .02em; color: var(--fg);
 }
 .settings-sub {
-  color: var(--dim); font-size: 11.5px; font-family: var(--mono);
+  color: var(--dim); font-size: var(--fs-md); font-family: var(--mono);
   margin: 0 0 18px;
 }
 .settings-close {
@@ -3631,28 +3640,28 @@ kbd {
 .settings-row {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 2px; border-bottom: 1px solid var(--border);
-  font-size: 12.5px; color: var(--fg);
+  font-size: var(--fs-md); color: var(--fg);
 }
 .settings-row:last-child { border-bottom: none; }
 .settings-row-label { flex: 1; min-width: 0; }
 .settings-row-hint {
-  display: block; color: var(--dim); font-size: 10.5px;
+  display: block; color: var(--dim); font-size: var(--fs-sm);
   font-family: var(--mono); margin-top: 2px;
 }
 .settings-row-val {
   display: flex; align-items: center; gap: 6px; flex: none;
-  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
 }
 /* Settings → Keyboard: the chip row must not squeeze — align chips on their centres and let a long
    row wrap rather than compress. */
-.settings-row .help-keys { gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.settings-row .help-keys { gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 /* Settings → Keyboard: the heading that splits real key combos from pointer
    gestures. Deliberately NOT row-shaped (no value column, no bottom border) —
    mono, small, wide-tracked and dim, with a top margin that reads as a section
    break, so it can never be mistaken for another row. */
 .settings-group {
   margin: 16px 2px 4px;
-  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
   letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
 }
 /* the first group sits right under the pane subtitle — no double gap */
@@ -3664,10 +3673,10 @@ kbd {
 .gesture {
   display: flex; align-items: center; gap: 0; flex-wrap: wrap;
   justify-content: flex-end;
-  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
 }
 .gesture-token { border: none; background: none; padding: 0; }
-.settings-state { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.settings-state { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 .settings-state.on { color: var(--green); }
 .settings-state.off { color: var(--dim); } /* AP-1: was --dim2 (3.12:1) — real status text */
 /* M2 — the Editor pane's Board preset is a REAL control (everything else in the
@@ -3676,8 +3685,8 @@ kbd {
 .settings-select {
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px 22px 5px 9px;
-  font-family: var(--sans); font-size: 12px;
+  padding: 4px 20px 4px 9px;
+  font-family: var(--sans); font-size: var(--fs-md);
   cursor: pointer; outline: none; transition: border-color .15s;
 }
 .settings-select:focus { border-color: var(--sel); }
@@ -3688,8 +3697,8 @@ kbd {
   width: 72px; box-sizing: border-box;
   background: var(--elevated); color: var(--fg);
   border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px 9px;
-  font-family: var(--mono); font-size: 12px;
+  padding: 4px 9px;
+  font-family: var(--mono); font-size: var(--fs-md);
   outline: none; transition: border-color .15s;
 }
 .settings-input:focus { border-color: var(--sel); }
@@ -3722,18 +3731,18 @@ kbd {
 }
 .settings-toggle.on .settings-toggle-knob { left: 21px; background: var(--acc); }
 .settings-chip {
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .06em;
   text-transform: uppercase; color: var(--dim);
   border: 1px solid var(--border); border-radius: 5px;
-  padding: 1px 5px; white-space: nowrap;
+  padding: 1px 4px; white-space: nowrap;
 }
 .settings-note {
-  margin-top: 16px; padding: 9px 11px;
+  margin-top: 16px; padding: 9px 10px;
   border: 1px solid var(--border); border-radius: 8px;
   background: var(--elevated);
-  color: var(--dim); font-family: var(--mono); font-size: 10.5px; line-height: 1.55;
+  color: var(--dim); font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.55;
 }
-.settings-kv { font-family: var(--mono); font-size: 11.5px; color: var(--dim); line-height: 1.9; }
+.settings-kv { font-family: var(--mono); font-size: var(--fs-md); color: var(--dim); line-height: 1.9; }
 
 /* ---- theme card grid (Appearance pane) ---- */
 .settings-grid {
@@ -3775,16 +3784,16 @@ kbd {
   background: var(--mini-surface);
   border-right: 1px solid var(--mini-border);
   display: flex; flex-direction: column; justify-content: center; gap: 4px;
-  padding: 0 5px;
+  padding: 0 4px;
 }
 .settings-mini-side i {
   display: block; height: 3px; border-radius: 999px;
   background: var(--mini-fg); opacity: .22;
 }
 .settings-card-cap { display: flex; align-items: center; gap: 7px; }
-.settings-card-name { font-size: 12px; font-weight: 600; }
+.settings-card-name { font-size: var(--fs-md); font-weight: 600; }
 .settings-card-mode {
-  font-family: var(--mono); font-size: 9.5px; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
 }
 .settings-card-check {
   margin-left: auto; display: flex; color: var(--acc);
@@ -3880,7 +3889,7 @@ kbd {
   width: auto; white-space: nowrap; flex: none;
 }
 .app[data-form-factor="phone"] .settings-nav-note { display: none; }
-.app[data-form-factor="phone"] .settings-main { padding: 16px 14px 22px; }
+.app[data-form-factor="phone"] .settings-main { padding: 16px 14px 20px; }
 /* 360px cannot hold a label and its control side by side — the label wrapped
    to three lines and the control slid under the close button. Stack the row. */
 .app[data-form-factor="phone"] .settings-row {
@@ -3897,8 +3906,8 @@ kbd {
    hit-testing, but the field it sits on reads as broken. Reserve the button's
    own width (26px + gap) out of the search instead of moving the control. */
 .app[data-form-factor="phone"] .settings-search { width: calc(100% - 34px); }
-.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-search { margin-right: 34px; }
-.app[data-form-factor="phone"] .settings-h { font-size: 15px; }
+.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-search { margin-right: 32px; }
+.app[data-form-factor="phone"] .settings-h { font-size: var(--fs-xl); }
 
 /* =====================================================================
    CONTROL KIT — one consistent chrome for every native control.
@@ -3930,7 +3939,7 @@ kbd {
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 8px 32px 8px 11px;
+  padding: 8px 32px 8px 10px;
   cursor: pointer;
   outline: none;
   transition: border-color .15s, box-shadow .15s;
@@ -3953,9 +3962,9 @@ kbd {
 /* the legend's table-mode select rides in a compact legend row — same kit
    chrome, smaller box so the legend keeps its size (see report). */
 .tnode-mode-sel {
-  padding: 4px 26px 4px 8px;
+  padding: 4px 24px 4px 8px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--fs-sm);
   background-position: right 7px center;
 }
 
@@ -3975,7 +3984,7 @@ kbd {
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 8px 11px;
+  padding: 8px 10px;
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -4033,13 +4042,13 @@ kbd {
 }
 .settings-seg-btn {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--fs-md);
   letter-spacing: .02em;
   background: transparent;
   color: var(--dim);
   border: 0;
   border-radius: 7px;
-  padding: 5px 11px;
+  padding: 4px 10px;
   cursor: pointer;
   transition: color .12s, background .12s;
 }
@@ -4381,19 +4390,19 @@ kbd {
    (`.node.shape-connector …` are higher specificity than the rules below and
    stay in charge), and `group-label small` is the group's sub-line at 10px.
    =========================================================================== */
-.node-kicker { font-size: calc(10.5px * var(--ts-scale, 1)); }
-.node-title { font-size: calc(14.5px * var(--ts-scale, 1)); }
-.node-sub { font-size: calc(11.5px * var(--ts-scale, 1)); }
-.node-metric { font-size: calc(20px * var(--ts-scale, 1)); }
-.node-metric small { font-size: calc(11px * var(--ts-scale, 1)); }
-.node .lo-title { font-size: calc(13.5px * var(--ts-scale, 1)); }
-.node .lo-sub { font-size: calc(10.5px * var(--ts-scale, 1)); }
-.note-node { font-size: calc(13px * var(--ts-scale, 1)); }
-.note-title { font-size: calc(13px * var(--ts-scale, 1)); }
-.group-label { font-size: calc(11px * var(--ts-scale, 1)); }
-.group-label small { font-size: calc(10px * var(--ts-scale, 1)); }
-.label-node { font-size: calc(13px * var(--ts-scale, 1)); }
-.label-node .node-label-input { font-size: calc(13px * var(--ts-scale, 1)); }
+.node-kicker { font-size: calc(var(--fs-sm) * var(--ts-scale, 1)); }
+.node-title { font-size: calc(var(--fs-xl) * var(--ts-scale, 1)); }
+.node-sub { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); }
+.node-metric { font-size: calc(var(--fs-2xl) * var(--ts-scale, 1)); }
+.node-metric small { font-size: calc(var(--fs-sm) * var(--ts-scale, 1)); }
+.node .lo-title { font-size: calc(var(--fs-lg) * var(--ts-scale, 1)); }
+.node .lo-sub { font-size: calc(var(--fs-sm) * var(--ts-scale, 1)); }
+.note-node { font-size: calc(var(--fs-lg) * var(--ts-scale, 1)); }
+.note-title { font-size: calc(var(--fs-lg) * var(--ts-scale, 1)); }
+.group-label { font-size: calc(var(--fs-sm) * var(--ts-scale, 1)); }
+.group-label small { font-size: calc(var(--fs-xs) * var(--ts-scale, 1)); }
+.label-node { font-size: calc(var(--fs-lg) * var(--ts-scale, 1)); }
+.label-node .node-label-input { font-size: calc(var(--fs-lg) * var(--ts-scale, 1)); }
 
 .node-title { font-weight: var(--ts-weight, 650); }
 .node-metric { font-weight: var(--ts-weight, 700); }
@@ -4818,7 +4827,7 @@ kbd {
 .tg-rail-fam { display: flex; flex-direction: column; gap: 2px; }
 .tg-rail-fam-label {
   margin: 0 0 2px 2px;
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim);
 }
 /* Navigation, NOT a filter: §3.5 settled level as a label + grouping header, so
@@ -4828,17 +4837,17 @@ kbd {
   background: transparent; color: var(--dim); text-align: left;
   border: 1px solid transparent; border-radius: 8px;
   padding: 7px 10px; cursor: pointer;
-  font-family: var(--sans); font-size: 12.5px; transition: all .12s;
+  font-family: var(--sans); font-size: var(--fs-md); transition: all .12s;
 }
 .tg-rail-item:hover { background: var(--surface); color: var(--fg); }
-.tg-rail-n { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+.tg-rail-n { margin-left: auto; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim); }
 
 /* ---- the card grid (right pane at the desktop tier) ---- */
 .tg-grid { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .tg-sec { display: flex; flex-direction: column; gap: 7px; scroll-margin-top: 2px; }
 .tg-sec-hd {
   margin: 0;
-  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim);
 }
 .tg-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
@@ -4846,7 +4855,7 @@ kbd {
   display: flex; flex-direction: column; gap: 6px; width: 100%;
   background: var(--surface); color: var(--fg); text-align: left;
   border: 1px solid var(--border); border-radius: 9px;
-  padding: 10px 11px; cursor: pointer;
+  padding: 10px 10px; cursor: pointer;
   transition: border-color .12s, background .12s;
 }
 .tg-tile:hover { background: var(--elevated); border-color: var(--border-strong); }
@@ -4854,26 +4863,26 @@ kbd {
    and token-built rather than left to the user agent. */
 .tg-tile:focus-visible { outline: 2px solid var(--sel); outline-offset: 1px; }
 .tg-tile-top { display: flex; align-items: center; gap: 8px; }
-.tg-tile-name { font-weight: 600; font-size: 12.5px; }
+.tg-tile-name { font-weight: 600; font-size: var(--fs-md); }
 .tg-chip {
   margin-left: auto; flex: none;
   border: 1px solid var(--border-strong); background: var(--elevated);
   color: var(--dim); border-radius: 999px; padding: 1px 7px;
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .04em;
 }
 .tg-preview { display: flex; align-items: center; gap: 4px; min-height: 18px; }
 .tg-glyphs { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; min-width: 0; }
 .tg-glyph { display: grid; place-items: center; }
-.tg-more { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+.tg-more { font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim); }
 /* The phone counter is the component's own `PREVIEW_MAX_PHONE` remainder; only
    ONE of the two counters is visible per tier, so the "+N" a user reads always
    accounts for the glyphs that tier did not draw. */
 .tg-more-phone { display: none; }
-.tg-tile-hint { font-family: var(--mono); font-size: 10px; color: var(--dim); line-height: 1.45; }
-.tg-tile-meta { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+.tg-tile-hint { font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim); line-height: 1.45; }
+.tg-tile-meta { font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim); }
 .tg-tile-cta {
   margin-top: 2px;
-  font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .06em;
   text-transform: uppercase; color: var(--sel);
 }
 
@@ -4973,7 +4982,7 @@ kbd {
 .rm-col { min-width: 0; padding-left: 9px; border-left: 2px solid var(--border); }
 .rm-colhead {
   display: flex; align-items: center; gap: 7px; margin: 0 0 9px;
-  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
   letter-spacing: .06em; text-transform: uppercase; color: var(--fg);
 }
 .rm-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
@@ -4981,36 +4990,36 @@ kbd {
 .rm-dot.next { background: var(--sel); }
 .rm-dot.later { background: var(--dim2); }
 .rm-collabel { flex: 1; min-width: 0; }
-.rm-colcount { flex: none; font-family: var(--mono); font-size: 10px; color: var(--dim2); }
+.rm-colcount { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 .rm-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 .rm-item {
   display: flex; flex-direction: column; gap: 4px; min-width: 0;
   padding: 8px 9px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--elevated);
 }
-.rm-title { font-size: 11.5px; color: var(--fg); }
-.rm-desc { font-size: 10.5px; line-height: 1.5; color: var(--dim); }
-.rm-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1px; }
+.rm-title { font-size: var(--fs-md); color: var(--fg); }
+.rm-desc { font-size: var(--fs-sm); line-height: 1.5; color: var(--dim); }
+.rm-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 1px; }
 .rm-chip {
-  font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+  font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: .06em;
   text-transform: uppercase; color: var(--dim);
   border: 1px solid var(--border); border-radius: 5px;
-  padding: 1px 5px; white-space: nowrap;
+  padding: 1px 4px; white-space: nowrap;
 }
 .rm-chip-conf.committed { color: var(--green); border-color: var(--green); }
 .rm-chip-conf.exploring { color: var(--sel); border-color: var(--sel); }
-.rm-foot { margin: 9px 0 0; font-size: 10px; font-style: italic; color: var(--dim2); }
+.rm-foot { margin: 9px 0 0; font-size: var(--fs-xs); font-style: italic; color: var(--dim2); }
 .rm-shipped-h {
   margin: 20px 2px 6px;
-  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
   letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
 }
-.rm-shipped { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 16px; }
-.rm-ship-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 10.5px; }
-.rm-ship-label { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
+.rm-shipped { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; }
+.rm-ship-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: var(--fs-sm); }
+.rm-ship-label { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 .rm-ship-what { flex: 1; min-width: 0; color: var(--fg); }
-.rm-ship-when { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
-.rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: 10px; color: var(--dim2); }
+.rm-ship-when { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
+.rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 
 /* The only per-tier rule this block needs: the shipped list IS three columns at
    a wide pane, so it stacks below the phone breakpoint. Same tier hook the
