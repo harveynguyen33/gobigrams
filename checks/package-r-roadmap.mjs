@@ -129,7 +129,10 @@ if (!M) {
   assert('r3  the status split is exactly 2 now / 3 next / 2 later',
     counts.now === 2 && counts.next === 3 && counts.later === 2,
     `now=${counts.now} next=${counts.next} later=${counts.later}`);
-  assert('r4  SHIPPED.length === 8', SHIPPED.length === 8, `measured ${SHIPPED.length}`);
+  /* PACKAGE-S re-anchor: SHIPPED grows as packages land — it is a floor (>= 8),
+     not a pin. A pinned count goes RED on every future legitimate append, which
+     is the same mistake the hex ratchet avoids by bounding, not pinning. */
+  assert('r4  SHIPPED.length >= 8 (append-only ratchet)', SHIPPED.length >= 8, `measured ${SHIPPED.length}`);
   assert('r5  ROADMAP_REVIEWED is 2026-09-22', ROADMAP_REVIEWED === '2026-09-22',
     `measured ${JSON.stringify(ROADMAP_REVIEWED)}`);
 
@@ -176,7 +179,9 @@ if (!M) {
      §4 table gives it, and separately as the structural property that makes the
      order meaningful (numbers descend inside each family, families do not
      interleave). A comment saying "newest first" proves nothing. */
-  const EXPECT_ORDER = ['round 3', 'round 2', 'round 1', 'package 5', 'package 4', 'package 3', 'package 2', 'package 1'];
+  /* PACKAGE-S re-anchor: package 6 + 7 appended (newest first). The probe keeps
+     checking the FULL sequence so an out-of-order insert still goes red. */
+  const EXPECT_ORDER = ['package 7', 'package 6', 'round 3', 'round 2', 'round 1', 'package 5', 'package 4', 'package 3', 'package 2', 'package 1'];
   const gotOrder = SHIPPED.map((s) => s.label);
   assert('r10 the shipped rows are in the spec order, newest first',
     gotOrder.length === EXPECT_ORDER.length && gotOrder.every((l, i) => l === EXPECT_ORDER[i]),

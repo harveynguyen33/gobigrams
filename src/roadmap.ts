@@ -50,7 +50,7 @@ export const ROADMAP: RoadmapItem[] = [
   },
   {
     title: 'Settings: the remaining panes',
-    desc: 'The Settings surface ships; the backlog behind it — autosave, grid size, input device, export defaults — fills it group by group.',
+    desc: 'The Settings surface keeps filling group by group. Autosave, export defaults and the persisted canvas preferences have landed; input device is the marquee setting that already ships.',
     status: 'now',
     confidence: 'committed',
     area: 'editor',
@@ -98,6 +98,8 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
+  {label: 'package 7', what: 'Settings completion — export defaults (PNG scale, padding), autosave control, persisted canvas preferences', when: '2026-10'},
+  {label: 'package 6', what: 'Roadmap surface — what the tool does today, next, and is exploring, in Settings → About', when: '2026-09'},
   {label: 'round 3', what: 'Colour palette, connection points, node resizing and rotation rules', when: '2026-09'},
   {label: 'round 2', what: 'Edge utilities — labels, line markers, flow animation', when: '2026-09'},
   {label: 'round 1', what: 'Templates gallery with three difficulty levels', when: '2026-09'},
