@@ -680,6 +680,27 @@ export function bootTheme(hasStoredTheme: boolean): ThemeName {
   return resolveMode(stored);
 }
 
+/* AUDIT-follow-up (Harvey 2026-10-13) — cycle detection as a pure function so
+   EVERY edge-creation path can use it, not just the inspector's onConnect. Three
+   paths were bypassing the Prevent-cycles setting: a connect drag dropped on an
+   existing node, the proximity connect, and an edge rewire. */
+function wouldCycle(source: string, target: string, edges: {source: string; target: string}[]): boolean {
+  if (source === target) return true;
+  const adj = new Map<string, string[]>();
+  edges.forEach(e => {
+    if (!adj.has(e.source)) adj.set(e.source, []);
+    adj.get(e.source)!.push(e.target);
+  });
+  const seen = new Set<string>([target]);
+  const stack = [target];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    if (cur === source) return true;
+    for (const nxt of adj.get(cur) ?? []) if (!seen.has(nxt)) { seen.add(nxt); stack.push(nxt); }
+  }
+  return false;
+}
+
 export default function App() {
   /* ITEM 2 — the canvas holds NOTHING while a board load is in flight.
      A board is the source of truth and it arrives asynchronously (~500ms after
@@ -1831,23 +1852,8 @@ export default function App() {
 
   // ---- F7 helpers: cycle detection on the current edge set ----
   /** Would adding source→target create a directed cycle? */
-  const createsCycle = useCallback((source: string, target: string): boolean => {
-    if (source === target) return true;
-    // cycle iff `target` can already reach `source`
-    const adj = new Map<string, string[]>();
-    edgesRef.current.forEach(e => {
-      if (!adj.has(e.source)) adj.set(e.source, []);
-      adj.get(e.source)!.push(e.target);
-    });
-    const seen = new Set<string>([target]);
-    const stack = [target];
-    while (stack.length) {
-      const cur = stack.pop()!;
-      if (cur === source) return true;
-      for (const nxt of adj.get(cur) ?? []) if (!seen.has(nxt)) { seen.add(nxt); stack.push(nxt); }
-    }
-    return false;
-  }, []);
+  const createsCycle = useCallback((source: string, target: string): boolean =>
+    wouldCycle(source, target, edgesRef.current), [edgesRef]);
 
   // ---- F2: context menu actions ----
   /** Absolute flow position of a node (parent-relative resolved up the tree). */
@@ -2064,8 +2070,37 @@ export default function App() {
       const exists = edgesRef.current.some(e =>
         (e.source === pe.from && e.target === pe.to) || (e.source === pe.to && e.target === pe.from));
       if (!exists) {
+        /* AUDIT-follow-up — Prevent-cycles reaches the proximity path too. */
+        if (noCycles && wouldCycle(pe.from, pe.to, edgesRef.current)) {
+          setProxEdge(null);
+          flash('Blocked: this connection would create a cycle (A→B→A)');
+          return;
+        }
         pushHistory();
-        const ne = makeEdge(pe.from, pe.to, {...preset.edges, path: defaultPath, dash: 'dashed'}, `e${idc++}`);
+        /* HARVEY 2026-10-13 — NEAREST-SIDE connection: the two sides (handles)
+           facing each other most closely, not hardcoded handles. Computed from
+           the two nodes' ABSOLUTE rects: the smallest gap between my four sides
+           and their four sides picks the pair (right↔left, left↔right,
+           bottom↔top, top↔bottom). */
+        /* absMap below belongs to the reparent section (declared later); the
+           proximity side-pair needs its own rects, so compute them here. */
+        const nsHere = nodesRef.current;
+        const mapHere = absNodes(nsHere);
+        const a = mapHere.get(pe.from), b = mapHere.get(pe.to);
+        let sourceHandle = 'right', targetHandle = 'left';
+        if (a && b) {
+          const gaps: [number, string, string][] = [
+            [Math.abs((a.x + a.w) - b.x), 'right', 'left'],
+            [Math.abs((b.x + b.w) - a.x), 'left', 'right'],
+            [Math.abs((a.y + a.h) - b.y), 'bottom', 'top'],
+            [Math.abs((b.y + b.h) - a.y), 'top', 'bottom'],
+          ];
+          gaps.sort((p, q) => p[0] - q[0]);
+          [sourceHandle, targetHandle] = [gaps[0][1], gaps[0][2]];
+        }
+        const ne = makeEdge(pe.from, pe.to, {...preset.edges, path: defaultPath, dash: 'dashed'}, `e${idc++}`, {
+          sourceHandle, targetHandle,
+        });
         setEdges(es => addEdge(ne, es));
         flash('Proximity connection created');
         return;
@@ -2137,6 +2172,14 @@ export default function App() {
 
   // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    /* AUDIT-follow-up — a rewire can create a cycle too: drop the end on a node
+       upstream and A→B→A is live. Checked against the edge set MINUS this edge
+       (the old end is being replaced, not added). */
+    if (noCycles && wouldCycle(newConnection.source, newConnection.target,
+        edgesRef.current.filter(e => e.id !== oldEdge.id))) {
+      flash('Blocked: this rewiring would create a cycle (A→B→A)');
+      return;
+    }
     pushHistory();
     // ROUND S: a waypoint measured against the OLD endpoints is nonsense the
     // moment an end moves, so all three bend keys go with it. Nothing else on
@@ -2147,7 +2190,7 @@ export default function App() {
       delete data.bend; delete data.bendX; delete data.bendY;
       return {...e, data};
     }));
-  }, [pushHistory, setEdges]);
+  }, [noCycles, pushHistory, setEdges]);
 
   // ---- Part C: connect on drop over a NODE ------------------------------
   // Dropping a connection drag on EMPTY canvas used to insert a fresh node at
@@ -2193,13 +2236,20 @@ export default function App() {
     // gesture that was simply released in the wrong place.
     if (!targetId) return;
     const src = c.source;
+    /* AUDIT-follow-up — the Prevent-cycles setting now reaches THIS path too
+       (it previously only gated the inspector's onConnect, so a connection drag
+       dropped straight on a node could create a cycle A→B→A). */
+    if (noCycles && wouldCycle(src, targetId, edgesRef.current)) {
+      flash('Blocked: this connection would create a cycle (A→B→A)');
+      return;
+    }
     const newId = `e${idc++}`;
     // The target node already exists in state, so the edge can be added
     // directly — the old `setTimeout` deferral only existed to wait for the
     // node this path used to insert.
     pushHistory();
     setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
-  }, [rf, absNodes, pushHistory, setEdges, preset, defaultPath]);
+  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath]);
 
   // ---- connect ---- (new edges use the editable goblinEdge type)
   // D4: a second connection between the same ordered pair of nodes is not a

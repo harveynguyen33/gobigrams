@@ -14,6 +14,24 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ ROUND AQ3 — feedback batch #2 (Canvas note removed, Prevent-cycles on all paths, proximity nearest-side). DONE, 40/40 GREEN. PENDING HARVEY'S TEST.
+
+- **Canvas pane description block: REMOVED** (Harvey: "do we need this?"). The pane now holds only the controls.
+- **Prevent cycles now works on EVERY edge-creation path.** Harvey: "seems didn't work". Root cause: the cycle
+  check lived only in `onConnectRules`; THREE paths bypassed it — a connect drag dropped straight on an existing
+  node (F6 Part C), the proximity connect (F9), and edge rewire. `wouldCycle(source, target, edges)` is now a
+  module-level pure function; `createsCycle` delegates to it; all three paths check it (reconnect checks against
+  the edge set minus the edge being rewired) and flash the same Blocked message.
+- **Proximity connect: NEAREST-SIDE handles** (Harvey's ask): the pair of sides facing each other most closely
+  wins — right↔left, left↔right, bottom↔top or top↔bottom, computed from the two nodes' absolute rects. Handles
+  are the goblin ids `left/right/top/bottom`.
+
+**Still needs Harvey:** the ×N overlap repro detail and the rest of the bend-handle sentence (both from the
+earlier batch).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ2 FIX — first-shape zoom-to-250% on an empty board. DONE, 40/40 GREEN. READY FOR HARVEY'S RETEST.
 
 Harvey: empty board, 50%/100% zoom, add the first shape → viewport snapped to 250%.

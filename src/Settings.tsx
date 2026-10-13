@@ -349,12 +349,6 @@ function CanvasPane({
           <Toggle label="Highlight connections" value={highlight} onToggle={() => onHighlight()} />
         </Row>
       </div>
-      <div className="settings-note">
-        Snap on/off is on the canvas toolbar. The grid size here drives both where nodes snap and the
-        dot spacing you see. Alignment guides are also on the toolbar — the fastest place to reach
-        them while drawing. Reduce motion turns off the travelling payload animation. Highlight
-        connections lights the edges touching the node you hover — off by default.
-      </div>
     </>
   );
 }
