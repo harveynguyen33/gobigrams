@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {type PaletteItem} from './palette';
+import {type PaletteItem, TYPE_LABEL, SOURCE_PURPOSE} from './palette';
 import {COLOR_VAR} from './colors';
 import {ShapePreview} from './shapes';
 import {matchesQuery} from './paletteSearch';
@@ -90,7 +90,17 @@ export default function SearchPalette({onInsert, onClose, items: source}: Props)
                   ? <span style={{color: COLOR_VAR[p.colorKey]}}>T</span>
                   : <ShapePreview shape={p.shape} color={COLOR_VAR[p.colorKey]} />}
               </span>
-              <span className="pal-meta"><span>{p.label}</span><small>{p.hint}</small></span>
+              <span className="pal-meta">
+                <span>{p.label}</span><small>{p.hint}</small>
+                {/* HARVEY 2026-10-13 — source badge + one-line purpose: four
+                    diagram languages share one search, so near-identical
+                    shapes (three cylinders for "datab") must say WHO they are
+                    and WHAT they are for, or the list is a guessing game. */}
+                <small className="sp-src">
+                  {p.types.map(t => TYPE_LABEL[t]).join(' · ')}
+                  {' — '}{SOURCE_PURPOSE[p.category]}
+                </small>
+              </span>
             </button>
           ))}
           {!items.length && <div className="sp-empty">No shape matches “{q}”.</div>}

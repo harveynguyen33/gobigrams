@@ -19,6 +19,28 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ6 — search results annotated with SOURCE + PURPOSE. DONE, 40/40 GREEN, live-verified.
+
+Harvey's "why are there three identical cylinders" — the search palette now
+answers it in place. Each `.sp-item` in the SearchPalette modal carries a third
+line: the diagram language(s) the entry belongs to (`TYPE_LABEL` over `types[]`)
++ a one-line purpose (`SOURCE_PURPOSE` over `category`), e.g. "Database /
+Architecture — a datastore in a system diagram", "Stored data / Flowchart — a
+step in a flowchart (ISO 5807)", "Container: database / C4 — a node in a C4
+model". Maps live in palette.ts as static vocabulary; styles use `--fs-2xs` +
+`--dim2` (the AP-1 contrast-fixed token), no new hex (ratchet 144 intact).
+
+SCOPE NOTE: the LEFT PANEL omnibox was deliberately NOT annotated — its results
+stay grouped under category headers (the "who" is already visible), and painting
+type on every resting row would regress PACKAGE-N's explicit "a single-type
+element no longer repeats its own category" decision. Group-by switcher: PARKED
+until the custom library grows (conditions: volume + missing taxonomy + mixed
+sources on one surface).
+
+Live-verified over CDP: "datab" → 3 rows, each with the right source line.
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · 40/40 harnesses.
+
 ## ▶ ROUND AQ5 — batch #3: dblclick-connect as a SETTING (+reach), straight-when-close, bend-drag verdict. DONE, 40/40 GREEN.
 
 - **Item 12** — the auto-connect is now a real control, Connections pane:

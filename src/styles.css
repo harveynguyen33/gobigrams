@@ -664,6 +664,10 @@ body {
 .shape-preview { display: block; overflow: visible; }
 .pal-meta { display: flex; flex-direction: column; line-height: 1.25; }
 .pal-meta small { color: var(--dim); font-size: var(--fs-sm); font-family: var(--mono); }
+/* HARVEY 2026-10-13 — the search row's source line: WHO (diagram language) and
+   WHAT FOR (one-line purpose), under the existing hint. Quieter than the hint
+   itself so the label stays the reading order. */
+.sp-src { margin-top: 2px; color: var(--dim2); font-size: var(--fs-2xs); font-family: var(--sans); }
 
 /* ---------- library: search + collapsible categories (PACKAGE-N 2b, 2c) ----------
    The section body scrolls inside `.panel-body` (overflow-y: auto); nothing here

@@ -22,6 +22,29 @@ export type PaletteCategory =
   | 'basic' | 'flowchart' | 'data-storage' | 'architecture'
   | 'c4' | 'entities' | 'groups' | 'annotations';
 
+/* HARVEY 2026-10-13 — search-result ANNOTATION: the palette merges four
+   diagram languages, so one query ("datab") can surface three near-identical
+   cylinders. Each result now names its SOURCE (which diagram language the
+   entry belongs to) and a one-line PURPOSE (what the entry is FOR). Both maps
+   are static vocabulary, not per-item prose. */
+export const TYPE_LABEL: Record<DiagramType, string> = {
+  architecture: 'Architecture',
+  flowchart: 'Flowchart',
+  c4: 'C4',
+  erd: 'ERD',
+};
+
+export const SOURCE_PURPOSE: Record<PaletteCategory, string> = {
+  basic: 'a general-purpose building block',
+  flowchart: 'a step in a flowchart (ISO 5807)',
+  'data-storage': 'a datastore in a system diagram',
+  architecture: 'a component in a system architecture',
+  c4: 'a node in a C4 model',
+  entities: 'an ERD entity piece',
+  groups: 'a boundary that groups other nodes',
+  annotations: 'a note or annotation, never connected',
+};
+
 export type PaletteItem = {
   /** Shape name (also the shape's conventional diagram name). */
   label: string;
