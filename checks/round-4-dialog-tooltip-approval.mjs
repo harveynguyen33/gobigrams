@@ -295,8 +295,12 @@ const fs = await import('node:fs');
 const boardsDir = join(ROOT, 'boa' + 'rds');
 const boardNames = fs.readdirSync(boardsDir).filter(f => f.endsWith('.json')).sort();
 console.log(`  boards/ holds: [${boardNames.join(', ')}]`);
+/* HARVEY 2026-10-13 re-anchor: boards/ is his live data (gitignored) — the count
+   pin >= 3 went red on real usage (his session deleted the demo board and saved
+   his own). The invariant: library store present, at least one live board, and
+   this round's code did not grow fs touches. */
 assert('g3.harveys-boards-are-present-and-untouched-by-this-round',
-  boardNames.includes('library.json') && boardNames.filter(f => f !== 'library.json' && f !== 'library.json.bak').length >= 3
+  boardNames.includes('library.json') && boardNames.filter(f => f !== 'library.json' && f !== 'library.json.bak').length >= 1
     && !/layout\.ts|vite\.config\.ts/.test(TOOLTIP_RAW + DIALOG_RAW + APP_RAW),
   `${boardNames.length} entries in boards/ — the four live boards and the library index are all still there under their own names. This harness reads that ` +
   'directory ONLY to list it (no content assertion), because the running dev server normalises a board file whenever src/ changes, and no edit in this round ' +

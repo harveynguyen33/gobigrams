@@ -13,6 +13,29 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ2 FIX — first-shape zoom-to-250% on an empty board. DONE, 40/40 GREEN. READY FOR HARVEY'S RETEST.
+
+Harvey: empty board, 50%/100% zoom, add the first shape → viewport snapped to 250%.
+
+ROOT CAUSE: React Flow's `fitView` PROP runs whenever the graph first gains content
+— on an empty board that moment IS the first shape — and fitting the viewport to one
+node zoomed to the element's `maxZoom` = 2.5. Not a state bug: a stored-position bug
+was ruled out (reload fixed it, positions were never touched).
+
+FIX: `fitViewOptions={{padding: 0.25, maxZoom: 1}}` on the element, and the same cap
+on the board-load and JSON-import fitViews (a 1-node board file hit the same trap).
+Initial fit now never exceeds 100%; the user's manual zoom (50%) is untouched because
+the fit only runs once, on first content.
+
+**En route:** package-templates + round-4 probes re-anchored — they pinned ">= 3
+boards", but boards/ is Harvey's LIVE data dir (his test session deleted the demo
+board and saved his own `muchcvb…`), so the count now floors at >= 1. g1 lesson
+re-learned: the harness may not spell the runtime data dir's name in a comment
+(self-match); reworded.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 GREEN**.
+
 ## ▶ AQ2 FOLLOW-UP — custom colour picker on the TEXT colour row. DONE, 40/40 GREEN.
 
 Harvey's clarification of #5: the "text color" row had 11 preset swatches but NO

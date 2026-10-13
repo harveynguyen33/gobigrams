@@ -1172,7 +1172,8 @@ export default function App() {
       setSelCount(0);
       setCurBoard(doc);
       boards.cacheLastBoard(doc.id);
-      setTimeout(() => rf?.fitView({padding: 0.25}), 30);
+      /* HARVEY 2026-10-13 — maxZoom 1: a 1-node board must not zoom to 250%. */
+      setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
     });
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
 
@@ -3943,7 +3944,8 @@ export default function App() {
         setNotice(`Imported ${parsed.nodes.length} nodes · ${parsed.edges.length} edges`);
       }
       setTimeout(() => setNotice(''), 2500);
-      setTimeout(() => rf?.fitView({padding: 0.25}), 30);
+      /* HARVEY 2026-10-13 — maxZoom 1, same as the board-load fit. */
+      setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
     } catch {
       flash('Import failed: could not parse JSON');
     }
@@ -5778,7 +5780,7 @@ export default function App() {
             setSelCount(s.length);
             setSelEdgeId(se.length === 1 ? se[0].id : null);
           }}
-          fitView proOptions={{hideAttribution: true}}
+          fitView fitViewOptions={{padding: 0.25, maxZoom: 1}} proOptions={{hideAttribution: true}}
           minZoom={0.2} maxZoom={2.5}
           // M3/S3.7 — KEEP false. React Flow's own warning: double-click zoom
           // bypasses the gesture filter entirely (no `isWrappedWithClass` guard
