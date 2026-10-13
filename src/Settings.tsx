@@ -486,46 +486,32 @@ function RoadmapBlock() {
           );
         })}
       </div>
-      <h3 className="rm-shipped-h">Shipped</h3>
-      <ul className="rm-shipped">
-        {SHIPPED.map((s) => (
-          <li className="rm-ship-row" key={s.label}>
-            <span className="rm-ship-label">{s.label}</span>
-            <span className="rm-ship-what">{s.what}</span>
-            <span className="rm-ship-when">{s.when}</span>
-          </li>
-        ))}
-      </ul>
-      {/* one honest line of provenance — not a warning, not a badge */}
+      {/* HARVEY 2026-10-13 — the Shipped list is gone from the pane ("quá xấu").
+          The data lives on in `src/roadmap.ts` (SHIPPED) so a future surface can
+          bring it back without re-typing history. */}
       <p className="rm-reviewed">last reviewed {ROADMAP_REVIEWED}</p>
     </div>
   );
 }
 
 function AboutPane() {
+  /* HARVEY 2026-10-13 — the pane rewrite: wordmark + joke, bare version number,
+     no Licence/Building-blocks rows (licensing is pending its own decision, and
+     a displayed MIT row contradicts the anti-reverse-engineering direction),
+     no self-host note (lives elsewhere when the product ships). */
   return (
     <>
       <h2 className="settings-h" id="settings-title">About</h2>
-      <p className="settings-sub">Diagram Studio · a standalone node-based diagram editor.</p>
+      <p className="settings-sub">
+        <b>Gobigrams</b> — diagrams drawn by a goblin with a grudge and a ruler.
+        Surprisingly straight lines. Zero patience for messy boxes.
+      </p>
       <div className="settings-rows">
-        <Row label="Version" hint="bumped with package.json">
+        <Row label="Version">
           <span className="settings-state">{APP_VERSION}</span>
-        </Row>
-        <Row label="Licence" hint="free to use, modify and share">
-          <span className="settings-state">MIT</span>
-        </Row>
-        <Row label="Building blocks" hint="React, React Flow, Vite">
-          <span className="settings-state">open source</span>
         </Row>
       </div>
       <RoadmapBlock />
-      <div className="settings-note">
-        Boards are plain JSON files kept next to the app — nothing leaves your machine.
-        <br />
-        Running it on another machine? Start the dev server with <b>--host 0.0.0.0</b> and open
-        <b> http://&lt;your-machine-ip&gt;:&lt;port&gt;/</b> — <b>localhost</b> only resolves on the
-        machine the server runs on.
-      </div>
     </>
   );
 }
@@ -703,7 +689,7 @@ export default function Settings({
               <div className="settings-empty">No category matches “{query}”.</div>
             )}
           </div>
-          <div className="settings-nav-note">5 groups · room to grow</div>
+
         </div>
 
         <div className="settings-main" data-settings-pane={cat}>

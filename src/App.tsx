@@ -13,6 +13,7 @@ import {
   PanelLeftClose, PanelRightClose, Eye,
   LayoutTemplate,
   Settings as SettingsIcon,
+  X,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -1183,21 +1184,36 @@ export default function App() {
     saveTimer.current = undefined;
     const seq = ++saveSeq.current;
     setSaveState('saving');
+    /* AUDIT-8b — retry with backoff: the dev server can blip (restart, network)
+       mid-edit; a transient fetch failure used to surface as "save failed" and
+       stayed failed. Two retries (1s, 3s) absorb a blip; a persistent failure
+       still surfaces. Each attempt rebuilds the payload from the REFS so the
+       retry carries the user's LATEST work, not a stale copy. */
+    const payload = () => ({
+      id: board.id, name: board.name,
+      nodes: nodesRef.current.map(n => ({...n, selected: false})),
+      /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
+     Every current edge writer replaces `data` wholesale, so the alias was
+     harmless; the copy makes that invariant ENFORCED rather than implicit —
+     a future in-place patch of edge.data can no longer rewrite history. */
+      edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
+      preset: presetId,
+      // The `legend` key is PERSISTED data (`BoardDoc.legend`) even though the
+      // on-canvas renderer is gone: it is written back from the loaded doc so a
+      // board that carries the key still round-trips instead of losing it.
+      legend: board.legend,
+    });
+    let saved: Awaited<ReturnType<typeof boards.saveBoard>> | undefined;
     try {
-      const saved = await boards.saveBoard({
-        id: board.id, name: board.name,
-        nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
-       Every current edge writer replaces `data` wholesale, so the alias was
-       harmless; the copy makes that invariant ENFORCED rather than implicit —
-       a future in-place patch of edge.data can no longer rewrite history. */
-    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-        preset: presetId,
-        // The `legend` key is PERSISTED data (`BoardDoc.legend`) even though the
-        // on-canvas renderer is gone: it is written back from the loaded doc so a
-        // board that carries the key still round-trips instead of losing it.
-        legend: board.legend,
-      });
+      for (let attempt = 0; ; attempt++) {
+        try {
+          saved = await boards.saveBoard(payload());
+          break;
+        } catch (err) {
+          if (attempt >= 2 || seq !== saveSeq.current) throw err;
+          await new Promise(r => setTimeout(r, attempt === 0 ? 1000 : 3000));
+        }
+      }
       if (seq !== saveSeq.current) return; // a newer save superseded this one
       // I6: do NOT setCurBoard here from the autosave path — writing updatedAt
       // back into state re-created flushSave and re-ran the autosave effect,
@@ -5141,7 +5157,7 @@ export default function App() {
                           removeFavourite(f.id);
                         }
                       }}
-                    >×</span>
+                      ><X size={12} strokeWidth={2.5} /></span>
                   </button>
                 ))}
               </div>
@@ -5220,7 +5236,7 @@ export default function App() {
                         removeCustomShape(String(s.created));
                       }
                     }}
-                  >×</span>
+                    ><X size={12} strokeWidth={2.5} /></span>
                 </button>
               ))}
               {/* The drop zone is ALWAYS a tile, and always LAST: it is the

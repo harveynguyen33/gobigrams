@@ -237,12 +237,13 @@ const stripJsComments = (js) => js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\
 
 {
   const about = stripJsComments(settings.slice(settings.indexOf('function AboutPane()')));
-  const iRows = about.indexOf('className="settings-rows"');
   const iRm = about.indexOf('<RoadmapBlock />');
-  const iNote = about.indexOf('className="settings-note"');
-  assert('r13 RoadmapBlock is rendered AFTER settings-rows and BEFORE settings-note',
-    iRows >= 0 && iRm > iRows && iNote > iRm,
-    `rows@${iRows} block@${iRm} note@${iNote} (within AboutPane)`);
+  /* HARVEY 2026-10-13 re-anchor: AboutPane was rewritten (rows trimmed to one
+     Version row; Licence/Building-blocks rows and the settings-note removed by
+     name). The block's contract is now simply: it renders inside AboutPane. */
+  assert('r13 RoadmapBlock renders inside AboutPane',
+    iRm >= 0,
+    `block@${iRm} (within AboutPane)`);
 
   /* STATUS IS TEXT, NOT COLOUR (a11y SC 1.4.1). The dot is aria-hidden and the
      label is a text span beside it. */

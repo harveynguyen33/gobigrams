@@ -11,6 +11,36 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ ROUND AQ2 — device-test feedback batch (About rewrite, nav note, Shipped removed, X buttons, swatch ring, save retry). DONE, 40/40 GREEN. PENDING HARVEY'S REVIEW.
+
+Harvey's feedback, all applied:
+- **About pane rewritten**: "Gobigrams" wordmark + goblin joke (his words: funny,
+  mischievous, pun on Goblin Diagrams); Version shows ONLY the number; Licence row
+  REMOVED (licensing undecided — anti-RE direction makes a displayed MIT row wrong);
+  Building blocks row REMOVED; self-host note REMOVED (re-homed when the product ships).
+- **"5 groups · room to grow"** nav note: REMOVED.
+- **Shipped block in the roadmap pane: REMOVED** ("quá xấu") — data lives on in
+  `src/roadmap.ts`; r13 re-anchored to the new pane shape.
+- **X buttons** (fav + cust tiles): text '×' -> lucide X icon 12px; circle -> 7px
+  rounded square (matches the chip system).
+- **White swatch cell** on light/paper: inset hairline ring via var(--border) — the
+  cell no longer vanishes. NOTE: the sheet's own "white node invisible on light
+  canvas is the user's choice" consequence STILL STANDS for node fills; the ring
+  fixes the CELL only. Text colour picker already exists (inspector "text color").
+- **Save retry**: fetch failures retry twice (1s, 3s) with the payload rebuilt from
+  refs (latest work, not stale); persistent failure still surfaces as "save failed".
+  Root cause of Harvey's "Saved failed: fetch" was the DEV SERVER dying (infra, fixed
+  separately — server now runs persisted).
+
+**NOT in this round (needs Harvey/live repro):** #6 flowCount -> nodes overlap (cannot
+reproduce from code — flowCount only changes SMIL payload count; needs his exact steps
+next session); #7 bend handle after 2nd+ top/bottom connection (his sentence was cut
+mid-thought — needs the rest).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · 40/40 harnesses · boards clean.
+r13 re-anchored (AboutPane rewrite made the old positional contract obsolete).
+
 ## ▶ AUDIT FIXES — all 15 interaction findings fixed (3 real bugs, 6 latent, 6 smells). DONE, 39/39 harnesses GREEN. PENDING HARVEY'S DEVICE TEST.
 
 From `AUDIT-INTERACTIONS-2026-10-12.json`. One commit per concern group:
