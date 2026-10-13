@@ -397,7 +397,7 @@ export function mergeTextStyle(
   const next: TextStyle = {...(cur ?? {})};
   // Fixed key order, so a delete-then-re-add cannot reorder the object and make
   // a value-equality check below read as a change.
-  for (const k of ['size', 'weight', 'colorKey', 'align', 'font', 'vAlign', 'scale'] as (keyof TextStyle)[]) {
+  for (const k of ['size', 'weight', 'colorKey', 'customColor', 'align', 'font', 'vAlign', 'scale'] as (keyof TextStyle)[]) {
     if (!(k in patch)) continue;
     const v = patch[k];
     if (v === undefined || isTextDefault(k, v, alignDefault, vAlignDefault)) delete next[k];
@@ -416,6 +416,15 @@ export function mergeTextStyle(
     if (patch.scale != null) delete next.size;
   }
   if ('size' in patch && patch.size !== undefined) delete next.scale;
+  /* ROUND AQ2 — the text colour's own mutual exclusion, same shape as scale/size
+     above: `colorKey` (symbolic, themable) and `customColor` (a literal hex) are
+     two spellings of ONE `--ts-color` and can never both be stored. ORDER MATTERS:
+     a key choice (non-null) deletes the literal; a key CLEARING (undefined) must
+     leave the literal alone, because the same patch may be storing it — the first
+     version deleted unconditionally and ate the custom colour the loop had just
+     stored, dropping the text back to the theme ink (Harvey's "turns black"). */
+  if ('colorKey' in patch && patch.colorKey != null) delete next.customColor;
+  if ('customColor' in patch && patch.customColor !== undefined) delete next.colorKey;
   return Object.keys(next).length ? next : undefined;
 }
 
