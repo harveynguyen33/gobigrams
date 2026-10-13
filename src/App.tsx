@@ -222,6 +222,9 @@ const RECONNECT_RADIUS = 14;
 /* HARVEY 2026-10-13 — dblclick-a-handle auto-connect reach, in flow px
    (centre-to-centre). Beyond this the nearest shape is IGNORED. */
 const DOUBLE_CLICK_CONNECT_RANGE = 400;
+/* Below this facing gap (px) the auto-connect renders a STRAIGHT edge instead
+   of an elbow — no kink when the shapes nearly touch (Harvey, batch #3). */
+const DBL_STRAIGHT_GAP = 160;
 
 
 /** G — the four connection points of the goblin node (src/DiagramNode.tsx
@@ -862,6 +865,18 @@ export default function App() {
     setGridSize(next);
     savePref('grid-size', next);
   }, []);
+  /* HARVEY 2026-10-13 — the dblclick auto-connect setting: toggle + reach
+     (clamped 150–800, 50px steps so the slider lands on sane numbers). */
+  const onDblConnect = useCallback((v: boolean) => {
+    setDblConnect(v);
+    savePref('dbl-connect', v);
+  }, []);
+  const onDblRange = useCallback((n: number) => {
+    if (!Number.isFinite(n)) return;
+    const next = Math.min(800, Math.max(150, Math.round(n / 50) * 50));
+    setDblRange(next);
+    savePref('dbl-range', next);
+  }, []);
   // ---- export dropdown open? ----
   const [pop, setPop] = useState(false);
   // ---- D1: searchable insert palette (position = double-click point) ----
@@ -905,6 +920,11 @@ export default function App() {
   // ---- F7: connection rules ----
   const [noCycles, setNoCycles] = useState(false);
   const [oneIn, setOneIn] = useState(false);
+  /* HARVEY 2026-10-13 (batch #3) — the handle dblclick auto-connect becomes a
+     SETTING: on by default, with an adjustable reach. Both persist through
+     prefs.ts's lazy-init contract (nothing written until the user chooses). */
+  const [dblConnect, setDblConnect] = useState(() => loadPref('dbl-connect', true));
+  const [dblRange, setDblRange] = useState(() => loadPref('dbl-range', 400));
   // ---- F6: pending drop-on-canvas connection ----
   const pendingDrop = useRef<Connection | null>(null);
   // ---- G: the handle the current connection drag STARTED from.
@@ -2196,7 +2216,11 @@ export default function App() {
      handle stays the source; the target side is whichever side of that shape is
      closest to the handle's midpoint. Too far = ignored (Harvey: "xa quá bỏ qua"). */
   useEffect(() => {
+    if (!dblConnect) return;
     const onHandleConnect = (ev: Event) => {
+      /* SELF-REVIEW (item 13) — read-only boards must not auto-connect, exactly
+         like a manual connection drag (AUDIT-16's guard). */
+      if (readOnlyRef.current) { flash('Read-only: connect disabled'); return; }
       const {nodeId, handleId} = (ev as CustomEvent<{nodeId: string; handleId: string}>).detail;
       const ns = nodesRef.current;
       const me = absNodes(ns).get(nodeId);
@@ -2206,10 +2230,10 @@ export default function App() {
       absNodes(ns).forEach((v, k) => {
         if (k === nodeId || v.n.parentId) return;
         const d = Math.hypot(cx - (v.x + v.w / 2), cy - (v.y + v.h / 2));
-        if (d <= DOUBLE_CLICK_CONNECT_RANGE && (!best || d < best.d)) best = {id: k, d};
+        if (d <= dblRange && (!best || d < best.d)) best = {id: k, d};
       });
       if (!best) {
-        flash(`No shape within ${DOUBLE_CLICK_CONNECT_RANGE}px — nothing connected`);
+        flash(`No shape within ${dblRange}px — nothing connected`);
         return;
       }
       const targetId = (best as {id: string; d: number}).id;
@@ -2221,6 +2245,12 @@ export default function App() {
       }
       if (noCycles && wouldCycle(nodeId, targetId, edgesRef.current)) {
         flash('Blocked: this connection would create a cycle (A→B→A)');
+        return;
+      }
+      /* SELF-REVIEW — One input per node gates the auto-connect too: a target
+         that already has an incoming edge stays single-input. */
+      if (oneIn && edgesRef.current.some(e => e.target === targetId)) {
+        flash('Blocked: that shape already has an input (One input per node)');
         return;
       }
       /* HARVEY's clarification — the CLICKED handle is the SOURCE, verbatim. Only
@@ -2246,15 +2276,21 @@ export default function App() {
       ];
       sides.sort((p, q) => p[0] - q[0]);
       pushHistory();
-      const ne = makeEdge(nodeId, targetId, {...preset.edges, path: defaultPath}, `e${idc++}`, {
+      /* HARVEY (batch #3) — NO KINK AT SMALL DISTANCE: when the facing gap is
+         tiny, a smoothstep elbow renders as an ugly zig-zag. Below
+         DBL_STRAIGHT_GAP px of facing gap the edge is a plain STRAIGHT line —
+         the arrowhead keeps its normal small size (it is the marker, not the
+         path). */
+      const facing = sides[0][0];
+      const ne = makeEdge(nodeId, targetId, {...preset.edges, path: facing < DBL_STRAIGHT_GAP ? 'straight' : defaultPath}, `e${idc++}`, {
         sourceHandle: handleId, targetHandle: sides[0][1],
       });
       setEdges(es => addEdge(ne, es));
-      flash('Connected to the nearest shape');
+      flash(facing < DBL_STRAIGHT_GAP ? 'Connected (straight — shapes are close)' : 'Connected to the nearest shape');
     };
     window.addEventListener('gobi:handle-connect', onHandleConnect);
     return () => window.removeEventListener('gobi:handle-connect', onHandleConnect);
-  }, [absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath]);
+  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath]);
 
   // ---- connect ---- (new edges use the editable goblinEdge type)
   // D4: a second connection between the same ordered pair of nodes is not a
@@ -5678,6 +5714,10 @@ export default function App() {
           onNoCycles={setNoCycles}
           oneIn={oneIn}
           onOneIn={setOneIn}
+          dblConnect={dblConnect}
+          onDblConnect={onDblConnect}
+          dblRange={dblRange}
+          onDblRange={onDblRange}
           gridSize={gridSize}
           onGridSize={onGridSize}
           alignGuides={alignGuides}

@@ -18,6 +18,30 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ ROUND AQ5 — batch #3: dblclick-connect as a SETTING (+reach), straight-when-close, bend-drag verdict. DONE, 40/40 GREEN.
+
+- **Item 12** — the auto-connect is now a real control, Connections pane:
+  "Connect on handle double-click" (default ON) + "Connect reach" segmented
+  150/200/300/400/600/800 px (default 400). Both persist via prefs.ts lazy-init;
+  the reach row hides while the toggle is off. `DOUBLE_CLICK_CONNECT_RANGE` stays
+  as the default constant.
+- **Item 14** — NO KINK at small distance: when the facing gap is under
+  `DBL_STRAIGHT_GAP = 160` px the auto-connect renders a plain STRAIGHT edge
+  (arrowhead unchanged — it is the marker, not the path). Elbow above the gap.
+- **Item 13** — self-review fixed 2 holes: read-only boards refuse the
+  auto-connect (flash), and One-input-per-node gates it (a target with an
+  incoming edge is refused). Noted (kept): auto-connect REFUSES a duplicate pair
+  while manual connect bumps ×N — deliberate, documented.
+- **Item 15** — VERDICT: bend drag is NOT broken. Proven end-to-end over CDP on
+  the live board: click an edge (selects it) → the dot handle appears → drag →
+  bendX/bendY written and the path routes through the waypoint. The mechanics:
+  (a) the handle shows ONLY on a SELECTED edge; (b) only for opposite-side pairs
+  (bottom→left has NO handle); (c) dragging the line BODY never bends — only the
+  dot. Harvey should say which of the three he hit.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ4b — target-side metric fixed: line distance → CLAMPED SEGMENT distance. DONE, 40/40 GREEN.
 
 Harvey's screenshot: dblclick A's RIGHT handle → edge left A.right correctly but

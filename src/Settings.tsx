@@ -56,6 +56,10 @@ type Props = {
   onNoCycles: React.Dispatch<React.SetStateAction<boolean>>;
   oneIn: boolean;
   onOneIn: React.Dispatch<React.SetStateAction<boolean>>;
+  dblConnect: boolean;
+  onDblConnect: (v: boolean) => void;
+  dblRange: number;
+  onDblRange: (n: number) => void;
 
   /** M4: the canvas snap-grid pitch — the NUMBER. The on/off toggle stays on
    *  the toolbar (so this row is not a duplicate control); App owns the value
@@ -115,6 +119,15 @@ const GRID_SIZES = [8, 16, 20, 32, 64] as const;
 function gridSizeOptions(current: number): number[] {
   if ((GRID_SIZES as readonly number[]).includes(current)) return [...GRID_SIZES];
   return [...GRID_SIZES, current];
+}
+
+/* HARVEY 2026-10-13 — the dblclick auto-connect reach, in the same segmented
+   style as Grid size. 150–800 px, and a stray stored value still shows. */
+const DBL_RANGES = [150, 200, 300, 400, 600, 800] as const;
+
+function dblRangeOptions(current: number): number[] {
+  if ((DBL_RANGES as readonly number[]).includes(current)) return [...DBL_RANGES];
+  return [...DBL_RANGES, current];
 }
 
 function Row({label, hint, children}: {label: string; hint?: string; children?: React.ReactNode}) {
@@ -353,8 +366,8 @@ function CanvasPane({
 }
 
 function ConnectionsPane({
-  noCycles, onNoCycles, oneIn, onOneIn,
-}: Pick<Props, 'noCycles' | 'onNoCycles' | 'oneIn' | 'onOneIn'>) {
+  noCycles, onNoCycles, oneIn, onOneIn, dblConnect, onDblConnect, dblRange, onDblRange,
+}: Pick<Props, 'noCycles' | 'onNoCycles' | 'oneIn' | 'onOneIn' | 'dblConnect' | 'onDblConnect' | 'dblRange' | 'onDblRange'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Connections</h2>
@@ -375,7 +388,25 @@ function ConnectionsPane({
           />
         </Row>
         {/* HARVEY 2026-10-13 — Proximity connect REMOVED (feature retired). The
-            replacement is dblclick-on-a-handle -> nearest-shape connect. */}
+            replacement is dblclick-on-a-handle -> nearest-shape connect, and it
+            is a real control: default ON, with an adjustable reach. */}
+        <Row label="Connect on handle double-click" hint="double-click a connection dot to join the nearest shape within reach">
+          <Toggle
+            label="Connect on handle double-click"
+            value={dblConnect}
+            onToggle={() => onDblConnect(!dblConnect)}
+          />
+        </Row>
+        {dblConnect && (
+          <Row label="Connect reach" hint="how far (in canvas px) the nearest shape may be; beyond it nothing connects">
+            <Segmented
+              label="Connect reach"
+              options={dblRangeOptions(dblRange)}
+              value={dblRange}
+              onPick={onDblRange}
+            />
+          </Row>
+        )}
       </div>
       <div className="settings-note">
         Rules applied while you draw. They apply to the whole board and can be changed at any time.
@@ -509,6 +540,7 @@ function AboutPane() {
 export default function Settings({
   open, onClose, mode, onMode, resolved,
   noCycles, onNoCycles, oneIn, onOneIn,
+  dblConnect, onDblConnect, dblRange, onDblRange,
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate,
   highlight, onHighlight,
   marquee, onMarquee,
@@ -623,6 +655,10 @@ export default function Settings({
           onNoCycles={onNoCycles}
           oneIn={oneIn}
           onOneIn={onOneIn}
+          dblConnect={dblConnect}
+          onDblConnect={onDblConnect}
+          dblRange={dblRange}
+          onDblRange={onDblRange}
         />
       );
       case 'keys':        return <KeyboardPane />;
