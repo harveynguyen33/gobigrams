@@ -16,6 +16,18 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ4 FIXUP — the CLICKED handle is the SOURCE (Harvey's clarification). DONE, 40/40 GREEN.
+
+Harvey: "khi double click vào handle, từ cái handle đó sẽ kết nối tới shape gần nhất
+(cạnh shape gần nhất)". The first cut overrode BOTH handles with the gap matrix —
+the clicked one was ignored. Now: `sourceHandle` = the handle you double-clicked,
+verbatim; only the TARGET side is computed, as whichever of the target's four sides
+is closest to the clicked handle's midpoint. Range 400px, cycle check, already-
+connected flash: all unchanged.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ ROUND AQ4 — proximity RETIRED, dblclick-a-handle auto-connect BUILT. DONE, 40/40 GREEN. PENDING HARVEY'S TEST.
 
 Harvey's call: proximity connect (drag-near auto-edge) is GONE — the toggle, the F9

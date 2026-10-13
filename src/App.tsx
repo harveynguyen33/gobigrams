@@ -2192,8 +2192,9 @@ export default function App() {
   /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
      DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
      owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
-     centre-to-centre), then the nearest-side pair, cycle-checked like every
-     other creation path. Too far = explicitly ignored (Harvey: "xa quá bỏ qua"). */
+     centre-to-centre), cycle-checked like every other creation path. The CLICKED
+     handle stays the source; the target side is whichever side of that shape is
+     closest to the handle's midpoint. Too far = ignored (Harvey: "xa quá bỏ qua"). */
   useEffect(() => {
     const onHandleConnect = (ev: Event) => {
       const {nodeId, handleId} = (ev as CustomEvent<{nodeId: string; handleId: string}>).detail;
@@ -2222,18 +2223,22 @@ export default function App() {
         flash('Blocked: this connection would create a cycle (A→B→A)');
         return;
       }
-      // nearest-side pair between the two rects (same rule as the old proximity path)
+      /* HARVEY's clarification — the CLICKED handle is the SOURCE, verbatim. Only
+         the TARGET side is computed: whichever side of the nearest shape is
+         closest to the clicked handle's midpoint. */
       const other = absNodes(ns).get(targetId)!;
-      const gaps: [number, string, string][] = [
-        [Math.abs((me.x + me.w) - other.x), 'right', 'left'],
-        [Math.abs((other.x + other.w) - me.x), 'left', 'right'],
-        [Math.abs((me.y + me.h) - other.y), 'bottom', 'top'],
-        [Math.abs((other.y + other.h) - me.y), 'top', 'bottom'],
+      const px = handleId === 'left' ? me.x : handleId === 'right' ? me.x + me.w : me.x + me.w / 2;
+      const py = handleId === 'top' ? me.y : handleId === 'bottom' ? me.y + me.h : me.y + me.h / 2;
+      const sides: [number, string][] = [
+        [Math.abs(px - other.x), 'left'],
+        [Math.abs(px - (other.x + other.w)), 'right'],
+        [Math.abs(py - other.y), 'top'],
+        [Math.abs(py - (other.y + other.h)), 'bottom'],
       ];
-      gaps.sort((p, q) => p[0] - q[0]);
+      sides.sort((p, q) => p[0] - q[0]);
       pushHistory();
       const ne = makeEdge(nodeId, targetId, {...preset.edges, path: defaultPath}, `e${idc++}`, {
-        sourceHandle: gaps[0][1], targetHandle: gaps[0][2],
+        sourceHandle: handleId, targetHandle: sides[0][1],
       });
       setEdges(es => addEdge(ne, es));
       flash('Connected to the nearest shape');
