@@ -4574,7 +4574,13 @@ export default function App() {
       </div>
       <div className="field">
         <label>text color</label>
-        {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k}))}
+        {/* ROUND AQ2 — the custom literal cell, same as the edge stroke row: the
+            literal is stored on `textStyle.customColor` with `colorKey` cleared
+            (the merge enforces the exclusion); a key pick clears the literal. The
+            custom cell takes the ring when a literal is set (no hue lights). */}
+        {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k, customColor: undefined}),
+          {value: tsShown.customColor, onPick: hex => writeTextStyle({customColor: hex, colorKey: undefined})},
+        )}
       </div>
       <div className="field">
         <label>align</label>

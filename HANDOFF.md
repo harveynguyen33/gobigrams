@@ -12,6 +12,25 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ2 FOLLOW-UP — custom colour picker on the TEXT colour row. DONE, 40/40 GREEN.
+
+Harvey's clarification of #5: the "text color" row had 11 preset swatches but NO
+custom cell (node fill, edge stroke and table colour rows all had one since AO-1c).
+
+**What shipped:** `TextStyle.customColor?: string` — a literal hex stored beside
+`colorKey`, with the SAME mutual exclusion `scale`/`size` has (setting one deletes
+the other, enforced in `mergeTextStyle`). `textStyleVars` emits `--ts-color` from
+the key first, the literal second (a hand-edited board carrying both keeps the key,
+same documented precedence). `readTextStyle` reads `customColor` back for the cell.
+The Text colour row passes the custom cell: key pick clears the literal, literal
+pick clears the key. Export note: `EXPORT_TOKENS` covers theme tokens; a literal
+travels inside the inlined `--ts-color` value automatically (it IS the emitted value).
+
+Reproduce: select a node → inspector → Text → "text color" → 12th cell = custom.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · 40/40 harnesses · hex 144.
+
 ## ▶ ROUND AQ2 — device-test feedback batch (About rewrite, nav note, Shipped removed, X buttons, swatch ring, save retry). DONE, 40/40 GREEN. PENDING HARVEY'S REVIEW.
 
 Harvey's feedback, all applied:

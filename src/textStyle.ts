@@ -80,6 +80,12 @@ export type TextStyle = {
   /** §E.1 — a SYMBOLIC KEY, resolved through `COLOR_VAR` (`src/colors.ts:20`).
    *  A hex here would be unthemable, which is the whole point of PACKAGE-L. */
   colorKey?: ColorKey;
+  /* ROUND AQ2 (Harvey 2026-10-13) — a LITERAL hex for the text colour, for the
+     case no key matches (the same need AO-1c served for the edge stroke). Stored
+     beside `colorKey`; setting one clears the other, because two writers for one
+     `--ts-color` is a value that can contradict itself. A literal cannot follow
+     a theme — that is stated here, not worked around. */
+  customColor?: string;
   align?: TextAlign;
   /** ROUND W, ITEM 2 — a family KEY, resolved through `TEXT_FONT_FAMILY` below.
    *  Stored as a key and not as a stack for the same reason `colorKey` is: a
@@ -486,6 +492,9 @@ export function readTextStyle(
     size: stepForScale(painted),
     weight: ts?.weight ?? TEXT_DEFAULT_WEIGHT,
     colorKey: ts?.colorKey ?? null,
+    /* ROUND AQ2 — the literal, read back so the custom cell can show the stored
+       value and take its ring. Absent when a key is set (the merge forbids both). */
+    customColor: ts?.customColor,
     align: ts?.align ?? alignDefault,
     /* ROUND Z, ITEM 1 — RESOLVED, so the control highlights the family that
      *  actually paints. A board carrying ROUND W's `'viet'` reads as
@@ -550,6 +559,10 @@ export function textStyleVars(
   if (scale !== undefined && scale !== 1) out['--ts-scale'] = String(scale);
   if (ts.weight === 'bold') out['--ts-weight'] = '700';
   if (isColorKey(ts.colorKey)) out['--ts-color'] = COLOR_VAR[ts.colorKey];
+  /* ROUND AQ2 — the literal wins ONLY when no key is set (setting one clears the
+     other at write time; a hand-edited board carrying both keeps the key, the
+     same precedence the scale/size pair documents above). */
+  else if (ts.customColor) out['--ts-color'] = ts.customColor;
   /* ROUND W, ITEM 2 — ONE property, the WHOLE node. Each of the sheet's text
      rules keeps its own stack as the fallback, so an untouched node emits
      nothing here and is byte-identical to before this round.
