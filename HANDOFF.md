@@ -15,6 +15,25 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ ROUND AQ4 — proximity RETIRED, dblclick-a-handle auto-connect BUILT. DONE, 40/40 GREEN. PENDING HARVEY'S TEST.
+
+Harvey's call: proximity connect (drag-near auto-edge) is GONE — the toggle, the F9
+drag-move candidate, the drag-stop creation, the dashed preview SVG, the caps field
+on all 5 presets, and the dead .prox-edge CSS block. #6 (×N overlap) confirmed OK.
+
+THE REPLACEMENT: **double-click any of the 4 handles** on a node → App searches for
+the nearest top-level shape within `DOUBLE_CLICK_CONNECT_RANGE = 400` flow px
+(centre-to-centre), picks the nearest-side pair (right↔left / left↔right /
+bottom↔top / top↔bottom from the absolute rects), cycle-checks like every other
+path, and creates the edge. Too far → flash "No shape within 400px". Already
+connected → flash. Mechanism: the Handle dispatches `gobi:handle-connect`
+CustomEvent (DiagramNode has no store access); one App effect owns search + guard +
+creation. `package-q-reconnect-endpoints` re-anchored (it pinned the caps literal
+that no longer carries `proximityConnect`).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ ROUND AQ3 — feedback batch #2 (Canvas note removed, Prevent-cycles on all paths, proximity nearest-side). DONE, 40/40 GREEN. PENDING HARVEY'S TEST.
 
 - **Canvas pane description block: REMOVED** (Harvey: "do we need this?"). The pane now holds only the controls.

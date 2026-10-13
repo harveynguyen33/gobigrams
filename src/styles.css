@@ -3040,12 +3040,6 @@ kbd {
    render went, so they went with it. Nothing else in the sheet used these
    class names (checked: zero remaining occurrences in `src/`). */
 
-/* ---------- F9: proximity connect candidate ---------- */
-.prox-edge {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none; overflow: visible; z-index: 4;
-}
-
 /* ---------- empty state (new / empty board) ---------- */
 .canvas-empty {
   text-align: center;

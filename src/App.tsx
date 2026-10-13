@@ -219,6 +219,10 @@ const isGoblinEdge = (t?: string) =>
    at the app's normal spacing the disc sits in open canvas and never reaches a
    neighbour. 20 would spend that margin for no discoverability gain. */
 const RECONNECT_RADIUS = 14;
+/* HARVEY 2026-10-13 — dblclick-a-handle auto-connect reach, in flow px
+   (centre-to-centre). Beyond this the nearest shape is IGNORED. */
+const DOUBLE_CLICK_CONNECT_RANGE = 400;
+
 
 /** G — the four connection points of the goblin node (src/DiagramNode.tsx
  *  NodeHandles). The onConnect direction guard is scoped to these: an ERD
@@ -901,9 +905,6 @@ export default function App() {
   // ---- F7: connection rules ----
   const [noCycles, setNoCycles] = useState(false);
   const [oneIn, setOneIn] = useState(false);
-  // ---- F9: proximity connect ----
-  const [proximity, setProximity] = useState(false);
-  const [proxEdge, setProxEdge] = useState<{from: string; to: string; fromPos: XYPosition; toPos: XYPosition} | null>(null);
   // ---- F6: pending drop-on-canvas connection ----
   const pendingDrop = useRef<Connection | null>(null);
   // ---- G: the handle the current connection drag STARTED from.
@@ -1520,7 +1521,6 @@ export default function App() {
     if (p.caps) {
       if (p.caps.cyclePrevention !== undefined) setNoCycles(p.caps.cyclePrevention);
       if (p.caps.oneInput !== undefined) setOneIn(p.caps.oneInput);
-      if (p.caps.proximityConnect !== undefined) setProximity(p.caps.proximityConnect);
     }
     // A preset's suggested theme is a SUGGESTION, not an explicit user choice:
     // it must never overwrite a stored 'system' preference. Render-only, and
@@ -2019,24 +2019,7 @@ export default function App() {
       setGuides(g);
     }
 
-    // F9: proximity connect candidate (subtle, dashed) — top-level only
-    if (proximity && !dragged.parentId) {
-      const cx = me.x + me.w / 2, cy = me.y + me.h / 2;
-      let best: {id: string; d: number; x: number; y: number} | null = null;
-      [...absMap.values()].forEach(v => {
-        if (v.n.id === dragged.id || v.n.parentId) return;
-        const ox = v.x + v.w / 2, oy = v.y + v.h / 2;
-        const dist = Math.hypot(cx - ox, cy - oy);
-        if (dist > 260) return;
-        const hx = cx < ox ? v.x : v.x + v.w;
-        if (!best || dist < best.d) best = {id: v.n.id, d: dist, x: hx, y: oy};
-      });
-      if (best) {
-        const b = best as {id: string; d: number; x: number; y: number};
-        setProxEdge({from: dragged.id, to: b.id, fromPos: {x: me.x + me.w, y: cy}, toPos: {x: b.x, y: b.y}});
-      } else setProxEdge(null);
-    }
-  }, [absNodes, proximity, setNodes, alignGuides]);
+  }, [absNodes, setNodes, alignGuides]);
 
   const onNodeDragStop = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     tickTask('move');
@@ -2062,51 +2045,6 @@ export default function App() {
       }
       setGuides({vertical: null, horizontal: null});
     }
-
-    // F9: proximity connect — drop near another node connects them
-    if (proximity && proxEdge && proxEdge.from === draggedNode.id) {
-      const pe = proxEdge;
-      setProxEdge(null);
-      const exists = edgesRef.current.some(e =>
-        (e.source === pe.from && e.target === pe.to) || (e.source === pe.to && e.target === pe.from));
-      if (!exists) {
-        /* AUDIT-follow-up — Prevent-cycles reaches the proximity path too. */
-        if (noCycles && wouldCycle(pe.from, pe.to, edgesRef.current)) {
-          setProxEdge(null);
-          flash('Blocked: this connection would create a cycle (A→B→A)');
-          return;
-        }
-        pushHistory();
-        /* HARVEY 2026-10-13 — NEAREST-SIDE connection: the two sides (handles)
-           facing each other most closely, not hardcoded handles. Computed from
-           the two nodes' ABSOLUTE rects: the smallest gap between my four sides
-           and their four sides picks the pair (right↔left, left↔right,
-           bottom↔top, top↔bottom). */
-        /* absMap below belongs to the reparent section (declared later); the
-           proximity side-pair needs its own rects, so compute them here. */
-        const nsHere = nodesRef.current;
-        const mapHere = absNodes(nsHere);
-        const a = mapHere.get(pe.from), b = mapHere.get(pe.to);
-        let sourceHandle = 'right', targetHandle = 'left';
-        if (a && b) {
-          const gaps: [number, string, string][] = [
-            [Math.abs((a.x + a.w) - b.x), 'right', 'left'],
-            [Math.abs((b.x + b.w) - a.x), 'left', 'right'],
-            [Math.abs((a.y + a.h) - b.y), 'bottom', 'top'],
-            [Math.abs((b.y + b.h) - a.y), 'top', 'bottom'],
-          ];
-          gaps.sort((p, q) => p[0] - q[0]);
-          [sourceHandle, targetHandle] = [gaps[0][1], gaps[0][2]];
-        }
-        const ne = makeEdge(pe.from, pe.to, {...preset.edges, path: defaultPath, dash: 'dashed'}, `e${idc++}`, {
-          sourceHandle, targetHandle,
-        });
-        setEdges(es => addEdge(ne, es));
-        flash('Proximity connection created');
-        return;
-      }
-    }
-    setProxEdge(null);
 
     // F1: reparent on drop — inside a group bounds → adopt; outside → release.
     const ns = nodesRef.current;
@@ -2163,7 +2101,7 @@ export default function App() {
       });
       flash('Removed from group');
     }
-  }, [tickTask, proximity, proxEdge, absNodes, pushHistory, setNodes, setEdges, flash]);
+  }, [tickTask, absNodes, pushHistory, setNodes, setEdges, flash]);
 
   /** History push on every node drag start (position moves are undoable). */
   const onNodeDragStartAll = useCallback((_e: MouseEvent | TouchEvent, _node: Node) => {
@@ -2250,6 +2188,59 @@ export default function App() {
     pushHistory();
     setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
   }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath]);
+
+  /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
+     DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
+     owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
+     centre-to-centre), then the nearest-side pair, cycle-checked like every
+     other creation path. Too far = explicitly ignored (Harvey: "xa quá bỏ qua"). */
+  useEffect(() => {
+    const onHandleConnect = (ev: Event) => {
+      const {nodeId, handleId} = (ev as CustomEvent<{nodeId: string; handleId: string}>).detail;
+      const ns = nodesRef.current;
+      const me = absNodes(ns).get(nodeId);
+      if (!me) return;
+      const cx = me.x + me.w / 2, cy = me.y + me.h / 2;
+      let best: {id: string; d: number} | null = null;
+      absNodes(ns).forEach((v, k) => {
+        if (k === nodeId || v.n.parentId) return;
+        const d = Math.hypot(cx - (v.x + v.w / 2), cy - (v.y + v.h / 2));
+        if (d <= DOUBLE_CLICK_CONNECT_RANGE && (!best || d < best.d)) best = {id: k, d};
+      });
+      if (!best) {
+        flash(`No shape within ${DOUBLE_CLICK_CONNECT_RANGE}px — nothing connected`);
+        return;
+      }
+      const targetId = (best as {id: string; d: number}).id;
+      const exists = edgesRef.current.some(e =>
+        (e.source === nodeId && e.target === targetId) || (e.source === targetId && e.target === nodeId));
+      if (exists) {
+        flash('These two shapes are already connected');
+        return;
+      }
+      if (noCycles && wouldCycle(nodeId, targetId, edgesRef.current)) {
+        flash('Blocked: this connection would create a cycle (A→B→A)');
+        return;
+      }
+      // nearest-side pair between the two rects (same rule as the old proximity path)
+      const other = absNodes(ns).get(targetId)!;
+      const gaps: [number, string, string][] = [
+        [Math.abs((me.x + me.w) - other.x), 'right', 'left'],
+        [Math.abs((other.x + other.w) - me.x), 'left', 'right'],
+        [Math.abs((me.y + me.h) - other.y), 'bottom', 'top'],
+        [Math.abs((other.y + other.h) - me.y), 'top', 'bottom'],
+      ];
+      gaps.sort((p, q) => p[0] - q[0]);
+      pushHistory();
+      const ne = makeEdge(nodeId, targetId, {...preset.edges, path: defaultPath}, `e${idc++}`, {
+        sourceHandle: gaps[0][1], targetHandle: gaps[0][2],
+      });
+      setEdges(es => addEdge(ne, es));
+      flash('Connected to the nearest shape');
+    };
+    window.addEventListener('gobi:handle-connect', onHandleConnect);
+    return () => window.removeEventListener('gobi:handle-connect', onHandleConnect);
+  }, [absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath]);
 
   // ---- connect ---- (new edges use the editable goblinEdge type)
   // D4: a second connection between the same ordered pair of nodes is not a
@@ -5673,8 +5664,6 @@ export default function App() {
           onNoCycles={setNoCycles}
           oneIn={oneIn}
           onOneIn={setOneIn}
-          proximity={proximity}
-          onProximity={setProximity}
           gridSize={gridSize}
           onGridSize={onGridSize}
           alignGuides={alignGuides}
@@ -5942,17 +5931,6 @@ export default function App() {
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}
           {(guides.vertical || guides.horizontal) && <HelperLinesView guides={guides} />}
-          {/* F9: proximity connect candidate */}
-          {proxEdge && (
-            <svg className="prox-edge">
-              <line
-                x1={proxEdge.fromPos.x} y1={proxEdge.fromPos.y}
-                x2={proxEdge.toPos.x} y2={proxEdge.toPos.y}
-                stroke="var(--sel)" strokeWidth={1.5} strokeDasharray="5 5" opacity={0.7}
-              />
-              <circle cx={proxEdge.toPos.x} cy={proxEdge.toPos.y} r={4} fill="var(--sel)" opacity={0.8} />
-            </svg>
-          )}
           <Controls showInteractive={false} />
           <ZoomPill />
           <MiniMap

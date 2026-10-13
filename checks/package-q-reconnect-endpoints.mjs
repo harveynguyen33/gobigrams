@@ -554,9 +554,13 @@ section('5 — BLAST RADIUS: nothing else moved');
 ok(/id: 'architecture'/.test(PRESETS) && /DEFAULT_PRESET_ID: PresetId = 'architecture'/.test(PRESETS),
    'the default preset is still architecture (read from src/presets.ts, not from a board)',
    `DEFAULT_PRESET_ID @ src/presets.ts:${lineOf(PRESETS, "DEFAULT_PRESET_ID: PresetId")}`);
-ok(/caps: \{subflow:\s*true,\s*proximityConnect:\s*false,\s*cyclePrevention:\s*false,\s*oneInput:\s*false,\s*resizable:\s*true\}/
+/* HARVEY 2026-10-13 — proximityConnect retired from caps (the feature was
+   removed; its replacement is dblclick-a-handle auto-connect), so the pinned
+   literal lost that field. The invariant is unchanged: the toggles that remain
+   all ship OFF. */
+ok(/caps: \{subflow:\s*true,\s*cyclePrevention:\s*false,\s*oneInput:\s*false,\s*resizable:\s*true\}/
      .test(PRESETS),
-   'architecture still ships all three optional toggles OFF, so adopting it cannot change an old board',
+   'architecture still ships every optional toggle OFF, so adopting it cannot change an old board',
    `src/presets.ts:${lineOf(PRESETS, "caps: {subflow: true")}`);
 ok(!/theme: *'/.test(PRESETS.slice(PRESETS.indexOf("id: 'architecture'"), PRESETS.indexOf("id: 'architecture'") + 700)),
    'architecture still seeds no literal board `theme` key (only `theme.suggested`)',

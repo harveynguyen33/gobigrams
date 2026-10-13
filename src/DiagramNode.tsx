@@ -205,14 +205,27 @@ export function IconGlyph({icon, size = 17}: {icon?: string; size?: number}) {
  *
  * All four are the SAME 12px dot; size, reveal and z-index are unchanged.
  */
-function NodeHandles() {
+/* HARVEY 2026-10-13 — dblclick a handle -> auto-connect to the NEAREST shape
+   (within range, nearest sides). The handle has no access to the app's node
+   store, so it dispatches a plain CustomEvent; App.tsx owns the search, the
+   cycle check and the edge creation. */
+function handleDblClick(nodeId: string) {
+  return (handleId: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('gobi:handle-connect', {detail: {nodeId, handleId}}));
+  };
+}
+
+function NodeHandles({nodeId}: {nodeId: string}) {
+  const on = handleDblClick(nodeId);
   return (
     <>
       {/* The four edge midpoints — every one a SOURCE handle (see above). */}
-      <Handle type="source" id="left" position={Position.Left} />
-      <Handle type="source" id="right" position={Position.Right} />
-      <Handle type="source" id="top" position={Position.Top} />
-      <Handle type="source" id="bottom" position={Position.Bottom} />
+      <Handle type="source" id="left" position={Position.Left} onDoubleClick={on('left')} />
+      <Handle type="source" id="right" position={Position.Right} onDoubleClick={on('right')} />
+      <Handle type="source" id="top" position={Position.Top} onDoubleClick={on('top')} />
+      <Handle type="source" id="bottom" position={Position.Bottom} onDoubleClick={on('bottom')} />
     </>
   );
 }
@@ -270,7 +283,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
-        <NodeHandles />
+        <NodeHandles nodeId={id} />
         {postit}
         {/* ROUND V — the text lives in its own box so the root's border can stay
             unclipped: the four connect dots and, when selected, the four resize
@@ -289,7 +302,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     return (
       <div className={`group-node${selected ? ' selected' : ''}${d.icon ? ' has-badge' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
         {resizer}
-        <NodeHandles />
+        <NodeHandles nodeId={id} />
         <div className="group-head" aria-hidden="true" />
         {d.icon && (
           <span className="group-badge" aria-hidden="true"><IconGlyph icon={d.icon} size={16} /></span>
@@ -310,7 +323,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
-        <NodeHandles />
+        <NodeHandles nodeId={id} />
         <ShapeFrame shape={shape} />
         {postit}
         <div className="node-body lo-body">
@@ -327,7 +340,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   return (
     <div className={`node shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
-      <NodeHandles />
+      <NodeHandles nodeId={id} />
       <ShapeFrame shape={shape} />
       {postit}
       <div className="node-body">

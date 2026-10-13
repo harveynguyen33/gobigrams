@@ -56,8 +56,7 @@ type Props = {
   onNoCycles: React.Dispatch<React.SetStateAction<boolean>>;
   oneIn: boolean;
   onOneIn: React.Dispatch<React.SetStateAction<boolean>>;
-  proximity: boolean;
-  onProximity: React.Dispatch<React.SetStateAction<boolean>>;
+
   /** M4: the canvas snap-grid pitch — the NUMBER. The on/off toggle stays on
    *  the toolbar (so this row is not a duplicate control); App owns the value
    *  and clamps it, this file only reads it and asks for a new one. */
@@ -354,8 +353,8 @@ function CanvasPane({
 }
 
 function ConnectionsPane({
-  noCycles, onNoCycles, oneIn, onOneIn, proximity, onProximity,
-}: Pick<Props, 'noCycles' | 'onNoCycles' | 'oneIn' | 'onOneIn' | 'proximity' | 'onProximity'>) {
+  noCycles, onNoCycles, oneIn, onOneIn,
+}: Pick<Props, 'noCycles' | 'onNoCycles' | 'oneIn' | 'onOneIn'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Connections</h2>
@@ -375,13 +374,8 @@ function ConnectionsPane({
             onToggle={() => onOneIn(v => !v)}
           />
         </Row>
-        <Row label="Proximity connect" hint="drop a node near another to auto-connect">
-          <Toggle
-            label="Proximity connect"
-            value={proximity}
-            onToggle={() => onProximity(v => !v)}
-          />
-        </Row>
+        {/* HARVEY 2026-10-13 — Proximity connect REMOVED (feature retired). The
+            replacement is dblclick-on-a-handle -> nearest-shape connect. */}
       </div>
       <div className="settings-note">
         Rules applied while you draw. They apply to the whole board and can be changed at any time.
@@ -514,7 +508,7 @@ function AboutPane() {
 
 export default function Settings({
   open, onClose, mode, onMode, resolved,
-  noCycles, onNoCycles, oneIn, onOneIn, proximity, onProximity,
+  noCycles, onNoCycles, oneIn, onOneIn,
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate,
   highlight, onHighlight,
   marquee, onMarquee,
@@ -629,8 +623,6 @@ export default function Settings({
           onNoCycles={onNoCycles}
           oneIn={oneIn}
           onOneIn={onOneIn}
-          proximity={proximity}
-          onProximity={onProximity}
         />
       );
       case 'keys':        return <KeyboardPane />;

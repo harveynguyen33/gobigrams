@@ -114,7 +114,7 @@ export type DiagramPreset = {
   /** 7 — TEMPLATES */
   templates?: TemplateSpec[];
   /** 8 — CAPABILITIES */
-  caps?: {subflow?: boolean; proximityConnect?: boolean; cyclePrevention?: boolean; oneInput?: boolean; resizable?: boolean};
+  caps?: {subflow?: boolean; cyclePrevention?: boolean; oneInput?: boolean; resizable?: boolean};
   /** ERD-specific: the default column show-mode. */
   showMode?: ShowMode;
   /** Legend rows (C4 requires a key on every diagram). */
@@ -914,7 +914,7 @@ export const ARCHITECTURE_PRESET: DiagramPreset = {
   guidance: {tip: 'Name the system, then label every arrow with what flows across it.'},
   // Truthful to today's behaviour: all three toggles ship OFF, so adopting this
   // preset cannot change an existing board (L2: architecture is byte-identical).
-  caps: {subflow: true, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
+  caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
   legend: [
     {colorKey: 'accent', label: 'External system'},
     {colorKey: 'cyan', label: 'Service'},
@@ -947,7 +947,7 @@ export const FLOWCHART_PRESET: DiagramPreset = {
     maxLabelChars: 30,
   },
   // a flowchart legitimately loops back, so cycle prevention stays off here
-  caps: {subflow: true, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
+  caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
   // PACKAGE-TEMPLATES — order follows the catalog's own render order inside the
   // family (basic → advanced group, whose members sort by `order ?? 0` then id).
   templates: [flowchartBasicTemplate, flowchartAdvancedTemplate, flowchartComplexTemplate],
@@ -975,7 +975,7 @@ export const C4_PRESET: DiagramPreset = {
     requireLabel: true,
     requireTechnology: true,
   },
-  caps: {subflow: true, proximityConnect: false, cyclePrevention: true, oneInput: false, resizable: true},
+  caps: {subflow: true, cyclePrevention: true, oneInput: false, resizable: true},
   templates: [c4ContextTemplate, c4ContainerTemplate],
   note: 'Relationships are unidirectional and dashed (the C4 convention), with an intent label plus a technology suffix.',
   legend: [
@@ -999,7 +999,7 @@ export const ERD_PRESET: DiagramPreset = {
   layout: {engine: 'grid', direction: 'LR', spacing: {x: 150, y: 90}, cols: 3},
   theme: {suggested: 'dark', canvas: 'plain', showLegend: true},
   guidance: {tip: 'Every table needs a primary key; draw the relationship from the FK column to the column it references.'},
-  caps: {subflow: false, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
+  caps: {subflow: false, cyclePrevention: false, oneInput: false, resizable: true},
   templates: [erdTemplate],
   showMode: 'ALL_FIELDS',
   note: 'FK edges attach column-to-column. Crow’s feet show cardinality: ring = zero, bar = one, foot = many.',
@@ -1031,7 +1031,7 @@ export const CUSTOM_PRESET: DiagramPreset = {
   },
   layout: {engine: 'free', direction: 'LR'},
   theme: {canvas: 'dots'},
-  caps: {subflow: true, proximityConnect: false, cyclePrevention: false, oneInput: false, resizable: true},
+  caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
   legend: [{colorKey: 'slate', label: 'Mixed notation'}],
 };
 
