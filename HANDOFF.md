@@ -17,6 +17,20 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ4b — target-side metric fixed: line distance → CLAMPED SEGMENT distance. DONE, 40/40 GREEN.
+
+Harvey's screenshot: dblclick A's RIGHT handle → edge left A.right correctly but
+landed on B's BOTTOM (arrow pointing up under B) instead of B's LEFT. Root cause,
+numeric: the metric measured |handle point − side LINE|, and B's bottom LINE was
+62px from the handle (the handle sat above the bottom line's y-band) while B's
+left line was 185px — so 'bottom' won even though the handle faces left. Fix:
+distance from the handle POINT to the CLOSEST POINT ON each side SEGMENT
+(projection clamped). Proven on the screenshot's own geometry: left 185.0 beats
+bottom 195.1 → LEFT wins. A shape-below control still picks the facing side (top).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ4 FIXUP — the CLICKED handle is the SOURCE (Harvey's clarification). DONE, 40/40 GREEN.
 
 Harvey: "khi double click vào handle, từ cái handle đó sẽ kết nối tới shape gần nhất

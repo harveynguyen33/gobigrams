@@ -2229,11 +2229,20 @@ export default function App() {
       const other = absNodes(ns).get(targetId)!;
       const px = handleId === 'left' ? me.x : handleId === 'right' ? me.x + me.w : me.x + me.w / 2;
       const py = handleId === 'top' ? me.y : handleId === 'bottom' ? me.y + me.h : me.y + me.h / 2;
+      /* AQ4b — measure from the HANDLE POINT to the CLOSEST POINT ON EACH SIDE
+         SEGMENT (projection clamped into the segment), not to the side's line.
+         The line metric let a diagonal placement pick the BOTTOM side: B's bottom
+         line ran "62px" from the handle even though the handle faces B's left.
+         Harvey's screenshot: right-handle dblconnect landed on B's bottom. */
+      const seg = (hx: number, hy: number, x1: number, y1: number, x2: number, y2: number) => {
+        const t = Math.max(0, Math.min(1, ((hx - x1) * (x2 - x1) + (hy - y1) * (y2 - y1)) / ((x2 - x1) ** 2 + (y2 - y1) ** 2)));
+        return Math.hypot(hx - (x1 + t * (x2 - x1)), hy - (y1 + t * (y2 - y1)));
+      };
       const sides: [number, string][] = [
-        [Math.abs(px - other.x), 'left'],
-        [Math.abs(px - (other.x + other.w)), 'right'],
-        [Math.abs(py - other.y), 'top'],
-        [Math.abs(py - (other.y + other.h)), 'bottom'],
+        [seg(px, py, other.x, other.y, other.x, other.y + other.h), 'left'],
+        [seg(px, py, other.x + other.w, other.y, other.x + other.w, other.y + other.h), 'right'],
+        [seg(px, py, other.x, other.y, other.x + other.w, other.y), 'top'],
+        [seg(px, py, other.x, other.y + other.h, other.x + other.w, other.y + other.h), 'bottom'],
       ];
       sides.sort((p, q) => p[0] - q[0]);
       pushHistory();
