@@ -20,6 +20,24 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ7 — per-node "Plain cylinder" (drop the inner arcs). DONE, 40/40 GREEN, live-verified both directions.
+
+Harvey: the cylinder's two inner arcs (the stacked-disks suggestion) should be
+droppable per node. `NodeKind.plainCylinder?: boolean` — absent keeps the arcs,
+so pre-existing boards render byte-identical. `ShapeFrame` takes `plain:` and
+`cylinder(cls, plain)` conditionally renders the two arcs; both cylinder shapes
+(database, storeddata) forward it. Inspector → Style → **"arcs" ToggleRow
+(Disks / Plain)**, shown ONLY when the shape is a cylinder. round-ad-flowchart's
+ad2 re-anchored: the call sites now forward `plain` (draw-once invariant
+unchanged — one definition, one ellipse markup).
+
+Live-verified over CDP: insert Database → arcs row appears → Plain → inner arcs
+gone (M4 42 / M4 60 absent) → Disks → arcs return. Palette previews unchanged
+(still show the default disks — the preview represents the default).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ6 — search results annotated with SOURCE + PURPOSE. DONE, 40/40 GREEN, live-verified.
 
 Harvey's "why are there three identical cylinders" — the search palette now

@@ -127,6 +127,10 @@ export type NodeKind = {
    *  did. Nothing here is a size in px — see `src/textStyle.ts` for why `size`
    *  is a SCALE. */
   textStyle?: TextStyle;
+  /** HARVEY 2026-10-14 — drop the two inner arcs on a cylinder (database /
+      storeddata), leaving a bare drum. OPTIONAL: absent keeps the arcs, so a
+      board from before this field renders byte-identical. */
+  plainCylinder?: boolean;
 };
 
 /* ITEM 2 (2026-09-17) — THE AUTO-SHOW NODE TOOLBAR IS GONE.
@@ -324,7 +328,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       >
         {resizer}
         <NodeHandles nodeId={id} />
-        <ShapeFrame shape={shape} />
+        <ShapeFrame shape={shape} plain={d.plainCylinder} />
         {postit}
         <div className="node-body lo-body">
           <div className="lo-title">
@@ -341,7 +345,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     <div className={`node shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
       <NodeHandles nodeId={id} />
-      <ShapeFrame shape={shape} />
+      <ShapeFrame shape={shape} plain={d.plainCylinder} />
       {postit}
       <div className="node-body">
         {d.kicker && <div className="node-kicker">{d.kicker}</div>}

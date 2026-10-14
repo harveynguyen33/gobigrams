@@ -92,7 +92,7 @@ export function asShape(v: unknown): Shape {
 const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent)';
 
 /** SVG frame drawn behind the node content. Not used by group / note. */
-export function ShapeFrame({shape}: {shape: Shape}) {
+export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
   const p = {
     fill: FILL,
     stroke: 'var(--nc, var(--border-strong))',
@@ -118,11 +118,15 @@ export function ShapeFrame({shape}: {shape: Shape}) {
      the markup lives HERE and both cases call it. Redrawing it under the new id
      would have been a second copy free to drift — the brief's "REUSE the path,
      do not redraw". Only the wrapper class differs. */
-  const cylinder = (cls: string) => wrap(<>
+  /* HARVEY 2026-10-14 — `plain`: TRUE drops the two inner arcs (the "stacked
+     disks" suggestion) and leaves a bare cylinder: top ellipse, body, bottom
+     cap. Per-node (NodeKind.plainCylinder); absent/undefined keeps the disks —
+     every existing board renders byte-identical. */
+  const cylinder = (cls: string, plain?: boolean) => wrap(<>
     <ellipse cx="100" cy="20" rx="96" ry="15" {...p} />
     <path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" {...p} />
-    <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />
-    <path d="M4 60 A 96 15 0 0 0 196 60" {...line} opacity={0.3} />
+    {!plain && <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />}
+    {!plain && <path d="M4 60 A 96 15 0 0 0 196 60" {...line} opacity={0.3} />}
   </>, cls);
   switch (shape) {
     case 'service':
@@ -130,7 +134,7 @@ export function ShapeFrame({shape}: {shape: Shape}) {
     case 'external':
       return wrap(<rect x="1" y="1" width="198" height="98" rx="14" strokeDasharray="8 5" {...p} />, 'external');
     case 'database':
-      return cylinder('database');
+      return cylinder('database', plain);
     case 'queue':
       // Message queue: a container with an item gutter on the left (dots + short
       // rows) and a divider, leaving the centre free for the title text.
@@ -230,7 +234,7 @@ export function ShapeFrame({shape}: {shape: Shape}) {
       return wrap(<path d="M2 2 H120 A 78 48 0 0 1 120 98 H2 Z" {...p} />, 'display');
     case 'storeddata':
       // Read / write store. SAME cylinder as `database` — see `cylinder()` above.
-      return cylinder('storeddata');
+      return cylinder('storeddata', plain);
     case 'looplimit':
       // Rectangle with the top corners CUT — the start of a loop. The cut is
       // what distinguishes it from `process`, and the flat top edge stays wide

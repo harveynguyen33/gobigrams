@@ -262,10 +262,13 @@ const ellipseDefs = [...SHAPES.matchAll(/ellipse cx="100" cy="20" rx="96" ry="15
 console.log(`  database  case: ${dbCase.replace(/\s+/g, ' ').trim()}`);
 console.log(`  storeddata case: ${sdCase.replace(/\s+/g, ' ').trim()}`);
 console.log(`  \`const cylinder = (\` definitions: ${cylinderDefs}   \`ellipse cx="100" cy="20"\` occurrences: ${ellipseDefs}`);
+/* HARVEY 2026-10-14 — both call sites now forward a per-node `plain` flag
+   (cylinder('database', plain) / cylinder('storeddata', plain)); the draw-once
+   invariant (one definition, one ellipse markup) is unchanged. */
 assert('ad2.stored-data-reuses-the-database-cylinder-rather-than-redrawing-it',
   cylinderDefs === 1 && ellipseDefs === 1
-    && /return cylinder\('database'\)/.test(dbCase)
-    && /return cylinder\('storeddata'\)/.test(sdCase),
+    && /return cylinder\('database', plain\)/.test(dbCase)
+    && /return cylinder\('storeddata', plain\)/.test(sdCase),
   'the cylinder markup is drawn ONCE (`const cylinder = (` x1, one `ellipse cx="100" cy="20"` in the file) and BOTH cases route ' +
   'through it — `database` with its own class and the new `storeddata` with its. So the two cannot drift and no second cylinder path ' +
   'exists. (The brief: "REUSE the path, do not redraw".)');

@@ -6696,6 +6696,29 @@ export default function App() {
                     color={resolveColor(selected.data as any)}
                   />
                 </div>
+                {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
+                    inner arcs (database / storeddata only). A key choice keeps
+                    this row's neighbour contract simple: clearing the shape back
+                    to a non-cylinder leaves the flag stored but unread. */}
+                {(() => {
+                  const sh = asShape((selected.data as any).shape);
+                  if (sh !== 'database' && sh !== 'storeddata') return null;
+                  const on = !!(selected.data as any).plainCylinder;
+                  return (
+                    <div className="field">
+                      <label>arcs</label>
+                      <ToggleRow
+                        value={on ? 'plain' : 'disks'}
+                        onChange={v => update({plainCylinder: v === 'plain'} as any)}
+                        options={[
+                          {v: 'disks', label: 'Disks', art: null},
+                          {v: 'plain', label: 'Plain', art: null},
+                        ]}
+                        title="Inner arcs on the cylinder: stacked-disk suggestion or a bare drum"
+                      />
+                    </div>
+                  );
+                })()}
                 {/* §C READ LITERALLY. The two halves of the sentence are
                     "the `body` toggle sits behind the Style section's trigger
                     rather than occupying a full row" AND "One control folds, not
