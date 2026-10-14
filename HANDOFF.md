@@ -26,6 +26,26 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ12 — align/distribute relocated to the selection bar. DONE, 40/40 GREEN, live-verified.
+
+Harvey: align only means something WITH a selection — the toolbar group
+("align" label + 6 align buttons + H/V distribute, visible whenever selCount >= 2)
+duplicated the selection bar's controls. Changes:
+
+- Toolbar: the whole align/distribute block REMOVED (the "Alignment guides" snap
+  toggle stays — it is a different feature).
+- Selection bar: the mislabeled single "Align" button (it only ran hcenter!) and
+  "Distribute" (only h) replaced by the FULL set — 6 align buttons + H/V
+  distribute — after Duplicate/Delete. Toolbar now shows only selection-proof
+  controls.
+
+LIVE-VERIFIED: toolbar with no selection has 0 align/distribute buttons (only the
+guides toggle); selecting 14 nodes shows the sel-bar with Duplicate, Delete,
+6 aligns, H/V distribute; clicking its Align left aligned all 14 nodes to x445.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ11 — align/distribute/auto-arrange AUDIT (Harvey: "sai sai"). 1 REAL BUG FIXED + 1 UX FIX + 2 verdicts WORK-AS-DESIGNED. 40/40 GREEN.
 
 AUDITED LIVE over CDP on a 9-node board (8 top-levels + 1 group child):

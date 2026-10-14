@@ -5560,21 +5560,9 @@ export default function App() {
             onClick={() => { setPop(false); setSettingsOpen(true); }}
           ><SettingsIcon size={14} /> Settings</button>
 
-          {selCount >= 2 && (
-            <>
-              {sep()}
-              <span className="tbtn-label">align</span>
-              <Tooltip label="Align left edges"><button className="tbtn-icon" aria-label="Align left" onClick={() => align('left')}>⇤</button></Tooltip>
-              <Tooltip label="Align horizontal centers"><button className="tbtn-icon" aria-label="Align horizontal centers" onClick={() => align('hcenter')}>↔</button></Tooltip>
-              <Tooltip label="Align right edges"><button className="tbtn-icon" aria-label="Align right" onClick={() => align('right')}>⇥</button></Tooltip>
-              <Tooltip label="Align top edges"><button className="tbtn-icon" aria-label="Align top" onClick={() => align('top')}>⇡</button></Tooltip>
-              <Tooltip label="Align vertical middles"><button className="tbtn-icon" aria-label="Align vertical middles" onClick={() => align('vcenter')}>↕</button></Tooltip>
-              <Tooltip label="Align bottom edges"><button className="tbtn-icon" aria-label="Align bottom" onClick={() => align('bottom')}>⇣</button></Tooltip>
-              {sep()}
-              <Tooltip label="Distribute spacing evenly (horizontal)"><button className="tbtn" aria-label="Distribute horizontally" onClick={() => distribute('h')}>⇹ H</button></Tooltip>
-              <Tooltip label="Distribute spacing evenly (vertical)"><button className="tbtn" aria-label="Distribute vertically" onClick={() => distribute('v')}>⇹ V</button></Tooltip>
-            </>
-          )}
+          {/* AQ12 — align/distribute moved OFF the toolbar: they only mean
+              something WITH a selection, so they live on the selection bar
+              below (the toolbar kept duplicate, export, settings...). */}
         </div>
 
         {/* floating action bar for a 2+ node selection */}
@@ -5589,8 +5577,18 @@ export default function App() {
               <button className="tbtn" aria-label="Delete selection" onClick={deleteSelection}><Trash2 size={13} style={{verticalAlign: -2}} /> Delete</button>
             </Tooltip>
             {sep()}
-            <Tooltip label="Align horizontal centers"><button className="tbtn" aria-label="Align horizontal centers" onClick={() => align('hcenter')}>Align</button></Tooltip>
-            <Tooltip label="Distribute spacing evenly (horizontal)"><button className="tbtn" aria-label="Distribute horizontally" onClick={() => distribute('h')}>Distribute</button></Tooltip>
+            {/* AQ12 — the FULL align set + distribute, relocated from the
+                toolbar. The old single "Align" button only ran hcenter while
+                labelled generically — misleading. */}
+            <Tooltip label="Align left edges"><button className="tbtn" aria-label="Align left" onClick={() => align('left')}>⇤</button></Tooltip>
+            <Tooltip label="Align horizontal centers"><button className="tbtn" aria-label="Align horizontal centers" onClick={() => align('hcenter')}>↔</button></Tooltip>
+            <Tooltip label="Align right edges"><button className="tbtn" aria-label="Align right" onClick={() => align('right')}>⇥</button></Tooltip>
+            <Tooltip label="Align top edges"><button className="tbtn" aria-label="Align top" onClick={() => align('top')}>⇡</button></Tooltip>
+            <Tooltip label="Align vertical middles"><button className="tbtn" aria-label="Align vertical middles" onClick={() => align('vcenter')}>↕</button></Tooltip>
+            <Tooltip label="Align bottom edges"><button className="tbtn" aria-label="Align bottom" onClick={() => align('bottom')}>⇣</button></Tooltip>
+            {sep()}
+            <Tooltip label="Distribute spacing evenly (horizontal)"><button className="tbtn" aria-label="Distribute horizontally" onClick={() => distribute('h')}>⇹ H</button></Tooltip>
+            <Tooltip label="Distribute spacing evenly (vertical)"><button className="tbtn" aria-label="Distribute vertically" onClick={() => distribute('v')}>⇹ V</button></Tooltip>
           </div>
         )}
 
