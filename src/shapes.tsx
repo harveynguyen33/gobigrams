@@ -269,10 +269,10 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
     case 'external':
       return wrap(<rect x="1" y="2" width="24" height="14" rx="4" strokeDasharray="3 2" {...s} />, 'external');
     case 'database':
+      /* AQ10b — the preview matches the Minimal default (no inner arc). */
       return wrap(<>
         <ellipse cx="13" cy="4.6" rx="11.5" ry="3.4" {...s} />
         <path d="M1.5 4.6 V13.4 A 11.5 3.4 0 0 0 24.5 13.4 V4.6" {...s} />
-        {line('M1.5 9 A 11.5 3.4 0 0 0 24.5 9', 1, 0.55)}
       </>, 'database');
     case 'queue':
       return wrap(<>
@@ -337,10 +337,10 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
     case 'display':
       return wrap(<path d="M1 2 H15 A 9 6.5 0 0 1 15 16 H1 Z" {...s} />, 'display');
     case 'storeddata':
+      /* AQ10b — preview matches the Minimal default (no inner arc). */
       return wrap(<>
         <ellipse cx="13" cy="4.6" rx="11.5" ry="3.4" {...s} />
         <path d="M1.5 4.6 V13.4 A 11.5 3.4 0 0 0 24.5 13.4 V4.6" {...s} />
-        {line('M1.5 9 A 11.5 3.4 0 0 0 24.5 9', 1, 0.55)}
       </>, 'storeddata');
     case 'looplimit':
       return wrap(<path d="M5 2 H21 L25 4.5 V15 H1 V4.5 Z" {...s} />, 'looplimit');

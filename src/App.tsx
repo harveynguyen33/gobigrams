@@ -6731,7 +6731,7 @@ export default function App() {
                       <label>details</label>
                       <ToggleRow
                         value={on ? 'plain' : 'disks'}
-                        onChange={v => update({plainCylinder: v !== 'plain'} as any)}
+                        onChange={v => update({plainCylinder: v === 'plain'} as any)}
                         options={[
                           {v: 'disks', label: 'Full', art: null},
                           {v: 'plain', label: 'Minimal', art: null},

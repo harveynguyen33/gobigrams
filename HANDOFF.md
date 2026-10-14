@@ -28,6 +28,25 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ14 — Details toggle un-inverted + cylinder previews minimal. DONE, 40/40 GREEN, live-verified both directions.
+
+Harvey: "ấn Minimal nó hiện Full và ngược lại". CONFIRMED + ROOT CAUSE: when the
+AQ10 default flip changed the value expression (`plainCylinder !== false`), the
+onChange was also flipped to `plainCylinder: v !== 'plain'` — which stores FALSE
+for Minimal. false renders FULL. Both mappings were inverted relative to each
+other's intent. Fix: onChange stores `v === 'plain'` (Minimal → true → bare drum;
+Full → false → arcs).
+
+ALSO: the ShapePreview cylinders (palette icons for database/storeddata) drew the
+inner arc — previews now match the Minimal default (arc removed). Node data icons
+already default minimal via DatabaseMin (AQ10b).
+
+LIVE-VERIFIED end-to-end on a fresh node: default 0 arcs; Full → 2 arcs +
+active=Full; Minimal → 0 arcs + active=Minimal.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ13 — selection bar redesigned (Harvey: "quite ugly"). DONE, 40/40 GREEN, live-verified.
 
 What was ugly (measured from Harvey's screenshot): three icon languages glued in
