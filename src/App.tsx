@@ -6706,15 +6706,18 @@ export default function App() {
                   const on = !!(selected.data as any).plainCylinder;
                   return (
                     <div className="field">
-                      <label>arcs</label>
+                      {/* HARVEY-CHOSEN LABEL — "Details" generalises: other shapes
+                          with optional inner lines (queue dividers, external dash)
+                          can reuse the same Full/Minimal vocabulary. */}
+                      <label>details</label>
                       <ToggleRow
                         value={on ? 'plain' : 'disks'}
                         onChange={v => update({plainCylinder: v === 'plain'} as any)}
                         options={[
-                          {v: 'disks', label: 'Disks', art: null},
-                          {v: 'plain', label: 'Plain', art: null},
+                          {v: 'disks', label: 'Full', art: null},
+                          {v: 'plain', label: 'Minimal', art: null},
                         ]}
-                        title="Inner arcs on the cylinder: stacked-disk suggestion or a bare drum"
+                        title="Details: Full keeps the inner lines, Minimal draws a bare shape"
                       />
                     </div>
                   );

@@ -21,6 +21,32 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ8 — "Details" label (Harvey's pick) + cylinder text confined to the drum body. DONE, 40/40 GREEN, live-verified.
+
+- Label rename: the AQ7 "arcs" row is now **"details"** with **Full | Minimal**
+  (Harvey's pick; the vocabulary deliberately generalises to future shapes with
+  optional inner lines).
+- The cylinder's text now ALWAYS sits in the drum body. Root cause: the body's
+  padding was FIXED px (24px) while the frame scales with the node
+  (preserveAspectRatio=none), so a resized-taller cylinder let titles paint over
+  the caps. The body is now an absolutely-positioned inset over the safe band —
+  **top 35% / bottom 20% / sides 6%** (measured off the frame's geometry:
+  cap ends y=35, bottom arc starts y=80 of the 200x100 viewBox).
+- TWO interactions surfaced (both fixed, both instructive):
+  1. `.node-body`'s AI-1 `min-height: 100%` beats top+bottom inset solving — the
+     body needs `min-height: 0` inside the band or the box ignores `bottom`.
+  2. A fresh unresized cylinder collapsed to 0 height once the body left normal
+     flow (`.node` min-height:100% of an auto wrapper) — `aspect-ratio: 2/1`
+     on cylinder nodes restores the fallback height; a resized node still fills
+     its wrapper via min-height.
+- Harness l (no earlier rule outranks a --ts-* consumer) caught my first draft
+  setting justify-content/display earlier+more-specific than the consumer rule —
+  slimmed to geometry-only declarations; alignment stays with the --ts-* layer.
+
+Live-verified: insets exactly 35.0%/20.0% at 190x95 AND at 300x240; title paints
+inside. Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ7 — per-node "Plain cylinder" (drop the inner arcs). DONE, 40/40 GREEN, live-verified both directions.
 
 Harvey: the cylinder's two inner arcs (the stacked-disks suggestion) should be

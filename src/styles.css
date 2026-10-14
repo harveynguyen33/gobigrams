@@ -1045,7 +1045,35 @@ body {
   border-radius: 8px;
 }
 .node-body { position: relative; padding: 14px 18px 14px; }
-.node.shape-database .node-body { padding: 24px 18px 24px; }
+/* HARVEY 2026-10-14 — the cylinder's text must stay INSIDE the drum body. The
+   frame (viewBox 200x100, preserveAspectRatio=none) scales with the node, so a
+   FIXED px padding stops matching the caps as soon as the node is resized
+   taller: the old 24px let titles paint over the top cap and the bottom arc.
+   The safe vertical band is y 35%..80% of the shape; the body is therefore an
+   absolutely-positioned inset over that band (percent insets resolve against
+   the NODE's own height, matching the SVG's percent geometry). Horizontal: the
+   drum spans x 2%..98% but its straight walls hold nearly the full width — 6%
+   keeps every glyph clear of the curved corners. */
+.node.shape-database .node-body,
+.node.shape-storeddata .node-body {
+  position: absolute; inset: 35% 6% 20%; padding: 0;
+  overflow: hidden;
+  /* the AI-1 fill rule below (min-height: 100%) would defeat the insets —
+     min-height wins over top+bottom solving. The inset BOX is the whole point
+     here, so the fill is turned off for cylinders only. Display/flex/alignment
+     stay with the later .node-body rule — this rule must not outrank the
+     --ts-* consumers (harness l). */
+  min-height: 0;
+}
+/* the body no longer gives the node its height — a fresh, never-resized
+   cylinder takes its height from the frame's own proportion instead
+   (viewBox 200x100). A resized node keeps min-height:100% of the wrapper. */
+.node.shape-database,
+.node.shape-storeddata { aspect-ratio: 2 / 1; }
+/* label-only cylinders need no extra rule: the band inset above already applies
+   (label-only shares .node-body), and their alignment comes from the same
+   --ts-* consumers as every other shape (harness l forbids an earlier literal
+   outranking them). */
 .node.shape-queue .node-body { padding: 32px 18px 16px; }
 .node.shape-actor .node-body { padding: 20px 16px 18px; }
 .node.shape-storage .node-body { padding: 24px 18px 20px; }
