@@ -341,8 +341,11 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     );
   }
 
+  /* HARVEY 2026-10-14 — body-inset: every goblin shape's text lives inside a
+     percent-inset band matched to that shape's silhouette (styles.css audit
+     block). Tables/labels/notes keep their own layout. */
   return (
-    <div className={`node shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
+    <div className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
       <NodeHandles nodeId={id} />
       <ShapeFrame shape={shape} plain={d.plainCylinder} />

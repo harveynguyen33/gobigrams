@@ -1045,39 +1045,65 @@ body {
   border-radius: 8px;
 }
 .node-body { position: relative; padding: 14px 18px 14px; }
-/* HARVEY 2026-10-14 — the cylinder's text must stay INSIDE the drum body. The
-   frame (viewBox 200x100, preserveAspectRatio=none) scales with the node, so a
-   FIXED px padding stops matching the caps as soon as the node is resized
-   taller: the old 24px let titles paint over the top cap and the bottom arc.
-   The safe vertical band is y 35%..80% of the shape; the body is therefore an
-   absolutely-positioned inset over that band (percent insets resolve against
-   the NODE's own height, matching the SVG's percent geometry). Horizontal: the
-   drum spans x 2%..98% but its straight walls hold nearly the full width — 6%
-   keeps every glyph clear of the curved corners. */
-.node.shape-database .node-body,
-.node.shape-storeddata .node-body {
-  position: absolute; inset: 35% 6% 20%; padding: 0;
-  overflow: hidden;
-  /* the AI-1 fill rule below (min-height: 100%) would defeat the insets —
-     min-height wins over top+bottom solving. The inset BOX is the whole point
-     here, so the fill is turned off for cylinders only. Display/flex/alignment
-     stay with the later .node-body rule — this rule must not outrank the
-     --ts-* consumers (harness l). */
-  min-height: 0;
+/* HARVEY 2026-10-14 — THE TEXT-FITS-THE-SHAPE PASS (all 25 shapes audited).
+   The frames use viewBox 200x100 with preserveAspectRatio=none, so they scale
+   with the node while a FIXED px padding does not: at 190x95 a 40px side inset
+   matched the diamond's taper, at 400x200 it drowns in the middle, at 140x60
+   the text escaped through it. Every shape therefore gets a PERCENT inset over
+   its own text-safe band, measured off its real geometry:
+
+     rect-family (service/external/process/note/group)  2,3,2,3
+     storeddata/database (drum)                        35,6,20,6
+     storage (open drum)                               24,3,26,3
+     queue (gutter + divider)                           2,34,2,36
+     actor (person badge on the left)                   2,3,2,33
+     subprocess / internalstorage (inner bars x26/x174) 2,16,2,16
+     gateway / preparation (hexagon)                    2,27,2,27
+     terminator (stadium rx49)                          2,27,2,27
+     decision (diamond — the tightest)                  2,30,2,30
+     io / manual (parallelogram/trapezoid, lean 34)     2,21,2,21
+     manualinput (sloped TOP edge)                     33,3,2,3
+     document (wavy bottom y62..96)                     2,3,26,3
+     delay (D: flat to x122, arc r78)                   2,42,2,3
+     display (trapezoid + curved right)                 2,30,2,12
+     offpage (home plate, point at x100)                2,3,34,3
+     connector (circle r48)                             2,30,2,30
+
+   The body is absolutely positioned over that band; `min-height: 0` stops the
+   AI-1 fill rule (min-height: 100%) from defeating the bottom inset; the
+   aspect-ratio fallback restores a fresh unresized node's height (its body no
+   longer provides one). Alignment stays with the --ts-* consumers (harness l
+   forbids an earlier literal here). The `body-inset` class is added in
+   DiagramNode for goblin shapes. */
+.node.body-inset .node-body {
+  position: absolute; padding: 0; overflow: hidden; min-height: 0;
+  inset: var(--body-inset, 2% 3% 2% 3%);
 }
-/* the body no longer gives the node its height — a fresh, never-resized
-   cylinder takes its height from the frame's own proportion instead
-   (viewBox 200x100). A resized node keeps min-height:100% of the wrapper. */
-.node.shape-database,
-.node.shape-storeddata { aspect-ratio: 2 / 1; }
+.node.body-inset { aspect-ratio: 2 / 1; }
+.node.body-inset .node-body { inset: var(--body-inset, 2% 3% 2% 3%); }
+.node.shape-database.body-inset,
+.node.shape-storeddata.body-inset { --body-inset: 35% 6% 20% 6%; }
+.node.shape-storage.body-inset    { --body-inset: 24% 3% 26% 3%; }
+.node.shape-queue.body-inset      { --body-inset: 2% 34% 2% 36%; }
+.node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
+.node.shape-subprocess.body-inset,
+.node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }
+.node.shape-gateway.body-inset,
+.node.shape-preparation.body-inset,
+.node.shape-terminator.body-inset,
+.node.shape-connector.body-inset  { --body-inset: 2% 27% 2% 27%; }
+.node.shape-decision.body-inset   { --body-inset: 2% 30% 2% 30%; }
+.node.shape-io.body-inset,
+.node.shape-manual.body-inset     { --body-inset: 2% 21% 2% 21%; }
+.node.shape-manualinput.body-inset{ --body-inset: 33% 3% 2% 3%; }
+.node.shape-document.body-inset   { --body-inset: 2% 3% 26% 3%; }
+.node.shape-delay.body-inset      { --body-inset: 2% 42% 2% 3%; }
+.node.shape-display.body-inset    { --body-inset: 2% 30% 2% 12%; }
+.node.shape-offpage.body-inset    { --body-inset: 2% 3% 34% 3%; }
 /* label-only cylinders need no extra rule: the band inset above already applies
    (label-only shares .node-body), and their alignment comes from the same
    --ts-* consumers as every other shape (harness l forbids an earlier literal
    outranking them). */
-.node.shape-queue .node-body { padding: 32px 18px 16px; }
-.node.shape-actor .node-body { padding: 20px 16px 18px; }
-.node.shape-storage .node-body { padding: 24px 18px 20px; }
-.node.shape-gateway .node-body { padding: 18px 32px 16px; }
 .node .glyph { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700; }
 .node-kicker {
   font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.11em;
@@ -3559,16 +3585,6 @@ kbd {
 /* H — the old `top: -6px` / `bottom: -6px` nudges lived here (same
    outboard scheme the horizontal pair carried at the midpoint block above);
    both are gone so the tb-mode wire also starts flush on the border. */
-.node.shape-terminator .node-body { padding: 16px 32px; }
-.node.shape-process .node-body { padding: 20px 18px; }
-.node.shape-decision .node-body { padding: 32px 40px; }
-.node.shape-io .node-body { padding: 18px 40px; }
-.node.shape-document .node-body { padding: 16px 20px 24px; }
-.node.shape-subprocess .node-body { padding: 18px 40px; }
-.node.shape-preparation .node-body { padding: 18px 40px; }
-.node.shape-manual .node-body { padding: 18px 32px 24px; }
-.node.shape-delay .node-body { padding: 18px 32px 18px 14px; }
-.node.shape-connector .node-body { padding: 6px; }
 .node.shape-connector {
   display: grid; place-items: center;
 }

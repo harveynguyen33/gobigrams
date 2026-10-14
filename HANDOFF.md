@@ -22,6 +22,30 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ9 — TEXT-FITS-THE-SHAPE: all 25 shapes audited and moved to percent insets. DONE, 40/40 GREEN, live-verified 23/25 in-browser.
+
+Harvey: "scan all the shapes and see if any shapes should fit the text". AUDIT
+RESULT: 16/25 shapes FAILED at the default 190x95 — every non-rectangular shape's
+fixed px padding mismatched its silhouette, and ALL failed worse when resized
+(the frames scale, px padding does not). The cylinder fix generalised:
+
+- ONE `.body-inset` mechanism (abs-pos body, `min-height: 0`, aspect-ratio 2/1
+  fallback) driven by a per-shape `--body-inset` percent band measured off each
+  shape's real geometry — decision (diamond) 2/30/2/30, delay (D) 2/42/2/3,
+  offpage 2/3/34/3, manualinput 33/3/2/3, queue (gutter) 2/34/2/36, actor
+  (badge) 2/3/2/33, document (wavy base) 2/3/26/3, gateway/preparation/
+  terminator/connector 2/27/2/27, io/manual 2/21/2/21, subprocess/
+  internalstorage 2/16/2/16, storage (open drum) 24/3/26/3, cylinders 35/6/20/6,
+  rect family 2/3/2/3. The 14 scattered px-padding rules are DELETED.
+- `body-inset` lands on the goblin node root only — tables/labels/notes keep
+  their own layout.
+- LIVE-VERIFIED over CDP by swapping one node through the inspector's shape
+  picker across 23 shapes: every measured inset matched its band EXACTLY
+  (35.0/20.0 drums, 2/30 diamond, 2/42 D-shape...), title painting inside.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ8 — "Details" label (Harvey's pick) + cylinder text confined to the drum body. DONE, 40/40 GREEN, live-verified.
 
 - Label rename: the AQ7 "arcs" row is now **"details"** with **Full | Minimal**
