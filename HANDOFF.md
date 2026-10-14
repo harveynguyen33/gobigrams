@@ -30,6 +30,21 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ15b — auto-grow re-checks after webfonts settle. DONE, 40/40 GREEN.
+
+Harvey's screenshot: a WIDE (430px) fresh cylinder with the sub still half-sliced.
+Root cause: the first auto-grow check ran at first paint with FALLBACK font
+metrics — it measured "fits" (clip ≤ 6) and stopped; when the real webfont
+swapped in, line heights changed and the clip returned. The body BOX does not
+resize on a font swap, so the ResizeObserver never refired.
+
+FIX: after fonts.ready + a settle ladder (120/400/900ms), the check re-runs with
+real metrics and grows if needed. Live-verified: fresh node resized to 430px wide
+→ 110px tall, clip 4, sub fully visible.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ15 — auto-grow on create: clipped text grows the node. DONE, 40/40 GREEN, live-verified.
 
 Harvey: a fresh cylinder (card body) hid its sub text until manually resized —

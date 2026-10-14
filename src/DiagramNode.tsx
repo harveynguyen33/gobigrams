@@ -288,7 +288,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
     ro.observe(body);
     check();
-    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+    /* AQ15b — webfonts land AFTER first paint: the first check measured with
+       fallback metrics and could clear a clip that the real font then recreates
+       (Harvey's screenshot: sub half-sliced at 150px). The body box does not
+       resize on a font swap, so the observer alone misses it — re-check when
+       fonts settle and on a short settle ladder. */
+    document.fonts?.ready.then(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
+    const timers = [120, 400, 900].map(ms => window.setTimeout(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }, ms));
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); timers.forEach(t => clearTimeout(t)); };
   }, [id, d]);
 
   // Container shapes get React Flow's resize affordance when selected (C3).
