@@ -1,4 +1,4 @@
-import {memo} from 'react';
+import {memo, useEffect, useRef} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {lucideByName} from './lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
@@ -131,6 +131,9 @@ export type NodeKind = {
       storeddata), leaving a bare drum. OPTIONAL: absent keeps the arcs, so a
       board from before this field renders byte-identical. */
   plainCylinder?: boolean;
+  /** AQ15 — auto-grow: called once fonts/measure settle if the body clips;
+      App grows the node's height (the same write a manual resize performs). */
+  __onGrow?: (id: string, height: number) => void;
 };
 
 /* ITEM 2 (2026-09-17) — THE AUTO-SHOW NODE TOOLBAR IS GONE.
@@ -257,6 +260,37 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      nothing AND still paints exactly what it painted before this round. */
   const tsVars = textStyleVars(d.textStyle, alignForBody(d.body), vAlignForBody(d.body));
 
+  /* AQ15 — AUTO-GROW ON CREATE. A fresh node has no explicit height, so a card
+     whose text is taller than the shape's safe band clips its sub/metric
+     (overflow: hidden from the text-fits pass). Once mounted AND once fonts
+     settle, if the body is clipped and the WRAPPER carries no user-set height,
+     grow the node to fit — exactly what a manual resize would have done. Runs
+     at most a few times and stops the moment the user resizes (the wrapper
+     then HAS an explicit height). */
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const inner = innerRef.current, body = bodyRef.current;
+    if (!inner || !body) return;
+    let raf = 0;
+    const check = () => {
+      const wrapper = inner.closest('.react-flow__node') as HTMLElement | null;
+      if (!wrapper) return;
+      // the user resized: RF wrote an explicit height — hands off
+      if (wrapper.style.height) return;
+      const clipped = body.scrollHeight - body.clientHeight;
+      /* >6px only: flex centring leaves a few px of scrollHeight slack that is
+         NOT hidden text — growing for it would chase its own tail. */
+      if (clipped <= 6) return;
+      if (d.__onGrow) d.__onGrow(id, Math.ceil(wrapper.offsetHeight + clipped + 4));
+      else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: Math.ceil(wrapper.offsetHeight + clipped + 4)}}));
+    };
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
+    ro.observe(body);
+    check();
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, [id, d]);
+
   // Container shapes get React Flow's resize affordance when selected (C3).
   // React Flow writes width/height back into node.style, so the size persists.
   const resizer = selected && RESIZABLE.has(shape) ? (
@@ -327,13 +361,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
            a label-only Decision with the text parked top-left, outside the
            diamond once the node grew. The .lo-body below must obey the band. */
         className={`node body-inset shape-${shape} label-only${selected ? ' selected' : ''}`}
+        ref={innerRef}
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
         <NodeHandles nodeId={id} />
         <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
         {postit}
-        <div className="node-body lo-body">
+        <div className="node-body lo-body" ref={bodyRef}>
           <div className="lo-title">
             {d.icon && <span className="node-ico"><IconGlyph icon={d.icon} /></span>}
             <span>{d.title}</span>
@@ -348,12 +383,12 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      percent-inset band matched to that shape's silhouette (styles.css audit
      block). Tables/labels/notes keep their own layout. */
   return (
-    <div className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
+    <div ref={innerRef} className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
       <NodeHandles nodeId={id} />
       <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
       {postit}
-      <div className="node-body">
+      <div className="node-body" ref={bodyRef}>
         {d.kicker && <div className="node-kicker">{d.kicker}</div>}
         <div className="node-title">
           {d.icon && <span className="node-ico"><IconGlyph icon={d.icon} /></span>}

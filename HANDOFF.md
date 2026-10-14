@@ -29,6 +29,29 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ15 — auto-grow on create: clipped text grows the node. DONE, 40/40 GREEN, live-verified.
+
+Harvey: a fresh cylinder (card body) hid its sub text until manually resized —
+"the shape should scale to adapt to show all". IMPLEMENTED for every goblin shape:
+
+- DiagramNode gains an auto-grow effect: ResizeObserver on the body; when
+  `scrollHeight − clientHeight > 6px` (6 = flex-centring slack, not hidden text)
+  and the WRAPPER has no user-set height, it reports the needed full height via
+  `gobi:node-grow`; App's `onGrow` writes `style.height` on the node — the same
+  write a manual resize performs, so it persists in the board and never
+  overrides a user resize (the renderer's wrapper check guarantees that).
+- Refs plumbed to BOTH branches (card `.node-body` and label-only `.lo-body`);
+  the card root was missing its innerRef on the first pass — caught live.
+- Delivered through a `gobi:node-grow` CustomEvent + a dedicated App listener
+  (the __onGrow-in-edge-memo first attempt was the wrong surface).
+
+LIVE-VERIFIED: fresh Database node auto-grew 95 → 110px and the sub renders fully
+(subBottom inside the node). A manual dispatch grows on demand; a wrapper with an
+explicit height is untouched.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ14 — Details toggle un-inverted + cylinder previews minimal. DONE, 40/40 GREEN, live-verified both directions.
 
 Harvey: "ấn Minimal nó hiện Full và ngược lại". CONFIRMED + ROOT CAUSE: when the

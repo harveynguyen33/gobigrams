@@ -2528,7 +2528,33 @@ export default function App() {
    *  It deliberately does NOT route through `updateEdge`: that is keyed on
    *  `selEdgeId`, so on the very first move (the one that selects the edge) it
    *  would write to the WRONG edge. */
-    const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
+      /* AQ15 — AUTO-GROW: a freshly created node whose text overflows the shape's
+     safe band grows once to fit. `height` is the FULL node height needed (the
+     renderer measured the clipped body against the wrapper). Only nodes WITHOUT
+     an explicit user height are grown — the wrapper style check in the renderer
+     guarantees that — so a manual resize is never overridden. Not undoable
+     (it is the insert's own settling, not a user edit). */
+  const onGrow = useCallback((id: string, height: number) => {
+    setNodes(ns => ns.map(n => {
+      if (n.id !== id) return n;
+      const style = {...(n.style ?? {})} as Record<string, string | number>;
+      if (style.height && Number(style.height) >= height) return n;
+      style.height = height;
+      return {...n, style: style as any};
+    }));
+  }, [setNodes]);
+
+  /* AQ15 — the global receiver for the renderer's auto-grow reports. */
+  useEffect(() => {
+    const h = (ev: Event) => {
+      const {id, height} = (ev as CustomEvent<{id: string; height: number}>).detail;
+      onGrow(id, height);
+    };
+    window.addEventListener('gobi:node-grow', h);
+    return () => window.removeEventListener('gobi:node-grow', h);
+  }, [onGrow]);
+
+const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
     if (phase === 'start') {
       bendGesturePushed.current = false;
       bendGestureAxis.current = null;
@@ -2889,6 +2915,10 @@ export default function App() {
           // — the edge renderer owns the handle and reports a pointer position;
           // the handler lives here because it writes `edges` state.
           __onBend: onBend,
+          /* AQ15 — auto-grow on create: the renderer reports a clipped body
+             and the node's needed height; this grows node.style.height, the
+             exact write a manual resize performs. */
+          __onGrow: onGrow,
           /* ROUND AK — AK-10's label drag, threaded per-edge for the reason
              above. `onLabelWrite` receives the FINISHED write: the renderer
              applies `labelWrite`, because only it holds the resolved path, the
@@ -2911,7 +2941,7 @@ export default function App() {
         },
       };
     }),
-    [edges, onCommitLabel, readOnly, onBend, onLabelWrite, consumeEditAt],
+    [edges, onCommitLabel, readOnly, onBend, onLabelWrite, consumeEditAt, onGrow],
   );
 
   /** L3c: the symbolic keys whose crow's-foot glyphs this board needs. Keyed by
