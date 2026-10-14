@@ -75,14 +75,30 @@ import {
   Divide, Scale, Ruler, Axe,
   Pickaxe, Recycle, Trash, Archive,
   FolderOpen,
+  createLucideIcon,
   type LucideIcon,
 } from 'lucide-react';
 
 /** kebab-case icon name → component. 277 curated icons. */
+/* AQ10 — the minimal drum: lucide's `database` minus its inner arc. Built with
+   the same createLucideIcon factory the library itself uses, so it inherits
+   size/colour/stroke behaviour exactly. */
+const DatabaseMin = createLucideIcon({
+  name: "database-min",
+  node: [
+    ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3" }],
+    ["path", { d: "M3 5V19A9 3 0 0 0 21 19V5" }],
+  ],
+});
+
 export const ICONS: Record<string, LucideIcon> = {
 
   "server": Server,
-  "database": Database,
+  /* AQ10 — the DEFAULT database icon is the MINIMAL drum (ellipse + body, no
+     inner arc), matching the shape's Minimal details default. The classic
+     three-line glyph stays available as "database-full". */
+  "database": DatabaseMin,
+  "database-full": Database,
   "cloud": Cloud,
   "network": Network,
   "messages-square": MessagesSquare,

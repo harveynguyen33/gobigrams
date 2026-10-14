@@ -24,6 +24,19 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ10b — the database ICON defaults to Minimal too. DONE, 40/40 GREEN, live-verified.
+
+Harvey: "make the icon of cylinder by default minimal too". The lucide
+`Database` glyph carries the same inner arc the shape did. Built
+`DatabaseMin` (lucide's own `createLucideIcon` factory, ellipse + body —
+the classic glyph minus its inner arc) and remapped the `"database"` icon key
+to it; the classic three-line glyph stays available as `"database-full"`.
+Live-verified: a fresh Database node renders icon with 0 inner arcs + the
+ellipse/body drum. IconPicker follows automatically (it reads the same map).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ10 — inscribed-rect insets for slanted shapes + cylinder default = Minimal. DONE, 40/40 GREEN, decision verified to 520x420.
 
 Harvey's screenshot: a label-only Decision with "Decision?" parked at the body's
