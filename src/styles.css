@@ -2876,11 +2876,25 @@ kbd {
 .sel-bar {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
   margin-top: 40px;
-  z-index: 6; display: flex; gap: 4px; align-items: center;
+  z-index: 6; display: flex; gap: 2px; align-items: center;
   background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px; padding: 4px;
 }
 .sel-bar .tbtn-label { padding: 0 2px; }
+/* AQ13 — the count chip: number + word on ONE line, quiet by contrast */
+.sel-bar .sel-count {
+  font-family: var(--mono); font-size: var(--fs-md); font-weight: 700;
+  color: var(--fg); padding: 0 2px 0 6px;
+}
+.sel-bar .sel-count-label {
+  font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--dim); padding: 0 6px 0 0;
+}
+/* even, tappable rhythm: every button in the bar gets the same box */
+.sel-bar .tbtn, .sel-bar .tbtn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 4px; gap: 4px;
+}
 /* ---------- edge flow animations ("message being sent") ---------- */
 .edge-flow-dot { pointer-events: none; }
 

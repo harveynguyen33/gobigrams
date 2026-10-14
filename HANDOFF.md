@@ -27,6 +27,28 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ13 — selection bar redesigned (Harvey: "quite ugly"). DONE, 40/40 GREEN, live-verified.
+
+What was ugly (measured from Harvey's screenshot): three icon languages glued in
+one bar — oversized Copy/Trash with text labels, skinny unicode arrows
+(⇤↔⇥⇡↕⇣), and "⇹ H"/"⇹ V" stacks; the count broke across two lines ("7" over
+"SELECTED"); uneven button sizes.
+
+The redesign:
+- ONE icon language: every control is a lucide icon at 15px in a uniform 30x30
+  button (Duplicate Copy, Delete Trash2, aligns
+  AlignStart/Center/EndVertical + AlignStart/Center/EndHorizontal, distributes
+  AlignHorizontalSpaceAround / AlignVerticalSpaceAround).
+- Count chip on ONE line: bold mono number + small uppercase "selected".
+- Even rhythm: flex gap 2px with every button the same 30x30 box; the bar keeps
+  its glass pill.
+
+LIVE-VERIFIED: all 10 buttons render 30x30 lucide icons with correct
+aria-labels; Align left through the bar aligned 14 nodes to a single x (445).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ12 — align/distribute relocated to the selection bar. DONE, 40/40 GREEN, live-verified.
 
 Harvey: align only means something WITH a selection — the toolbar group

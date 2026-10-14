@@ -10,6 +10,9 @@ import {
   Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
   LayoutGrid, Plus, Pencil, Save, Waypoints, AlignCenter,
+  AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+  AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
+  AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   PanelLeftClose, PanelRightClose, Eye,
   LayoutTemplate,
   Settings as SettingsIcon,
@@ -5565,30 +5568,32 @@ export default function App() {
               below (the toolbar kept duplicate, export, settings...). */}
         </div>
 
-        {/* floating action bar for a 2+ node selection */}
+        {/* floating action bar for a 2+ node selection. AQ13 — redesigned:
+            ONE icon language (lucide at 15px everywhere — the old mix of
+            oversized Copy/Trash + skinny unicode arrows ⇤↔⇥ read as three
+            different bars glued together), a single-line count chip, and an
+            even gap rhythm from the flex container instead of ad-hoc seps. */}
         {selCount >= 2 && (
           <div className="sel-bar">
-            <span className="tbtn-label">{selCount} selected</span>
+            <span className="sel-count">{selCount}</span>
+            <span className="sel-count-label">selected</span>
             {sep()}
-            <Tooltip label="Duplicate selection — Cmd/Ctrl+D">
-              <button className="tbtn" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={13} style={{verticalAlign: -2}} /> Duplicate</button>
+            <Tooltip label="Duplicate — Cmd/Ctrl+D">
+              <button className="tbtn-icon" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={15} /></button>
             </Tooltip>
-            <Tooltip label="Delete selection — Del">
-              <button className="tbtn" aria-label="Delete selection" onClick={deleteSelection}><Trash2 size={13} style={{verticalAlign: -2}} /> Delete</button>
+            <Tooltip label="Delete — Del">
+              <button className="tbtn-icon" aria-label="Delete selection" onClick={deleteSelection}><Trash2 size={15} /></button>
             </Tooltip>
             {sep()}
-            {/* AQ12 — the FULL align set + distribute, relocated from the
-                toolbar. The old single "Align" button only ran hcenter while
-                labelled generically — misleading. */}
-            <Tooltip label="Align left edges"><button className="tbtn" aria-label="Align left" onClick={() => align('left')}>⇤</button></Tooltip>
-            <Tooltip label="Align horizontal centers"><button className="tbtn" aria-label="Align horizontal centers" onClick={() => align('hcenter')}>↔</button></Tooltip>
-            <Tooltip label="Align right edges"><button className="tbtn" aria-label="Align right" onClick={() => align('right')}>⇥</button></Tooltip>
-            <Tooltip label="Align top edges"><button className="tbtn" aria-label="Align top" onClick={() => align('top')}>⇡</button></Tooltip>
-            <Tooltip label="Align vertical middles"><button className="tbtn" aria-label="Align vertical middles" onClick={() => align('vcenter')}>↕</button></Tooltip>
-            <Tooltip label="Align bottom edges"><button className="tbtn" aria-label="Align bottom" onClick={() => align('bottom')}>⇣</button></Tooltip>
+            <Tooltip label="Align left edges"><button className="tbtn-icon" aria-label="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button></Tooltip>
+            <Tooltip label="Align horizontal centers"><button className="tbtn-icon" aria-label="Align horizontal centers" onClick={() => align('hcenter')}><AlignCenterVertical size={15} /></button></Tooltip>
+            <Tooltip label="Align right edges"><button className="tbtn-icon" aria-label="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button></Tooltip>
+            <Tooltip label="Align top edges"><button className="tbtn-icon" aria-label="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button></Tooltip>
+            <Tooltip label="Align vertical middles"><button className="tbtn-icon" aria-label="Align vertical middles" onClick={() => align('vcenter')}><AlignCenterHorizontal size={15} /></button></Tooltip>
+            <Tooltip label="Align bottom edges"><button className="tbtn-icon" aria-label="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button></Tooltip>
             {sep()}
-            <Tooltip label="Distribute spacing evenly (horizontal)"><button className="tbtn" aria-label="Distribute horizontally" onClick={() => distribute('h')}>⇹ H</button></Tooltip>
-            <Tooltip label="Distribute spacing evenly (vertical)"><button className="tbtn" aria-label="Distribute vertically" onClick={() => distribute('v')}>⇹ V</button></Tooltip>
+            <Tooltip label="Distribute horizontally"><button className="tbtn-icon" aria-label="Distribute horizontally" onClick={() => distribute('h')}><AlignHorizontalSpaceAround size={15} /></button></Tooltip>
+            <Tooltip label="Distribute vertically"><button className="tbtn-icon" aria-label="Distribute vertically" onClick={() => distribute('v')}><AlignVerticalSpaceAround size={15} /></button></Tooltip>
           </div>
         )}
 
