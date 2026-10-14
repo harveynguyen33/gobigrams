@@ -2390,8 +2390,12 @@ export default function App() {
         if (!to) return n;   // children of a group / frozen bands follow their parent
         return {...n, position: {x: Math.round(to.x), y: Math.round(to.y)}};
       }));
+      /* AQ11 — fit the result: the engine lays out from (0,0) and a rearranged
+         board regularly lands partly off-viewport, which reads as "the button
+         did nothing" (measured: y -340..756 on a 9-node board). */
+      requestAnimationFrame(() => rf?.fitView({padding: 0.25, duration: 300}));
     });
-  }, [nodes, edges, pushHistory, setNodes, animateLayout, preset]);
+  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset]);
 
   const selected = nodes.find(n => n.id === sel);
   const selectedEdge = edges.find(e => e.id === selEdgeId) ?? null;
@@ -3571,63 +3575,75 @@ export default function App() {
   }, [onEdgesChange, noteRemove]);
 
   // ---- align / distribute ----
+  /* AQ11 — BOTH functions now work in ABSOLUTE coordinates. The old versions
+     read `n.position` directly, which is PARENT-RELATIVE for a group child: one
+     child in the selection poisoned the min/max with a tiny local offset and
+     the whole alignment jumped to the group's frame (measured live: align-left
+     on 8 top-levels + 1 child teleported the board ~250px left). Bounds are
+     computed over absolute rects; the write converts the absolute target back
+     to the node's own parent-relative position. */
   const align = useCallback((kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => {
     const selNodes = nodesRef.current.filter(n => n.selected);
     if (selNodes.length < 2) return;
+    const abs = absNodes(nodesRef.current);
+    const rects = selNodes.map(n => {
+      const r = abs.get(n.id)!;
+      return {id: n.id, x: r.x, y: r.y, w: r.w, h: r.h, node: n};
+    });
     pushHistory();
-    const lefts = selNodes.map(n => n.position.x);
-    const rights = selNodes.map(n => n.position.x + nodeW(n));
-    const tops = selNodes.map(n => n.position.y);
-    const bottoms = selNodes.map(n => n.position.y + nodeH(n));
-    const minL = Math.min(...lefts);
-    const maxR = Math.max(...rights);
-    const minT = Math.min(...tops);
-    const maxB = Math.max(...bottoms);
+    const minL = Math.min(...rects.map(r => r.x));
+    const maxR = Math.max(...rects.map(r => r.x + r.w));
+    const minT = Math.min(...rects.map(r => r.y));
+    const maxB = Math.max(...rects.map(r => r.y + r.h));
     const cx = (minL + maxR) / 2;
     const cy = (minT + maxB) / 2;
-    const ids = new Set(selNodes.map(n => n.id));
-    setNodes(ns => ns.map(n => {
-      if (!ids.has(n.id)) return n;
-      const w = nodeW(n);
-      const h = nodeH(n);
-      let x = n.position.x;
-      let y = n.position.y;
-      if (kind === 'left') x = minL;
-      else if (kind === 'right') x = maxR - w;
-      else if (kind === 'hcenter') x = cx - w / 2;
-      else if (kind === 'top') y = minT;
-      else if (kind === 'bottom') y = maxB - h;
-      else if (kind === 'vcenter') y = cy - h / 2;
-      return {...n, position: {x: Math.round(x), y: Math.round(y)}};
-    }));
-  }, [pushHistory, setNodes]);
+    const targets = new Map<string, {x: number; y: number}>();
+    for (const r of rects) {
+      let ax = r.x, ay = r.y;
+      if (kind === 'left') ax = minL;
+      else if (kind === 'right') ax = maxR - r.w;
+      else if (kind === 'hcenter') ax = cx - r.w / 2;
+      else if (kind === 'top') ay = minT;
+      else if (kind === 'bottom') ay = maxB - r.h;
+      else if (kind === 'vcenter') ay = cy - r.h / 2;
+      // absolute -> parent-relative: keep the frame offset the node already has
+      targets.set(r.id, {x: Math.round(ax - (r.x - r.node.position.x)), y: Math.round(ay - (r.y - r.node.position.y))});
+    }
+    setNodes(ns => ns.map(n => targets.has(n.id) ? {...n, position: targets.get(n.id)!} : n));
+  }, [absNodes, pushHistory, setNodes]);
 
   const distribute = useCallback((axis: 'h' | 'v') => {
     const selNodes = nodesRef.current.filter(n => n.selected);
     if (selNodes.length < 3) return;
+    /* AQ11 — absolute-space distribution (see the align note above): mixed
+       parent-relative frames poisoned the sort order and the span. */
+    const abs = absNodes(nodesRef.current);
+    const rects = selNodes.map(n => {
+      const r = abs.get(n.id)!;
+      return {id: n.id, x: r.x, y: r.y, w: r.w, h: r.h, node: n};
+    });
     pushHistory();
-    const sorted = [...selNodes].sort((a, b) =>
-      axis === 'h' ? a.position.x - b.position.x : a.position.y - b.position.y);
+    const sorted = [...rects].sort((a, b) => axis === 'h' ? a.x - b.x : a.y - b.y);
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
-    const start = axis === 'h' ? first.position.x : first.position.y;
-    const end = axis === 'h'
-      ? last.position.x + nodeW(last)
-      : last.position.y + nodeH(last);
-    const total = sorted.reduce((s, n) => s + (axis === 'h' ? nodeW(n) : nodeH(n)), 0);
+    const start = axis === 'h' ? first.x : first.y;
+    const end = axis === 'h' ? last.x + last.w : last.y + last.h;
+    const total = sorted.reduce((s2, r) => s2 + (axis === 'h' ? r.w : r.h), 0);
     const gap = (end - start - total) / (sorted.length - 1);
-    const posMap = new Map<string, number>();
+    const targets = new Map<string, {x: number; y: number}>();
     let cursor = start;
-    for (const n of sorted) {
-      posMap.set(n.id, Math.round(cursor));
-      cursor += (axis === 'h' ? nodeW(n) : nodeH(n)) + gap;
+    for (const r of sorted) {
+      const v = Math.round(cursor);
+      const absX = axis === 'h' ? v : r.x;
+      const absY = axis === 'h' ? r.y : v;
+      targets.set(r.id, {
+        x: Math.round(absX - (r.x - r.node.position.x)),
+        y: Math.round(absY - (r.y - r.node.position.y)),
+      });
+      cursor += (axis === 'h' ? r.w : r.h) + gap;
     }
-    setNodes(ns => ns.map(n => {
-      if (!posMap.has(n.id)) return n;
-      const v = posMap.get(n.id)!;
-      return {...n, position: axis === 'h' ? {x: v, y: n.position.y} : {x: n.position.x, y: v}};
-    }));
-  }, [pushHistory, setNodes]);
+    setNodes(ns => ns.map(n => targets.has(n.id) ? {...n, position: targets.get(n.id)!} : n));
+  }, [absNodes, pushHistory, setNodes]);
 
   // Part B — ONE source of truth for the read-only review toggle. The toolbar
   // button and the Shift+2 shortcut both call this, so the two triggers can

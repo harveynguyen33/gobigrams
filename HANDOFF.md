@@ -25,6 +25,31 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ11 — align/distribute/auto-arrange AUDIT (Harvey: "sai sai"). 1 REAL BUG FIXED + 1 UX FIX + 2 verdicts WORK-AS-DESIGNED. 40/40 GREEN.
+
+AUDITED LIVE over CDP on a 9-node board (8 top-levels + 1 group child):
+
+1. **Align — REAL BUG, FIXED.** align/distribute read `n.position`, which is
+   PARENT-RELATIVE for a group child. Measured: align-left with one group child
+   in the selection teleported the whole 8-node board ~250px left (the child's
+   local (37,66) poisoned the min/max). Rewritten in ABSOLUTE space via the
+   existing `absNodes` map; the write converts the absolute target back to each
+   node's parent-relative position. Verified: 9-node mixed selection align-left
+   → every node at the same left edge, child keeps its in-group offset.
+2. **Distribute — semantics are STANDARD, frames bug fixed by the same rewrite.**
+   Equal-gaps-between-boxes across the selection (same as draw.io/Figma). Note:
+   with mixed node heights the y-gaps are uneven BY DEFINITION (gaps are between
+   box edges, and boxes differ) — not a defect. Verified across the mixed
+   selection in absolute space.
+3. **Auto-arrange — works, but had a UX hole: FIXED.** The layered engine
+   rearranged correctly but laid out from (0,0): measured y −340..756 on a 577px
+   viewport — 7 of 9 nodes OFF-SCREEN, which reads exactly as "the button does
+   nothing". `fitView({padding: 0.25, duration: 300})` now runs after the
+   animation: 9/9 nodes visible after clicking.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ10b — the database ICON defaults to Minimal too. DONE, 40/40 GREEN, live-verified.
 
 Harvey: "make the icon of cylinder by default minimal too". The lucide
