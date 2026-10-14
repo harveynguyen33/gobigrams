@@ -120,9 +120,10 @@ export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
      do not redraw". Only the wrapper class differs. */
   /* HARVEY 2026-10-14 — `plain`: TRUE drops the two inner arcs (the "stacked
      disks" suggestion) and leaves a bare cylinder: top ellipse, body, bottom
-     cap. Per-node (NodeKind.plainCylinder); absent/undefined keeps the disks —
-     every existing board renders byte-identical. */
-  const cylinder = (cls: string, plain?: boolean) => wrap(<>
+     cap. AQ10 — Minimal is the DEFAULT: `plain` is now `plainCylinder !== false`
+     at the call sites, so a board that never stored the flag draws the bare
+     drum, and "Full" (disks) is the explicit choice. */
+  const cylinder = (cls: string, plain = true) => wrap(<>
     <ellipse cx="100" cy="20" rx="96" ry="15" {...p} />
     <path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" {...p} />
     {!plain && <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />}

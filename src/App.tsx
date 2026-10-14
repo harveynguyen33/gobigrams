@@ -6703,7 +6703,7 @@ export default function App() {
                 {(() => {
                   const sh = asShape((selected.data as any).shape);
                   if (sh !== 'database' && sh !== 'storeddata') return null;
-                  const on = !!(selected.data as any).plainCylinder;
+                  const on = (selected.data as any).plainCylinder !== false;
                   return (
                     <div className="field">
                       {/* HARVEY-CHOSEN LABEL — "Details" generalises: other shapes
@@ -6712,7 +6712,7 @@ export default function App() {
                       <label>details</label>
                       <ToggleRow
                         value={on ? 'plain' : 'disks'}
-                        onChange={v => update({plainCylinder: v === 'plain'} as any)}
+                        onChange={v => update({plainCylinder: v !== 'plain'} as any)}
                         options={[
                           {v: 'disks', label: 'Full', art: null},
                           {v: 'plain', label: 'Minimal', art: null},

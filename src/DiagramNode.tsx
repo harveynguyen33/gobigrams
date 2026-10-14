@@ -323,12 +323,15 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   if (d.body === 'label-only') {
     return (
       <div
-        className={`node shape-${shape} label-only${selected ? ' selected' : ''}`}
+        /* body-inset covers the label-only branch too — Harvey's screenshot was
+           a label-only Decision with the text parked top-left, outside the
+           diamond once the node grew. The .lo-body below must obey the band. */
+        className={`node body-inset shape-${shape} label-only${selected ? ' selected' : ''}`}
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
         <NodeHandles nodeId={id} />
-        <ShapeFrame shape={shape} plain={d.plainCylinder} />
+        <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
         {postit}
         <div className="node-body lo-body">
           <div className="lo-title">
@@ -348,7 +351,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     <div className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
       <NodeHandles nodeId={id} />
-      <ShapeFrame shape={shape} plain={d.plainCylinder} />
+      <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
       {postit}
       <div className="node-body">
         {d.kicker && <div className="node-kicker">{d.kicker}</div>}

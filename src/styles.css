@@ -1045,61 +1045,7 @@ body {
   border-radius: 8px;
 }
 .node-body { position: relative; padding: 14px 18px 14px; }
-/* HARVEY 2026-10-14 — THE TEXT-FITS-THE-SHAPE PASS (all 25 shapes audited).
-   The frames use viewBox 200x100 with preserveAspectRatio=none, so they scale
-   with the node while a FIXED px padding does not: at 190x95 a 40px side inset
-   matched the diamond's taper, at 400x200 it drowns in the middle, at 140x60
-   the text escaped through it. Every shape therefore gets a PERCENT inset over
-   its own text-safe band, measured off its real geometry:
 
-     rect-family (service/external/process/note/group)  2,3,2,3
-     storeddata/database (drum)                        35,6,20,6
-     storage (open drum)                               24,3,26,3
-     queue (gutter + divider)                           2,34,2,36
-     actor (person badge on the left)                   2,3,2,33
-     subprocess / internalstorage (inner bars x26/x174) 2,16,2,16
-     gateway / preparation (hexagon)                    2,27,2,27
-     terminator (stadium rx49)                          2,27,2,27
-     decision (diamond — the tightest)                  2,30,2,30
-     io / manual (parallelogram/trapezoid, lean 34)     2,21,2,21
-     manualinput (sloped TOP edge)                     33,3,2,3
-     document (wavy bottom y62..96)                     2,3,26,3
-     delay (D: flat to x122, arc r78)                   2,42,2,3
-     display (trapezoid + curved right)                 2,30,2,12
-     offpage (home plate, point at x100)                2,3,34,3
-     connector (circle r48)                             2,30,2,30
-
-   The body is absolutely positioned over that band; `min-height: 0` stops the
-   AI-1 fill rule (min-height: 100%) from defeating the bottom inset; the
-   aspect-ratio fallback restores a fresh unresized node's height (its body no
-   longer provides one). Alignment stays with the --ts-* consumers (harness l
-   forbids an earlier literal here). The `body-inset` class is added in
-   DiagramNode for goblin shapes. */
-.node.body-inset .node-body {
-  position: absolute; padding: 0; overflow: hidden; min-height: 0;
-  inset: var(--body-inset, 2% 3% 2% 3%);
-}
-.node.body-inset { aspect-ratio: 2 / 1; }
-.node.body-inset .node-body { inset: var(--body-inset, 2% 3% 2% 3%); }
-.node.shape-database.body-inset,
-.node.shape-storeddata.body-inset { --body-inset: 35% 6% 20% 6%; }
-.node.shape-storage.body-inset    { --body-inset: 24% 3% 26% 3%; }
-.node.shape-queue.body-inset      { --body-inset: 2% 34% 2% 36%; }
-.node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
-.node.shape-subprocess.body-inset,
-.node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }
-.node.shape-gateway.body-inset,
-.node.shape-preparation.body-inset,
-.node.shape-terminator.body-inset,
-.node.shape-connector.body-inset  { --body-inset: 2% 27% 2% 27%; }
-.node.shape-decision.body-inset   { --body-inset: 2% 30% 2% 30%; }
-.node.shape-io.body-inset,
-.node.shape-manual.body-inset     { --body-inset: 2% 21% 2% 21%; }
-.node.shape-manualinput.body-inset{ --body-inset: 33% 3% 2% 3%; }
-.node.shape-document.body-inset   { --body-inset: 2% 3% 26% 3%; }
-.node.shape-delay.body-inset      { --body-inset: 2% 42% 2% 3%; }
-.node.shape-display.body-inset    { --body-inset: 2% 30% 2% 12%; }
-.node.shape-offpage.body-inset    { --body-inset: 2% 3% 34% 3%; }
 /* label-only cylinders need no extra rule: the band inset above already applies
    (label-only shares .node-body), and their alignment comes from the same
    --ts-* consumers as every other shape (harness l forbids an earlier literal
@@ -5074,3 +5020,64 @@ kbd {
    a wide pane, so it stacks below the phone breakpoint. Same tier hook the
    template gallery and the inspector use. */
 .app[data-form-factor="phone"] .rm-shipped { grid-template-columns: minmax(0, 1fr); }
+
+/* HARVEY 2026-10-14 — THE TEXT-FITS-THE-SHAPE PASS (all 25 shapes audited).
+   The frames use viewBox 200x100 with preserveAspectRatio=none, so they scale
+   with the node while a FIXED px padding does not: at 190x95 a 40px side inset
+   matched the diamond's taper, at 400x200 it drowns in the middle, at 140x60
+   the text escaped through it. Every shape therefore gets a PERCENT inset over
+   its own text-safe band, measured off its real geometry:
+
+     rect-family (service/external/process/note/group)  2,3,2,3
+     storeddata/database (drum)                        35,6,20,6
+     storage (open drum)                               24,3,26,3
+     queue (gutter + divider)                           2,34,2,36
+     actor (person badge on the left)                   2,3,2,33
+     subprocess / internalstorage (inner bars x26/x174) 2,16,2,16
+     gateway / preparation (hexagon)                    2,27,2,27
+     terminator (stadium rx49)                          2,27,2,27
+     decision (diamond — the tightest)                  2,30,2,30
+     io / manual (parallelogram/trapezoid, lean 34)     2,21,2,21
+     manualinput (sloped TOP edge)                     33,3,2,3
+     document (wavy bottom y62..96)                     2,3,26,3
+     delay (D: flat to x122, arc r78)                   2,42,2,3
+     display (trapezoid + curved right)                 2,30,2,12
+     offpage (home plate, point at x100)                2,3,34,3
+     connector (circle r48)                             2,30,2,30
+
+   The body is absolutely positioned over that band; `min-height: 0` stops the
+   AI-1 fill rule (min-height: 100%) from defeating the bottom inset; the
+   aspect-ratio fallback restores a fresh unresized node's height (its body no
+   longer provides one). Alignment stays with the --ts-* consumers (harness l
+   forbids an earlier literal here). The `body-inset` class is added in
+   DiagramNode for goblin shapes. */
+.node.body-inset .node-body {
+  position: absolute; padding: 0; overflow: hidden; min-height: 0;
+  inset: var(--body-inset, 2% 3% 2% 3%);
+}
+.node.body-inset { aspect-ratio: 2 / 1; }
+.node.body-inset .node-body { inset: var(--body-inset, 2% 3% 2% 3%); }
+.node.shape-database.body-inset,
+.node.shape-storeddata.body-inset { --body-inset: 35% 6% 20% 6%; }
+.node.shape-storage.body-inset    { --body-inset: 24% 3% 26% 3%; }
+.node.shape-queue.body-inset      { --body-inset: 2% 34% 2% 36%; }
+.node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
+.node.shape-subprocess.body-inset,
+.node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }
+/* AQ10 — slanted silhouettes: the INSCRIBED RECTANGLE must sit inside the
+   outline, not just a generous border band — Harvey's screenshot: "Decision?"
+   parked at the body box's top-left corner crossed the diamond's edge once the
+   node grew. Each band below is the largest centred rectangle whose CORNERS
+   stay inside the path (verified against the path vertices), not a border band. */
+.node.shape-terminator.body-inset { --body-inset: 2% 27% 2% 27%; }
+.node.shape-gateway.body-inset    { --body-inset: 2% 27% 2% 27%; }
+.node.shape-preparation.body-inset{ --body-inset: 2% 24% 2% 24%; }
+.node.shape-connector.body-inset  { --body-inset: 17% 34% 17% 34%; }
+.node.shape-decision.body-inset   { --body-inset: 28% 27% 28% 27%; }
+.node.shape-io.body-inset,
+.node.shape-manual.body-inset     { --body-inset: 2% 19% 2% 19%; }
+.node.shape-manualinput.body-inset{ --body-inset: 30% 3% 2% 3%; }
+.node.shape-document.body-inset   { --body-inset: 2% 3% 26% 3%; }
+.node.shape-delay.body-inset      { --body-inset: 2% 42% 2% 3%; }
+.node.shape-display.body-inset    { --body-inset: 2% 30% 2% 12%; }
+.node.shape-offpage.body-inset    { --body-inset: 2% 3% 34% 3%; }

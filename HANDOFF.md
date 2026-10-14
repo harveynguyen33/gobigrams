@@ -23,6 +23,35 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ10 — inscribed-rect insets for slanted shapes + cylinder default = Minimal. DONE, 40/40 GREEN, decision verified to 520x420.
+
+Harvey's screenshot: a label-only Decision with "Decision?" parked at the body's
+top-left — outside the diamond once the node grew. TWO findings:
+
+1. **Diamond (and circle) needed INSCRIBED-RECTANGLE insets, not border bands.**
+   The AQ9 audit measured "generous border bands"; for a diamond the safe region
+   is a rhombus, so a band of 2/30/2/30 still had its TOP-LEFT CORNER outside
+   the outline. Corrected: decision 28/27/28/27 (largest inscribed rect ≈
+   25.5/26 plus margin — corners verified against the path vertices), connector
+   (circle → ellipse under preserveAspectRatio=none) 17/34/17/34. ALSO
+   recomputed from the vertices: preparation 2/24/2/24, io + manual 2/19/2/19,
+   manualinput 30/3/2/3 (its sloped TOP edge binds at the box's top-left).
+2. **The label-only branch had NO inset at all** — Harvey's node was label-only,
+   and that return path lacked `body-inset`, so the band never applied. Added
+   (its body is `.node-body lo-body`, matched by the same rule).
+3. **The body-inset block relocated to the END of styles.css** — `.node.label-only
+   .lo-body` (equal specificity, later in the sheet) was beating the band's
+   position/min-height; later-in-sheet now decides.
+4. **Cylinder default = Minimal** (Harvey's ask): `plainCylinder !== false` — a
+   board that never stored the flag draws the bare drum; "Full" is the explicit
+   choice. The inspector toggle shows Minimal for untouched nodes.
+
+LIVE-VERIFIED: decision label-only insets 28/27/28/27 at 190x141 AND at
+520x420 with all four body-box corners INSIDE the diamond path.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ9 — TEXT-FITS-THE-SHAPE: all 25 shapes audited and moved to percent insets. DONE, 40/40 GREEN, live-verified 23/25 in-browser.
 
 Harvey: "scan all the shapes and see if any shapes should fit the text". AUDIT
