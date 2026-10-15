@@ -4012,6 +4012,26 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     }, 4000); // give Safari time to start the download before revoking
   };
 
+  /* AQ21-H — RE-THEME IN THE DOCUMENT. Serializing tokens can't fully
+     reproduce a theme switch: some styles (text colour mixers, shadows,
+     pseudo-elements, theme-scoped rules) resolve at paint time against the
+     LIVE document theme. So both builders now mount the clone OFFSCREEN under
+     `data-theme=<target>` and let the real stylesheet style it — identical
+     mechanics to switching Appearance, without touching the visible board. */
+  const mountThemed = (source: HTMLElement, themeName: string): {host: HTMLDivElement; clone: HTMLElement; done: () => void} => {
+    const host = document.createElement('div');
+    host.setAttribute('data-theme', themeName);
+    host.style.cssText = 'position:fixed;left:-100000px;top:0;width:1600px;height:1200px;overflow:hidden;pointer-events:none;';
+    const clone = source.cloneNode(true) as HTMLElement;
+    clone.style.transform = 'none';
+    host.appendChild(clone);
+    document.body.appendChild(host);
+    return {
+      host, clone,
+      done: () => host.remove(),
+    };
+  };
+
   /* AQ21-F — the cloned viewport's classes (.node shapes, edges, groups…) are
      styled by the APP stylesheet, which a standalone SVG does not carry — that
      is why theme-switched previews looked washed out: fills/strokes fell back
@@ -4052,13 +4072,19 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     const pad = pngPad;
     const w = Math.ceil((b.width ?? 800) + pad * 2);
     const h = Math.ceil((b.height ?? 400) + pad * 2);
-    const clone = el.cloneNode(true) as HTMLElement;
+    const eff = o.theme || theme;
+    /* AQ21-H — style the clone under the TARGET theme, offscreen, so every
+       paint-time resolution matches a real Appearance switch. */
+    const pre = mountThemed(el, eff);
+    try {
+    const clone = pre.clone;
     /* scope: keep only the requested nodes + their edge/label children */
     const keep = new Set(o.nodes.map(n => n.id));
     const sel = clone.querySelectorAll('.react-flow__node');
     sel.forEach(nn => { if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove(); });
     clone.setAttribute('transform', `translate(${pad - (b.x ?? 0)},${pad - (b.y ?? 0)})`);
-    const eff = o.theme || theme;
+    /* let the real stylesheet apply to the offscreen mount before collecting */
+    await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
     const tokens = eff === theme
       ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
       : tokensFor(eff, EXPORT_TOKENS);
@@ -4067,7 +4093,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     const bg = tokens['--bg'] ?? readToken('--bg', '#0b0b0d');
     const dim = tokens['--dim'] ?? readToken('--dim', '#8a8a92');
     const fg = tokens['--fg'] ?? readToken('--fg', '#e8e8ea');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${eff}">
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${eff}">
 <rect width="${w}" height="${h}" fill="${bg}"/>
 <style>
   :root, svg {${'\n'}${tokenCss}
@@ -4087,6 +4113,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   </div>
 </foreignObject>
 </svg>`;
+      return svg;
+    } finally {
+      pre.done();
+    }
   };
 
   const buildPng = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
@@ -4097,19 +4127,29 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     const imageWidth = Math.ceil((b.width ?? 800) + pad * 2);
     const imageHeight = Math.ceil((b.height ?? 400) + pad * 2);
     const transform = `translate(${pad - (b.x ?? 0)}px, ${pad - (b.y ?? 0)}px) scale(1)`;
-    const prev = el.style.transform;
-    el.style.transform = transform;
+    /* AQ21-H — render the offscreen THEMED clone, not the live viewport, so a
+       non-live theme exports with the real Appearance colours (and nothing on
+       the visible board is touched → no flicker behind the modal). */
+    const eff = o.theme || theme;
+    const pre = mountThemed(el, eff);
+    const target = pre.clone;
+    target.style.transform = transform;
+    const keep = new Set(o.nodes.map(n => n.id));
+    target.querySelectorAll('.react-flow__node').forEach(nn => {
+      if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove();
+    });
     try {
+      await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
       const dataUrl = await Promise.race([
-        toPng(el, {
-          backgroundColor: o.theme === theme ? undefined : tokensFor(o.theme, ['--bg'])['--bg'],
+        toPng(target, {
+          backgroundColor: tokensFor(eff, ['--bg'])['--bg'],
           width: imageWidth, height: imageHeight, pixelRatio: pngScale,
         } as any),
         new Promise<string>((_, rej) => window.setTimeout(() => rej(new Error('PNG render timed out')), 15000)),
       ]) as string;
       return dataUrl;
     } finally {
-      el.style.transform = prev;
+      pre.done();
     }
   };
 

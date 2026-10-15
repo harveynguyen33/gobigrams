@@ -41,6 +41,32 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ21-H — offscreen re-theme: exports now match a real Appearance switch; flicker gone. DONE, 40/40 GREEN, live-verified.
+
+Harvey: exporting with a non-live theme STILL didn't bring the colours a real
+Appearance change does; also changing modal controls made the board flicker
+behind the modal.
+
+Root causes, one fix:
+- buildSvg serialized tokens but the clone's paint-time styles (theme-scoped
+  rules, text mixers, pseudo-elements) had resolved under the LIVE theme.
+- buildPng's html-to-image ran on the LIVE viewport and MUTATED its transform
+  (translate/scale) mid-render — the board visibly jumped behind the modal,
+  and computed styles were still live-theme.
+
+**`mountThemed(source, theme)`**: clones the viewport into an offscreen host
+(`position:fixed; left:-100000px`) with `data-theme=<target>`, lets the REAL
+stylesheet style it (2 rAF), and removes it after. Both builders now render
+THAT clone — identical mechanics to switching Appearance, zero contact with
+the visible board (transform never touches the live viewport → flicker gone).
+
+LIVE-VERIFIED: live theme dark + export theme light → SVG bg #f7f7f8 (correct),
+documentElement data-theme still dark, 0 themed hosts leaked into body; PNG
+preview renders 3052×9082 through the same path.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ21-G — theme-faithful SVG export; Import as its own tab. DONE, 40/40 GREEN, live-verified.
 
 Harvey: switching the export theme made the preview look washed out/dim vs the
