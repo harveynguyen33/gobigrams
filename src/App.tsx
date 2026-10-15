@@ -4012,6 +4012,37 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     }, 4000); // give Safari time to start the download before revoking
   };
 
+  /* AQ21-F — the cloned viewport's classes (.node shapes, edges, groups…) are
+     styled by the APP stylesheet, which a standalone SVG does not carry — that
+     is why theme-switched previews looked washed out: fills/strokes fell back
+     to defaults. Collect ONLY the rules whose selector matches something in
+     the clone (keeps the SVG small), then the chosen theme's tokens override
+     the :root values. Order = app rules, then token overrides (wins). */
+  const collectCss = (root: HTMLElement): string => {
+    const classes = new Set<string>();
+    root.querySelectorAll('*').forEach(el => {
+      (el.classList ?? []).forEach(c => classes.add(c));
+    });
+    classes.add('node'); classes.add('react-flow__node'); classes.add('react-flow__edge');
+    classes.add('react-flow__handle'); classes.add('react-flow__edges'); classes.add('react-flow__viewport');
+    const parts: string[] = [];
+    const walk = (list: CSSRuleList): void => {
+      for (const rule of [...list]) {
+        if (rule instanceof CSSStyleRule) {
+          let ok = false;
+          try { ok = [...classes].some(c => rule.selectorText?.includes('.' + c)) ?? false; } catch { ok = false; }
+          if (ok) parts.push(rule.cssText);
+        } else if (rule instanceof CSSMediaRule) {
+          walk(rule.cssRules);
+        }
+      }
+    };
+    for (const sheet of [...document.styleSheets]) {
+      try { walk(sheet.cssRules); } catch { /* cross-origin */ }
+    }
+    return parts.join('\n');
+  };
+
   /* AQ21 — parametrised builders. The modal and the one-click menu buttons
      share THESE; the difference is only defaults (live theme, full board). */
   const buildSvg = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
@@ -4032,6 +4063,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
       : tokensFor(eff, EXPORT_TOKENS);
     const tokenCss = EXPORT_TOKENS.map(t => `    ${t}:${tokens[t] ?? readToken(t, '#888')};`).join('\n');
+    const appCss = collectCss(clone);
     const bg = tokens['--bg'] ?? readToken('--bg', '#0b0b0d');
     const dim = tokens['--dim'] ?? readToken('--dim', '#8a8a92');
     const fg = tokens['--fg'] ?? readToken('--fg', '#e8e8ea');
@@ -4040,6 +4072,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 <style>
   :root, svg {${'\n'}${tokenCss}
   }
+  ${appCss}
   .node{font-family:ui-monospace,Menlo,Consolas,monospace}
   .node-body{padding:13px 15px 12px}
   .node-kicker{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;fill:${dim}}
@@ -5853,6 +5886,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           selCount={selCount}
           buildSvg={buildSvg}
           buildPng={buildPng}
+          onImportJson={() => fileRef.current?.click()}
         />
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects

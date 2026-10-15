@@ -25,12 +25,15 @@ type Props = {
   /** Serialisers owned by App (they need the wrap ref + rf instance). */
   buildSvg: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<string>;
   buildPng: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<string>;
+  /** AQ21-G — Import gets its own tab; JSON file picking stays in App (fileRef). */
+  onImportJson: () => void;
 };
 
 /** AQ21 — the export modal. LEFT: scope + format + theme. RIGHT: a live
  *  preview of the actual artifact the Export button will download — the SAME
  *  code path, not a mock. Debounced so dragging across themes re-renders once. */
-export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng}: Props) {
+export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, onImportJson}: Props) {
+  const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
   const [format, setFormat] = useState<ExportFormat>('svg');
   const [theme, setTheme] = useState('live');
@@ -139,10 +142,41 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
 
   return (
     <div className="sp-overlay em-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="em-modal" role="dialog" aria-label="Export diagram">
+      <div className="em-modal" role="dialog" aria-label="Export or import diagram">
         <div className="em-left">
-          <div className="em-title">Export</div>
+          {/* AQ21-G — Export and Import are SEPARATE tabs; mixing them in one
+              column read as noise. */}
+          <div className="em-tabs" role="tablist">
+            <button role="tab" aria-selected={tab === 'export'} className={tab === 'export' ? 'on' : ''} onClick={() => setTab('export')}>Export</button>
+            <button role="tab" aria-selected={tab === 'import'} className={tab === 'import' ? 'on' : ''} onClick={() => setTab('import')}>Import</button>
+          </div>
 
+          {tab === 'import' && (
+            <div className="em-import">
+              <div className="em-label">From Mermaid text</div>
+              <textarea
+                className="em-ta"
+                placeholder={'flowchart TD\n  A[Service] -->|reads| B[(Database)]'}
+                value={importText}
+                onChange={ev => setImportText(ev.target.value)}
+                rows={8}
+                spellCheck={false}
+              />
+              <button className="em-go" onClick={doImportMermaid} disabled={!importText.trim()}>
+                Insert onto board
+              </button>
+              {importMsg && <div className="em-note">{importMsg}</div>}
+              <div className="em-note">Flowchart subset: node shapes, edge labels, subgraphs. Styling (classDef) is not imported.</div>
+
+              <div className="em-label">From file</div>
+              <button className="em-go secondary" onClick={onImportJson}>
+                Import board JSON…
+              </button>
+              <div className="em-note">Replaces the current board's content with a saved .json board.</div>
+            </div>
+          )}
+
+          {tab === 'export' && (<>
           <div className="em-label">Scope</div>
           <Seg<ExportScope> value={scope} set={setScope} aria="Scope" options={[
             {id: 'full', label: `Full board (${nodes.length})`},
@@ -164,23 +198,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           <button className="em-go" onClick={doExport} disabled={busy || !preview || (format === 'png' && !scoped.nodes.length)}>
             {busy ? 'Rendering…' : `Export ${format.toUpperCase()}`}
           </button>
-
-          <div className="em-import">
-            <div className="em-label">Import Mermaid</div>
-            <textarea
-              className="em-ta"
-              placeholder={'flowchart TD\n  A[Service] -->|reads| B[(Database)]'}
-              value={importText}
-              onChange={e => setImportText(e.target.value)}
-              rows={5}
-              spellCheck={false}
-            />
-            <button className="em-go secondary" onClick={doImportMermaid} disabled={!importText.trim()}>
-              Insert onto board
-            </button>
-            {importMsg && <div className="em-note">{importMsg}</div>}
-            <div className="em-note">Flowchart subset: node shapes, edge labels, subgraphs. Styling (classDef) is not imported.</div>
-          </div>
+          </>)}
         </div>
 
         <div className="em-right">

@@ -40,6 +40,27 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ21-G — theme-faithful SVG export; Import as its own tab. DONE, 40/40 GREEN, live-verified.
+
+Harvey: switching the export theme made the preview look washed out/dim vs the
+real Appearance switch, and Import should be its own tab (file + pasted data),
+not mixed into the export column.
+
+- **Washed preview root cause**: the exported SVG only inlined ~8 hand-written
+  style rules; every class the cloned viewport carries (.node shapes, edges,
+  handles, group fills, lo-body…) resolves from the APP stylesheet on the live
+  page but nowhere in a standalone SVG → default black strokes/transparent
+  fills. Fix: `collectCss(clone)` walks document.styleSheets and inlines only
+  rules whose selector matches a class present in the clone (live: 410 rules,
+  110KB — vs ~2KB before), then the chosen theme's token block overrides :root.
+  Midnight bg #0a0f1e vs light #f7f7f8 verified in the generated files.
+- **Tabs**: modal header = Export | Import. Export tab unchanged (scope /
+  format / theme / preview). Import tab = Mermaid textarea + "Import board
+  JSON…" (delegates to App's fileRef via the new onImportJson prop).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ21-F — modal replaces the toolbar dropdown; SVG preview renders; fixed modal height. DONE, 40/40 GREEN.
 
 Harvey feedback on AQ21: (1) the modal should REPLACE the old export buttons,

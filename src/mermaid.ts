@@ -180,11 +180,9 @@ export function fromMermaid(text: string): MermaidImport | null {
     if (line === 'end') { groupStack.pop(); continue; }
 
     /* find all node tokens in order; edges are ADJACENT spans with an edge
-       operator between them. This handles A[def] -->|lbl| B[(def)] chains. */
+       operator between them. |labels| and --text--> spans are scrubbed to
+       NULs BEFORE node-lexing, so bare ids inside a label never become nodes. */
     const EDGE_OP = /-{1,3}>|-{3}|={2,}>|-\.->/;
-    /* blank out |labels| and --text--> spans first so the bare ids inside a
-       label never lex as nodes (the |reads| bug). Keep their spans so the
-       edge label can still be read back. */
     const labelSpans: {start: number; text: string}[] = [];
     let scrubbed = line.replace(/\|[^|]*\|/g, (m0, off) => { labelSpans.push({start: off, text: m0}); return '\u0000'.repeat(m0.length); });
     scrubbed = scrubbed.replace(/--\s+[^\s-][^-]*?\s*--(>)?/g, m0 => '\u0000'.repeat(m0.length));
@@ -199,7 +197,6 @@ export function fromMermaid(text: string): MermaidImport | null {
     for (let k = 0; k + 1 < spans.length; k++) {
       const between = scrubbed.slice(spans[k].end, spans[k + 1].start);
       if (!EDGE_OP.test(between)) continue;
-      /* label = any |..| that sat inside this gap in the ORIGINAL line */
       const gapStart = spans[k].end, gapEnd = spans[k + 1].start;
       const lbl = labelSpans.filter(l => l.start >= gapStart && l.start < gapEnd)
         .map(l => /\|([^|]*)\|/.exec(l.text)?.[1]?.trim()).find(Boolean);
