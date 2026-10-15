@@ -32,6 +32,22 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ15c-final — the grow amount was under-shot by the percent insets. FIXED, 40/40 GREEN.
+
+Harvey pushed once more ("kiểm tra kỹ") and the deeper defect surfaced: percent
+insets mean the TEXT BAND is a fixed FRACTION of the node — growing the node by
+exactly the clip amount grows the band by only 45% of it (cylinders), so the fix
+kept re-converging 3px short (sub descender still crossing). The grow now divides
+the measured clip by the band's actual height share (read from the body's
+computed top/bottom insets, floor 0.2): a 3-5px clip on a cylinder grows the node
+~7-16px. LIVE-VERIFIED: fresh node 116px, sub fully inside the band with 4px
+margin. Also: the grow metric now compares the LAST CONTENT CHILD's bottom to the
+body's bottom (scrollHeight misses glyph descenders painted below their line box
+under overflow:hidden — the exact "primary" slice).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ15c — belt-and-braces font timing for auto-grow. DONE, 40/40 GREEN.
 
 Harvey asked to double-check first-create. On the dev box the first-create path

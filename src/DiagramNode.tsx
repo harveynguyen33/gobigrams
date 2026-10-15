@@ -278,12 +278,27 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       if (!wrapper) return;
       // the user resized: RF wrote an explicit height — hands off
       if (wrapper.style.height) return;
-      const clipped = body.scrollHeight - body.clientHeight;
-      /* >6px only: flex centring leaves a few px of scrollHeight slack that is
-         NOT hidden text — growing for it would chase its own tail. */
-      if (clipped <= 6) return;
-      if (d.__onGrow) d.__onGrow(id, Math.ceil(wrapper.offsetHeight + clipped + 4));
-      else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: Math.ceil(wrapper.offsetHeight + clipped + 4)}}));
+      /* The metric is the LAST CONTENT ELEMENT's bottom vs the body's bottom —
+         scrollHeight misses glyph descenders (p/y paint below their line box
+         with overflow:hidden, invisible to scroll metrics): Harvey's screenshot
+         had "primary" sliced by exactly that. */
+      const kids = [...body.children].filter(c => (c as HTMLElement).offsetParent !== null);
+      const last = kids[kids.length - 1];
+      const clipped = last ? Math.ceil(last.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom + 2) : 0;
+      if (clipped <= 0) return;
+      /* PERCENT INSETS: the band is a fixed FRACTION of the node, so the node
+         must grow by MORE than the clip — dividing by the band's height share
+         (1 - topInset - bottomInset, read from the computed insets) converts
+         the clip into the real node growth. Cylinders: clip / 0.45 ≈ 2.2x. */
+      const cb = getComputedStyle(body);
+      const topIns = parseFloat(cb.top) || 0;
+      const botIns = parseFloat(cb.bottom) || 0;
+      const nodeH = wrapper.offsetHeight;
+      const bandRatio = nodeH > 0 ? Math.max(0.2, (nodeH - topIns - botIns) / nodeH) : 0.55;
+      const grow = Math.ceil((clipped + 2) / bandRatio);
+      const target = Math.ceil(nodeH + grow);
+      if (d.__onGrow) d.__onGrow(id, target);
+      else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: target}}));
     };
     const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
     ro.observe(body);
@@ -297,7 +312,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     /* fonts.loadingdone fires per webfont batch — a slow font landing at 2s+
        still triggers a re-check (Harvey's first-create clip). */
     document.fonts?.addEventListener?.('loadingdone', onFontDone);
-    const timers = [120, 400, 900, 2000].map(ms => window.setTimeout(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }, ms));
+    const timers = [60, 150, 400, 900, 2000].map(ms => window.setTimeout(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }, ms));
     function onFontDone() { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }
     return () => {
       ro.disconnect(); cancelAnimationFrame(raf); timers.forEach(t => clearTimeout(t));
