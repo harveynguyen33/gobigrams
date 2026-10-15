@@ -31,6 +31,18 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ15c — belt-and-braces font timing for auto-grow. DONE, 40/40 GREEN.
+
+Harvey asked to double-check first-create. On the dev box the first-create path
+measures clean (110px, sub visible, cache disabled + hard reload), but Harvey's
+machine could still land a webfont AFTER every existing re-check. Added:
+`document.fonts.loadingdone` listener (fires per webfont batch, however late) +
+a 2000ms ladder timer, alongside fonts.ready and the 120/400/900 ladder. Any
+late font landing now re-runs the grow check. Cleanup listener included.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ15b — auto-grow re-checks after webfonts settle. DONE, 40/40 GREEN.
 
 Harvey's screenshot: a WIDE (430px) fresh cylinder with the sub still half-sliced.

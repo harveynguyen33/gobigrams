@@ -294,8 +294,15 @@ const Node = memo(({id, data, selected}: NodeProps) => {
        resize on a font swap, so the observer alone misses it — re-check when
        fonts settle and on a short settle ladder. */
     document.fonts?.ready.then(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
-    const timers = [120, 400, 900].map(ms => window.setTimeout(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }, ms));
-    return () => { ro.disconnect(); cancelAnimationFrame(raf); timers.forEach(t => clearTimeout(t)); };
+    /* fonts.loadingdone fires per webfont batch — a slow font landing at 2s+
+       still triggers a re-check (Harvey's first-create clip). */
+    document.fonts?.addEventListener?.('loadingdone', onFontDone);
+    const timers = [120, 400, 900, 2000].map(ms => window.setTimeout(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }, ms));
+    function onFontDone() { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); }
+    return () => {
+      ro.disconnect(); cancelAnimationFrame(raf); timers.forEach(t => clearTimeout(t));
+      document.fonts?.removeEventListener?.('loadingdone', onFontDone);
+    };
   }, [id, d]);
 
   // Container shapes get React Flow's resize affordance when selected (C3).
