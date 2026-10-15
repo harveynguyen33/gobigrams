@@ -6,6 +6,8 @@ import {
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
 import {toPng} from 'html-to-image';
+import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
+import {mermaidToGraph} from './mermaid';
 import {
   Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
@@ -85,7 +87,7 @@ import {type PaletteItem} from './palette';
    (Option B's condition: the key must be labelled where the user looks, and the
    label must be dismissible so it does not become permanent furniture). */
 import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
-import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
+import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, tokensFor, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
@@ -882,6 +884,8 @@ export default function App() {
   }, []);
   // ---- export dropdown open? ----
   const [pop, setPop] = useState(false);
+  // ---- AQ21 — the export modal ----
+  const [expOpen, setExpOpen] = useState(false);
   // ---- D1: searchable insert palette (position = double-click point) ----
   const [searchPos, setSearchPos] = useState<{x: number; y: number} | null>(null);
   // ---- D2: cheat sheet popover ----
@@ -4010,6 +4014,74 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     }, 4000); // give Safari time to start the download before revoking
   };
 
+  /* AQ21 — parametrised builders. The modal and the one-click menu buttons
+     share THESE; the difference is only defaults (live theme, full board). */
+  const buildSvg = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
+    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!el || !rf) return '';
+    const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
+    const pad = pngPad;
+    const w = Math.ceil((b.width ?? 800) + pad * 2);
+    const h = Math.ceil((b.height ?? 400) + pad * 2);
+    const clone = el.cloneNode(true) as HTMLElement;
+    /* scope: keep only the requested nodes + their edge/label children */
+    const keep = new Set(o.nodes.map(n => n.id));
+    const sel = clone.querySelectorAll('.react-flow__node');
+    sel.forEach(nn => { if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove(); });
+    clone.setAttribute('transform', `translate(${pad - (b.x ?? 0)},${pad - (b.y ?? 0)})`);
+    const eff = o.theme || theme;
+    const tokens = eff === theme
+      ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
+      : tokensFor(eff, EXPORT_TOKENS);
+    const tokenCss = EXPORT_TOKENS.map(t => `    ${t}:${tokens[t] ?? readToken(t, '#888')};`).join('\n');
+    const bg = tokens['--bg'] ?? readToken('--bg', '#0b0b0d');
+    const dim = tokens['--dim'] ?? readToken('--dim', '#8a8a92');
+    const fg = tokens['--fg'] ?? readToken('--fg', '#e8e8ea');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${eff}">
+<rect width="${w}" height="${h}" fill="${bg}"/>
+<style>
+  :root, svg {${'\n'}${tokenCss}
+  }
+  .node{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .node-body{padding:13px 15px 12px}
+  .node-kicker{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;fill:${dim}}
+  .node-title{font-size:14.5px;font-weight:650;fill:${fg}}
+  .node-sub{font-size:11.5px;fill:${dim}}
+  .node-metric{font-size:20px;font-weight:700}
+  text{font-family:ui-monospace,Menlo,Consolas,monospace}
+</style>
+<foreignObject width="100%" height="100%">
+  <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px">
+    ${clone.outerHTML}
+  </div>
+</foreignObject>
+</svg>`;
+  };
+
+  const buildPng = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
+    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!el || !rf || !o.nodes.length) return '';
+    const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
+    const pad = pngPad;
+    const imageWidth = Math.ceil((b.width ?? 800) + pad * 2);
+    const imageHeight = Math.ceil((b.height ?? 400) + pad * 2);
+    const transform = `translate(${pad - (b.x ?? 0)}px, ${pad - (b.y ?? 0)}px) scale(1)`;
+    const prev = el.style.transform;
+    el.style.transform = transform;
+    try {
+      const dataUrl = await Promise.race([
+        toPng(el, {
+          backgroundColor: o.theme === theme ? undefined : tokensFor(o.theme, ['--bg'])['--bg'],
+          width: imageWidth, height: imageHeight, pixelRatio: 2,
+        } as any),
+        new Promise<string>((_, rej) => window.setTimeout(() => rej(new Error('PNG render timed out')), 15000)),
+      ]) as string;
+      return dataUrl;
+    } finally {
+      el.style.transform = prev;
+    }
+  };
+
   // ---- export SVG (serialize the live flow viewport) ----
   const exportSvg = () => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
@@ -4106,6 +4178,25 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /* AQ21 — the export modal's Mermaid import lands here. Fresh ids, grid
+     layout, then the same apply path as a JSON import (history reset). */
+  useEffect(() => {
+    const h = (ev: Event) => {
+      const parsed = (ev as CustomEvent).detail;
+      if (!parsed) return;
+      const {nodes: mmNodes, edges: mmEdges, nextId} = mermaidToGraph(parsed, idc);
+      idc = nextId;
+      past.current = [];
+      future.current = [];
+      setNodes(ns => [...ns, ...mmNodes]);
+      setEdges(es => [...es, ...mmEdges]);
+      bumpHist(v => v + 1);
+      flash(`Imported ${mmNodes.length} nodes · ${mmEdges.length} edges from Mermaid`);
+    };
+    window.addEventListener('gobi:mermaid-import', h);
+    return () => window.removeEventListener('gobi:mermaid-import', h);
+  }, [flash, tickTask]);
 
   const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -5633,6 +5724,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             </Tooltip>
             {pop && (
               <div className="pop">
+                <button className="pop-item primary" title="Open the export modal — scope, format, theme and a live preview" onClick={() => { setPop(false); setExpOpen(true); }}>
+                  Export / Import… (preview)
+                </button>
                 <button className="pop-item" title="Import diagram JSON into the current board" onClick={() => { setPop(false); fileRef.current?.click(); }}>
                   <Upload size={14} /> Import JSON
                 </button>
@@ -5860,6 +5954,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           accept="application/json,.json"
           style={{display: 'none'}}
           onChange={onImportFile}
+        />
+
+        <ExportModal
+          open={expOpen}
+          onClose={() => setExpOpen(false)}
+          nodes={nodes}
+          edges={edges}
+          liveTheme={theme}
+          boardName={curBoard?.name}
+          selCount={selCount}
+          buildSvg={buildSvg}
+          buildPng={buildPng}
         />
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects

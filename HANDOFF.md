@@ -38,6 +38,36 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ21 — Export modal: scope + format + theme + live preview; Mermaid export/import. DONE, 40/40 GREEN, live-verified.
+
+Harvey: make export a modal — choose selected-only/full, preview on the right,
+pick the export theme, and ask whether Mermaid interop is possible.
+
+**ExportModal.tsx** (new): two-pane modal. LEFT: Scope (Full board / Selected
+only — disabled at 0 selection), Format (SVG/PNG/JSON/Mermaid), Theme (live +
+the 5 concrete themes), Export button, plus an Import-Mermaid textarea. RIGHT:
+live preview of the ACTUAL artifact (same builder the download uses), debounced
+250ms. Entry: the import/export dropdown's new primary row "Export / Import…".
+
+- App gains parametrised `buildSvg`/`buildPng` builders (scope filters nodes in
+  the cloned viewport; theme tokens resolved via the new `tokensFor(theme,
+  names)` in theme.ts — walks document stylesheets for `[data-theme=x]`
+  blocks over the light baseline, no live re-theme needed).
+- **Mermaid export** (`src/mermaid.ts` toMermaid): flowchart TD, shape mapping
+  (database/storeddata→[(·)], decision/gateway→{·}, actor→((·)), external→([·]),
+  queue→[/·], else (·)), edge labels, RF parentId groups → subgraphs. HONEST
+  loss list shown in the modal (colours/text styles/icons/metrics/custom shapes).
+- **Mermaid import** (fromMermaid): line-based flowchart subset — shape tokens,
+  `-->`/`---`/`==>` edges, `|label|` and `-- text -->` labels (labels scrubbed
+  before node-lexing — the |reads| bug), subgraph blocks → group nodes +
+  membership. mermaidToGraph lays out a 4-row grid, ids namespaced mm*/me*.
+  Live E2E: import inserted 4 nodes with correct shapes/labels + 3 labelled
+  edges; export of the 25-node template produced a 59-line valid flowchart.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 (modal CSS uses tokens only)
+· **40/40 harnesses**. Boards runtime data untouched (gitignored).
+
 ## ▶ AQ20 — search source lines unique for EVERY duplicated shape. DONE, 40/40 GREEN, live-verified.
 
 Harvey: extend the AQ6 treatment (search annotation) to all duplicated shapes.

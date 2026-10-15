@@ -127,3 +127,48 @@ export const EXPORT_TOKENS = [
      every theme. */
   '--c-black', '--c-white',
 ] as const;
+
+
+/** AQ21 — resolve the CSS custom properties of ANY theme without switching the
+ *  live page. Walks the document stylesheets for `[data-theme="x"]` blocks and
+ *  overlays their declarations on top of the theme-independent `:root` set.
+ *  Falls back to the LIVE computed value for anything unresolvable. Used by
+ *  the export modal's theme picker so the preview and the file agree. */
+export function tokensFor(themeName: string, names: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const n of names) out[n] = readToken(n, '#888');
+  try {
+    const block: Record<string, string> = {};
+    for (const sheet of [...document.styleSheets]) {
+      let rules: CSSRuleList;
+      try { rules = sheet.cssRules; } catch { continue; }
+      const walk = (list: CSSRuleList): void => {
+        for (const rule of [...list]) {
+          if (rule instanceof CSSStyleRule && /data-theme\s*=\s*["']?light["']?/.test(rule.selectorText)) {
+            /* light block = the baseline every other theme starts from */
+            for (let i = 0; i < rule.style.length; i++) {
+              const prop = rule.style[i];
+              if (prop.startsWith('--')) block[prop] = rule.style.getPropertyValue(prop).trim();
+            }
+          }
+        }
+      };
+      walk(rules);
+    }
+    /* the requested theme's own block overrides the light baseline */
+    for (const sheet of [...document.styleSheets]) {
+      let rules: CSSRuleList;
+      try { rules = sheet.cssRules; } catch { continue; }
+      for (const rule of [...rules]) {
+        if (rule instanceof CSSStyleRule && new RegExp(`data-theme\\s*=\\s*["']${themeName}["']`).test(rule.selectorText ?? '')) {
+          for (let i = 0; i < rule.style.length; i++) {
+            const prop = rule.style[i];
+            if (prop.startsWith('--')) block[prop] = rule.style.getPropertyValue(prop).trim();
+          }
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(block)) if (k in out && v) out[k] = v;
+  } catch { /* keep live values */ }
+  return out;
+}
