@@ -34,6 +34,22 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ17 — dblclick-handle skips already-connected, picks the NEXT nearest. DONE, 40/40 GREEN, live-verified.
+
+Harvey: dblclick a handle on an already-connected node should not just report
+"already connected" — find the next nearest shape. The candidate loop now skips
+any shape already joined to this node (either direction) and keeps the nearest
+unconnected one; the flash only reports when EVERY candidate in range is
+exhausted ("All N nearby shapes already connected") or none are in range.
+noCycles + oneIn still gate the final choice.
+
+LIVE-VERIFIED on a 4-node board: Service pre-connected to both neighbours;
+dblclick its right handle with a fresh unconnected Queue nearby → connected to
+the Queue (edge 2→3), toast "Connected (straight — shapes are close)".
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ16 — auto-scale WIDTH + re-check on text edits. DONE, 40/40 GREEN, live-verified.
 
 Harvey: auto scale should set the minimum WIDTH too (the first-create fitting).

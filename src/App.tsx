@@ -2229,23 +2229,27 @@ export default function App() {
       const me = absNodes(ns).get(nodeId);
       if (!me) return;
       const cx = me.x + me.w / 2, cy = me.y + me.h / 2;
+      /* HARVEY — if the nearest shape is ALREADY connected to this node, keep
+         walking: pick the nearest shape that is NOT connected yet. Only when
+         every candidate inside the range is exhausted does it report back. */
+      const connectedTo = (other: string) => edgesRef.current.some(e =>
+        (e.source === nodeId && e.target === other) || (e.source === other && e.target === nodeId));
       let best: {id: string; d: number} | null = null;
+      let alreadyN = 0;
       absNodes(ns).forEach((v, k) => {
         if (k === nodeId || v.n.parentId) return;
         const d = Math.hypot(cx - (v.x + v.w / 2), cy - (v.y + v.h / 2));
-        if (d <= dblRange && (!best || d < best.d)) best = {id: k, d};
+        if (d > dblRange) return;
+        if (connectedTo(k)) { alreadyN++; return; }
+        if (!best || d < best.d) best = {id: k, d};
       });
       if (!best) {
-        flash(`No shape within ${dblRange}px — nothing connected`);
+        flash(alreadyN > 0
+          ? `All ${alreadyN} nearby shape${alreadyN > 1 ? 's' : ''} already connected`
+          : `No shape within ${dblRange}px — nothing connected`);
         return;
       }
       const targetId = (best as {id: string; d: number}).id;
-      const exists = edgesRef.current.some(e =>
-        (e.source === nodeId && e.target === targetId) || (e.source === targetId && e.target === nodeId));
-      if (exists) {
-        flash('These two shapes are already connected');
-        return;
-      }
       if (noCycles && wouldCycle(nodeId, targetId, edgesRef.current)) {
         flash('Blocked: this connection would create a cycle (A→B→A)');
         return;
