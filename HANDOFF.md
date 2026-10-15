@@ -35,6 +35,26 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ18 — drop-position double-subtract fixed (2 more instances of the AUDIT-7 class). DONE, 40/40 GREEN, live-verified.
+
+Harvey: "thả node theo con trỏ chuột... lệch nhiều so với vị trí thả". AUDIT of
+every screenToFlowPosition call found TWO remaining double-subtractions — the
+same defect AUDIT-7 fixed for the ctx-menu path, in its siblings:
+
+1. **Palette drag-drop** (`onDrop`): `screenToFlowPosition({x: e.clientX - b.left, ...})`
+   — the extra wrap-rect subtraction landed every palette drop up-left of the
+   cursor by the sidebar+toolbar offset (200+px on wide layouts).
+2. **Double-click empty canvas → search palette position**: same pattern.
+
+Both now pass raw client coords. LIVE-VERIFIED: dragged Service from the palette,
+dropped at client (732, 300) → node top-left lands EXACTLY at (732, 300). The
+remaining 4 screenToFlowPosition calls are wrap-centre fallbacks (intentional) or
+already raw. Note: node TOP-LEFT anchors at the cursor — standard for draw.io/
+Figma; say the word if you'd rather centre the node under the cursor.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ17 — dblclick-handle skips already-connected, picks the NEXT nearest. DONE, 40/40 GREEN, live-verified.
 
 Harvey: dblclick a handle on an already-connected node should not just report

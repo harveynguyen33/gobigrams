@@ -3566,8 +3566,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     const label = e.dataTransfer.getData('palette');
     const cust = e.dataTransfer.getData('customshape');
     if (!favId && !label && !cust) return;
-    const b = wrap.current.getBoundingClientRect();
-    const p = rf.screenToFlowPosition({x: e.clientX - b.left, y: e.clientY - b.top});
+    /* AQ18 — raw client coords: screenToFlowPosition subtracts the pane rect
+       itself; the extra `- b.left/- b.top` double-subtracted the wrap offset
+       and every palette drop landed up-left of the cursor (same defect AUDIT-7
+       fixed for the ctx-menu path — this sibling was missed). */
+    const p = rf.screenToFlowPosition({x: e.clientX, y: e.clientY});
     // §6.5 — a favourite drop re-derives the geometry at the drop point; the
     // payload carried only the favourite's ID, never a stored coordinate.
     if (cust) {
@@ -5925,8 +5928,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             const t = e.target as HTMLElement;
             if (t.closest('.react-flow__node') || t.closest('.react-flow__edge')) return;
             if (!rf || !wrap.current) return;
-            const b = wrap.current.getBoundingClientRect();
-            setSearchPos(rf.screenToFlowPosition({x: e.clientX - b.left, y: e.clientY - b.top}));
+            /* AQ18 — raw client coords (see the palette onDrop note): the extra
+               wrap subtraction landed the search palette up-left of the click. */
+            setSearchPos(rf.screenToFlowPosition({x: e.clientX, y: e.clientY}));
           }}
           onSelectionChange={({nodes: s, edges: se}) => {
             setSel(s[0]?.id ?? null);
