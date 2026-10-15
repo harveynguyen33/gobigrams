@@ -33,6 +33,25 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ16 — auto-scale WIDTH + re-check on text edits. DONE, 40/40 GREEN, live-verified.
+
+Harvey: auto scale should set the minimum WIDTH too (the first-create fitting).
+- The grow check now probes the content's natural single-line width
+  (`width: max-content` probe, capped 340) and grows WIDTH alongside height —
+  floored at the node's 190px min-width, never shrunk.
+- Text edits (title/sub/metric/textStyle) re-run the grow check via a
+  data-keyed effect — the body box doesn't resize on a text change, so the
+  ResizeObserver stays silent exactly when the user retypes.
+- The recheck no longer bails on an existing wrapper height: growth is
+  GROW-ONLY (App's onGrow keeps max(current, target)), so a text change raises
+  a too-short node but never shrinks a user's resize.
+
+LIVE-VERIFIED: long title set on a 300x150 node → grew to 300x163, clipped 0,
+sub fully visible inside the band. Width 300 kept (grow-only).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ15c-final — the grow amount was under-shot by the percent insets. FIXED, 40/40 GREEN.
 
 Harvey pushed once more ("kiểm tra kỹ") and the deeper defect surfaced: percent

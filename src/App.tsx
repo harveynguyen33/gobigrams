@@ -2534,12 +2534,19 @@ export default function App() {
      an explicit user height are grown — the wrapper style check in the renderer
      guarantees that — so a manual resize is never overridden. Not undoable
      (it is the insert's own settling, not a user edit). */
-  const onGrow = useCallback((id: string, height: number) => {
+  const onGrow = useCallback((id: string, height: number, width?: number) => {
     setNodes(ns => ns.map(n => {
       if (n.id !== id) return n;
       const style = {...(n.style ?? {})} as Record<string, string | number>;
       if (style.height && Number(style.height) >= height) return n;
       style.height = height;
+      /* AQ16 — the width floors at the content's natural single-line width
+         (capped 340) so long text widens the shape instead of over-wrapping.
+         Only ever grows: an explicit user width is never shrunk. */
+      if (width) {
+        const floored = Math.max(190, width); /* .node min-width — never under */
+        if (!style.width || Number(style.width) < floored) style.width = floored;
+      }
       return {...n, style: style as any};
     }));
   }, [setNodes]);
@@ -2547,8 +2554,8 @@ export default function App() {
   /* AQ15 — the global receiver for the renderer's auto-grow reports. */
   useEffect(() => {
     const h = (ev: Event) => {
-      const {id, height} = (ev as CustomEvent<{id: string; height: number}>).detail;
-      onGrow(id, height);
+      const {id, height, width} = (ev as CustomEvent<{id: string; height: number; width?: number}>).detail;
+      onGrow(id, height, width);
     };
     window.addEventListener('gobi:node-grow', h);
     return () => window.removeEventListener('gobi:node-grow', h);

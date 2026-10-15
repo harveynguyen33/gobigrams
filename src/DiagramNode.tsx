@@ -133,7 +133,7 @@ export type NodeKind = {
   plainCylinder?: boolean;
   /** AQ15 — auto-grow: called once fonts/measure settle if the body clips;
       App grows the node's height (the same write a manual resize performs). */
-  __onGrow?: (id: string, height: number) => void;
+  __onGrow?: (id: string, height: number, width?: number) => void;
 };
 
 /* ITEM 2 (2026-09-17) — THE AUTO-SHOW NODE TOOLBAR IS GONE.
@@ -289,7 +289,11 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       /* PERCENT INSETS: the band is a fixed FRACTION of the node, so the node
          must grow by MORE than the clip — dividing by the band's height share
          (1 - topInset - bottomInset, read from the computed insets) converts
-         the clip into the real node growth. Cylinders: clip / 0.45 ≈ 2.2x. */
+         the clip into the real node growth. Cylinders: clip / 0.45 ≈ 2.2x.
+         AQ16 — WIDTH too: measure the text's natural single-line width
+         (max-content probe) so a long title/sub widens the node instead of
+         over-wrapping into a taller one. Capped at 340px (the cheatsheet cap)
+         to keep boards tidy. */
       const cb = getComputedStyle(body);
       const topIns = parseFloat(cb.top) || 0;
       const botIns = parseFloat(cb.bottom) || 0;
@@ -297,8 +301,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       const bandRatio = nodeH > 0 ? Math.max(0.2, (nodeH - topIns - botIns) / nodeH) : 0.55;
       const grow = Math.ceil((clipped + 2) / bandRatio);
       const target = Math.ceil(nodeH + grow);
-      if (d.__onGrow) d.__onGrow(id, target);
-      else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: target}}));
+      // natural single-line width of the content
+      body.style.width = 'max-content';
+      const naturalW = body.scrollWidth;
+      body.style.width = '';
+      const sideIns = (parseFloat(cb.left) || 0) + (parseFloat(cb.right) || 0);
+      const targetW = Math.min(340, Math.max(0, Math.ceil(naturalW + sideIns + 8)));
+      if (d.__onGrow) d.__onGrow(id, target, targetW);
+      else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: target, width: targetW}}));
     };
     const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(check); });
     ro.observe(body);
@@ -319,6 +329,27 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       document.fonts?.removeEventListener?.('loadingdone', onFontDone);
     };
   }, [id, d]);
+  /* AQ16 — text edits (title/sub/metric) change the content WITHOUT resizing
+     the body box, so the RO stays silent; re-run the grow check when data
+     changes, and listen for the check's report at App level. */
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const inner = innerRef.current, body = bodyRef.current;
+      if (!inner || !body) return;
+      const wrapper = inner.closest('.react-flow__node') as HTMLElement | null;
+      if (!wrapper) return;
+      const kids = [...body.children].filter(c => (c as HTMLElement).offsetParent !== null);
+      const last = kids[kids.length - 1];
+      if (!last) return;
+      const over = Math.ceil(last.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom + 2);
+      if (over > 0) window.dispatchEvent(new CustomEvent('gobi:node-grow', {
+        /* growth-only: App's onGrow never shrinks, so a user-set height is
+           only ever RAISED by a text change — never lowered. */
+        detail: {id, height: wrapper.offsetHeight + Math.ceil(over / 0.45) + 4},
+      }));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [id, d?.title, d?.sub, d?.metric, d?.textStyle]);
 
   // Container shapes get React Flow's resize affordance when selected (C3).
   // React Flow writes width/height back into node.style, so the size persists.
