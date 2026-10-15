@@ -39,6 +39,32 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ21-F — modal replaces the toolbar dropdown; SVG preview renders; fixed modal height. DONE, 40/40 GREEN.
+
+Harvey feedback on AQ21: (1) the modal should REPLACE the old export buttons,
+not sit beside them; (2) the SVG preview showed nothing; (3) a too-tall modal
+should scroll inside, not scale its height.
+
+- The toolbar "Export" button now opens the modal DIRECTLY. The whole dropdown
+  (Import JSON / Export JSON / Export SVG one-click rows) is REMOVED along with
+  the dead `exportJson`/`exportSvg`/`exportPng` wrappers and the `pop` state —
+  JSON import moved into the modal (Mermaid textarea + JSON via the file input
+  stays through `fileRef`; note: JSON import row retired — import now = Mermaid
+  in-modal, JSON boards via drag-drop which already existed).
+- SVG preview root cause: `clone.outerHTML` inside the SVG `<foreignObject>`
+  is HTML, not well-formed XML, and an `<img>`-loaded SVG parses STRICT XML →
+  blank image. Fix: `new XMLSerializer().serializeToString(clone)`. Live:
+  naturalWidth 641 (was 0/blank).
+- Modal height is now FIXED (`height: min(84vh, 640px)`) — the left pane
+  (`overflow-y: auto`) scrolls; the dialog never stretches.
+- buildPng `pixelRatio` now reads the stored `pngScale` pref (was hard-coded 2 —
+  S2.png-scale harness caught the regression my dead-code removal introduced).
+- package-o-metrics re-anchored: the export dropdown was the last BARE `.pop`
+  element; base CSS + compound boards-pop consumer stay pinned.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ21 — Export modal: scope + format + theme + live preview; Mermaid export/import. DONE, 40/40 GREEN, live-verified.
 
 Harvey: make export a modal — choose selected-only/full, preview on the right,

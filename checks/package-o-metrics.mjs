@@ -488,10 +488,12 @@ assert('item6a.boards-pop-explicitly-cancels-the-shared-floor',
   boardsPop.decls['min-width'] === '0' && boardsGeom(200).inherited === 0,
   `min-width=${boardsPop.decls['min-width']} declared, inherited=${boardsGeom(200).inherited}px`);
 // The SECOND .pop user must be untouched: the shared base keeps `right: 0` and
-// its own floor, and there is still a bare `.pop` element (the Export dropdown).
+// its own floor. AQ21-F — the Export dropdown (the last BARE .pop) was replaced
+// by the export modal, so the bare-user clause is retired; the base itself and
+// the compound boards-pop consumer remain pinned.
 assert('item6a.shared-.pop-base-unchanged',
-  popRule.decls.right === '0' && pxOf(popRule.decls['min-width']) === 168 && otherPopUsers === 1,
-  `.pop right=${popRule.decls.right} min-width=${popRule.decls['min-width']}, ${otherPopUsers} bare .pop element(s)`);
+  popRule.decls.right === '0' && pxOf(popRule.decls['min-width']) === 168,
+  `.pop right=${popRule.decls.right} min-width=${popRule.decls['min-width']}`);
 
 // --- ITEM 4 -----------------------------------------------------------------
 assert('item4.no-duplicate-hints (SHAPES)', dupes.length === 0,

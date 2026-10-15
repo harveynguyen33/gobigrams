@@ -882,8 +882,6 @@ export default function App() {
     setDblRange(next);
     savePref('dbl-range', next);
   }, []);
-  // ---- export dropdown open? ----
-  const [pop, setPop] = useState(false);
   // ---- AQ21 — the export modal ----
   const [expOpen, setExpOpen] = useState(false);
   // ---- D1: searchable insert palette (position = double-click point) ----
@@ -4052,7 +4050,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 </style>
 <foreignObject width="100%" height="100%">
   <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px">
-    ${clone.outerHTML}
+    ${new XMLSerializer().serializeToString(clone)}
   </div>
 </foreignObject>
 </svg>`;
@@ -4072,7 +4070,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const dataUrl = await Promise.race([
         toPng(el, {
           backgroundColor: o.theme === theme ? undefined : tokensFor(o.theme, ['--bg'])['--bg'],
-          width: imageWidth, height: imageHeight, pixelRatio: 2,
+          width: imageWidth, height: imageHeight, pixelRatio: pngScale,
         } as any),
         new Promise<string>((_, rej) => window.setTimeout(() => rej(new Error('PNG render timed out')), 15000)),
       ]) as string;
@@ -4082,99 +4080,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     }
   };
 
-  // ---- export SVG (serialize the live flow viewport) ----
-  const exportSvg = () => {
-    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!el || !rf) return;
-    const b = (rf as any).getNodesBounds(nodes);
-    const pad = pngPad; /* PACKAGE-S §S-2 — the user's export padding */
-    const w = Math.ceil((b.width ?? 800) + pad * 2);
-    const h = Math.ceil((b.height ?? 400) + pad * 2);
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.setAttribute('transform', `translate(${pad - (b.x ?? 0)},${pad - (b.y ?? 0)})`);
-    // L1: exports read the LIVE theme — a light board exports on a light
-    // background, and the resolved token values are inlined so `var(--…)`
-    // inside the serialised DOM (node accents, shape strokes) still resolves.
-    const tokenCss = EXPORT_TOKENS.map(t => `    ${t}:${readToken(t, '#888')};`).join('\n');
-    const bg = readToken('--bg', '#0b0b0d');
-    const dim = readToken('--dim', '#8a8a92');
-    const fg = readToken('--fg', '#e8e8ea');
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${theme}">
-<rect width="${w}" height="${h}" fill="${bg}"/>
-<style>
-  :root, svg {${'\n'}${tokenCss}
-  }
-  .node{font-family:ui-monospace,Menlo,Consolas,monospace}
-  .node-body{padding:13px 15px 12px}
-  .node-kicker{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;fill:${dim}}
-  .node-title{font-size:14.5px;font-weight:650;fill:${fg}}
-  .node-sub{font-size:11.5px;fill:${dim}}
-  .node-metric{font-size:20px;font-weight:700}
-  text{font-family:ui-monospace,Menlo,Consolas,monospace}
-</style>
-<foreignObject width="100%" height="100%">
-  <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px">
-    ${clone.outerHTML}
-  </div>
-</foreignObject>
-</svg>`;
-    const blob = new Blob([svg], {type: 'image/svg+xml'});
-    download(blob, 'diagram.svg');
-    tickTask('export');
-  };
 
-  const exportJson = () => {
-    tickTask('export');
-    if (curBoard) {
-      // download the current board, including its name so it can be re-imported
-      const data = JSON.stringify({name: curBoard.name, nodes, edges}, null, 2);
-      download(new Blob([data], {type: 'application/json'}), `${curBoard.name.replace(/[^\w.-]+/g, '_') || 'board'}.json`);
-      flash('Downloaded this board as JSON');
-    } else {
-      const data = JSON.stringify({nodes, edges}, null, 2);
-      download(new Blob([data], {type: 'application/json'}), 'diagram.json');
-    }
-  };
-
-  // ---- export PNG (2x) ----
-  const exportPng = async () => {
-    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!el || !rf || !nodes.length) return;
-    tickTask('export');
-    const b = (rf as any).getNodesBounds(nodes) as {x: number; y: number; width: number; height: number};
-    const pad = pngPad; /* PACKAGE-S §S-2 — the user's export padding */
-    const imageWidth = Math.ceil((b.width ?? 800) + pad * 2);
-    const imageHeight = Math.ceil((b.height ?? 400) + pad * 2);
-    const transform = `translate(${pad - (b.x ?? 0)}px, ${pad - (b.y ?? 0)}px) scale(1)`;
-    const prev = el.style.transform;
-    el.style.transform = transform;
-    try {
-      // I4: html-to-image can hang (especially over the network while fetching
-      // fonts/stylesheets) — race it with a timeout so the user gets feedback.
-      const dataUrl = await Promise.race([
-        toPng(el, {
-          // L1: the PNG background follows the live theme.
-          backgroundColor: readToken('--bg', '#0b0b0d'),
-          width: imageWidth,
-          height: imageHeight,
-          pixelRatio: pngScale, /* PACKAGE-S §S-2 — the user's export scale */
-          skipFonts: true, // avoid cross-origin stylesheet fetches (I4)
-          style: {width: `${imageWidth}px`, height: `${imageHeight}px`, transform},
-        }),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('PNG export timed out')), 20000)),
-      ]);
-      // data-URL → Blob so Safari accepts the download from a remote origin.
-      const bin = atob(dataUrl.split(',')[1] ?? '');
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      download(new Blob([bytes], {type: 'image/png'}), 'diagram.png');
-      flash('Exported diagram.png');
-    } catch {
-      flash('PNG export failed');
-    } finally {
-      el.style.transform = prev;
-    }
-  };
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);
@@ -5717,30 +5623,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           {sep()}
 
           <div style={{position: 'relative'}}>
-            <Tooltip label="Export PNG (2×), SVG or JSON · import JSON">
-              <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setPop(o => !o)}>
+            <Tooltip label="Export / Import — scope, format, theme and a live preview">
+              <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setExpOpen(true)}>
                 Export <ChevronDown size={13} />
               </button>
             </Tooltip>
-            {pop && (
-              <div className="pop">
-                <button className="pop-item primary" title="Open the export modal — scope, format, theme and a live preview" onClick={() => { setPop(false); setExpOpen(true); }}>
-                  Export / Import… (preview)
-                </button>
-                <button className="pop-item" title="Import diagram JSON into the current board" onClick={() => { setPop(false); fileRef.current?.click(); }}>
-                  <Upload size={14} /> Import JSON
-                </button>
-                <button className="pop-item" title="Download this board as JSON" onClick={() => { setPop(false); exportJson(); }}>
-                  <FileJson size={14} /> Export JSON
-                </button>
-                <button className="pop-item primary" title="Export diagram as PNG at your saved scale (Settings → Canvas)" onClick={() => { setPop(false); exportPng(); }}>
-                  <Image size={14} /> Export PNG
-                </button>
-                <button className="pop-item" title="Export diagram as SVG" onClick={() => { setPop(false); exportSvg(); }}>
-                  <FileCode size={14} /> Export SVG
-                </button>
-              </div>
-            )}
           </div>
 
           {sep()}
@@ -5752,7 +5639,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             aria-label="Settings"
             aria-haspopup="dialog"
             aria-expanded={settingsOpen}
-            onClick={() => { setPop(false); setSettingsOpen(true); }}
+            onClick={() => setSettingsOpen(true)}
           ><SettingsIcon size={14} /> Settings</button>
 
           {/* AQ12 — align/distribute moved OFF the toolbar: they only mean
