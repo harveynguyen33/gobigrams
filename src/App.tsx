@@ -3069,15 +3069,67 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       : shape === 'note'
         ? {width: 200, height: 90}
         : null);
+    /* AQ19 — CENTRE THE NODE UNDER THE CURSOR: `p` is the cursor/flow point and
+       RF anchors node.position at the TOP-LEFT, so a dropped node always sat
+       down-right of where the user pointed. Offset by half the node's known
+       size (defaults for shapes without one) — every insert path funnels the
+       cursor point through here or its sibling inserters. */
+    const half = {
+      w: (size ? size.width : 190) / 2,
+      h: (size ? size.height : 95) / 2,
+    };
+    const centre = {x: p.x - half.w, y: p.y - half.h};
     // L3a: a flowchart node defaults to vertical handles and a label-only body.
     if (preset.id === 'flowchart' && shape !== 'group' && shape !== 'note') {
       data.handles = 'tb';
       data.body = 'label-only';
     }
     setNodes(ns => [...ns, {
-      id, type: item.kind, position: p, data, selected: false,
+      id, type: item.kind, position: centre, data: {...data, __dropAt: p}, selected: false,
       ...(size ? {style: {width: size.width, height: size.height}} : null),
     }]);
+    /* AQ19 — the estimated half-size differs from the RENDERED box (content,
+       font, auto-grow), so after the node mounts and settles, re-measure and
+       shift it so its CENTRE sits exactly on the drop point. One extra tick,
+       idempotent (reads __dropAt, then clears it). */
+    window.setTimeout(() => {
+      const el = document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement | null;
+      if (!el || !rf) return;
+      const rr = el.getBoundingClientRect();
+      if (!rr.width || !rr.height) return;
+      setNodes(ns => ns.map(n => {
+        if (n.id !== id || !(n.data as any)?.__dropAt) return n;
+        const at = (n.data as any).__dropAt as {x: number; y: number};
+        /* the rendered box is CLIENT coords — convert its centre to FLOW
+           space before comparing with __dropAt (mixing the two spaces at
+           non-1 zoom teleports the node — caught live at 0.53 zoom). */
+        const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
+        const dx = at.x - cf.x;
+        const dy = at.y - cf.y;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return n;
+        return {...n, position: {x: n.position.x + dx, y: n.position.y + dy}, data: {...n.data}};
+      }));
+    }, 320);
+    /* second pass after the auto-grow ladder settles (400/900ms steps) so a
+       node that GREW after the first pass still ends centred; the flag is
+       cleared here. */
+    window.setTimeout(() => {
+      const el = document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement | null;
+      if (!el || !rf) return;
+      const rr = el.getBoundingClientRect();
+      if (!rr.width || !rr.height) return;
+      setNodes(ns => ns.map(n => {
+        if (n.id !== id || !(n.data as any)?.__dropAt) return n;
+        const at = (n.data as any).__dropAt as {x: number; y: number};
+        const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
+        const dx = at.x - cf.x;
+        const dy = at.y - cf.y;
+        const data = {...n.data};
+        delete data.__dropAt;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return {...n, data};
+        return {...n, position: {x: n.position.x + dx, y: n.position.y + dy}, data};
+      }));
+    }, 1150);
   };
 
   // ---- D1: insert via the searchable palette ----
@@ -3400,7 +3452,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     const raw = pos ?? (rf && wr2
       ? rf.screenToFlowPosition({x: wr2.left + wr2.width / 2, y: wr2.top + wr2.height / 2})
       : {x: 480, y: 300});
-    const p = {x: Math.round(raw.x / gridSize) * gridSize, y: Math.round(raw.y / gridSize) * gridSize};
+    let p = {x: Math.round(raw.x / gridSize) * gridSize, y: Math.round(raw.y / gridSize) * gridSize};
+    // AQ19 — centre the custom shape under the cursor (its own size is known).
+    p = {x: Math.round(p.x - shape.w / 2), y: Math.round(p.y - shape.h / 2)};
     // §6.5 step 3 — RE-GENERATE THE ID. Never a stored one.
     const id = `n${idc++}`;
     setNodes(ns => [...ns, {

@@ -36,6 +36,28 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ19 — node CENTRES under the cursor at insert. DONE, 40/40 GREEN, live-verified at 0.53 zoom.
+
+Harvey approved the option offered in AQ18 ("vậy đổi thử"). Nodes now land
+CENTRED on the drop point instead of top-left anchored:
+- `addNodeByLabel` offsets by half the estimated size (palette item size,
+  group 320x200, note 200x90, else 190x95) — covers palette drop, ctx menu,
+  search insert, dblclick canvas, favourites (single-node path).
+- `dropCustomShape` uses its own known shape.w/h.
+- Two-pass re-centre after insert (320ms + 1150ms, after the auto-grow ladder
+  steps): measures the RENDERED box, converts its centre to FLOW space via
+  screenToFlowPosition, shifts so centre == the stored `data.__dropAt`. The
+  flag is cleared on the second pass.
+- PITFALL (caught live): the first pass compared FLOW drop coords against a
+  CLIENT rect centre — at 0.53 zoom this teleported the node ~1200px down.
+  Always convert rendered-box points to flow space before diffing.
+
+LIVE-VERIFIED: ctx 'Add node here' at client (650, 500) on a 0.53-zoom board →
+Queue centre lands at (650, 500) exactly.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ18 — drop-position double-subtract fixed (2 more instances of the AUDIT-7 class). DONE, 40/40 GREEN, live-verified.
 
 Harvey: "thả node theo con trỏ chuột... lệch nhiều so với vị trí thả". AUDIT of
