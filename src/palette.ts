@@ -15,12 +15,13 @@ export type PalKind = 'goblin' | 'label';
 /** The four real diagram types. `custom` (Mixed) is deliberately ABSENT — it is a
  *  separate SET selector, not a filter over `types[]`. These are the persisted
  *  preset ids minus `custom`. */
-export type DiagramType = 'architecture' | 'flowchart' | 'c4' | 'erd';
+export type DiagramType = 'architecture' | 'flowchart' | 'c4' | 'erd' | 'sequence';
 
 /** Grouping in the shape panel. */
 export type PaletteCategory =
   | 'basic' | 'flowchart' | 'data-storage' | 'architecture'
-  | 'c4' | 'entities' | 'groups' | 'annotations';
+  | 'c4' | 'entities' | 'groups' | 'annotations'
+  | 'sequence';
 
 /* HARVEY 2026-10-13 — search-result ANNOTATION: the palette merges four
    diagram languages, so one query ("datab") can surface three near-identical
@@ -32,6 +33,7 @@ export const TYPE_LABEL: Record<DiagramType, string> = {
   flowchart: 'Flowchart',
   c4: 'C4',
   erd: 'ERD',
+  sequence: 'Sequence',
 };
 
 export const SOURCE_PURPOSE: Record<PaletteCategory, string> = {
@@ -43,6 +45,7 @@ export const SOURCE_PURPOSE: Record<PaletteCategory, string> = {
   entities: 'an ERD entity piece',
   groups: 'a boundary that groups other nodes',
   annotations: 'a note or annotation, never connected',
+  sequence: 'a piece of a UML sequence diagram',
 };
 
 export type PaletteItem = {

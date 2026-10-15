@@ -205,7 +205,13 @@ section('AL-1 — selection is option C: a var(--sel) body with an authored-colo
   /* (c) THE REPLACEMENT IS REAL: the body takes the TOKEN and the core takes the
    *     AUTHORED colour, and both are wired to `selected` (never to `:hover`). */
   const selStroke = /const SEL_STROKE = 'var\(--sel\)'/.test(EDGE);
-  const bodyUsesToken = /style=\{selected \? \{\.\.\.props\.style, stroke: SEL_STROKE\} : props\.style\}/.test(EDGE);
+  /* PACKAGE-SEQ 2026-10-15 — the BaseEdge style grew a seqMsg branch
+     (`seqStyle ? {...} : (selected ? ... : props.style)`). The pixel-parity
+     rule is unchanged — for a normal edge the false branch still hands over
+     `props.style` ITSELF — so the probe accepts either spelling. */
+  const bodyUsesToken = /style=\{selected \? \{\.\.\.props\.style, stroke: SEL_STROKE\} : props\.style\}/.test(EDGE)
+    || (/seqStyle \? \{\.\.\.\(selected \? \{\.\.\.props\.style, stroke: SEL_STROKE\} : props\.style\), \.\.\.seqStyle\}/.test(EDGE)
+      && /: \(selected \? \{\.\.\.props\.style, stroke: SEL_STROKE\} : props\.style\)\}/.test(EDGE));
   const coreRendered = /className="edge-sel-core"/.test(EDGE);
   const coreStroke = /className="edge-sel-core"[\s\S]{0,220}?stroke=\{stroke\}/.test(EDGE);
   const coreWidth = /const SEL_CORE_PX = 1\.1/.test(EDGE);
@@ -236,7 +242,10 @@ section('AL-1 — selection is option C: a var(--sel) body with an authored-colo
    *     always spreads would change every unselected edge in the app. */
   const oneBaseEdge = (EDGE.match(/<BaseEdge\b/g) ?? []).length === 1;
   const coreGatedOnSelected = /\{selected && \(/.test(EDGE);
-  const unselectedIsIdentity = /: props\.style\}/.test(EDGE);
+  /* PACKAGE-SEQ — the seqMsg wrapper adds ONE `)` before the closing brace
+     (`... : props.style)}`), so accept both spellings; the semantics — the
+     false branch hands over `props.style` ITSELF — are unchanged. */
+  const unselectedIsIdentity = /: props\.style\)??\}/.test(EDGE);
   assert('al1.an-UNSELECTED-edge-renders-ONE-path-with-the-style-passed-through-UNCHANGED',
     oneBaseEdge && coreGatedOnSelected && unselectedIsIdentity,
     `exactly ${(EDGE.match(/<BaseEdge\b/g) ?? []).length} \`<BaseEdge>\` (one path, as before), the core is gated on ` +

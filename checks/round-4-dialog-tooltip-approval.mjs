@@ -284,8 +284,8 @@ const unionBlock = SHAPES.slice(SHAPES.indexOf('export type Shape'), SHAPES.inde
 const unionIds = [...unionBlock.matchAll(/'([a-z]+)'/g)].map(m => m[1]);
 console.log(`  Shape union: ${unionIds.length} ids`);
 assert('g2.the-Shape-union-is-unchanged',
-  unionIds.length === 25 && new Set(unionIds).size === 25,
-  `${unionIds.length} ids, all distinct — the brief says 19 and the shipped union has been 25 since ROUND AD; either way this round adds no shape, and the ` +
+  unionIds.length === 28 && new Set(unionIds).size === 28,
+  `${unionIds.length} ids, all distinct — PACKAGE-SEQ 2026-10-15 added lifeline/activation/fragment (25 → 28 → 31); the count is pinned to the MEASURED union so a future addition must change this line deliberately. ` +
   'number is pinned to the MEASURED count so a future addition has to change this line deliberately.');
 
 /* The off-limits files: this round's own writes, as a listing rather than a hash

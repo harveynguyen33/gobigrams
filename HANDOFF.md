@@ -42,6 +42,57 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ PACKAGE-SEQ — UML Sequence diagrams ship: 3 levels (System / Component / Protocol). DONE, 40/40 GREEN, live-verified.
+
+Harvey: research sequence charts, then — matching the flowchart experience —
+build 3 sequence-chart variants at 3 levels. Research (deleg_5be68934, 24
+sources, notes at `.hermes/research/track1-sequence-notation.md`) → synthesised
+spec → built overnight for Harvey's morning review.
+
+**The 3 levels (research-backed, Larman SSD lineage):**
+- **Sequence · System** (basic) — actors ↔ one black-box system, loop fragment,
+  boundary messages + replies.
+- **Sequence · Component** (advanced) — typed lifelines (service/db/queue),
+  activation bars, notes — the DEFAULT for design work.
+- **Sequence · Protocol** (complex) — alt fragment, queue lifeline, dividers.
+
+**What was built:**
+- `src/shapes.tsx`: 3 new shapes — `lifeline` (head box + dashed stem in ONE
+  frame; stretch the node → longer lifeline), `activation` (thin bar),
+  `fragment` (UML 2.5 frame + pentagon label tab; kind lives in the kicker).
+  Both ShapeFrame and ShapePreview drawn.
+- `src/palette.ts` + `src/categoryState.ts`: DiagramType + PaletteCategory
+  gain `sequence`; TYPE_LABEL/SOURCE_PURPOSE rows (search modal annotates
+  "Sequence — a piece of a UML sequence diagram").
+- `src/presets.ts`: PresetId `sequence`; SEQUENCE_PALETTE (3 rows, purpose
+  lines carry the S1/S2/S3 tier); SEQUENCE_PRESET (straight edges, ArrowClosed
+  default marker, paper/lines theme, 3 templates registered at basic/advanced/
+  complex — surfaced automatically by templateCatalog).
+- Message semantics: `EdgeData.seqMsg: 'sync'|'async'|'return'|'self'` →
+  GoblinEdge derives arrowhead (ArrowClosed for sync, Arrow for the rest) +
+  dash (return/self dashed) per render; template edges carry the field.
+- Mermaid: `toMermaidSequence` — participants ordered by x, messages ordered by
+  y, `->>` sync / `-->>` return / `-)` async; ExportModal picks the sequence
+  branch automatically when any edge carries seqMsg.
+- Harness re-anchors (this round DID add shapes): package-templates fixture
+  28, round-4 union pin 28 + message, round-ad hint collision fixed (Lifeline
+  hint unified 'head + dashed stem'), round-al style-probe accepts the seqMsg
+  wrapper spelling (identity semantics unchanged).
+
+**LIVE-VERIFIED:** gallery shows Sequence · System/Component/Protocol; picking
+Component loads 8 nodes (3 lifelines + 3 activations + note + title) + 4
+messages; return edges render dashed (styleDash 6,4); Mermaid export emits a
+valid sequenceDiagram (participants by x, sync ->>, return -->>).
+
+**KNOWN V1 LIMITS (deliberate, next-round candidates):** participant x-only
+drag + message-order row model not enforced (freeform positions still win —
+the column constraint is the research's big ~30% item); activations are
+placeable, not derived; fragment frames are visual (no operand enforcement);
+no import of Mermaid sequence syntax (fromMermaid stays flowchart-only).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ21-H — offscreen re-theme: exports now match a real Appearance switch; flicker gone. DONE, 40/40 GREEN, live-verified.
 
 Harvey: exporting with a non-live theme STILL didn't bring the colours a real

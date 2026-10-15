@@ -32,6 +32,43 @@ const SHAPE_TO_MERMAID: Record<string, {open: string; close: string}> = {
 
 const esc = (s: string): string => s.replace(/"/g, '#quot;').replace(/[\r\n]+/g, ' ');
 
+/* PACKAGE-SEQ — UML sequence export. Participants = lifeline nodes (heads at
+   the smallest y per column), ordered by x. Messages = edges carrying seqMsg,
+   ordered by the y of the pair's midpoint. The Mermaid arrow token per kind:
+   sync ->> (filled), async -) (open, fire-and-forget), return -->> (dashed). */
+export function toMermaidSequence(nodes: Node[], edges: Edge[]): string {
+  const heads = nodes.filter(n => n.type === 'goblin'
+    && (n.data as {shape?: string})?.shape === 'lifeline');
+  if (heads.length < 2) return ['sequenceDiagram', '%% fewer than two lifelines — nothing to draw'].join('\n');
+  const sorted = [...heads].sort((a, b) => a.position.x - b.position.x);
+  const ids = sorted.map((_, i) => `S${i + 1}`);
+  const idOf = new Map(sorted.map((n, i) => [n.id, ids[i]]));
+  const lines: string[] = ['sequenceDiagram'];
+  const autonumber = edges.some(e => (e.data as {seqAuto?: boolean})?.seqAuto);
+  if (autonumber) lines.push('  autonumber');
+  sorted.forEach((n, i) => {
+    const d = n.data as {shape?: string; title?: string};
+    const isActor = (d.title ?? '').toLowerCase().includes('actor')
+      || (n.data as {icon?: string})?.icon === 'user';
+    lines.push(`  ${isActor ? 'actor' : 'participant'} ${ids[i]} as ${esc(d.title ?? `P${i + 1}`)}`);
+  });
+  const msgs = edges
+    .filter(e => idOf.has(e.source) && idOf.has(e.target))
+    .map(e => ({e, y: Math.min(
+      nodes.find(n => n.id === e.source)?.position.y ?? 0,
+      nodes.find(n => n.id === e.target)?.position.y ?? 0,
+    )}))
+    .sort((a, b) => a.y - b.y);
+  for (const {e} of msgs) {
+    const kind = (e.data as {seqMsg?: string})?.seqMsg ?? 'sync';
+    const token = kind === 'return' ? '-->>' : kind === 'async' ? '-)' : '->>';
+    const d = (e.data ?? {}) as {label?: string};
+    const label = d.label ? `: ${d.label}` : '';
+    lines.push(`  ${idOf.get(e.source)} ${token} ${idOf.get(e.target)}${label}`);
+  }
+  return lines.join('\n');
+}
+
 export function toMermaid(nodes: Node[], edges: Edge[]): string {
   const goblin = nodes.filter(n => n.type === 'goblin' || n.type === 'label');
   const groups = goblin.filter(n => (n.data as {shape?: string})?.shape === 'group');

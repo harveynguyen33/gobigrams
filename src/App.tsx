@@ -332,6 +332,10 @@ type EdgeData = {
    *  frame it was measured in) and this merges the result — rebasing the stored
    *  offset when the frame moved. */
   __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
+  /** PACKAGE-SEQ — the UML message kind this edge carries. Drives arrowhead +
+   *  dash at render (GoblinEdge) and the Mermaid arrow token at export.
+   *  Absent = a normal (non-sequence) edge. */
+  seqMsg?: 'sync' | 'async' | 'return' | 'self';
 };
 
 /* ---------------------------------------------------------------------------

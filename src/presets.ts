@@ -23,7 +23,7 @@ import {type ShowMode, type TableColumn} from './TableNode';
    is a data change.
 --------------------------------------------------------------------------- */
 
-export type PresetId = 'architecture' | 'flowchart' | 'c4' | 'erd' | 'custom';
+export type PresetId = 'architecture' | 'flowchart' | 'c4' | 'erd' | 'sequence' | 'custom';
 export type LayoutId = 'layered-lr' | 'layered-tb' | 'grid' | 'free';
 
 export type PathId = 'bezier' | 'smoothstep' | 'step' | 'straight';
@@ -825,6 +825,34 @@ const erdTemplate: TemplateSpec = {
   ],
 };
 
+/* PACKAGE-SEQ — the UML sequence palette. Message ARROW KINDS (sync / async /
+   reply) are edge data, not shapes; these rows are the NODE pieces. `purpose`
+   lines carry the level (S1/S2/S3) so the search modal says which tier each
+   piece belongs to (AQ20 override). */
+const SEQUENCE_PALETTE: PaletteItem[] = [
+  {
+    label: 'Lifeline', hint: 'head + dashed stem', shape: 'lifeline', colorKey: 'cyan', kind: 'goblin',
+    category: 'sequence', types: ['sequence'], aliases: ['participant', 'column', 'object'],
+    geometry: 'head + dashed stem', purpose: 'a sequence participant — stretch it downward to lengthen the lifeline',
+    size: {width: 190, height: 380},
+    make: () => ({shape: 'lifeline', kicker: '', title: 'Participant', sub: '', metric: '', metricUnit: '', colorKey: 'cyan'}),
+  },
+  {
+    label: 'Activation', hint: 'thin bar · processing', shape: 'activation', colorKey: 'cyan', kind: 'goblin',
+    category: 'sequence', types: ['sequence'], aliases: ['active', 'bar', 'focus'],
+    geometry: 'thin vertical bar', purpose: 'the span in which a participant processes — level S2+',
+    size: {width: 30, height: 220},
+    make: () => ({shape: 'activation', kicker: '', title: 'activation', sub: '', metric: '', metricUnit: '', colorKey: 'cyan'}),
+  },
+  {
+    label: 'Fragment', hint: 'frame · alt / loop', shape: 'fragment', colorKey: 'slate', kind: 'goblin',
+    category: 'sequence', types: ['sequence'], aliases: ['alt', 'opt', 'loop', 'par', 'frame', 'combined'],
+    geometry: 'frame + label tab', purpose: 'a combined fragment — set its kind in the kicker (alt / opt / loop / par)',
+    size: {width: 480, height: 180},
+    make: () => ({shape: 'fragment', kicker: 'loop', title: 'fragment', sub: '[ condition ]', metric: '', metricUnit: '', colorKey: 'slate'}),
+  },
+];
+
 /* ===========================================================================
    v2 §2 — THE ONE LIBRARY + the `libraryFor(id)` selector.
 
@@ -850,6 +878,8 @@ export const LIBRARY: PaletteItem[] = [
   ...FLOWCHART_PALETTE.filter(p => p.label === 'Lane'),
   // 4 — the C4 elements (11), in C4_TYPES order.
   ...C4_PALETTE_ITEMS,
+  // 4b — PACKAGE-SEQ: the UML sequence pieces.
+  ...SEQUENCE_PALETTE,
   // 5 — the ERD entities.
   TABLE_PALETTE_ITEM,
   ERD_ENUM_NOTE_ITEM,
@@ -893,6 +923,8 @@ export function libraryFor(id: PresetId): PaletteItem[] {
       return withNoteLast(LIBRARY.filter(p => p.types.includes('c4')));
     case 'erd':
       return LIBRARY.filter(p => p.types.includes('erd'));
+    case 'sequence':
+      return withNoteLast(LIBRARY.filter(p => p.types.includes('sequence')));
     default:
       return LIBRARY.filter(p => p.types.includes('architecture'));
   }
@@ -1018,6 +1050,137 @@ export const ERD_PRESET: DiagramPreset = {
   ],
 };
 
+/* ===========================================================================
+   3e — PACKAGE-SEQ: `sequence` (UML sequence diagrams, 3 template levels)
+
+   Levels (research-backed, deleg_5be68934):
+     S1 System     — actors + ONE black-box system lifeline; boundary messages.
+     S2 Component  — typed lifelines (service/db/queue), activations, fragments.
+     S3 Protocol   — everything S2 has, plus break/critical, dividers, notes.
+
+   MESSAGES ARE EDGES. Arrow semantics (UML 2.5): sync = solid + filled
+   arrowhead, async = solid + open, reply = dashed + open. The palette rows for
+   messages insert an edge kind by way of the edge-defaults button row — the
+   shapes here are only the NODE pieces (lifelines, activations, fragments).
+   =========================================================================== */
+
+const seqNode = (
+  key: string, shape: Shape, title: string, sub: string,
+  colorKey: ColorKey, x: number, y: number,
+  w?: number, h?: number,
+): Node => ({
+  id: `sq-${key}`,
+  type: 'goblin',
+  position: {x, y},
+  ...(w && h ? {style: {width: w, height: h}} : {}),
+  data: {shape, kicker: '', title, sub, metric: '', metricUnit: '', colorKey},
+});
+
+const seqEdge = (id: string, source: string, target: string, label: string, kind: 'sync' | 'async' | 'return'): Edge => ({
+  id: `sq-${id}`,
+  source: `sq-${source}`,
+  target: `sq-${target}`,
+  type: 'goblinEdge',
+  data: {label, seqMsg: kind},
+});
+
+const seqSystemTemplate: TemplateSpec = {
+  id: 'seq-system',
+  label: 'Sequence · System',
+  hint: 'actors ↔ one black-box system · S1',
+  level: 'basic',
+  nodes: [
+    seqNode('user', 'lifeline', 'Customer', 'actor', 'green', 0, 0, 190, 380),
+    seqNode('system', 'lifeline', 'Booking System', 'system', 'cyan', 320, 0, 190, 380),
+    seqNode('frag', 'fragment', 'loop', '[ more items ]', 'slate', 60, 150, 480, 170),
+    {
+      id: 'sq-title', type: 'label', position: {x: 0, y: -50},
+      data: {text: 'System Sequence diagram — booking flow'},
+    },
+  ],
+  edges: [
+    seqEdge('e1', 'user', 'system', 'searchItems(query)', 'sync'),
+    seqEdge('e2', 'system', 'user', 'items', 'return'),
+    seqEdge('e3', 'user', 'system', 'checkout(cart)', 'sync'),
+    seqEdge('e4', 'system', 'user', 'receipt', 'return'),
+  ],
+};
+
+const seqComponentTemplate: TemplateSpec = {
+  id: 'seq-component',
+  label: 'Sequence · Component',
+  hint: 'services + datastores + activations · S2',
+  level: 'advanced',
+  nodes: [
+    seqNode('api', 'lifeline', 'API Gateway', 'service', 'cyan', 0, 0, 190, 460),
+    seqNode('auth', 'lifeline', 'Auth Service', 'service', 'violet', 300, 0, 190, 460),
+    seqNode('db', 'lifeline', 'User Database', 'database', 'amber', 600, 0, 190, 460),
+    seqNode('act1', 'activation', '', '', 'cyan', 80, 120, 30, 260),
+    seqNode('act2', 'activation', '', '', 'violet', 380, 170, 30, 170),
+    seqNode('act3', 'activation', '', '', 'amber', 680, 230, 30, 90),
+    /* activation x centres under each lifeline stem (lifeline x + 95 - 15) */
+    seqNode('note1', 'note', 'Token verified on every request', '', 'slate', 40, 420, 220, 60),
+    {
+      id: 'sq-title', type: 'label', position: {x: 0, y: -50},
+      data: {text: 'Component interaction — authenticate'},
+    },
+  ],
+  edges: [
+    seqEdge('e1', 'api', 'auth', 'authenticate(token)', 'sync'),
+    seqEdge('e2', 'auth', 'db', 'loadUser(id)', 'sync'),
+    seqEdge('e3', 'db', 'auth', 'user record', 'return'),
+    seqEdge('e4', 'auth', 'api', 'session', 'return'),
+  ],
+};
+
+const seqProtocolTemplate: TemplateSpec = {
+  id: 'seq-protocol',
+  label: 'Sequence · Protocol',
+  hint: 'fragments · dividers · full set · S3',
+  level: 'complex',
+  nodes: [
+    seqNode('client', 'lifeline', 'Client', 'actor', 'green', 0, 0, 190, 520),
+    seqNode('lb', 'lifeline', 'Load Balancer', 'gateway', 'cyan', 300, 0, 190, 520),
+    seqNode('svc', 'lifeline', 'Payment Service', 'service', 'violet', 600, 0, 190, 520),
+    seqNode('q', 'lifeline', 'Event Queue', 'queue', 'amber', 900, 0, 190, 520),
+    seqNode('div', 'fragment', 'div', '== settled payments ==', 'slate', 60, 380, 1020, 60),
+    seqNode('frag1', 'fragment', 'alt', '[ card ] / [ wallet ]', 'slate', 40, 120, 840, 200),
+    {
+      id: 'sq-title', type: 'label', position: {x: 0, y: -50},
+      data: {text: 'Payment protocol — charge flow'},
+    },
+  ],
+  edges: [
+    seqEdge('e1', 'client', 'lb', 'POST /charge', 'sync'),
+    seqEdge('e2', 'lb', 'svc', 'charge(amount)', 'sync'),
+    seqEdge('e3', 'svc', 'q', 'PaymentSettled', 'async'),
+    seqEdge('e4', 'svc', 'lb', 'result', 'return'),
+    seqEdge('e5', 'lb', 'client', '200 OK', 'return'),
+  ],
+};
+
+export const SEQUENCE_PRESET: DiagramPreset = {
+  id: 'sequence',
+  label: 'Sequence',
+  hint: 'lifelines · messages over time',
+  palette: libraryFor('sequence'),
+  extraShapes: ['lifeline', 'activation', 'fragment'],
+  edges: {path: 'straight', strokeKey: 'slate', markerEnd: MarkerType.ArrowClosed},
+  layout: {engine: 'grid', direction: 'LR', spacing: {x: 300, y: 80}},
+  theme: {suggested: 'paper', canvas: 'lines', showLegend: false},
+  guidance: {tip: 'Lifelines are columns — stretch one downward to lengthen it. Messages are edges: drop them between lifelines, top to bottom in time order.'},
+  caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
+  templates: [seqSystemTemplate, seqComponentTemplate, seqProtocolTemplate],
+  note: 'Time flows downward. Solid + filled arrow = sync call · solid + open = async · dashed = reply.',
+  legend: [
+    {colorKey: 'green', label: 'Actor / client'},
+    {colorKey: 'cyan', label: 'System under design'},
+    {colorKey: 'violet', label: 'Internal service'},
+    {colorKey: 'amber', label: 'Datastore / queue'},
+    {colorKey: 'slate', label: 'Fragment frame (alt · opt · loop)'},
+  ],
+};
+
 /** 2/5 — `custom`: the union of every palette, for blending diagram types. */
 export const CUSTOM_PRESET: DiagramPreset = {
   id: 'custom',
@@ -1044,6 +1207,7 @@ export const CUSTOM_PRESET: DiagramPreset = {
 
 export const PRESETS: Record<PresetId, DiagramPreset> = {
   architecture: ARCHITECTURE_PRESET,
+  sequence: SEQUENCE_PRESET,
   flowchart: FLOWCHART_PRESET,
   c4: C4_PRESET,
   erd: ERD_PRESET,

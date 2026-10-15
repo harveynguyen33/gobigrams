@@ -36,7 +36,7 @@ export const CATEGORIES_KEY = 'diagram-studio:categories';
 /** The CANONICAL section order. It is fixed this pass — user reordering is not
  *  in scope (synthesis §3), which is why no `libraryOrder` key is persisted. */
 export const CATEGORY_ORDER: PaletteCategory[] = [
-  'basic', 'flowchart', 'data-storage', 'architecture', 'c4', 'entities', 'groups', 'annotations',
+  'basic', 'flowchart', 'data-storage', 'architecture', 'c4', 'entities', 'groups', 'annotations', 'sequence',
 ];
 
 /** The real display names for the 8 section headers. */
@@ -49,6 +49,7 @@ export const CATEGORY_LABEL: Record<PaletteCategory, string> = {
   entities: 'Entities',
   groups: 'Groups & boundaries',
   annotations: 'Annotations',
+  sequence: 'Sequence',
 };
 
 /** A view id that resolves a not-yet-decided section: the board's own preset.

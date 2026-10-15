@@ -63,7 +63,7 @@ const FIXTURE = {
   approvalNodes: 14,
   approvalEdges: 10,
   hexLiterals: 144,
-  shapeUnionIds: 25,
+  shapeUnionIds: 28, /* PACKAGE-SEQ 2026-10-15 — +lifeline/activation/fragment (25 → 28); the fixture tracks the shipped union */
   templates: 4,
 };
 

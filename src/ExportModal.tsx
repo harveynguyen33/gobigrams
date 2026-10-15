@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {EXPORT_TOKENS, tokensFor} from './theme';
-import {toMermaid, fromMermaid} from './mermaid';
+import {toMermaid, toMermaidSequence, fromMermaid} from './mermaid';
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'json' | 'mermaid';
@@ -67,7 +67,13 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
         } else if (format === 'json') {
           setPreview({kind: 'text', data: JSON.stringify({name: boardName, nodes: scoped.nodes, edges: scoped.edges}, null, 2).slice(0, 4000), sub: `${scoped.nodes.length} nodes · ${scoped.edges.length} edges`});
         } else {
-          setPreview({kind: 'text', data: toMermaid(scoped.nodes, scoped.edges), sub: 'Mermaid flowchart — colours/text styles/icons are not representable'});
+          const isSeq = scoped.edges.some(x => (x.data as {seqMsg?: string})?.seqMsg);
+          const text = isSeq
+            ? toMermaidSequence(scoped.nodes, scoped.edges)
+            : toMermaid(scoped.nodes, scoped.edges);
+          setPreview({kind: 'text', data: text, sub: isSeq
+            ? 'Mermaid sequenceDiagram — activations/fragments are not representable'
+            : 'Mermaid flowchart — colours/text styles/icons are not representable'});
         }
       } catch (err) {
         setPreview({kind: 'text', data: `Preview failed: ${(err as Error)?.message ?? 'unknown'}`});
@@ -104,7 +110,9 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
         blob = new Blob([JSON.stringify({name: boardName, nodes: scoped.nodes, edges: scoped.edges}, null, 2)], {type: 'application/json'});
         name = `${base}.json`;
       } else {
-        blob = new Blob([toMermaid(scoped.nodes, scoped.edges)], {type: 'text/plain'});
+        const isSeq = scoped.edges.some(x => (x.data as {seqMsg?: string})?.seqMsg);
+        const text = isSeq ? toMermaidSequence(scoped.nodes, scoped.edges) : toMermaid(scoped.nodes, scoped.edges);
+        blob = new Blob([text], {type: 'text/plain'});
         name = `${base}.mmd`;
       }
       const a = document.createElement('a');

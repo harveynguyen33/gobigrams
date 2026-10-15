@@ -4,7 +4,9 @@ import {
   getBezierPath, getSmoothStepPath, getStraightPath,
   useStore,
   useStoreApi,
+  MarkerType,
   type EdgeProps,
+  type EdgeMarkerType,
 } from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from './colors';
 import {
@@ -162,6 +164,11 @@ const GoblinEdge = memo((props: EdgeProps) => {
 
   const d = (data ?? {}) as {
     shape?: string;
+    /* PACKAGE-SEQ — the UML message kind. Overrides the arrowhead + dash so a
+       sequence edge ALWAYS renders with the notation's semantics, whatever the
+       board defaults were: sync = solid + closed head, async = solid + open,
+       return/self = dashed + open. Colour follows the edge's own stroke. */
+    seqMsg?: 'sync' | 'async' | 'return' | 'self';
     offset?: 'center' | 'start' | 'end';
     flow?: 'none' | 'dots' | 'dash' | 'pulse' | 'icon';
     flowIcon?: 'mail' | 'package' | 'file' | 'zap' | 'settings' | 'database';
@@ -972,6 +979,19 @@ const GoblinEdge = memo((props: EdgeProps) => {
     });
   }, [path, id, flow, flowCount, flowDur, stroke, randomDelay, d.flowIcon]);
 
+  /* PACKAGE-SEQ — derive the message-kind overrides once per render. The head
+     type values mirror what makeEdge builds for plain markers: sync gets the
+     CLOSED (filled) head; async / return / self get the OPEN head, and the
+     dashed stroke comes as a style override. Colour follows the edge's own. */
+  const seqColor = (props.style as React.CSSProperties | undefined)?.stroke as string | undefined;
+  const seqMarker = d.seqMsg
+    ? ({type: d.seqMsg === 'async' || d.seqMsg === 'return' || d.seqMsg === 'self'
+      ? MarkerType.Arrow : MarkerType.ArrowClosed, color: seqColor, width: 18, height: 12} as EdgeMarkerType)
+    : null;
+  const seqStyle = d.seqMsg === 'return' || d.seqMsg === 'self'
+    ? {strokeDasharray: '6 4'}
+    : undefined;
+
   return (
     <>
       {/* ROUND AL, AL-1 — SELECTION IS OPTION C: THE OLD LOOK, MADE TRUTHFUL.
@@ -1010,8 +1030,9 @@ const GoblinEdge = memo((props: EdgeProps) => {
         id={id}
         path={path}
         markerStart={props.markerStart}
-        markerEnd={props.markerEnd}
-        style={selected ? {...props.style, stroke: SEL_STROKE} : props.style}
+        markerEnd={(seqMarker ?? props.markerEnd) as string | undefined}
+        style={seqStyle ? {...(selected ? {...props.style, stroke: SEL_STROKE} : props.style), ...seqStyle}
+                        : (selected ? {...props.style, stroke: SEL_STROKE} : props.style)}
         interactionWidth={26}
       />
 

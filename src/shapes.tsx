@@ -17,7 +17,13 @@ export type Shape =
   | 'terminator' | 'process' | 'decision' | 'io' | 'document' | 'subprocess'
   | 'manual' | 'delay' | 'connector' | 'preparation'
   /* ROUND AD — the six "every tool ships this" additions Harvey approved. */
-  | 'offpage' | 'manualinput' | 'display' | 'storeddata' | 'looplimit' | 'internalstorage';
+  | 'offpage' | 'manualinput' | 'display' | 'storeddata' | 'looplimit' | 'internalstorage'
+  /* PACKAGE-SEQ — UML sequence. The lifeline is a STRETCHABLE node: the head
+     box carries the participant name; the dashed stem is drawn inside the same
+     frame, so stretching the node downward lengthens the lifeline. Activation
+     is the thin bar; fragment is the combined-fragment frame (alt/opt/loop/…
+     named in the node's sub line). */
+  | 'lifeline' | 'activation' | 'fragment';
 
 /* ITEM 4 (2026-09-17) — EVERY `hint` IS A GLANCEABLE SECONDARY LINE.
 
@@ -74,6 +80,12 @@ export const SHAPES: {id: Shape; label: string; hint: string}[] = [
   {id: 'storeddata', label: 'Stored data', hint: 'cylinder · read / write'},
   {id: 'looplimit', label: 'Loop limit', hint: 'notched top · loop start'},
   {id: 'internalstorage', label: 'Internal storage', hint: 'pane rect · in-memory'},
+  /* PACKAGE-SEQ — UML sequence trio. Hints follow the SAME rules as above:
+     geometry cue + semantic cue, ≤22 chars, no label repetition, no collisions
+     (package-o-metrics asserts distinctness across the whole table). */
+  {id: 'lifeline', label: 'Lifeline', hint: 'head + dashed stem'},
+  {id: 'activation', label: 'Activation', hint: 'thin bar · processing'},
+  {id: 'fragment', label: 'Fragment', hint: 'frame · alt / loop'},
 ];
 
 export const SHAPE_IDS: Shape[] = SHAPES.map(s => s.id);
@@ -250,6 +262,33 @@ export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
         <path d="M2 26 H26" {...line} />
       </>, 'internalstorage');
 
+    /* ------------- PACKAGE-SEQ: UML sequence -------------
+       LIFELINE is ONE shape: the head box occupies the top band; the dashed
+       stem runs down the middle of whatever height the node has (stretch the
+       node → longer lifeline). The stem uses the frame's own stroke so it
+       recolours with the colour key like every other shape. */
+    case 'lifeline':
+      return wrap(<>
+        <rect x="1" y="1" width="198" height="30" rx="6" {...p} />
+        <path d="M100 31 V98" {...line} strokeDasharray="6 5" />
+      </>, 'lifeline');
+    case 'activation':
+      // The thin vertical bar. In a 200x100 frame this renders as a slim
+      // centred column; the intended use is a NARROW, TALL node (default size
+      // set by the palette item), so the frame scales the column correctly.
+      return wrap(<>
+        <rect x="88" y="1" width="24" height="98" rx="4" {...p} />
+      </>, 'activation');
+    case 'fragment':
+      // Combined-fragment frame (UML 2.5): solid rectangle + the pentagon
+      // label tab in the top-left corner. The fragment kind (alt / opt /
+      // loop / par) lives in the node's kicker line, so one shape serves all.
+      return wrap(<>
+        <rect x="1" y="1" width="198" height="98" {...p} />
+        <path d="M1 1 H66 L82 17 V1" {...line} />
+        <path d="M1 1 H66 L82 18 H1 Z" {...p} />
+      </>, 'fragment');
+
     default:
       return null;
   }
@@ -340,8 +379,22 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
       /* AQ10b — preview matches the Minimal default (no inner arc). */
       return wrap(<>
         <ellipse cx="13" cy="4.6" rx="11.5" ry="3.4" {...s} />
-        <path d="M1.5 4.6 V13.4 A 11.5 3.4 0 0 0 24.5 13.4 V4.6" {...s} />
+        <path d="M1.5 4.6 V13 A 11.5 3.4 0 0 0 24.5 13 V4.6" {...s} />
       </>, 'storeddata');
+
+    /* ---------------- PACKAGE-SEQ previews (26x18) ---------------- */
+    case 'lifeline':
+      return wrap(<>
+        <rect x="3" y="1.5" width="20" height="6" rx="2" {...s} />
+        <path d="M13 7.5 V16.5" strokeDasharray="2.5 2" {...s} strokeWidth={1.2} />
+      </>, 'lifeline');
+    case 'activation':
+      return wrap(<rect x="10.5" y="1.5" width="5" height="15" rx="1.6" {...s} />, 'activation');
+    case 'fragment':
+      return wrap(<>
+        <rect x="1" y="1.5" width="24" height="15" {...s} />
+        <path d="M1 1.5 H8 L11.5 6 H1 Z" {...s} strokeWidth={1.1} />
+      </>, 'fragment');
     case 'looplimit':
       return wrap(<path d="M5 2 H21 L25 4.5 V15 H1 V4.5 Z" {...s} />, 'looplimit');
     case 'internalstorage':
