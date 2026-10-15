@@ -98,7 +98,7 @@ export default function SearchPalette({onInsert, onClose, items: source}: Props)
                     and WHAT they are for, or the list is a guessing game. */}
                 <small className="sp-src">
                   {p.types.map(t => TYPE_LABEL[t]).join(' · ')}
-                  {' — '}{SOURCE_PURPOSE[p.category]}
+                  {' — '}{p.purpose ?? SOURCE_PURPOSE[p.category]}
                 </small>
               </span>
             </button>

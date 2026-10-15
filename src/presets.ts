@@ -286,6 +286,10 @@ const c4PaletteItem = (t: C4Type): PaletteItem => {
     label: e.kicker.replace(/[[\]]/g, ''),
     hint: e.hint, shape: e.shape, colorKey: e.colorKey, kind: 'goblin',
     category: 'c4', types: ['c4'],
+    /* AQ20 — every C4 entry shares the c4 category, so the generic
+       SOURCE_PURPOSE sentence made all C4 rows read identically in search.
+       The level + the C4 element's own description say what THIS one is. */
+    purpose: `a level-${e.level} C4 element — ${e.sub}`,
     size: e.shape === 'group' ? {width: 460, height: 300} : undefined,
     make: () => ({
       shape: e.shape, kicker: e.kicker, title: e.kicker.replace(/[[\]]/g, ''),
@@ -754,6 +758,9 @@ export const TABLE_PALETTE_ITEM: PaletteItem = {
 export const ERD_ENUM_NOTE_ITEM: PaletteItem = {
   label: 'Note (enum)', hint: 'enum / annotation', shape: 'note', colorKey: 'amber', kind: 'goblin',
   category: 'annotations', types: ['erd'], aliases: ['enum', 'field values'], geometry: 'plain text annotation',
+  /* AQ20 — same shape + category as the shared Note; the purpose line must
+     say this one lists field values. */
+  purpose: 'an ERD note listing the allowed values of a field',
   make: () => ({shape: 'note', kicker: 'enum', title: 'status', sub: 'pending · paid · shipped', metric: '', metricUnit: '', icon: 'sticky-note', colorKey: 'amber'}),
 };
 

@@ -55,6 +55,11 @@ export type PaletteItem = {
   kind: PalKind;
   /** Optional default node size (a flowchart diamond needs more height). */
   size?: {width: number; height: number};
+  /** AQ20 — per-item purpose override for the search-result source line. The
+      category map (SOURCE_PURPOSE) is generic; C4 entries all share the c4
+      category, so without an override every C4 row reads the same sentence.
+      Set when the item needs to say something more specific. */
+  purpose?: string;
   /** Panel grouping — an item lands in exactly ONE category. */
   category: PaletteCategory;
   /** Diagram types this element belongs to (filter membership). Required and

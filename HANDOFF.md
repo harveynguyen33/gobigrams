@@ -37,6 +37,27 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ20 — search source lines unique for EVERY duplicated shape. DONE, 40/40 GREEN, live-verified.
+
+Harvey: extend the AQ6 treatment (search annotation) to all duplicated shapes.
+Audit of the 28-entry LIBRARY found the duplicate-shape groups: actor (1+2 C4),
+service (1+3), database (1+2), queue (1+2), storage (1+1), external (1+2),
+group (1 arch + 1 flow + 3 C4), note (4 entries). The AQ6 line was generic:
+`p.types → TYPE_LABEL` + `SOURCE_PURPOSE[p.category]` — so ALL C4 rows read the
+identical "C4 — a node in a C4 model", and Note vs Note (enum) collided too.
+
+Fix: `PaletteItem.purpose?: string` override, consumed by SearchPalette as
+`p.purpose ?? SOURCE_PURPOSE[p.category]`.
+- Every C4 palette item now sets `purpose: a level-N C4 element — <e.sub>`.
+- ERD Note (enum): "an ERD note listing the allowed values of a field".
+
+LIVE-VERIFIED: 'boundary' → Group (Architecture — boundary…), Lane (Flowchart —
+boundary…), System boundary (C4 — level-2…), Container boundary (C4 — level-3…)
+— four rows, four distinct lines. 'datab' trio unchanged and distinct.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · hex 144 · **40/40 harnesses**.
+
 ## ▶ AQ19 — node CENTRES under the cursor at insert. DONE, 40/40 GREEN, live-verified at 0.53 zoom.
 
 Harvey approved the option offered in AQ18 ("vậy đổi thử"). Nodes now land
