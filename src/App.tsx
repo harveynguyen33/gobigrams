@@ -3111,9 +3111,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
            non-1 zoom teleports the node — caught live at 0.53 zoom). */
         const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
         const dx = at.x - cf.x;
-        const dy = at.y - cf.y;
-        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return n;
-        return {...n, position: {x: n.position.x + dx, y: n.position.y + dy}, data: {...n.data}};
+        /* AQ19d — X-ONLY on BOTH passes now. The grow ladder's first steps
+           (60/150ms) land BEFORE this 320ms pass, so a cylinder is already
+           taller than the estimate here; a Y-recentre after that growth reads
+           as the node jumping UP ~1s after the drop (Harvey). Vertical is
+           decided at insert time and never revisited — growth extends
+           downward from the placed head. */
+        if (Math.abs(dx) < 1) return n;
+        return {...n, position: {x: n.position.x + dx, y: n.position.y}, data: {...n.data}};
       }));
     }, 320);
     /* second pass after the auto-grow ladder settles (400/900ms steps) so a

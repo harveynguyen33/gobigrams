@@ -352,10 +352,12 @@ assert('R4 .resize-line still kills RF\'s own line border (no second selection b
   lineBorderZero,
   `.resize-line { border-width: ${resizeLine?.decls['border-width']} } [styles.css:${resizeLine?.line}]`);
 
+/* AQ19e — the goblin floors are per-node derivations; compare the label floors
+   against the CLAMP CONSTANTS (the worst cases the derivations can reach). */
 assert('R5 the label floors are smaller than a diagram node\'s, and grabbable (>44)',
   Number.isFinite(minW) && Number.isFinite(minH) && minW > 0 && minH > 0
-    && (minW < diagW || minH < diagH) && minW >= 44 && minH >= 44,
-  `label ${minW}x${minH} vs goblin ${diagW}x${diagH}`);
+    && (minW < DIAG_CONSTS.NODE_MIN_W || minH < DIAG_CONSTS.NODE_MIN_H) && minW >= 44 && minH >= 44,
+  `label ${minW}x${minH} vs goblin clamp ${DIAG_CONSTS.NODE_MIN_W}x${DIAG_CONSTS.NODE_MIN_H}`);
 
 assert('R6 .label-node fills the wrapper on BOTH axes',
   labelW === '100%' && labelMinH === '100%',
@@ -379,8 +381,9 @@ assert('R10 addNodeByLabel honours item.size (no App.tsx change needed)',
 
 /* ---- ROUND S: the floors now hold an invariant against the sheet ---- */
 assert('S1 the resizer floor is NEVER below the CSS content floor (.node min-width)',
-  Number.isFinite(diagW) && Number.isFinite(nodeCssMinW) && diagW >= nodeCssMinW,
-  `resizer ${diagW} >= .node min-width ${nodeCssMinW}`);
+  DIAG_CONSTS.NODE_MIN_W >= nodeCssMinW
+    && /Math\.min\(NODE_MIN_W, naturalWRef\.current\)/.test(DIAGRAM),
+  `clamp constant NODE_MIN_W ${DIAG_CONSTS.NODE_MIN_W} >= .node min-width ${nodeCssMinW} (the per-node floor is min(clamp, natural))`);
 
 assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two)',
   cssContentMinW === nodeCssMinW && /CSS_CONTENT_MIN_W \+ FLOOR_SLACK_PX/.test(DIAGRAM),
@@ -391,10 +394,11 @@ assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two
    141 guarantee moved into the auto-grow ladder (AQ15c), which re-raises any
    too-short node instead of clipping — so S3 now pins the DERIVATION (the clamp
    must reference NODE_MIN_H) instead of a static number. */
-assert('S3 the vertical floor clamps against NODE_MIN_H (worst-case moved to auto-grow)',
-  /minHFloor = naturalHRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_H, naturalHRef\.current\)/.test(DIAGRAM)
-    && diagW >= WORST_CONTENT_W,
-  `floor width ${diagW} vs content ${WORST_CONTENT_W}; height floor = per-node natural (clamped by NODE_MIN_H=${DIAG_CONSTS.NODE_MIN_H})`);
+assert('S3 the floors clamp against the NODE_MIN constants (worst-case moved to auto-grow)',
+  /minWFloor = naturalWRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_W, naturalWRef\.current\)/.test(DIAGRAM)
+    && /minHFloor = naturalHRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_H, naturalHRef\.current\)/.test(DIAGRAM)
+    && DIAG_CONSTS.NODE_MIN_W >= WORST_CONTENT_W,
+  `floors are per-node natural, clamped by NODE_MIN_W=${DIAG_CONSTS.NODE_MIN_W} (>= worst width ${WORST_CONTENT_W}) and NODE_MIN_H=${DIAG_CONSTS.NODE_MIN_H}`);
 
 assert('S4 the old 140x80 floors are GONE (a regression would be the defect)',
   diagW !== 140 && diagH !== 80,

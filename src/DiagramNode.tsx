@@ -273,6 +273,10 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      the resizer's vertical floor so "shrink back to minimum" lands on the SAME
      size a fresh drop produces, instead of the static worst-case NODE_MIN_H. */
   const naturalHRef = useRef<number>(0);
+  /* AQ19e — same idea for WIDTH: the fresh-drop natural width (190 via the CSS
+     floor) is BELOW the static NODE_MIN_W (200), so a stretch→shrink could
+     never return to the dropped width. Measured alongside the height. */
+  const naturalWRef = useRef<number>(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const inner = innerRef.current, body = bodyRef.current;
@@ -291,9 +295,10 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       const last = kids[kids.length - 1];
       const clipped = last ? Math.ceil(last.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom + 2) : 0;
       if (clipped <= 0) {
-        /* content fits: the current wrapper height IS this node's natural
-           height — remember it as the resizer's floor (AQ19c). */
+        /* content fits: the current wrapper size IS this node's natural size —
+           remembered as the resizer's floors (AQ19c/AQ19e). */
         naturalHRef.current = wrapper.offsetHeight;
+        naturalWRef.current = wrapper.offsetWidth;
         return;
       }
       /* PERCENT INSETS: the band is a fixed FRACTION of the node, so the node
@@ -318,6 +323,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       const sideIns = (parseFloat(cb.left) || 0) + (parseFloat(cb.right) || 0);
       const targetW = Math.min(340, Math.max(0, Math.ceil(naturalW + sideIns + 8)));
       naturalHRef.current = target;
+      if (targetW) naturalWRef.current = targetW;
       if (d.__onGrow) d.__onGrow(id, target, targetW);
       else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: target, width: targetW}}));
     };
@@ -370,9 +376,12 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   const minHFloor = naturalHRef.current > 0
     ? Math.min(NODE_MIN_H, naturalHRef.current)
     : NODE_MIN_H;
+  const minWFloor = naturalWRef.current > 0
+    ? Math.min(NODE_MIN_W, naturalWRef.current)
+    : NODE_MIN_W;
   const resizer = selected && RESIZABLE.has(shape) ? (
     <NodeResizer
-      minWidth={NODE_MIN_W}
+      minWidth={minWFloor}
       minHeight={minHFloor}
       lineClassName="resize-line"
       handleClassName="resize-handle"

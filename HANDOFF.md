@@ -46,6 +46,30 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ19d/e — no vertical motion after drop; width floor = per-node natural. DONE, 40/40 GREEN, live-verified.
+
+Harvey, two more cylinder issues:
+1. **Still jumps up ~1s after drop** — AQ19b fixed only the 1150ms pass, but
+   the grow ladder's 60/150ms steps land BEFORE the 320ms pass, so the cylinder
+   is already taller than the estimate when pass 1 re-centres Y. Fix: BOTH
+   passes are now X-ONLY. Vertical is decided at insert time (the centre
+   estimate) and never revisited — growth extends downward from the placed
+   head. LIVE-VERIFIED: cylinder drop, position sampled across 0-3s is
+   x=557 y=473 CONSTANT while h settles 128; zero motion.
+2. **Width: stretch → shrink never returned to the dropped width** — same
+   static-floor bug as the height (AQ19c): resizer `minWidth` was NODE_MIN_W
+   (200) while a fresh drop is 190 (the CSS floor). Fix mirrors AQ19c:
+   `naturalWRef` measured alongside the height; `minWFloor =
+   min(NODE_MIN_W, naturalW)`. Shrink-below-content is safe (AQ15c auto-grow
+   re-widens).
+
+Harness re-anchors: round-5 7b (minWFloor derivation), round-r S3 (both floor
+derivations + clamp constants), R5/S1 (compare against clamp constants; a
+stray debug line removed).
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ19c — resize floor = the node's own natural height (shrink-back == fresh-drop size). DONE, 40/40 GREEN.
 
 Harvey + screenshot: a fresh-dropped node is SMALLER than the same node after

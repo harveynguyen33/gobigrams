@@ -498,7 +498,10 @@ check('7a. no resizer gained a gesture callback prop (the feel is unchanged)', (
 });
 
 check('7b. the diagram node floors are still wired to the same constants', () => {
-  assert.match(DIAGRAM, /minWidth=\{NODE_MIN_W\}/, 'minWidth is no longer NODE_MIN_W');
+  /* AQ19e 2026-10-16 — minWidth became per-node too (minWFloor, same pattern
+     as minHeight): measured natural width clamped by NODE_MIN_W. */
+  assert.match(DIAGRAM, /minWidth=\{minWFloor\}/, 'minWidth no longer uses the minWFloor derivation');
+  assert.match(DIAGRAM, /const minWFloor = naturalWRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_W, naturalWRef\.current\)/, 'the minWidth floor derivation changed');
   /* AQ19c 2026-10-16 — minHeight became PER-NODE: `naturalHRef` (the measured
      fresh-drop fit) clamped by NODE_MIN_H. The constant stays declared and the
      clamp always Math.min()s against it. */
