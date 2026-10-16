@@ -3129,11 +3129,15 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         const at = (n.data as any).__dropAt as {x: number; y: number};
         const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
         const dx = at.x - cf.x;
-        const dy = at.y - cf.y;
+        /* HARVEY 2026-10-16 — X-ONLY on this pass. A cylinder auto-grows ~2.2×
+           taller on this ladder; re-centring Y after that growth yanks the node
+           UP ~1s after the drop (the grown body pulls the head back to the
+           drop point). The user placed the HEAD — growth belongs BELOW it, so
+           vertical is anchored at pass 1 and never touched again. */
         const data = {...n.data};
         delete data.__dropAt;
-        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return {...n, data};
-        return {...n, position: {x: n.position.x + dx, y: n.position.y + dy}, data};
+        if (Math.abs(dx) < 1) return {...n, data};
+        return {...n, position: {x: n.position.x + dx, y: n.position.y}, data};
       }));
     }, 1150);
   };

@@ -44,6 +44,25 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ19b — drop jump fix: the 1150ms re-centre pass is X-ONLY. DONE, 40/40 GREEN, live-verified.
+
+Harvey: dropping a node made it JUMP UP ~1s later (cylinders only). Root cause:
+the cylinder auto-grow ladder (up to ~2.2× height) runs inside the AQ19
+two-pass re-centre window; pass 2 re-centred BOTH axes, so after the growth the
+pass yanked the grown body's centre back to the drop point — a visible upward
+jump ~1s after the drop, on exactly the shapes that grow (cylinders).
+
+Fix: pass 2 is X-ONLY. The user placed the HEAD — auto-growth belongs BELOW it,
+so vertical is anchored at pass 1 (320ms, before growth) and never touched
+again. Horizontal still recentres (width estimates can be off).
+
+LIVE-VERIFIED: cylinder dropped at (600, 300) — position sampled at ~0.4/1.0/
+1.6/2.5s stays y=235 x=505 constant while height settles 95→131 (grew); centre
+lands exactly on the drop x. No jump.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ PACKAGE-SEQ-HIDE — sequence hidden behind SEQUENCE_ENABLED=false. DONE, 40/40 GREEN, live-verified.
 
 Harvey: the first sequence cut reads poorly ("tệ quá") — hide it for now, the
