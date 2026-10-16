@@ -386,9 +386,15 @@ assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two
   cssContentMinW === nodeCssMinW && /CSS_CONTENT_MIN_W \+ FLOOR_SLACK_PX/.test(DIAGRAM),
   `CSS_CONTENT_MIN_W ${cssContentMinW} === .node { min-width: ${nodeCssMinW}px }`);
 
-assert('S3 the floors clear the WORST-CASE measured content (queue 199x131)',
-  diagW >= WORST_CONTENT_W && diagH >= WORST_CONTENT_H,
-  `floor ${diagW}x${diagH} vs content ${WORST_CONTENT_W}x${WORST_CONTENT_H}`);
+/* AQ19c 2026-10-16 — the vertical floor became PER-NODE: minHeight={minHFloor}
+   where minHFloor = min(NODE_MIN_H, measured natural height). The worst-case
+   141 guarantee moved into the auto-grow ladder (AQ15c), which re-raises any
+   too-short node instead of clipping — so S3 now pins the DERIVATION (the clamp
+   must reference NODE_MIN_H) instead of a static number. */
+assert('S3 the vertical floor clamps against NODE_MIN_H (worst-case moved to auto-grow)',
+  /minHFloor = naturalHRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_H, naturalHRef\.current\)/.test(DIAGRAM)
+    && diagW >= WORST_CONTENT_W,
+  `floor width ${diagW} vs content ${WORST_CONTENT_W}; height floor = per-node natural (clamped by NODE_MIN_H=${DIAG_CONSTS.NODE_MIN_H})`);
 
 assert('S4 the old 140x80 floors are GONE (a regression would be the defect)',
   diagW !== 140 && diagH !== 80,

@@ -268,6 +268,11 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      at most a few times and stops the moment the user resizes (the wrapper
      then HAS an explicit height). */
   const innerRef = useRef<HTMLDivElement | null>(null);
+  /* AQ19c — the node's NATURAL content height (its height with no explicit
+     style). Measured whenever the grow-check finds the content fits; used as
+     the resizer's vertical floor so "shrink back to minimum" lands on the SAME
+     size a fresh drop produces, instead of the static worst-case NODE_MIN_H. */
+  const naturalHRef = useRef<number>(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const inner = innerRef.current, body = bodyRef.current;
@@ -285,7 +290,12 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       const kids = [...body.children].filter(c => (c as HTMLElement).offsetParent !== null);
       const last = kids[kids.length - 1];
       const clipped = last ? Math.ceil(last.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom + 2) : 0;
-      if (clipped <= 0) return;
+      if (clipped <= 0) {
+        /* content fits: the current wrapper height IS this node's natural
+           height — remember it as the resizer's floor (AQ19c). */
+        naturalHRef.current = wrapper.offsetHeight;
+        return;
+      }
       /* PERCENT INSETS: the band is a fixed FRACTION of the node, so the node
          must grow by MORE than the clip — dividing by the band's height share
          (1 - topInset - bottomInset, read from the computed insets) converts
@@ -307,6 +317,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       body.style.width = '';
       const sideIns = (parseFloat(cb.left) || 0) + (parseFloat(cb.right) || 0);
       const targetW = Math.min(340, Math.max(0, Math.ceil(naturalW + sideIns + 8)));
+      naturalHRef.current = target;
       if (d.__onGrow) d.__onGrow(id, target, targetW);
       else window.dispatchEvent(new CustomEvent('gobi:node-grow', {detail: {id, height: target, width: targetW}}));
     };
@@ -353,10 +364,16 @@ const Node = memo(({id, data, selected}: NodeProps) => {
 
   // Container shapes get React Flow's resize affordance when selected (C3).
   // React Flow writes width/height back into node.style, so the size persists.
+  /* AQ19c — the floor is this node's MEASURED natural height when known
+     (fresh-drop fit), falling back to the static worst-case NODE_MIN_H.
+     Harvey: stretch → shrink-to-min must land on the fresh-drop size. */
+  const minHFloor = naturalHRef.current > 0
+    ? Math.min(NODE_MIN_H, naturalHRef.current)
+    : NODE_MIN_H;
   const resizer = selected && RESIZABLE.has(shape) ? (
     <NodeResizer
       minWidth={NODE_MIN_W}
-      minHeight={NODE_MIN_H}
+      minHeight={minHFloor}
       lineClassName="resize-line"
       handleClassName="resize-handle"
     />

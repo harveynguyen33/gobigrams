@@ -45,6 +45,29 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ AQ19c — resize floor = the node's own natural height (shrink-back == fresh-drop size). DONE, 40/40 GREEN.
+
+Harvey + screenshot: a fresh-dropped node is SMALLER than the same node after
+stretch → shrink-to-minimum (right panel ~15px taller). Root cause: the
+resizer's static floor `NODE_MIN_H` (141, the ROUND-S worst-case across ALL
+shapes — queue) applied to every node, while a fresh database drop sits at its
+grown natural height (131). Shrink could never go below 141.
+
+Fix (`src/DiagramNode.tsx`): `naturalHRef` records the node's measured natural
+height — written by the grow-check when content fits (wrapper.offsetHeight) and
+after each grow (target). `minHFloor = min(NODE_MIN_H, naturalH)` when measured
+(else 141) feeds `NodeResizer minHeight`. Text spill stays impossible: shrink
+below content triggers the AQ15c auto-grow ladder, which re-raises the node.
+Harness re-anchors: round-5 7b + round-r S3 now pin the minHFloor derivation
+(the worst-case vertical guarantee moved to auto-grow); R3 parses clean again.
+
+NOTE: CDP-driven resize simulation could not grab the NodeResizer handles
+(pointer-capture quirk of the test harness, not the app) — the prop wiring is
+tsc/harness-verified; the behavioural check is Harvey's device test.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ AQ19b — drop jump fix: the 1150ms re-centre pass is X-ONLY. DONE, 40/40 GREEN, live-verified.
 
 Harvey: dropping a node made it JUMP UP ~1s later (cylinders only). Root cause:
