@@ -43,6 +43,34 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ PACKAGE-SEQ-HIDE — sequence hidden behind SEQUENCE_ENABLED=false. DONE, 40/40 GREEN, live-verified.
+
+Harvey: the first sequence cut reads poorly ("tệ quá") — hide it for now, the
+design will be revisited; the near-term priority is a final test round then
+public release.
+
+**One flag, three gates** (all code stays in the tree — flipping
+`SEQUENCE_ENABLED` to true in `src/presets.ts` restores everything):
+1. `LIBRARY` spread: `...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : [])` — search
+   + palette + Mixed lose the 3 sequence rows.
+2. `PRESETS` record: `...(SEQUENCE_ENABLED ? {sequence: SEQUENCE_PRESET} : {})`
+   (cast `as unknown as Record<PresetId, DiagramPreset>` — the key is
+   flag-gated) — board dialog + templateCatalog lose the family + 3 templates.
+3. Shapes stay REGISTERED in the Shape union/SHAPES/ShapeFrame (no harness
+   count churn); they are simply unreachable from any palette.
+
+Live-verified: templates gallery shows Flowchart/C4/Data model only (0
+"Sequence" buttons); palette sidebar has no Sequence section.
+
+INCIDENT during this pass: a bad insert briefly duplicated most of
+`src/presets.ts` (blind `find('
+};')` surgery); repaired by deleting the whole
+duplicate copy — final `git diff` verified to contain ONLY the flag change
+(+10/−5), symbol counts 1× each, tsc/build/harnesses green.
+
+Gates: tsc 0 · build 0 · verify 22/0/5 · **40/40 harnesses**.
+
 ## ▶ PACKAGE-SEQ — UML Sequence diagrams ship: 3 levels (System / Component / Protocol). DONE, 40/40 GREEN, live-verified.
 
 Harvey: research sequence charts, then — matching the flowchart experience —

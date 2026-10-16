@@ -24,6 +24,11 @@ import {type ShowMode, type TableColumn} from './TableNode';
 --------------------------------------------------------------------------- */
 
 export type PresetId = 'architecture' | 'flowchart' | 'c4' | 'erd' | 'sequence' | 'custom';
+
+/* HARVEY 2026-10-16 — sequence shipped but the first cut read poorly ("tệ quá"):
+   HIDDEN behind this flag until the row-order/column-constraint design is
+   redone. One switch flips it back on — every piece stays in the tree. */
+export const SEQUENCE_ENABLED = false;
 export type LayoutId = 'layered-lr' | 'layered-tb' | 'grid' | 'free';
 
 export type PathId = 'bezier' | 'smoothstep' | 'step' | 'straight';
@@ -878,8 +883,8 @@ export const LIBRARY: PaletteItem[] = [
   ...FLOWCHART_PALETTE.filter(p => p.label === 'Lane'),
   // 4 — the C4 elements (11), in C4_TYPES order.
   ...C4_PALETTE_ITEMS,
-  // 4b — PACKAGE-SEQ: the UML sequence pieces.
-  ...SEQUENCE_PALETTE,
+  // 4b — PACKAGE-SEQ: the UML sequence pieces (HIDDEN — see SEQUENCE_ENABLED).
+  ...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : []),
   // 5 — the ERD entities.
   TABLE_PALETTE_ITEM,
   ERD_ENUM_NOTE_ITEM,
@@ -1205,14 +1210,14 @@ export const CUSTOM_PRESET: DiagramPreset = {
   legend: [{colorKey: 'slate', label: 'Mixed notation'}],
 };
 
-export const PRESETS: Record<PresetId, DiagramPreset> = {
+export const PRESETS = ({
   architecture: ARCHITECTURE_PRESET,
-  sequence: SEQUENCE_PRESET,
+  ...(SEQUENCE_ENABLED ? {sequence: SEQUENCE_PRESET} : {}),
   flowchart: FLOWCHART_PRESET,
   c4: C4_PRESET,
   erd: ERD_PRESET,
   custom: CUSTOM_PRESET,
-};
+}) as unknown as Record<PresetId, DiagramPreset>; // `sequence` key is flag-gated (see SEQUENCE_ENABLED)
 
 /** The preset a fresh editor starts on — until a board load replaces it. Kept as
  *  ONE named constant because the boot theme depends on its suggestion: both
