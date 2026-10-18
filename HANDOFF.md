@@ -47,6 +47,32 @@ Conventions (demo board restore, English artifacts, per-round spec files) are in
 
 
 
+
+## ▶ SESSION CLOSED 2026-10-15 — HEAD 3b26faa (pushed, 0 ahead, mirror synced, 40/40 GREEN).
+
+This session shipped: AQ16 (auto-scale min width) · AQ17 (dblclick next-nearest)
+· AQ18 (drop double-subtract fix) · AQ19 (centre-under-cursor) · AQ19b/c/d/e
+(drop-jump X-only + per-node natural resize floors) · AQ20 (search purpose
+lines for all duplicated shapes) · AQ21 + F/G/H (Export modal: scope/format/
+theme/preview, Import tab, theme-faithful SVG/PNG via mountThemed) ·
+PACKAGE-SEQ (sequence diagrams) then SEQ-HIDE (hidden behind
+SEQUENCE_ENABLED=false in presets.ts — one-flag restore).
+
+**Harvey's stated next step: a FINAL TEST ROUND, then PUBLIC RELEASE.**
+
+Next-session pointers:
+- Sequence redesign backlog (research at `.hermes/research/track1-sequence-notation.md`,
+  24 sources): column-constrained participants, ordered message model, derived
+  activations, Mermaid sequence import. Flag = SEQUENCE_ENABLED in presets.ts.
+- Vault debt: one batched pkm pass for AQ2..AQ21 + PACKAGE-SEQ (still unwritten).
+- #7 bend handle: still awaiting Harvey's phenomenon description.
+- Mermaid import is FLOWCHART-ONLY (fromMermaid); sequence import not built.
+- Known pre-existing: Mermaid-export modal says "sequenceDiagram — activations/
+  fragments not representable" (fine); dev browser boards hold test nodes
+  (gitignored runtime data).
+
+Gates at HEAD: tsc 0 · build 0 · verify 22/0/5 · hex 144 · 40/40 harnesses.
+
 ## ▶ AQ19d/e — no vertical motion after drop; width floor = per-node natural. DONE, 40/40 GREEN, live-verified.
 
 Harvey, two more cylinder issues:
