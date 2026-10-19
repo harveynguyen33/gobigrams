@@ -160,14 +160,19 @@ export default function Tooltip({label, side = 'bottom', delay = 350, children}:
   useEffect(() => clear, [clear]);
 
   const child = isValidElement(children) ? children : <span>{String(children)}</span>;
+  /* AR-8 — React 19 removed `element.ref`: the ref now lives on `props.ref`.
+     Reading it off the element logs "Accessing element.ref was removed" on
+     every load. Both refs chain through ONE closure: the child's own ref
+     (callback OR object, read from props) is invoked alongside the tooltip's
+     triggerRef, so the child keeps receiving the node. */
+  const origRef = (child.props as {ref?: React.Ref<HTMLElement>}).ref;
+  const chainRef = (el: HTMLElement | null) => {
+    triggerRef.current = el;
+    if (typeof origRef === 'function') origRef(el);
+    else if (origRef && typeof origRef === 'object') (origRef as {current: HTMLElement | null}).current = el;
+  };
   const trigger = cloneElement(child as React.ReactElement<Record<string, unknown>>, {
-    ref: (el: HTMLElement | null) => {
-      triggerRef.current = el;
-      // preserve an existing ref on the child if there was one
-      const orig = (child as any).ref;
-      if (typeof orig === 'function') orig(el);
-      else if (orig && typeof orig === 'object') orig.current = el;
-    },
+    ref: chainRef,
     onMouseEnter: (e: React.MouseEvent) => {
       show();
       (child.props as any).onMouseEnter?.(e);
