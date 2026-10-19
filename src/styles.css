@@ -897,17 +897,17 @@ body {
    only. */
 .react-flow__attribution {
   background: var(--surface);
-  color: var(--dim2);
+  color: var(--dim);
   border: 1px solid var(--border);
   border-radius: 9px;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 .react-flow__attribution svg {
-  fill: var(--dim2);
+  fill: var(--dim);
 }
 .react-flow__attribution a {
-  color: var(--dim2);
+  color: var(--dim);
 }
 .react-flow__attribution a:hover,
 .react-flow__attribution a:focus-visible {
