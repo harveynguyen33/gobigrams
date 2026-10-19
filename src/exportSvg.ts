@@ -46,10 +46,12 @@ export type SvgMeasurer = {
     start: {x: number; y: number};
     end: {x: number; y: number};
   } | null;
-  /** model position − clone-space position of a node's top-left corner.
-   *  Constant across the clone, so edge routes translate into model space
-   *  with ONE group transform (no path rewriting). */
-  origin(nodeEl: unknown, node: ExportNode): {x: number; y: number} | null;
+  /** DEFECT-2 — width of `text` in px under the SAME font metrics the
+   *  emitter paints with (family, size, weight, letter-spacing). Optional:
+   *  without it the wrap falls back to the monospace 0.6em estimator. */
+  measureText?(text: string, o: {size: number; weight: number; spacing?: number}): number;
+  /** Frees any measurement scaffold (the DOM measurer's hidden <svg>). */
+  dispose?(): void;
 };
 
 export type ExportNode = {
@@ -126,6 +128,7 @@ function nodeSize(n: ExportNode): {w: number; h: number} {
  *  usable inside the node's box. Never called at module load — the bundle is
  *  safe for the Node harness, which never imports this symbol's behaviour. */
 export function domMeasurer(): SvgMeasurer {
+  let measTextEl: SVGTextElement | null = null;
   const rel = (el: Element, inner: Element) => {
     const nb = el.getBoundingClientRect();
     const b = inner.getBoundingClientRect();
@@ -154,13 +157,12 @@ export function domMeasurer(): SvgMeasurer {
       if (!p) return null;
       const d = p.getAttribute('d');
       if (!d) return null;
-      /* DEFECT-1: flow-space endpoints read OFF THE PATH ITSELF. The clone's
-         routes are drawn in flow coordinates (the translate lives on an
-         ancestor), so length 0 and length N are the edge's absolute endpoints
-         — exactly the two anchors the canvas's labelAnchor consumes. No
-         getBoundingClientRect: that was the bug (a viewport-space box centre
-         is meaningless inside an offscreen themed clone, and a bounding-box
-         centre is not the 50% point of a diagonal anyway). */
+      /* Flow-space endpoints read OFF THE PATH ITSELF: the clone's routes are
+         drawn in flow coordinates (translate lives on an ancestor), so length
+         0 and length N are the edge's absolute endpoints — exactly what the
+         canvas's labelAnchor consumes. No getBoundingClientRect here: that was
+         the DEFECT-1 bug (a viewport-space box centre is meaningless inside an
+         offscreen themed clone). */
       let sx = 0, sy = 0, tx = 0, ty = 0;
       try {
         const total = p.getTotalLength();
@@ -169,15 +171,35 @@ export function domMeasurer(): SvgMeasurer {
         sx = a.x; sy = a.y; tx = b.x; ty = b.y;
       } catch {
         /* non-renderable path (display:none clone) — keep {0,0} ends, which
-           makes the label fall back to the geometric centre below */
+           makes the label fall back to the pathless anchor below */
       }
       return {d, start: {x: sx, y: sy}, end: {x: tx, y: ty}};
     },
-    origin(nodeEl, node) {
-      const el = nodeEl as Element | null;
-      if (!el || typeof el.getBoundingClientRect !== 'function') return null;
-      const b = el.getBoundingClientRect();
-      return {x: node.position.x - b.left, y: node.position.y - b.top};
+    /* DEFECT-2 — real glyph widths via a hidden SVG <text> carrying the same
+       FONT_STACK/size/weight the emitter writes, so the wrap decision is the
+       decision the browser will itself re-derive when painting the file. */
+    measureText(text, o) {
+      try {
+        if (!measTextEl) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement;
+          svg.setAttribute('style', 'position:absolute;left:-99999px;top:0;width:0;height:0;overflow:hidden');
+          measTextEl = document.createElementNS('http://www.w3.org/2000/svg', 'text') as SVGTextElement;
+          measTextEl.setAttribute('font-family', FONT_STACK);
+          svg.appendChild(measTextEl);
+          document.body.appendChild(svg);
+        }
+        measTextEl.setAttribute('font-size', String(o.size));
+        measTextEl.setAttribute('font-weight', String(o.weight));
+        measTextEl.setAttribute('letter-spacing', String(o.spacing ?? 0));
+        measTextEl.textContent = text;
+        return measTextEl.getComputedTextLength();
+      } catch {
+        return text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
+      }
+    },
+    dispose() {
+      try { (measTextEl?.parentNode ?? null)?.parentNode?.removeChild(measTextEl!.parentNode!); } catch { /* best effort */ }
+      measTextEl = null;
     },
   };
 }
@@ -185,6 +207,62 @@ export function domMeasurer(): SvgMeasurer {
 /* --------------------------------------------------------------- emitters */
 
 const FONT_STACK = 'ui-monospace,Menlo,Consolas,monospace';
+
+/* ------------------------------------------------------- text wrapping (D2) */
+
+/** Monospace advance-width fallback when the injected measurer carries no
+ *  `measureText` (the stub): 0.6em per glyph is the ui-monospace norm. */
+function estimateTextWidth(text: string, o: {size: number; spacing?: number}): number {
+  return text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
+}
+
+/** Pure greedy word wrap — DEFECT-2's whole mechanism.
+ *
+ *  Inputs: the text, the box it must fit, and a WIDTH FUNCTION. It knows
+ *  nothing about SVG, nodes or the DOM, so the stub measurer drives it in the
+ *  harness exactly as the browser's does in the app. `overflow-wrap:
+ *  anywhere` semantics: break BETWEEN words first; a word wider than the box
+ *  is hard-broken at the character that overflows rather than escaping the
+ *  box (matching the `.node-title` CSS rule). */
+export function wrapText(
+  text: string,
+  availableWidth: number,
+  measure: (s: string) => number,
+): string[] {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (!t || availableWidth <= 0) return [text];
+  if (measure(t) <= availableWidth) return [t];
+
+  const words = t.split(' ');
+  const lines: string[] = [];
+  let cur = '';
+  for (const word of words) {
+    const candidate = cur ? cur + ' ' + word : word;
+    if (measure(candidate) <= availableWidth) { cur = candidate; continue; }
+    if (cur) { lines.push(cur); cur = ''; }
+    if (measure(word) <= availableWidth) { cur = word; continue; }
+    /* single word too long: hard-break at the last fitting character */
+    let piece = '';
+    for (const ch of word) {
+      if (piece && measure(piece + ch) > availableWidth) { lines.push(piece); piece = ch; }
+      else piece += ch;
+    }
+    cur = piece;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/** Max lines a text row may occupy inside the node box — the exporter's twin
+ *  of the live canvas' clip: `.node-body { overflow: hidden; max-height: 100% }`
+ *  (src/styles.css) hides whatever overflows the body. Here the leftover
+ *  height after the other rows converts into whole line slots; if the very
+ *  first line does not fit either, ONE line is kept (the live box always
+ *  shows its first line). */
+function maxLinesFor(rowBudgetPx: number, lineHeightPx: number): number {
+  if (lineHeightPx <= 0) return 1;
+  return Math.max(1, Math.floor(rowBudgetPx / lineHeightPx));
+}
 
 function tokenStyle(tokens: Record<string, string>): string {
   const lines = EXPORT_TOKENS
@@ -211,25 +289,61 @@ function textLine(
 }
 
 /** The node's text block: kicker / title / sub / metric stacked inside the
- *  measured box. Title uses the measurer's dominant size/weight/fill. */
-function nodeText(n: ExportNode, box: {w: number; h: number}, t: TextRect, fg: string, dim: string, accent: string): string {
+ *  measured box. Title uses the measurer's dominant size/weight/fill.
+ *
+ *  DEFECT-2 — the title WRAPS inside the box's content width (`.node-title`
+ *  carries `overflow-wrap: anywhere` live) and is clamped to the body's
+ *  leftover height (`.node-body { overflow: hidden; max-height: 100% }` live:
+ *  lines that would not fit are clipped exactly as the browser clips them). */
+function nodeText(
+  n: ExportNode, box: {w: number; h: number}, t: TextRect, fg: string, dim: string, accent: string,
+  widthOf: (s: string, o: {size: number; weight: number; spacing?: number}) => number,
+): string {
   const d = (n.data ?? {}) as Record<string, unknown>;
   const title = String(d.title ?? d.label ?? n.id);
   const lines: string[] = [];
   let y = t.y + Math.min(t.size, t.h > 60 ? 16 : t.h * 0.3) + 4;
   const x = t.x;
-  if (d.kicker && typeof d.kicker === 'string' && d.kicker !== title) {
-    lines.push(textLine(x, y, d.kicker.toUpperCase(), {size: 9.5, weight: 500, fill: t.fill || dim, spacing: '1.1'}));
+  const hasSub = d.sub && typeof d.sub === 'string';
+  const hasMetric = d.metric && typeof d.metric === 'string';
+  const hasKicker = d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
+
+  if (hasKicker) {
+    lines.push(textLine(x, y, String(d.kicker).toUpperCase(), {size: 9.5, weight: 500, fill: t.fill || dim, spacing: '1.1'}));
     y += 15;
   }
-  lines.push(textLine(x, y, title, {size: t.size, weight: t.weight, fill: t.fill || fg}));
-  if (d.sub && typeof d.sub === 'string') {
-    y += Math.round(t.size * 1.35);
-    lines.push(textLine(x, y, d.sub, {size: 11.5, weight: 450, fill: dim}));
+
+  /* wrap the title into the body's content width … */
+  const availW = Math.max(12, t.w);
+  const meas = (s: string) => widthOf(s, {size: t.size, weight: t.weight});
+  const lineHeight = Math.round(t.size * 1.35);
+  let wrapped = wrapText(title, availW, meas);
+  /* … then clamp to the height the body has left (the CSS clip above). The
+     budget only binds when ANOTHER row (sub / metric) needs the space below:
+     `.node-body { max-height: 100% }` clips at the NODE box, and a title-only
+     node with a small measured body still has the whole node to paint into —
+     clipping it to a body stub would invent an ellipsis the canvas never
+     draws. */
+  const otherRows = (hasSub ? lineHeight : 0) + (hasMetric ? 20 : 0);
+  if (t.h > 0 && otherRows > 0) {
+    const budget = (t.y + t.h) - (y - lineHeight * 0.35);
+    const maxLines = maxLinesFor(budget, lineHeight);
+    if (wrapped.length > maxLines) wrapped = wrapped.slice(0, maxLines);
   }
-  if (d.metric && typeof d.metric === 'string') {
+
+  const titleBottomY = y + (wrapped.length - 1) * lineHeight;
+  wrapped.forEach((ln, i) => {
+    lines.push(textLine(x, y + i * lineHeight, ln, {size: t.size, weight: t.weight, fill: t.fill || fg}));
+  });
+  y = titleBottomY;
+
+  if (hasSub) {
+    y += lineHeight;
+    lines.push(textLine(x, y, String(d.sub), {size: 11.5, weight: 450, fill: dim}));
+  }
+  if (hasMetric) {
     y += 20;
-    lines.push(textLine(x, y, d.metric + (d.metricUnit ? ` ${d.metricUnit}` : ''), {size: 20, weight: 700, fill: accent}));
+    lines.push(textLine(x, y, String(d.metric) + (d.metricUnit ? ` ${d.metricUnit}` : ''), {size: 20, weight: 700, fill: accent}));
   }
   return lines.join('');
 }
@@ -275,9 +389,9 @@ function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, f
  *  adds `labelOffset` only once `labelPinned` is set. This wrapper adapts the
  *  exporter's route to it: the source/target read from the PATH ITSELF
  *  (getPointAtLength 0 / total), `labelX`/`labelY` default to the endpoints'
- *  midpoint — which is what the canvas generators hand back for a resting
- *  edge — and `offset` is the legacy 3-slot fraction. Same function, same
- *  inputs' space (flow), same result the canvas paints. */
+ *  midpoint — which is exactly what GoblinEdge's straight/free/bezier
+ *  generators hand back for a resting edge — and `offset` is the legacy
+ *  3-slot fraction. Same function, same inputs' space (flow), same result. */
 function edgeLabelAnchor(
   route: {start: {x: number; y: number}; end: {x: number; y: number}},
   d: Record<string, unknown>,
@@ -297,10 +411,10 @@ function edgeLabelAnchor(
 
 /** DEFECT-3 — absolute (flow) position of a node, resolving the `parentId`
  *  chain. React Flow stores a CHILD's `position` RELATIVE TO ITS PARENT; the
- *  exporter consumed it raw, so a grouped child exported at its relative
- *  offset (the app's own AQ11 ~250 px teleport, paid a second time). Pure,
- *  no DOM; a missing parent (dangling id) or a cycle terminates via the
- *  `guard` set instead of hanging — same shape as `absPos` in src/App.tsx. */
+ *  exporter used to consume it raw, so a grouped child exported at its
+ *  relative offset (the app's own AQ11 ~250 px teleport, paid again). Pure,
+ *  no DOM; a missing parent or a cycle terminates (the `guard` set) instead
+ *  of hanging — same shape as `absPos` in src/App.tsx. */
 function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; y: number} {
   let x = n.position.x, y = n.position.y;
   let pid = n.parentId ?? null;
@@ -320,12 +434,19 @@ function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; 
 export function exportSvg(input: ExportInput): string {
   const pad = input.pad ?? 24;
   const tokens = input.tokens;
+  const measurer = input.measurer;
   const nodes = input.nodes.filter(n => n && typeof n.id === 'string');
   const byId = new Map(nodes.map(n => [n.id, n]));
   const edges = input.edges.filter(e => e && byId.has(e.source) && byId.has(e.target));
   /* DEFECT-3 — every geometry use below consumes the ABSOLUTE position
      (parentId chain resolved), never the stored relative `position`. */
   const abs = new Map(nodes.map(n => [n.id, absPosition(n, byId)]));
+  /* DEFECT-2 — one width function for every wrap: the injected measurer when
+     it can really measure, the monospace estimator otherwise. */
+  const widthOf: (s: string, o: {size: number; weight: number; spacing?: number}) => number =
+    measurer.measureText
+      ? (s, o) => measurer.measureText!(s, o)
+      : (s, o) => estimateTextWidth(s, o);
   const ink = {
     fg: tokens['--fg'] || '#e8e8ea',
     dim: tokens['--dim'] || '#8a8a92',
@@ -351,7 +472,7 @@ export function exportSvg(input: ExportInput): string {
   /* Edge `d` coordinates are MODEL space in both paths (the DOM clone's
      React Flow routes use flow coordinates = absolute model coordinates, and
      the stub routes are computed from absolute positions). Labels derive from
-     the SAME coordinates — see `edgeLabelAnchor` above. */
+     the SAME coordinates — see `edgeLabelAnchor` below. */
   const edgeParts: string[] = [`<g transform="translate(${off.x},${off.y})">`];
   const defs: string[] = [];
   const markerId = (color: string): string => {
@@ -394,12 +515,8 @@ export function exportSvg(input: ExportInput): string {
     groupParts.push('</g>');
   }
 
-  /* ONE group transform puts clone-space edge routes into model space */
-  let origin = {x: 0, y: 0};
-  const firstWithEl = nodes.find(n => n.el);
-  if (firstWithEl) {
-    origin = input.measurer.origin(firstWithEl.el, firstWithEl) ?? origin;
-  }
+  /* DEFECT-1 removed the clone→model `origin` shift: labels now derive from
+     the edge route's own flow-space endpoints, not from any clone-space rect. */
 
   for (const e of edges) {
     const s = byId.get(e.source)!;
@@ -414,7 +531,7 @@ export function exportSvg(input: ExportInput): string {
     if (typeof label === 'string' && label) {
       /* DEFECT-1: the label anchor is the app's own parity function
          (`labelAnchor`), fed the edge's FLOW-space path endpoints — the same
-         expression GoblinEdge paints with, so export matches canvas.
+         expression GoblinEdge.tsx paints with, so export matches canvas.
          `midX`/`midY` used to be a viewport-space bounding-rect centre (both
          wrong space and wrong point on a diagonal). Degenerate ends ({0,0}
          both — a path the clone could not measure) fall back to the stub's
@@ -425,9 +542,7 @@ export function exportSvg(input: ExportInput): string {
         ? {x: (abs.get(s.id)!.x + abs.get(t.id)!.x + nodeSize(s).w - nodeSize(t).w) / 2,
            y: (abs.get(s.id)!.y + abs.get(t.id)!.y + nodeSize(s).h - nodeSize(t).h) / 2}
         : edgeLabelAnchor(route, d);
-      /* a live route is already flow space (origin = {0,0}); the shift only
-         matters if a measurer ever returns clone-space ends */
-      const mid = {x: L.x + origin.x + off.x, y: L.y + origin.y + off.y};
+      const mid = {x: L.x + off.x, y: L.y + off.y};
       const lw = Math.max(24, label.length * 6.6 + 12);
       edgeParts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(ink.surface)}" stroke="${escAttr(ink.dim)}" stroke-width="0.8"/>`,
@@ -466,7 +581,7 @@ export function exportSvg(input: ExportInput): string {
     } else if (asShape(n.data?.shape) === 'note') {
       nodeParts.push(noteMarkup(s, ink.surface, ink.dim));
       const nt = input.measurer.text(n.el);
-      nodeParts.push(nodeText(n, s, nt ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent));
+      nodeParts.push(nodeText(n, s, nt ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     } else if (type === 'table') {
       nodeParts.push(tableMarkup(n, s, accent, ink.fg, ink.dim));
     } else {
@@ -477,7 +592,7 @@ export function exportSvg(input: ExportInput): string {
         `</svg>`,
       );
       const t = input.measurer.text(n.el);
-      nodeParts.push(nodeText(n, s, t ?? {x: 13, y: s.h * 0.18, w: s.w * 0.72, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent));
+      nodeParts.push(nodeText(n, s, t ?? {x: 13, y: s.h * 0.18, w: s.w * 0.72, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     }
     nodeParts.push('</g>');
   }
@@ -493,8 +608,9 @@ export function exportSvg(input: ExportInput): string {
 }
 
 /** Model-space straight route when no live element exists (the harness path —
- *  deterministic, no DOM). Endpoints are the boxes' FLOW-space centres, the
- *  same anchors React Flow hands the canvas edge. */
+ *  deterministic, no DOM). Endpoints are the boxes' ABSOLUTE flow-space
+ *  centres (D3: through the parentId chain), the same anchors React Flow
+ *  hands the canvas edge. */
 function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
   abs: Map<string, {x: number; y: number}>): {
   d: string; start: {x: number; y: number}; end: {x: number; y: number};

@@ -4141,14 +4141,21 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const tokens = eff === theme
         ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
         : tokensFor(eff, EXPORT_TOKENS);
-      return exportSvg({
-        nodes: exportNodes,
-        edges: exportEdges,
-        theme: eff,
-        tokens,
-        measurer: domMeasurer(),
-        pad: pngPad,
-      });
+      /* DEFECT-2: one measurer per export, with measureText for the wrap —
+         disposed in the finally so the hidden measuring <svg> never leaks. */
+      const measure = domMeasurer();
+      try {
+        return exportSvg({
+          nodes: exportNodes,
+          edges: exportEdges,
+          theme: eff,
+          tokens,
+          measurer: measure,
+          pad: pngPad,
+        });
+      } finally {
+        measure.dispose?.();
+      }
     } finally {
       pre.done();
     }
