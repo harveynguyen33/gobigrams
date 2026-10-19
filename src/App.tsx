@@ -6100,7 +6100,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             setSelCount(s.length);
             setSelEdgeId(se.length === 1 ? se[0].id : null);
           }}
-          fitView fitViewOptions={{padding: 0.25, maxZoom: 1}} proOptions={{hideAttribution: true}}
+          fitView fitViewOptions={{padding: 0.25, maxZoom: 1}}
           minZoom={0.2} maxZoom={2.5}
           // M3/S3.7 — KEEP false. React Flow's own warning: double-click zoom
           // bypasses the gesture filter entirely (no `isWrappedWithClass` guard

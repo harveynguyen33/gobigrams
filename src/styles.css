@@ -889,7 +889,31 @@ body {
 .canvas-wrap { position: relative; background:
   radial-gradient(1200px 600px at 20% -10%, var(--canvas-glow), transparent 60%),
   var(--bg); }
-.react-flow__attribution { display: none; }
+/* AR-7 — the React Flow attribution badge STAYS VISIBLE (Harvey's call, PASS 3
+   scope). It is a bottom-right `.react-flow__attribution` Panel; it is themed
+   from the same tokens as the controls cluster so it reads as part of the
+   canvas, sits clear of the zoom controls (bottom-LEFT), and remains a real
+   link — the library sets its own href/target/rel. No hex literals: tokens
+   only. */
+.react-flow__attribution {
+  background: var(--surface);
+  color: var(--dim2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.react-flow__attribution svg {
+  fill: var(--dim2);
+}
+.react-flow__attribution a {
+  color: var(--dim2);
+}
+.react-flow__attribution a:hover,
+.react-flow__attribution a:focus-visible {
+  color: var(--fg);
+  background: var(--surface);
+}
 
 /* controls (zoom) — dark theme */
 .react-flow__controls {
