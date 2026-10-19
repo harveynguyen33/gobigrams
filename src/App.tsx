@@ -53,6 +53,7 @@ import BoardDialog, {type BoardDialogResult} from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
+import {exportSvg, domMeasurer, type ExportNode, type ExportEdge} from './exportSvg';
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
@@ -4084,60 +4085,75 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
   /* AQ21 — parametrised builders. The modal and the one-click menu buttons
      share THESE; the difference is only defaults (live theme, full board). */
+  /* ROUND AR, AR-1 — buildSvg is now a THIN WRAPPER around `src/exportSvg.ts`:
+     it mounts the themed offscreen clone ONLY to take measurements (text
+     boxes, edge routes, the clone→model origin shift), resolves the token
+     map for the target theme, and hands everything to the pure emitter.
+     The emitted file is real SVG primitives — no foreignObject, no HTML —
+     so image-context consumers (<img>, Quick Look, Figma, Illustrator)
+     actually paint it. `mountThemed`/`collectCss` stay for `buildPng`. */
   const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf) return '';
     const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
     const pad = pngPad;
-    const w = Math.ceil((b.width ?? 800) + pad * 2);
-    const h = Math.ceil((b.height ?? 400) + pad * 2);
+    void b; void pad; /* bounds + pad are derived inside the emitter from the node boxes */
     const eff = o.theme || theme;
-    /* AQ21-H — style the clone under the TARGET theme, offscreen, so every
-       paint-time resolution matches a real Appearance switch. */
     const pre = mountThemed(el, eff);
     try {
-    const clone = pre.clone;
-    /* scope: keep only the requested nodes + their edge/label children */
-    const keep = new Set(o.nodes.map(n => n.id));
-    const sel = clone.querySelectorAll('.react-flow__node');
-    sel.forEach(nn => { if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove(); });
-    clone.setAttribute('transform', `translate(${pad - (b.x ?? 0)},${pad - (b.y ?? 0)})`);
-    /* let the real stylesheet apply to the offscreen mount before collecting */
-    await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
-    const tokens = eff === theme
-      ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
-      : tokensFor(eff, EXPORT_TOKENS);
-    const tokenCss = EXPORT_TOKENS.map(t => `    ${t}:${tokens[t] ?? readToken(t, '#888')};`).join('\n');
-    const appCss = collectCss(clone);
-    const bg = tokens['--bg'] ?? readToken('--bg', '#0b0b0d');
-    const dim = tokens['--dim'] ?? readToken('--dim', '#8a8a92');
-    const fg = tokens['--fg'] ?? readToken('--fg', '#e8e8ea');
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${eff}">
-<rect width="${w}" height="${h}" fill="${bg}"/>
-<style>
-  :root, svg {${'\n'}${tokenCss}
-  }
-  ${appCss}
-  .node{font-family:ui-monospace,Menlo,Consolas,monospace}
-  .node-body{padding:13px 15px 12px}
-  .node-kicker{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;fill:${dim}}
-  .node-title{font-size:14.5px;font-weight:650;fill:${fg}}
-  .node-sub{font-size:11.5px;fill:${dim}}
-  .node-metric{font-size:20px;font-weight:700}
-  text{font-family:ui-monospace,Menlo,Consolas,monospace}
-</style>
-<foreignObject width="100%" height="100%">
-  <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px">
-    ${new XMLSerializer().serializeToString(clone)}
-  </div>
-</foreignObject>
-</svg>`;
-      return svg;
+      const clone = pre.clone;
+      /* scope: keep only the requested nodes + their edge children */
+      const keep = new Set(o.nodes.map(n => n.id));
+      const modelById = new Map(o.nodes.map(n => [n.id, n]));
+      const cloneNodes = [...clone.querySelectorAll<HTMLElement>('.react-flow__node')];
+      const exportNodes: ExportNode[] = [];
+      for (const cn of cloneNodes) {
+        const id = cn.getAttribute('data-id') ?? '';
+        const model = modelById.get(id);
+        if (!model) continue;
+        const me = (model as any).measured;
+        const st = (model as any).style;
+        exportNodes.push({
+          id,
+          type: (model as any).type,
+          position: {x: (model as any).position.x, y: (model as any).position.y},
+          measured: me ?? null,
+          style: st ?? null,
+          data: ((model as any).data ?? null) as Record<string, unknown> | null,
+          parentId: (model as any).parentId ?? null,
+          el: cn,
+        });
+      }
+      const modelEdges = new Map(o.edges.map(e => [e.id, e]));
+      const exportEdges: ExportEdge[] = [];
+      for (const ce of clone.querySelectorAll<HTMLElement>('.react-flow__edge')) {
+        const id = ce.getAttribute('data-id') ?? '';
+        const model = modelEdges.get(id);
+        if (!model) continue;
+        exportEdges.push({
+          id, source: (model as any).source, target: (model as any).target,
+          data: ((model as any).data ?? null) as Record<string, unknown> | null,
+          el: ce,
+        });
+      }
+      /* let the real stylesheet apply to the offscreen mount before measuring */
+      await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+      const tokens = eff === theme
+        ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
+        : tokensFor(eff, EXPORT_TOKENS);
+      return exportSvg({
+        nodes: exportNodes,
+        edges: exportEdges,
+        theme: eff,
+        tokens,
+        measurer: domMeasurer(),
+        pad: pngPad,
+      });
     } finally {
       pre.done();
     }
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [rf, theme, pngPad, mountThemed, collectCss]);
+  }, [rf, theme, pngPad, mountThemed]);
 
   const buildPng = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;

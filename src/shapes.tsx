@@ -103,195 +103,137 @@ export function asShape(v: unknown): Shape {
 
 const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent)';
 
-/** SVG frame drawn behind the node content. Not used by group / note. */
-export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
-  const p = {
-    fill: FILL,
-    stroke: 'var(--nc, var(--border-strong))',
-    strokeWidth: 1.5,
-    vectorEffect: 'non-scaling-stroke' as const,
-    strokeLinejoin: 'round' as const,
-  };
-  /** Inner detail strokes (cylinder rings, queue rows, …) — same colour, no fill. */
-  const line = {
-    fill: 'none',
-    stroke: 'var(--nc, var(--border-strong))',
-    strokeWidth: 1.5,
-    vectorEffect: 'non-scaling-stroke' as const,
-  };
-  const wrap = (children: React.ReactNode, cls: string) => (
-    <svg className={`shape-frame ${cls}`} viewBox="0 0 200 100" preserveAspectRatio="none">
-      {children}
-    </svg>
-  );
-  /* ROUND AD — THE CYLINDER IS ONE DRAWING. `database` and the new `storeddata`
-     are the same conventional cylinder (AWS / ArchiMate style: a rounder top
-     and two inner bands, so it reads as a store rather than a flat pancake), so
-     the markup lives HERE and both cases call it. Redrawing it under the new id
-     would have been a second copy free to drift — the brief's "REUSE the path,
-     do not redraw". Only the wrapper class differs. */
-  /* HARVEY 2026-10-14 — `plain`: TRUE drops the two inner arcs (the "stacked
-     disks" suggestion) and leaves a bare cylinder: top ellipse, body, bottom
-     cap. AQ10 — Minimal is the DEFAULT: `plain` is now `plainCylinder !== false`
-     at the call sites, so a board that never stored the flag draws the bare
-     drum, and "Full" (disks) is the explicit choice. */
-  const cylinder = (cls: string, plain = true) => wrap(<>
-    <ellipse cx="100" cy="20" rx="96" ry="15" {...p} />
-    <path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" {...p} />
-    {!plain && <path d="M4 42 A 96 15 0 0 0 196 42" {...line} opacity={0.5} />}
-    {!plain && <path d="M4 60 A 96 15 0 0 0 196 60" {...line} opacity={0.3} />}
-  </>, cls);
+/* ROUND AR, AR-1 — THE SHAPE GEOMETRY, AS DATA.
+ *
+ * Every case below is the SAME drawing its React sibling renders, expressed as
+ * inner markup in the normalised 200×100 frame. `ShapeFrame` consumes this
+ * table through `shapeFrameMarkup` (below), so the exporter (src/exportSvg.ts)
+ * and the canvas share ONE source — the file's own "never a second copy free
+ * to drift" rule, now enforced rather than aspirational.
+ *
+ * `p` = the outline primitive's attributes (resolved fill/stroke, NOT var()
+ * references — the exporter writes literal values); `line` = inner detail
+ * strokes; `plain` drops the cylinder's inner arcs exactly as the React
+ * `plainCylinder` flag does. */
+
+type FramePaint = {
+  fill: string; stroke: string; strokeWidth?: number;
+  fillOpacity?: string; dash?: string; plain?: boolean;
+};
+
+function frameMarkup(shape: Shape, p: FramePaint): string {
+  const sw = p.strokeWidth ?? 1.5;
+  const a = `fill="${p.fill}"${p.fillOpacity ? ` fill-opacity="${p.fillOpacity}"` : ''} stroke="${p.stroke}" stroke-width="${sw}" stroke-linejoin="round"`;
+  const line = `fill="none" stroke="${p.stroke}" stroke-width="${sw}"`;
+  const accent = p.stroke;
   switch (shape) {
     case 'service':
-      return wrap(<rect x="1" y="1" width="198" height="98" rx="14" {...p} />, 'service');
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>`;
     case 'external':
-      return wrap(<rect x="1" y="1" width="198" height="98" rx="14" strokeDasharray="8 5" {...p} />, 'external');
+      return `<rect x="1" y="1" width="198" height="98" rx="14" stroke-dasharray="8 5" ${a}/>`;
+    /* ROUND AD / HARVEY 2026-10-14 — ONE cylinder drawing for `database` and
+       `storeddata`; `plain` drops the two inner arcs (see ShapeFrame). */
     case 'database':
-      return cylinder('database', plain);
+    case 'storeddata': {
+      const rings = p.plain === false
+        ? `<path d="M4 42 A 96 15 0 0 0 196 42" ${line} opacity="0.5"/><path d="M4 60 A 96 15 0 0 0 196 60" ${line} opacity="0.3"/>`
+        : '';
+      return `<ellipse cx="100" cy="20" rx="96" ry="15" ${a}/><path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" ${a}/>${rings}`;
+    }
     case 'queue':
-      // Message queue: a container with an item gutter on the left (dots + short
-      // rows) and a divider, leaving the centre free for the title text.
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="98" rx="14" {...p} />
-        <path d="M62 10 V90" {...line} opacity={0.35} />
-        <path d="M28 26 H50" {...line} strokeLinecap="round" opacity={0.7} />
-        <path d="M28 50 H50" {...line} strokeLinecap="round" opacity={0.7} />
-        <path d="M28 74 H50" {...line} strokeLinecap="round" opacity={0.7} />
-        <circle cx="16" cy="26" r="4.5" fill="var(--nc, var(--border-strong))" opacity={0.9} />
-        <circle cx="16" cy="50" r="4.5" fill="var(--nc, var(--border-strong))" opacity={0.9} />
-        <circle cx="16" cy="74" r="4.5" fill="var(--nc, var(--border-strong))" opacity={0.9} />
-      </>, 'queue');
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>` +
+        `<path d="M62 10 V90" ${line} opacity="0.35"/>` +
+        `<path d="M28 26 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<path d="M28 50 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<path d="M28 74 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<circle cx="16" cy="26" r="4.5" fill="${accent}" opacity="0.9"/>` +
+        `<circle cx="16" cy="50" r="4.5" fill="${accent}" opacity="0.9"/>` +
+        `<circle cx="16" cy="74" r="4.5" fill="${accent}" opacity="0.9"/>`;
     case 'actor':
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="98" rx="14" {...p} />
-        {/* person badge, left side — ArchiMate-style actor notation */}
-        <circle cx="36" cy="42" r="13" fill="none" stroke="var(--nc, var(--border-strong))" strokeWidth={2.4} vectorEffect="non-scaling-stroke" />
-        <path d="M14 84 C 14 66 24 59 36 59 C 48 59 58 66 58 84" fill="none" stroke="var(--nc, var(--border-strong))" strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-      </>, 'actor');
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>` +
+        `<circle cx="36" cy="42" r="13" fill="none" stroke="${accent}" stroke-width="2.4"/>` +
+        `<path d="M14 84 C 14 66 24 59 36 59 C 48 59 58 66 58 84" fill="none" stroke="${accent}" stroke-width="2.4" stroke-linecap="round"/>`;
     case 'storage':
-      return wrap(<>
-        <path d="M1 18 H199 V 76 A 99 23 0 0 0 1 76 Z" {...p} />
-        <rect x="1" y="2" width="198" height="19" rx="9.5" {...p} />
-      </>, 'storage');
+      return `<path d="M1 18 H199 V 76 A 99 23 0 0 0 1 76 Z" ${a}/>` +
+        `<rect x="1" y="2" width="198" height="19" rx="9.5" ${a}/>`;
     case 'gateway':
-      return wrap(<>
-        <path d="M34 1 H166 L199 50 L166 99 H34 L1 50 Z" {...p} />
-      </>, 'gateway');
-
-    /* ---------------- L3a: ISO 5807 flowchart shapes ---------------- */
+      return `<path d="M34 1 H166 L199 50 L166 99 H34 L1 50 Z" ${a}/>`;
     case 'terminator':
-      // Stadium / pill — start & end of a process.
-      return wrap(<rect x="1" y="1" width="198" height="98" rx="49" {...p} />, 'terminator');
+      return `<rect x="1" y="1" width="198" height="98" rx="49" ${a}/>`;
     case 'process':
-      // Plain rectangle — one processing operation.
-      return wrap(<rect x="1" y="1" width="198" height="98" rx="2" {...p} />, 'process');
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>`;
     case 'decision':
-      // Diamond / rhombus — a conditional branch.
-      return wrap(<path d="M100 2 L198 50 L100 98 L2 50 Z" {...p} />, 'decision');
+      return `<path d="M100 2 L198 50 L100 98 L2 50 Z" ${a}/>`;
     case 'io':
-      // Parallelogram leaning right — data input / output.
-      return wrap(<path d="M36 2 H198 L164 98 H2 Z" {...p} />, 'io');
+      return `<path d="M36 2 H198 L164 98 H2 Z" ${a}/>`;
     case 'document':
-      // Rect with a wavy bottom edge — a report / printed output.
-      return wrap(<>
-        <path d="M1 1 H199 V78 C 175 96 155 68 131 80 S 91 96 67 78 S 27 62 1 78 Z" {...p} />
-      </>, 'document');
+      return `<path d="M1 1 H199 V78 C 175 96 155 68 131 80 S 91 96 67 78 S 27 62 1 78 Z" ${a}/>`;
     case 'subprocess':
-      // Predefined process — rectangle with double vertical bars.
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="98" rx="2" {...p} />
-        <path d="M26 2 V98" {...line} />
-        <path d="M174 2 V98" {...line} />
-      </>, 'subprocess');
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>` +
+        `<path d="M26 2 V98" ${line}/><path d="M174 2 V98" ${line}/>`;
     case 'preparation':
-      // ADAPTS the gateway hexagon geometry as its own case (never a second
-      // hexagon component) — the meaning differs, the silhouette does not.
-      return wrap(<>
-        <path d="M46 2 H154 L198 50 L154 98 H46 L2 50 Z" {...p} />
-      </>, 'preparation');
+      return `<path d="M46 2 H154 L198 50 L154 98 H46 L2 50 Z" ${a}/>`;
     case 'manual':
-      // Trapezoid, wide base on top — a step performed by a person.
-      return wrap(<path d="M2 2 H198 L164 98 H36 Z" {...p} />, 'manual');
+      return `<path d="M2 2 H198 L164 98 H36 Z" ${a}/>`;
     case 'delay':
-      /* D-shape — a waiting period. The only asymmetric shape, so its ports read.
-         FIX (2026-09-20): the arc used to be `M2 2 H100 A 48 48 …` — r=48 from
-         x=100 puts the rightmost point at x=148 in a 200-wide viewBox, leaving a
-         52-unit (26%) empty strip that the selection box, the alignment guides
-         and the auto-layout all treated as part of the node. A user reported it
-         as "the grip box contains it but it sinks in, not flush". The flat run now
-         ends at x=122 so a 78-radius arc lands EXACTLY on 200, the same
-         construction `display` below already used. The bulge is identical; only
-         the flat part is longer, which is also the truer D-shape. */
-      return wrap(<path d="M2 2 H122 A 78 48 0 0 1 122 98 H2 Z" {...p} />, 'delay');
+      return `<path d="M2 2 H122 A 78 48 0 0 1 122 98 H2 Z" ${a}/>`;
     case 'connector':
-      // Small circle — an on-page jump (label it A / B / 1 / 2).
-      return wrap(<circle cx="100" cy="50" r="48" {...p} />, 'connector');
-
-    /* ------------- ROUND AD: the six approved additions -------------
-       Geometry from draw.io / Lucidchart's own shapes, drawn in THIS frame's
-       normalised 200x100 box so they stretch with the node exactly as the rest
-       of the set does. */
+      return `<circle cx="100" cy="50" r="48" ${a}/>`;
     case 'offpage':
-      // Home plate pointing DOWN — continue on another page / sheet. The
-      // deliberate partner of the round `connector` above (an on-page jump).
-      return wrap(<path d="M2 2 H198 V66 L100 98 L2 66 Z" {...p} />, 'offpage');
+      return `<path d="M2 2 H198 V66 L100 98 L2 66 Z" ${a}/>`;
     case 'manualinput':
-      // A quadrilateral with a SLOPED TOP edge — data entered by hand. The
-      // slope is what tells it apart from `manual` (a trapezoid, sloped on the
-      // sides) and from `process` (a plain rect).
-      return wrap(<path d="M2 30 L198 2 V98 H2 Z" {...p} />, 'manualinput');
+      return `<path d="M2 30 L198 2 V98 H2 Z" ${a}/>`;
     case 'display':
-      // Trapezoid on the left, a curved right edge — show data to a person.
-      // The arc is drawn to the frame's own centre line so the curve reads as
-      // the shape's end cap rather than a stray bulge.
-      return wrap(<path d="M2 2 H120 A 78 48 0 0 1 120 98 H2 Z" {...p} />, 'display');
-    case 'storeddata':
-      // Read / write store. SAME cylinder as `database` — see `cylinder()` above.
-      return cylinder('storeddata', plain);
+      return `<path d="M2 2 H120 A 78 48 0 0 1 120 98 H2 Z" ${a}/>`;
     case 'looplimit':
-      // Rectangle with the top corners CUT — the start of a loop. The cut is
-      // what distinguishes it from `process`, and the flat top edge stays wide
-      // enough for a label on a node at the resizer floor.
-      return wrap(<path d="M36 2 H164 L198 24 V98 H2 V24 Z" {...p} />, 'looplimit');
+      return `<path d="M36 2 H164 L198 24 V98 H2 V24 Z" ${a}/>`;
     case 'internalstorage':
-      // Rectangle with a vertical + horizontal pane line — in-memory storage.
-      // The two lines divide off a corner pane, the way the notation does.
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="98" rx="2" {...p} />
-        <path d="M26 2 V98" {...line} />
-        <path d="M2 26 H26" {...line} />
-      </>, 'internalstorage');
-
-    /* ------------- PACKAGE-SEQ: UML sequence -------------
-       LIFELINE is ONE shape: the head box occupies the top band; the dashed
-       stem runs down the middle of whatever height the node has (stretch the
-       node → longer lifeline). The stem uses the frame's own stroke so it
-       recolours with the colour key like every other shape. */
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>` +
+        `<path d="M26 2 V98" ${line}/><path d="M2 26 H26" ${line}/>`;
     case 'lifeline':
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="30" rx="6" {...p} />
-        <path d="M100 31 V98" {...line} strokeDasharray="6 5" />
-      </>, 'lifeline');
+      return `<rect x="1" y="1" width="198" height="30" rx="6" ${a}/>` +
+        `<path d="M100 31 V98" ${line} stroke-dasharray="6 5"/>`;
     case 'activation':
-      // The thin vertical bar. In a 200x100 frame this renders as a slim
-      // centred column; the intended use is a NARROW, TALL node (default size
-      // set by the palette item), so the frame scales the column correctly.
-      return wrap(<>
-        <rect x="88" y="1" width="24" height="98" rx="4" {...p} />
-      </>, 'activation');
+      return `<rect x="88" y="1" width="24" height="98" rx="4" ${a}/>`;
     case 'fragment':
-      // Combined-fragment frame (UML 2.5): solid rectangle + the pentagon
-      // label tab in the top-left corner. The fragment kind (alt / opt /
-      // loop / par) lives in the node's kicker line, so one shape serves all.
-      return wrap(<>
-        <rect x="1" y="1" width="198" height="98" {...p} />
-        <path d="M1 1 H66 L82 17 V1" {...line} />
-        <path d="M1 1 H66 L82 18 H1 Z" {...p} />
-      </>, 'fragment');
-
+      return `<rect x="1" y="1" width="198" height="98" ${a}/>` +
+        `<path d="M1 1 H66 L82 17 V1" ${line}/><path d="M1 1 H66 L82 18 H1 Z" ${a}/>`;
     default:
-      return null;
+      return '';
   }
+}
+
+/** The exporter's entry point: resolved paint values in, inner markup out.
+ *  Emitted inside a viewBox="0 0 200 100" wrapper by the caller. */
+export function shapeFrameSvg(shape: Shape, paint: FramePaint): string {
+  return frameMarkup(shape, paint);
+}
+
+/** The live render path: the SAME table, wrapped in the frame svg the canvas
+ *  has always mounted. `nc` is the resolved `--nc` colour; `plain` matches the
+ *  `plainCylinder` flag's semantics (undefined = plain, per AQ10). */
+export function shapeFrameMarkup(shape: Shape, nc: string, plain: boolean): string {
+  return frameMarkup(shape, {
+    fill: 'transparent', stroke: nc,
+    fillOpacity: '0.09', plain,
+  });
+}
+
+/** SVG frame drawn behind the node content. Not used by group / note.
+ *  ROUND AR — renders `shapeFrameMarkup`, the SAME table the exporter emits:
+ *  the visual output is unchanged (fill + stroke from the node's `--nc` var,
+ *  non-scaling stroke), but there is no second copy of the geometry left to
+ *  drift.
+ *  XSS note: the injected markup is 100% generated by `frameMarkup` above —
+ *  static path/rect attribute strings with NO user data interpolated (node
+ *  titles etc. never reach it) — so the trusted-input surface is empty and
+ *  `dangerouslySetInnerHTML` is safe here. */
+export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
+  const inner = shapeFrameMarkup(shape, 'var(--nc, var(--border-strong))', plain !== false);
+  return (
+    <svg className={`shape-frame ${shape}`} viewBox="0 0 200 100" preserveAspectRatio="none"
+      dangerouslySetInnerHTML={{__html: inner}} />
+  );
 }
 
 /** Tiny palette preview of a shape, 26×18 CSS pixels. */
