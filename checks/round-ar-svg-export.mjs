@@ -151,7 +151,11 @@ const TABLE = node('n-table', 40, 1300, {
 const GROUP = node('n-group', 20, 1480, {shape: 'group', title: 'boundary'}, {
   measured: {width: 500, height: 300},
 });
-const GROUPED = node('n-grouped', 60, 1540, {shape: 'service', title: 'inside group', colorKey: 'green'}, {parentId: 'n-group'});
+/* D3 fixture: the child's position is PARENT-RELATIVE (React Flow semantics),
+   so its absolute position is parent (20,1480) + relative (40,60) = (60,1540).
+   On the pre-D3 tree the emitter consumed position raw and the child exported
+   at (40,60) — detached from its group and its edges. */
+const GROUPED = node('n-grouped', 40, 60, {shape: 'service', title: 'inside group', colorKey: 'green'}, {parentId: 'n-group'});
 
 const LABEL = node('n-label', 700, 1400, {title: 'free label', sub: 'note'}, {type: 'label', measured: {width: 120, height: 40}});
 
@@ -164,6 +168,19 @@ const NODES = [...FAMILY, TABLE, GROUP, GROUPED, LABEL, CUSTOM];
 const EDGES = [
   {id: 'e1', source: 'n-rect', target: 'n-cylinder-database', data: {label: 'reads', colorKey: 'amber'}},
   {id: 'e2', source: 'n-process', target: 'n-decision', data: {colorKey: 'red'}},
+  /* D1 fixture: a STEEP DIAGONAL between far-apart nodes, with a PINNED
+     label (labelPinned + labelOffset) — the edge's own anchor data the fix
+     must honour (labelAnchor adds the offset only when labelPinned is set).
+     The pre-D1 tree had NO anchor semantics: it stamped the route's
+     bounding-rect centre and ignored the pin, so the parity assertion is RED
+     there. The viewport-space half of the defect (bounding rects of the
+     offscreen clone) lives in domMeasurer and is unreachable from a DOM-free
+     stub — that half's RED proof is the reviewer's live export measurement
+     plus this round's live repro. */
+  {id: 'e3-diag', source: 'n-rect', target: 'n-actor', data: {label: 'yes', colorKey: 'amber', labelPinned: true, labelOffset: {x: 40, y: 0}}},
+  /* D3 fixture: an edge INTO the grouped child must follow it to
+     parent+relative (its stub endpoints resolve through the parentId chain). */
+  {id: 'e4-grp', source: 'n-queue', target: 'n-grouped', data: {label: 'into group', colorKey: 'cyan'}},
 ];
 
 const svg = exportSvg({nodes: NODES, edges: EDGES, theme: 'dark', tokens: DARK, measurer: STUB, pad: 24});
@@ -316,6 +333,160 @@ const bigSvg = exportSvg({nodes: big, edges: bigEdges, theme: 'dark', tokens: DA
 const ms = Number(process.hrtime.bigint() - t0) / 1e6;
 assert('A12-budget-70nodes', ms <= 2000 && bigSvg.length > 10000,
   `${ms.toFixed(1)} ms, ${bigSvg.length} bytes (ceiling 2000 ms)`);
+
+/* ================================================== ROUND AR REPAIR PASS ===
+   D1 / D2 / D3 — the three reviewer defects. Same house style: DOM-free,
+   stub-measurer, output-string + emitted-geometry assertions.
+
+   Geometry helpers — the emitted SVG has no Nest, so positions are parsed
+   from the bytes: node transforms are translate(x,y) inside
+   <g data-ar-node="id">, labels are <text x y>…</text> (label plates carry
+   the label string), the viewBox comes from the root tag. */
+
+function viewBoxOf(s) {
+  const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(s);
+  return m ? {w: parseFloat(m[1]), h: parseFloat(m[2])} : null;
+}
+/** Every <text x= y= …>content</text> whose content is exactly `label` —
+    the exporter's edge-label emission (textLine, anchor 'start'). */
+function labelTexts(s, label) {
+  const out = [];
+  for (const m of s.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
+    if (m[2] !== label) continue;
+    const x = /(?:^| )x="(-?[\d.]+)"/.exec(m[1]);
+    const y = /(?:^| )y="(-?[\d.]+)"/.exec(m[1]);
+    if (x && y) out.push({x: parseFloat(x[1]), y: parseFloat(y[1])});
+  }
+  return out;
+}
+/** The translate(x,y) of a node's emitted <g data-ar-node="id"> block. */
+function nodeTranslate(s, id) {
+  const block = nodeBlock(s, id);
+  if (!block) return null;
+  const m = /<g data-ar-node="[^"]*" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(block);
+  return m ? {x: parseFloat(m[1]), y: parseFloat(m[2])} : null;
+}
+
+/* ---------------------------------------------------------- D1: labels --- */
+/* The label's anchor post-D1 is labelAnchor() on the edge's flow-space
+   endpoints — for a stub straight route that is the midpoint of the two box
+   centres. n-rect (40,40) centre (135,105.5); n-actor is FAMILY[6] =
+   row 1 col 0 → (40,220), centre (135,285.5). Expected mid: (135,195.5). */
+const vb = viewBoxOf(svg);
+const diagYes = labelTexts(svg, 'yes');
+const srcC = (() => { const t = nodeTranslate(svg, 'n-rect'); return t ? {x: t.x + 95, y: t.y + 65.5} : null; })();
+const tgtC = (() => { const t = nodeTranslate(svg, 'n-actor'); return t ? {x: t.x + 95, y: t.y + 65.5} : null; })();
+const expX = srcC && tgtC ? (srcC.x + tgtC.x) / 2 : NaN;
+const expY = srcC && tgtC ? (srcC.y + tgtC.y) / 2 : NaN;
+const yesAnchor = diagYes[0] ?? {x: NaN, y: NaN};
+assert('D1-label-inside-viewbox', !!vb && diagYes.length === 1 &&
+    yesAnchor.x >= 0 && yesAnchor.x <= vb.w && yesAnchor.y >= 0 && yesAnchor.y <= vb.h,
+  `label 'yes' at (${yesAnchor.x},${yesAnchor.y}) inside viewBox ${vb ? `${vb.w}x${vb.h}` : 'MISSING'} (${diagYes.length} match)`);
+/* anchor parity: expected = midpoint of the emitted node-box centres + the
+   off translate of the edge group the label lives in. */
+const edgeGroupOff = (() => {
+  const i = svg.indexOf('>yes</text>');
+  const seg = svg.slice(0, i);
+  const j = seg.lastIndexOf('<g transform="translate(');
+  const m = /translate\((-?[\d.]+),(-?[\d.]+)\)/.exec(seg.slice(j));
+  return m ? {x: parseFloat(m[1]), y: parseFloat(m[2])} : {x: 0, y: 0};
+})();
+const wantX = expX + 40, wantY = expY; /* labelAnchor: centre + pinned offset(40,0) */
+/* the plate is centred on the anchor and the text sits at plate-left + 6,
+   baseline + 4 — the canvas's centred <EdgeLabel> expressed in <text> */
+const yesLw = Math.max(24, 'yes'.length * 6.6 + 12);
+const wantTextX = wantX - yesLw / 2 + 6, wantTextY = wantY + 4;
+assert('D1-label-anchor-parity', Math.abs(yesAnchor.x - wantTextX) <= 2 && Math.abs(yesAnchor.y - wantTextY) <= 2,
+  `emitted text (${yesAnchor.x.toFixed(1)},${yesAnchor.y.toFixed(1)}) vs centred plate on labelAnchor(${wantX.toFixed(1)},${wantY.toFixed(1)}) with pinned offset(40,0) → text (${wantTextX.toFixed(1)},${wantTextY.toFixed(1)}) — within ±2 px`);
+/* the same for the VERTICAL stub edge from the original fixture ('reads') —
+   pre-D1 this was correct only by accident of the horizontal case; the D1
+   arithmetic must keep it anchored on the endpoint midpoint too. */
+const reads = labelTexts(svg, 'reads')[0] ?? {x: NaN, y: NaN};
+const srcC1 = (() => { const t = nodeTranslate(svg, 'n-cylinder-database'); return t ? {x: t.x + 95, y: t.y + 65.5} : null; })();
+const wantRx = srcC ? (srcC.x + srcC1.x) / 2 : NaN;
+const wantRy = srcC ? (srcC.y + srcC1.y) / 2 : NaN;
+const readsLw = Math.max(24, 'reads'.length * 6.6 + 12);
+const wantRTextX = wantRx - readsLw / 2 + 6, wantRTextY = wantRy + 4;
+assert('D1-label-vertical-edge-parity', Math.abs(reads.x - wantRTextX) <= 2 && Math.abs(reads.y - wantRTextY) <= 2,
+  `label 'reads' text at (${reads.x.toFixed(1)},${reads.y.toFixed(1)}) vs plate on endpoint midpoint (${wantRx?.toFixed(1)},${wantRy?.toFixed(1)}) → text (${wantRTextX?.toFixed(1)},${wantRTextY?.toFixed(1)})`);
+/* (regression guard, not a RED row: on a straight stub route the pre-D1
+   bounding-centre arithmetic coincides with the anchor midpoint — the defect
+   needed the clone's viewport rects. This row pins the vertical edge so a
+   future anchor change cannot silently move it.) */
+
+/* ---------------------------------------------------------- D2: wrap ----- */
+/* A 190-px node whose title cannot fit one line at 14.5px in the 137px body.
+   wrapText must split it; every line must measure <= the body width and the
+   concatenation must equal the original (no lost characters, no ellipsis). */
+const LONG_TITLE = 'Order Ingestion Service With Very Long Name That Must Wrap';
+const wrapNode = node('n-wrap', 40, 2200, {shape: 'rect', title: LONG_TITLE, colorKey: 'violet'}, {measured: {width: 190, height: 160}});
+const wrapSvg = exportSvg({nodes: [wrapNode], edges: [], theme: 'dark', tokens: DARK, measurer: STUB, pad: 24});
+const bodyW = 130; /* the stub's TextRect w */
+const mono = (s2, size = 14.5) => s2.length * size * 0.6; /* the stub's fallback metric */
+const wrapLines = [];
+for (const m of wrapSvg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
+  const a = m[1];
+  if (/font-size="14\.5"/.test(a) && /font-weight="650"/.test(a)) wrapLines.push({x: parseFloat(/x="(-?[\d.]+)"/.exec(a)[1]), y: parseFloat(/y="(-?[\d.]+)"/.exec(a)[1]), text: m[2]});
+}
+const linesFit = wrapLines.length >= 2 && wrapLines.every(l => mono(l.text) <= bodyW + 0.5);
+const concat = wrapLines.map(l => l.text).join(' ');
+assert('D2-title-wraps-fits', linesFit && wrapLines.every(l => l.x + mono(l.text) <= 24 + 190 - 12),
+  `${wrapLines.length} lines: [${wrapLines.map(l => `${l.text}(${mono(l.text).toFixed(0)}px)`).join(' | ')}] in a 190px box, body ${bodyW}px`);
+assert('D2-title-concat-lossless', concat === LONG_TITLE,
+  `concatenated lines === original title (${concat.length} vs ${LONG_TITLE.length} chars)`);
+/* single-word-too-long: must HARD-BREAK, never overflow the box */
+const monster = 'ExtraordinarilyLongUnbreakableServiceIdentifierName';
+const monsterNode = node('n-monster', 40, 2440, {shape: 'rect', title: monster, colorKey: 'red'}, {measured: {width: 190, height: 160}});
+const monsterSvg = exportSvg({nodes: [monsterNode], edges: [], theme: 'dark', tokens: DARK, measurer: STUB, pad: 24});
+const monsterLines = [];
+for (const m of monsterSvg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
+  if (/font-size="14\.5"/.test(m[1]) && /font-weight="650"/.test(m[1])) monsterLines.push({x: parseFloat(/x="(-?[\d.]+)"/.exec(m[1])[1]), text: m[2]});
+}
+const monsterOk = monsterLines.length >= 2 && monsterLines.every(l => mono(l.text) <= bodyW + 0.5) &&
+  monsterLines.map(l => l.text).join('') === monster;
+assert('D2-single-word-breaks', monsterOk,
+  `${monsterLines.length} hard-broken lines, widths [${monsterLines.map(l => mono(l.text).toFixed(0)).join(', ')}]px <= ${bodyW}px, lossless: ${monsterLines.map(l => l.text).join('') === monster}`);
+
+/* ---------------------------------------------------------- D3: groups --- */
+/* The child fixture's STORED position is parent-relative (40,60); the group
+   sits at (20,1480) → absolute (60,1540). The emitted child translate must be
+   abs + off, NOT the raw relative position. The group's bounds rect must
+   cover parent+relative of both. */
+const childT = nodeTranslate(svg, 'n-grouped');
+const grpT = nodeTranslate(svg, 'n-group');
+/* the group's boundary rect is emitted at its own translate with size = its
+   content bounds + 24px of apron; recompute what the child SHOULD be: */
+const gBlockD3 = nodeBlock(svg, 'n-group') ?? '';
+const grpRect = /<rect x="0" y="0" width="([\d.]+)" height="([\d.]+)"/.exec(gBlockD3);
+const childWant = {x: 20 + 40, y: 1480 + 60}; /* parent + relative */
+const d3childOk = !!childT && Math.abs(childT.x - (childWant.x + edgeGroupOff.x)) <= 2 &&
+  Math.abs(childT.y - (childWant.y + edgeGroupOff.y)) <= 2;
+assert('D3-child-at-parent-plus-relative', d3childOk,
+  `grouped child emitted translate (${childT?.x.toFixed(1)},${childT?.y.toFixed(1)}) = parent+relative (${childWant.x},${childWant.y}) + off (${edgeGroupOff.x},${edgeGroupOff.y}) within ±2px`);
+/* the group's bounds cover BOTH the group frame and the child (child inside
+   the boundary rect's x/y/w/h in emitted space) */
+let d3boundsOk = false;
+if (grpT && grpRect && childT) {
+  const gx = grpT.x, gy = grpT.y, gw = parseFloat(grpRect[1]), gh = parseFloat(grpRect[2]);
+  d3boundsOk = childT.x >= gx && childT.y >= gy &&
+    childT.x + 190 <= gx + gw + 0.5 && childT.y + 131 <= gy + gh + 0.5;
+}
+assert('D3-group-bounds-cover-child', d3boundsOk,
+  grpT && grpRect ? `child box inside boundary rect (group@(${grpT.x},${grpT.y}) ${grpRect[1]}x${grpRect[2]}, child@(${childT?.x},${childT?.y}))` : 'group rect or child translate missing');
+/* edge INTO the grouped child follows it: e4-grp's stub route ends at the
+   child's ABSOLUTE centre → its label anchors there, not at the raw
+   relative (40,60)-derived midpoint. */
+const intoGrp = labelTexts(svg, 'into group')[0] ?? {x: NaN, y: NaN};
+const queueT = nodeTranslate(svg, 'n-queue');
+const queueC = queueT ? {x: queueT.x + 95, y: queueT.y + 65.5} : null;
+const childC = childT ? {x: childT.x + 95, y: childT.y + 65.5} : null;
+const wantInto = queueC && childC ? {x: (queueC.x + childC.x) / 2, y: (queueC.y + childC.y) / 2} : null;
+const intoLw = Math.max(24, 'into group'.length * 6.6 + 12);
+const wantIntoTextX = wantInto ? wantInto.x - intoLw / 2 + 6 : NaN;
+const wantIntoTextY = wantInto ? wantInto.y + 4 : NaN;
+assert('D3-edge-follows-child', isFinite(wantIntoTextX) && Math.abs(intoGrp.x - wantIntoTextX) <= 2 && Math.abs(intoGrp.y - wantIntoTextY) <= 2,
+  `'into group' text at (${intoGrp.x?.toFixed(1)},${intoGrp.y?.toFixed(1)}) vs plate on midpoint to ABSOLUTE child centre (${wantInto?.x.toFixed(1)},${wantInto?.y.toFixed(1)}) → text (${wantIntoTextX?.toFixed(1)},${wantIntoTextY?.toFixed(1)})`);
+
 
 /* ------------------------------------------------------------------ end -- */
 
