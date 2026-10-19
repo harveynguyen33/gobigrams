@@ -23,6 +23,7 @@
 import {resolveColor} from './colors';
 import {asShape, shapeFrameSvg} from './shapes';
 import {EXPORT_TOKENS} from './theme';
+import {labelAnchor, type LabelPos} from './edgeLabel';
 
 /** A measured text block, relative to its node's top-left corner. */
 export type TextRect = {
@@ -36,8 +37,15 @@ export type TextRect = {
 export type SvgMeasurer = {
   /** The node's text body box. Coordinates are relative to the node box. */
   text(nodeEl: unknown): TextRect | null;
-  /** The edge's route, in the clone's own coordinate space. */
-  edgePath(edgeEl: unknown): {d: string; midX: number; midY: number} | null;
+  /** The edge's route. `d` is the path string; `start`/`end` are the route's
+   *  ENDPOINTS in the path's own coordinate space — for both the live clone
+   *  and the stub that is FLOW space (= absolute model space), so label
+   *  anchors derived from them land where the canvas put the label. */
+  edgePath(edgeEl: unknown): {
+    d: string;
+    start: {x: number; y: number};
+    end: {x: number; y: number};
+  } | null;
   /** model position − clone-space position of a node's top-left corner.
    *  Constant across the clone, so edge routes translate into model space
    *  with ONE group transform (no path rewriting). */
@@ -142,12 +150,28 @@ export function domMeasurer(): SvgMeasurer {
     edgePath(edgeEl) {
       const el = edgeEl as Element | null;
       if (!el || typeof el.querySelector !== 'function') return null;
-      const p = el.querySelector('.react-flow__edge-path') ?? el.querySelector('path');
+      const p = (el.querySelector('.react-flow__edge-path') ?? el.querySelector('path')) as SVGPathElement | null;
       if (!p) return null;
       const d = p.getAttribute('d');
       if (!d) return null;
-      const b = p.getBoundingClientRect();
-      return {d, midX: b.left + b.width / 2, midY: b.top + b.height / 2};
+      /* DEFECT-1: flow-space endpoints read OFF THE PATH ITSELF. The clone's
+         routes are drawn in flow coordinates (the translate lives on an
+         ancestor), so length 0 and length N are the edge's absolute endpoints
+         — exactly the two anchors the canvas's labelAnchor consumes. No
+         getBoundingClientRect: that was the bug (a viewport-space box centre
+         is meaningless inside an offscreen themed clone, and a bounding-box
+         centre is not the 50% point of a diagonal anyway). */
+      let sx = 0, sy = 0, tx = 0, ty = 0;
+      try {
+        const total = p.getTotalLength();
+        const a = p.getPointAtLength(0);
+        const b = p.getPointAtLength(total);
+        sx = a.x; sy = a.y; tx = b.x; ty = b.y;
+      } catch {
+        /* non-renderable path (display:none clone) — keep {0,0} ends, which
+           makes the label fall back to the geometric centre below */
+      }
+      return {d, start: {x: sx, y: sy}, end: {x: tx, y: ty}};
     },
     origin(nodeEl, node) {
       const el = nodeEl as Element | null;
@@ -242,6 +266,33 @@ function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, f
   return parts.join('');
 }
 
+/* ------------------------------------------------------------- edge label */
+
+/** DEFECT-1 — the export's label anchor, ONE source with the canvas.
+ *
+ *  `labelAnchor` (src/edgeLabel.ts) is the app's whole parity claim: it
+ *  reproduces the shipped GoblinEdge expression operation for operation and
+ *  adds `labelOffset` only once `labelPinned` is set. This wrapper adapts the
+ *  exporter's route to it: the source/target read from the PATH ITSELF
+ *  (getPointAtLength 0 / total), `labelX`/`labelY` default to the endpoints'
+ *  midpoint — which is what the canvas generators hand back for a resting
+ *  edge — and `offset` is the legacy 3-slot fraction. Same function, same
+ *  inputs' space (flow), same result the canvas paints. */
+function edgeLabelAnchor(
+  route: {start: {x: number; y: number}; end: {x: number; y: number}},
+  d: Record<string, unknown>,
+): {x: number; y: number} {
+  return labelAnchor({
+    sourceX: route.start.x, sourceY: route.start.y,
+    targetX: route.end.x, targetY: route.end.y,
+    labelX: (route.start.x + route.end.x) / 2,
+    labelY: (route.start.y + route.end.y) / 2,
+    offset: (typeof d.offset === 'string' ? d.offset : undefined) as LabelPos | undefined,
+    labelOffset: (d.labelOffset ?? undefined) as {x: number; y: number} | undefined,
+    labelPinned: d.labelPinned === true,
+  });
+}
+
 /* -------------------------------------------------------------------- main */
 
 export function exportSvg(input: ExportInput): string {
@@ -272,10 +323,9 @@ export function exportSvg(input: ExportInput): string {
   const off = {x: pad - minX, y: pad - minY};
 
   /* Edge `d` coordinates are MODEL space in both paths (the DOM clone's
-     React Flow routes use flow coordinates = model coordinates; the stub
-     routes are computed from model positions). Only the label mid-point read
-     off a live element comes back in rect space, so it is the one value that
-     needs `origin` added before `off`. */
+     React Flow routes use flow coordinates = absolute model coordinates, and
+     the stub routes are computed from absolute positions). Labels derive from
+     the SAME coordinates — see `edgeLabelAnchor` above. */
   const edgeParts: string[] = [`<g transform="translate(${off.x},${off.y})">`];
   const defs: string[] = [];
   const markerId = (color: string): string => {
@@ -329,17 +379,28 @@ export function exportSvg(input: ExportInput): string {
     const t = byId.get(e.target)!;
     const color = resolveVar(resolveColor(e.data), tokens);
     const route = (e.el ? input.measurer.edgePath(e.el) : null) ?? stubEdgePath(e, s, t);
-    /* a live rect-space mid-point needs the clone→model shift; a stub mid is
-       already model space (`origin` = 0 there) */
-    const mid = e.el
-      ? {x: route.midX + origin.x + off.x, y: route.midY + origin.y + off.y}
-      : {x: route.midX + off.x, y: route.midY + off.y};
     const marker = markerId(color);
     edgeParts.push(
       `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="2" marker-end="url(#${marker})"/>`,
     );
     const label = e.data?.label ?? e.label;
     if (typeof label === 'string' && label) {
+      /* DEFECT-1: the label anchor is the app's own parity function
+         (`labelAnchor`), fed the edge's FLOW-space path endpoints — the same
+         expression GoblinEdge paints with, so export matches canvas.
+         `midX`/`midY` used to be a viewport-space bounding-rect centre (both
+         wrong space and wrong point on a diagonal). Degenerate ends ({0,0}
+         both — a path the clone could not measure) fall back to the stub's
+         geometric centre so the label never vanishes. */
+      const degenerate = route.start.x === 0 && route.start.y === 0 && route.end.x === 0 && route.end.y === 0;
+      const d = (e.data ?? {}) as Record<string, unknown>;
+      const L = degenerate
+        ? {x: (s.position.x + t.position.x + nodeSize(s).w - nodeSize(t).w) / 2,
+           y: (s.position.y + t.position.y + nodeSize(s).h - nodeSize(t).h) / 2}
+        : edgeLabelAnchor(route, d);
+      /* a live route is already flow space (origin = {0,0}); the shift only
+         matters if a measurer ever returns clone-space ends */
+      const mid = {x: L.x + origin.x + off.x, y: L.y + origin.y + off.y};
       const lw = Math.max(24, label.length * 6.6 + 12);
       edgeParts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(ink.surface)}" stroke="${escAttr(ink.dim)}" stroke-width="0.8"/>`,
@@ -404,12 +465,15 @@ export function exportSvg(input: ExportInput): string {
 }
 
 /** Model-space straight route when no live element exists (the harness path —
- *  deterministic, no DOM). */
-function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode): {d: string; midX: number; midY: number} {
+ *  deterministic, no DOM). Endpoints are the boxes' FLOW-space centres, the
+ *  same anchors React Flow hands the canvas edge. */
+function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode): {
+  d: string; start: {x: number; y: number}; end: {x: number; y: number};
+} {
   const ss = nodeSize(s), ts = nodeSize(t);
   const x1 = s.position.x + ss.w / 2, y1 = s.position.y + ss.h / 2;
   const x2 = t.position.x + ts.w / 2, y2 = t.position.y + ts.h / 2;
-  return {d: `M ${x1},${y1} L ${x2},${y2}`, midX: (x1 + x2) / 2, midY: (y1 + y2) / 2};
+  return {d: `M ${x1},${y1} L ${x2},${y2}`, start: {x: x1, y: y1}, end: {x: x2, y: y2}};
 }
 
 function hashStr(s: string): number {
