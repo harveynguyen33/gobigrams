@@ -1,5 +1,24 @@
 # HANDOFF — Diagram Studio
 
+## ▶ ROUND AR PASS 2 (coder, 2026-10-19) — AR-1 landed at e0fb1d0; ONE ORCHESTRATOR ACTION OPEN
+
+AR-1 (SVG vector serializer) is COMMITTED at `e0fb1d0` (local, not pushed):
+`src/exportSvg.ts` new (React-free pure emitter, injected measurer), `src/shapes.tsx`
+geometry lifted into one data table (ShapeFrame renders it), `src/App.tsx` buildSvg is a
+thin wrapper. Gates measured: tsc 0 · vite build 0 · goblin-verify 22 passed / 0 failed ·
+client_js_bytes 866161.
+
+**OPEN — the ratchet re-anchor could NOT land:** AGENTS.md is a write-protected agent
+instruction file for this profile (approval gate timed out, single-query session). The
+gob block still says `ratchet.ceiling: 831522` while the measured value is 866161, so
+goblin-verify's ratchet row reads OVER CEILING until the orchestrator applies:
+
+```
+ratchet.ceiling: 866161
+ratchet.increment: round-ar-export-svg (AR-1: real SVG primitives replace the
+  foreignObject serializer; measured 2026-10-19 at e0fb1d0)
+```
+
 ## START HERE
 
 Read the newest `## ▶` section below — it is the current state of the repo. The gob

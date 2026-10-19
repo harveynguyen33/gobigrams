@@ -205,7 +205,10 @@ const resizableIds = [...RESIZABLE_BLOCK.matchAll(/'([^']+)'/g)].map(m => m[1]);
    array. `[^=]*=` skips the annotation and `\s*` spans the newline. */
 const extrasDecl = (SHAPES.match(/FLOWCHART_EXTRA_SHAPES[^=]*=\s*\[([\s\S]*?)\]/) ?? [])[1] ?? '';
 const extraIds = [...extrasDecl.matchAll(/'([^']+)'/g)].map(m => m[1]);
-const FRAME_HALF = SHAPES.slice(SHAPES.indexOf('export function ShapeFrame'), SHAPES.indexOf('export function ShapePreview'));
+/* ROUND AR — the frame renderer is now the frameMarkup DATA TABLE (ShapeFrame
+   renders it through shapeFrameMarkup); the switch lives in frameMarkup, so
+   the frame-half window starts there, not at ShapeFrame. */
+const FRAME_HALF = SHAPES.slice(SHAPES.indexOf('function frameMarkup'), SHAPES.indexOf('export function ShapePreview'));
 const PREVIEW_HALF = SHAPES.slice(SHAPES.indexOf('export function ShapePreview'));
 
 const wiring = NEW_SHAPES.map(s => {
@@ -252,26 +255,23 @@ assert('ad2.every-addition-is-a-palette-row-with-its-approved-colour-key',
   ` — each row carries the colour key proposed for it, drawn from the EXISTING six accent keys (no new colour).`);
 
 /* Stored data REUSES the database geometry, which the brief requires verbatim:
-   the cylinder path must be ONE source, not a second copy. The shared drawing
-   lives in `cylinder()`, so the requirement is asserted on THAT: one cylinder
-   body in the whole file, both cases routing through it. */
-const dbCase = (SHAPES.match(/case 'database':[\s\S]*?(?=case ')/) ?? [''])[0];
-const sdCase = (SHAPES.match(/case 'storeddata':[\s\S]*?(?=case ')/) ?? [''])[0];
-const cylinderDefs = [...SHAPES.matchAll(/const cylinder\s*=\s*\(/g)].length;
-const ellipseDefs = [...SHAPES.matchAll(/ellipse cx="100" cy="20" rx="96" ry="15"/g)].length;
-console.log(`  database  case: ${dbCase.replace(/\s+/g, ' ').trim()}`);
-console.log(`  storeddata case: ${sdCase.replace(/\s+/g, ' ').trim()}`);
-console.log(`  \`const cylinder = (\` definitions: ${cylinderDefs}   \`ellipse cx="100" cy="20"\` occurrences: ${ellipseDefs}`);
-/* HARVEY 2026-10-14 — both call sites now forward a per-node `plain` flag
-   (cylinder('database', plain) / cylinder('storeddata', plain)); the draw-once
-   invariant (one definition, one ellipse markup) is unchanged. */
+   the cylinder path must be ONE source, not a second copy. ROUND AR moved that
+   source into the `frameMarkup` DATA TABLE (`database`/`storeddata` share one
+   fall-through case; the React `ShapeFrame` renders the same table through
+   `shapeFrameMarkup`), so the draw-once invariant is asserted on the TABLE:
+   one `ellipse cx="100" cy="20" rx="96" ry="15"` markup in the whole file, and
+   a single shared `case 'database':` fall-through that `storeddata` joins. */
+const cylinderDefs = [...SHAPES.matchAll(/ellipse cx="100" cy="20" rx="96" ry="15"/g)].length;
+const sharedCase = /case 'database':\s*\n\s*case 'storeddata':/.test(SHAPES);
+console.log(`  \`ellipse cx="100" cy="20"\` occurrences: ${cylinderDefs}   database/storeddata share one case: ${sharedCase}`);
+/* HARVEY 2026-10-14 — the per-node `plain` flag still drives the inner arcs
+   (`p.plain === false` gates the rings in the shared cylinder markup); the
+   draw-once invariant (one definition, one ellipse markup) is unchanged. */
 assert('ad2.stored-data-reuses-the-database-cylinder-rather-than-redrawing-it',
-  cylinderDefs === 1 && ellipseDefs === 1
-    && /return cylinder\('database', plain\)/.test(dbCase)
-    && /return cylinder\('storeddata', plain\)/.test(sdCase),
-  'the cylinder markup is drawn ONCE (`const cylinder = (` x1, one `ellipse cx="100" cy="20"` in the file) and BOTH cases route ' +
-  'through it — `database` with its own class and the new `storeddata` with its. So the two cannot drift and no second cylinder path ' +
-  'exists. (The brief: "REUSE the path, do not redraw".)');
+  cylinderDefs === 1 && sharedCase,
+  'the cylinder markup is drawn ONCE (one `ellipse cx="100" cy="20" rx="96" ry="15"` in the file) and BOTH ids route ' +
+  'through the ONE shared case in the frameMarkup data table (which `ShapeFrame` and the AR exporter both render). So the two ' +
+  'cannot drift and no second cylinder path exists. (The brief: "REUSE the path, do not redraw".)');
 
 /* The preset extraShapes fields — both of them. They are REFERENCES now (see
    the note in `src/presets.ts`), so the check is that both point at the ONE

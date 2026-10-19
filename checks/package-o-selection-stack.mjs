@@ -162,9 +162,14 @@ console.log(`  .node.selected { ${JSON.stringify(ourNodeSel.decls)} }   [styles.
 console.log(`    --bg = ${token('--bg')}, --sel = ${token('--sel')}`);
 
 /* ---------- 4. THE SHAPE FRAME's paint ---------- */
+/* ROUND AR — the frame's stroke width lives in `frameMarkup`'s `sw` default:
+   `const sw = p.strokeWidth ?? 1.5;` inside the frameMarkup table. */
 console.log('\n-- 4. The shape\'s OWN border --');
 const shapesSrc = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
-const frameStrokeW = /strokeWidth:\s*([\d.]+)/.exec(shapesSrc)?.[1];
+const swDefault = /const sw = p\.strokeWidth \?\? ([\d.]+);/.exec(shapesSrc)?.[1];
+const frameStrokeW = swDefault
+  ?? /stroke-width="([\d.]+)"/.exec(shapesSrc)?.[1]
+  ?? /strokeWidth:\s*([\d.]+)/.exec(shapesSrc)?.[1];
 const frameStrokeSrc = /stroke:\s*'([^']+)'/.exec(shapesSrc)?.[1];
 console.log(`  ShapeFrame strokeWidth = ${frameStrokeW}   [src/shapes.tsx, the \`p\` object]`);
 console.log(`  ShapeFrame stroke      = ${frameStrokeSrc}`);
