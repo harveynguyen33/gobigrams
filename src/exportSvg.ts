@@ -25,10 +25,17 @@ import {asShape, shapeFrameSvg} from './shapes';
 import {EXPORT_TOKENS} from './theme';
 import {labelAnchor, type LabelPos} from './edgeLabel';
 
-/** A measured text block, relative to its node's top-left corner. */
+/** A measured text block, relative to its node's top-left corner.
+ *  AR-10 — `titleW` (when the measurer found a title element) is the TITLE's
+ *  own content width — rect width minus its horizontal padding — which the
+ *  live canvas wraps `.node-title` at. The exporter must wrap to THAT, not to
+ *  the body width: for some node layouts the title sits wider than `.node-body`
+ *  and wrapping to the body emitted one line too many. `spacing` is the
+ *  title's computed letter-spacing, included in the measured advance. */
 export type TextRect = {
   x: number; y: number; w: number; h: number;
   size: number; weight: number; fill: string; anchor: string;
+  titleW?: number; spacing?: number;
 };
 
 /** Injected measurements. `nodeEl`/`edgeEl` are the themed clone's live
@@ -139,16 +146,23 @@ export function domMeasurer(): SvgMeasurer {
       const el = nodeEl as Element | null;
       if (!el || typeof el.querySelector !== 'function') return null;
       const body = el.querySelector('.node-body') ?? el.querySelector('.lo-wrap') ?? el;
-      const box = rel(el, body as Element);
       const titleEl = el.querySelector('.node-title') ?? el.querySelector('.lo-title');
-      let size = 14.5, weight = 650, fill = '';
+      let size = 14.5, weight = 650, fill = '', spacing = 0, titleW: number | undefined;
       if (titleEl) {
         const cs = getComputedStyle(titleEl);
         size = parseFloat(cs.fontSize) || size;
         weight = parseInt(cs.fontWeight, 10) || weight;
         fill = cs.color || '';
+        /* AR-10 — wrap to the TITLE's own content width (the canvas wraps
+           .node-title at ITS box, which can be wider than .node-body), with
+           the title's letter-spacing folded into the measured advance. */
+        const padL = parseFloat(cs.paddingLeft) || 0;
+        const padR = parseFloat(cs.paddingRight) || 0;
+        titleW = Math.max(12, titleEl.getBoundingClientRect().width - padL - padR);
+        spacing = cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0);
       }
-      return {...box, size, weight, fill, anchor: 'start'};
+      const box = rel(el, body as Element);
+      return {...box, size, weight, fill, anchor: 'start', titleW, spacing};
     },
     edgePath(edgeEl) {
       const el = edgeEl as Element | null;
@@ -313,9 +327,11 @@ function nodeText(
     y += 15;
   }
 
-  /* wrap the title into the body's content width … */
-  const availW = Math.max(12, t.w);
-  const meas = (s: string) => widthOf(s, {size: t.size, weight: t.weight});
+  /* wrap the title into the TITLE's content width when the measurer found a
+     title element (AR-10 — the canvas wraps .node-title at its own box, which
+     is wider than .node-body for some layouts); body width otherwise. */
+  const availW = Math.max(12, t.titleW ?? t.w);
+  const meas = (s: string) => widthOf(s, {size: t.size, weight: t.weight, spacing: t.spacing});
   const lineHeight = Math.round(t.size * 1.35);
   let wrapped = wrapText(title, availW, meas);
   /* … then clamp to the height the body has left (the CSS clip above). The
