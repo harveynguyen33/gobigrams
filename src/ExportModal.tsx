@@ -67,7 +67,14 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   const [format, setFormat] = useState<ExportFormat>('svg');
   const [theme, setTheme] = useState('live');
   const [preview, setPreview] = useState<{kind: 'img' | 'text'; data: string; sub?: string} | null>(null);
-  const [busy, setBusy] = useState(false);
+  /* AR-3 — ONE `busy` state used to serve two meanings ("a preview is
+   * rebuilding" and "a download is in flight"), so the primary button's label
+   * flipped to "Rendering…" on every preview rebuild (measured). The preview
+   * effect now drives only `previewBusy`; only `exportBusy` (doExport) may
+   * change the button's label or disabled state. `Seg` and the tabs read
+   * neither flag. */
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const tabRef = useRef<HTMLButtonElement>(null);
@@ -84,7 +91,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(async () => {
-      setBusy(true);
+      setPreviewBusy(true);
       try {
         const effTheme = theme === 'live' ? liveTheme : theme;
         if (format === 'svg') {
@@ -107,7 +114,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       } catch (err) {
         setPreview({kind: 'text', data: `Preview failed: ${(err as Error)?.message ?? 'unknown'}`});
       }
-      setBusy(false);
+      setPreviewBusy(false);
     }, 250);
     return () => window.clearTimeout(t);
   }, [open, scope, format, theme, nodes, edges, liveTheme, boardName, buildSvg, buildPng, scoped]);
@@ -122,7 +129,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   if (!open) return null;
 
   const doExport = async () => {
-    setBusy(true);
+    setExportBusy(true);
     try {
       const effTheme = theme === 'live' ? liveTheme : theme;
       const base = (boardName?.replace(/[^\w.-]+/g, '_') || 'diagram');
@@ -150,7 +157,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       a.click();
       URL.revokeObjectURL(a.href);
     } finally {
-      setBusy(false);
+      setExportBusy(false);
     }
   };
 
@@ -217,8 +224,10 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />
           <div className="em-note">Preview and file both use the chosen theme — what you see is what downloads.</div>
 
-          <button className="em-go" onClick={doExport} disabled={busy || !preview || (format === 'png' && !scoped.nodes.length)}>
-            {busy ? 'Rendering…' : `Export ${format.toUpperCase()}`}
+          {/* AR-3 — reads `exportBusy` only; a preview rebuild must not change
+              this button's label or disabled state. */}
+          <button className="em-go" onClick={doExport} disabled={exportBusy || !preview || (format === 'png' && !scoped.nodes.length)}>
+            {exportBusy ? 'Rendering…' : `Export ${format.toUpperCase()}`}
           </button>
           </>)}
         </div>
