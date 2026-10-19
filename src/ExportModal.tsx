@@ -5,6 +5,10 @@ import {toMermaid, toMermaidSequence, fromMermaid} from './mermaid';
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'json' | 'mermaid';
+/* AR-9 — one pluraliser for every count string ("1 node · 0 edges"), so no
+   branch hand-writes its own. */
+const count = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'}`;
+
 const THEME_CHOICES: {id: string; label: string}[] = [
   {id: 'live', label: 'live'},
   {id: 'dark', label: 'dark'},
@@ -96,12 +100,12 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
         const effTheme = theme === 'live' ? liveTheme : theme;
         if (format === 'svg') {
           const svg = await buildSvg({...scoped, theme: effTheme});
-          setPreview({kind: 'img', data: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, sub: `${scoped.nodes.length} nodes · ${scoped.edges.length} edges`});
+          setPreview({kind: 'img', data: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, sub: `${count(scoped.nodes.length, 'node')} · ${count(scoped.edges.length, 'edge')}`});
         } else if (format === 'png') {
           const url = await buildPng({...scoped, theme: effTheme});
           setPreview({kind: 'img', data: url, sub: '2× PNG'});
         } else if (format === 'json') {
-          setPreview({kind: 'text', data: JSON.stringify({name: boardName, nodes: scoped.nodes, edges: scoped.edges}, null, 2).slice(0, 4000), sub: `${scoped.nodes.length} nodes · ${scoped.edges.length} edges`});
+          setPreview({kind: 'text', data: JSON.stringify({name: boardName, nodes: scoped.nodes, edges: scoped.edges}, null, 2).slice(0, 4000), sub: `${count(scoped.nodes.length, 'node')} · ${count(scoped.edges.length, 'edge')}`});
         } else {
           const isSeq = scoped.edges.some(x => (x.data as {seqMsg?: string})?.seqMsg);
           const text = isSeq
@@ -109,7 +113,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
             : toMermaid(scoped.nodes, scoped.edges);
           setPreview({kind: 'text', data: text, sub: isSeq
             ? 'Mermaid sequenceDiagram — activations/fragments are not representable'
-            : 'Mermaid flowchart — colours/text styles/icons are not representable'});
+            : 'Mermaid flowchart — colors/text styles/icons are not representable'});
         }
       } catch (err) {
         setPreview({kind: 'text', data: `Preview failed: ${(err as Error)?.message ?? 'unknown'}`});
@@ -165,7 +169,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     const parsed = fromMermaid(importText);
     if (!parsed) { setImportMsg('Could not parse any nodes — is it a Mermaid flowchart?'); return; }
     window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: parsed}));
-    setImportMsg(`Parsed ${parsed.nodes.length} nodes · ${parsed.edges.length} edges — inserting onto the board…`);
+    setImportMsg(`Parsed ${count(parsed.nodes.length, 'node')} · ${count(parsed.edges.length, 'edge')} — inserting onto the board…`);
     window.setTimeout(onClose, 900);
   };
 
