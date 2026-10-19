@@ -4031,7 +4031,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      LIVE document theme. So both builders now mount the clone OFFSCREEN under
      `data-theme=<target>` and let the real stylesheet style it — identical
      mechanics to switching Appearance, without touching the visible board. */
-  const mountThemed = (source: HTMLElement, themeName: string): {host: HTMLDivElement; clone: HTMLElement; done: () => void} => {
+  /* AR-4 — identity-stable so the export modal's preview effect does not
+     re-fire on unrelated App re-renders: the builders used to be plain consts
+     re-created every render (and passed inline to <ExportModal>), so ANY App
+     re-render invalidated the effect deps [.., buildSvg, buildPng, ..] and
+     rebuilt the preview. Every function these builders read is itself a
+     useCallback now, so their deps are the honest reactive set. */
+  const mountThemed = useCallback((source: HTMLElement, themeName: string): {host: HTMLDivElement; clone: HTMLElement; done: () => void} => {
     const host = document.createElement('div');
     host.setAttribute('data-theme', themeName);
     host.style.cssText = 'position:fixed;left:-100000px;top:0;width:1600px;height:1200px;overflow:hidden;pointer-events:none;';
@@ -4043,7 +4049,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       host, clone,
       done: () => host.remove(),
     };
-  };
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   /* AQ21-F — the cloned viewport's classes (.node shapes, edges, groups…) are
      styled by the APP stylesheet, which a standalone SVG does not carry — that
@@ -4051,7 +4057,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      to defaults. Collect ONLY the rules whose selector matches something in
      the clone (keeps the SVG small), then the chosen theme's tokens override
      the :root values. Order = app rules, then token overrides (wins). */
-  const collectCss = (root: HTMLElement): string => {
+  const collectCss = useCallback((root: HTMLElement): string => {
     const classes = new Set<string>();
     root.querySelectorAll('*').forEach(el => {
       (el.classList ?? []).forEach(c => classes.add(c));
@@ -4074,11 +4080,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       try { walk(sheet.cssRules); } catch { /* cross-origin */ }
     }
     return parts.join('\n');
-  };
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   /* AQ21 — parametrised builders. The modal and the one-click menu buttons
      share THESE; the difference is only defaults (live theme, full board). */
-  const buildSvg = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
+  const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf) return '';
     const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
@@ -4130,9 +4136,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     } finally {
       pre.done();
     }
-  };
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [rf, theme, pngPad, mountThemed, collectCss]);
 
-  const buildPng = async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
+  const buildPng = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf || !o.nodes.length) return '';
     const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
@@ -4164,9 +4171,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     } finally {
       pre.done();
     }
-  };
-
-
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [rf, theme, pngPad, pngScale, mountThemed]);
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);
