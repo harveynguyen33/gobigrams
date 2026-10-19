@@ -293,6 +293,28 @@ function edgeLabelAnchor(
   });
 }
 
+/* -------------------------------------------------- absolute positions (D3) */
+
+/** DEFECT-3 — absolute (flow) position of a node, resolving the `parentId`
+ *  chain. React Flow stores a CHILD's `position` RELATIVE TO ITS PARENT; the
+ *  exporter consumed it raw, so a grouped child exported at its relative
+ *  offset (the app's own AQ11 ~250 px teleport, paid a second time). Pure,
+ *  no DOM; a missing parent (dangling id) or a cycle terminates via the
+ *  `guard` set instead of hanging — same shape as `absPos` in src/App.tsx. */
+function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; y: number} {
+  let x = n.position.x, y = n.position.y;
+  let pid = n.parentId ?? null;
+  const guard = new Set<string>();
+  while (pid && !guard.has(pid)) {
+    guard.add(pid);
+    const p = byId.get(pid);
+    if (!p) break; /* dangling parent id: keep what we have */
+    x += p.position.x; y += p.position.y;
+    pid = p.parentId ?? null;
+  }
+  return {x, y};
+}
+
 /* -------------------------------------------------------------------- main */
 
 export function exportSvg(input: ExportInput): string {
@@ -301,6 +323,9 @@ export function exportSvg(input: ExportInput): string {
   const nodes = input.nodes.filter(n => n && typeof n.id === 'string');
   const byId = new Map(nodes.map(n => [n.id, n]));
   const edges = input.edges.filter(e => e && byId.has(e.source) && byId.has(e.target));
+  /* DEFECT-3 — every geometry use below consumes the ABSOLUTE position
+     (parentId chain resolved), never the stored relative `position`. */
+  const abs = new Map(nodes.map(n => [n.id, absPosition(n, byId)]));
   const ink = {
     fg: tokens['--fg'] || '#e8e8ea',
     dim: tokens['--dim'] || '#8a8a92',
@@ -308,14 +333,15 @@ export function exportSvg(input: ExportInput): string {
     bg: tokens['--bg'] || '#0b0b0d',
   };
 
-  /* content bounds → viewBox (same arithmetic as the PNG path) */
+  /* content bounds → viewBox (same arithmetic as the PNG path); D3: absolute */
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const n of nodes) {
     const s = nodeSize(n);
-    minX = Math.min(minX, n.position.x);
-    minY = Math.min(minY, n.position.y);
-    maxX = Math.max(maxX, n.position.x + s.w);
-    maxY = Math.max(maxY, n.position.y + s.h);
+    const p = abs.get(n.id)!;
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x + s.w);
+    maxY = Math.max(maxY, p.y + s.h);
   }
   if (!nodes.length) { minX = minY = 0; maxX = 800; maxY = 400; }
   const w = Math.ceil(maxX - minX) + pad * 2;
@@ -348,10 +374,11 @@ export function exportSvg(input: ExportInput): string {
     let b = {minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity};
     for (const k of kids) {
       const s = nodeSize(k);
-      b.minX = Math.min(b.minX, k.position.x); b.minY = Math.min(b.minY, k.position.y);
-      b.maxX = Math.max(b.maxX, k.position.x + s.w); b.maxY = Math.max(b.maxY, k.position.y + s.h);
+      const p = abs.get(k.id)!; /* D3: child bounds in ABSOLUTE space */
+      b.minX = Math.min(b.minX, p.x); b.minY = Math.min(b.minY, p.y);
+      b.maxX = Math.max(b.maxX, p.x + s.w); b.maxY = Math.max(b.maxY, p.y + s.h);
     }
-    if (!kids.length) { const s = nodeSize(g); b = {minX: g.position.x, minY: g.position.y, maxX: g.position.x + s.w, maxY: g.position.y + s.h}; }
+    if (!kids.length) { const s = nodeSize(g); const p = abs.get(g.id)!; b = {minX: p.x, minY: p.y, maxX: p.x + s.w, maxY: p.y + s.h}; }
     /* model space here: the off group translate already carries `off` */
     const left = b.minX + off.x - 12, top = b.minY + off.y - 12;
     const lw = (b.maxX - b.minX) + 24, lh = (b.maxY - b.minY) + 24;
@@ -378,7 +405,7 @@ export function exportSvg(input: ExportInput): string {
     const s = byId.get(e.source)!;
     const t = byId.get(e.target)!;
     const color = resolveVar(resolveColor(e.data), tokens);
-    const route = (e.el ? input.measurer.edgePath(e.el) : null) ?? stubEdgePath(e, s, t);
+    const route = (e.el ? input.measurer.edgePath(e.el) : null) ?? stubEdgePath(e, s, t, abs);
     const marker = markerId(color);
     edgeParts.push(
       `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="2" marker-end="url(#${marker})"/>`,
@@ -395,8 +422,8 @@ export function exportSvg(input: ExportInput): string {
       const degenerate = route.start.x === 0 && route.start.y === 0 && route.end.x === 0 && route.end.y === 0;
       const d = (e.data ?? {}) as Record<string, unknown>;
       const L = degenerate
-        ? {x: (s.position.x + t.position.x + nodeSize(s).w - nodeSize(t).w) / 2,
-           y: (s.position.y + t.position.y + nodeSize(s).h - nodeSize(t).h) / 2}
+        ? {x: (abs.get(s.id)!.x + abs.get(t.id)!.x + nodeSize(s).w - nodeSize(t).w) / 2,
+           y: (abs.get(s.id)!.y + abs.get(t.id)!.y + nodeSize(s).h - nodeSize(t).h) / 2}
         : edgeLabelAnchor(route, d);
       /* a live route is already flow space (origin = {0,0}); the shift only
          matters if a measurer ever returns clone-space ends */
@@ -416,7 +443,8 @@ export function exportSvg(input: ExportInput): string {
     const s = nodeSize(n);
     const accent = nodeColor(n, tokens);
     const type = n.type ?? (n.data?.columns ? 'table' : 'goblin');
-    nodeParts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${n.position.x + off.x},${n.position.y + off.y})">`);
+    const p = abs.get(n.id)!; /* D3: absolute, so a grouped child lands at parent+relative */
+    nodeParts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${p.x + off.x},${p.y + off.y})">`);
     if (type === 'label') {
       const lt = input.measurer.text(n.el);
       const title = String(n.data?.title ?? n.id);
@@ -467,12 +495,14 @@ export function exportSvg(input: ExportInput): string {
 /** Model-space straight route when no live element exists (the harness path —
  *  deterministic, no DOM). Endpoints are the boxes' FLOW-space centres, the
  *  same anchors React Flow hands the canvas edge. */
-function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode): {
+function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
+  abs: Map<string, {x: number; y: number}>): {
   d: string; start: {x: number; y: number}; end: {x: number; y: number};
 } {
   const ss = nodeSize(s), ts = nodeSize(t);
-  const x1 = s.position.x + ss.w / 2, y1 = s.position.y + ss.h / 2;
-  const x2 = t.position.x + ts.w / 2, y2 = t.position.y + ts.h / 2;
+  const sp = abs.get(s.id)!, tp = abs.get(t.id)!;
+  const x1 = sp.x + ss.w / 2, y1 = sp.y + ss.h / 2;
+  const x2 = tp.x + ts.w / 2, y2 = tp.y + ts.h / 2;
   return {d: `M ${x1},${y1} L ${x2},${y2}`, start: {x: x1, y: y1}, end: {x: x2, y: y2}};
 }
 
