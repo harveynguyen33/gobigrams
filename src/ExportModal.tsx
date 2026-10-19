@@ -32,6 +32,35 @@ type Props = {
 /** AQ21 — the export modal. LEFT: scope + format + theme. RIGHT: a live
  *  preview of the actual artifact the Export button will download — the SAME
  *  code path, not a mock. Debounced so dragging across themes re-renders once. */
+/** AR-2 — hoisted OUT of the ExportModal body: a component type declared inside
+ *  the function body is a new identity every render, so React remounts the whole
+ *  `.em-seg` subtree on every state change (measured 0/12 marker survival) and
+ *  every CSS transition/hover/:active restarts. `selCount` and `tabRef` arrive
+ *  as props; same JSX, same classes, same aria wiring as before. */
+function Seg<T extends string>({value, set, options, aria, selCount, tabRef}: {
+  value: T;
+  set: (v: T) => void;
+  options: {id: T; label: string}[];
+  aria: string;
+  selCount: number;
+  tabRef: {current: HTMLButtonElement | null};
+}) {
+  return (
+    <div className="em-seg" role="radiogroup" aria-label={aria}>
+      {options.map(o => (
+        <button
+          key={o.id}
+          ref={o.id === value ? tabRef : undefined}
+          className={o.id === value ? 'on' : ''}
+          onClick={() => set(o.id as T)}
+          disabled={o.id === 'selection' && aria === 'Scope' && selCount === 0}
+          title={o.id === 'selection' && selCount === 0 ? 'Nothing selected' : undefined}
+        >{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
 export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, onImportJson}: Props) {
   const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
@@ -133,21 +162,6 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     window.setTimeout(onClose, 900);
   };
 
-  const Seg = <T extends string>({value, set, options, aria}: {value: T; set: (v: T) => void; options: {id: T; label: string}[]; aria: string}) => (
-    <div className="em-seg" role="radiogroup" aria-label={aria}>
-      {options.map(o => (
-        <button
-          key={o.id}
-          ref={o.id === value ? tabRef : undefined}
-          className={o.id === value ? 'on' : ''}
-          onClick={() => set(o.id as T)}
-          disabled={o.id === 'selection' && aria === 'Scope' && selCount === 0}
-          title={o.id === 'selection' && selCount === 0 ? 'Nothing selected' : undefined}
-        >{o.label}</button>
-      ))}
-    </div>
-  );
-
   return (
     <div className="sp-overlay em-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="em-modal" role="dialog" aria-label="Export or import diagram">
@@ -186,13 +200,13 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
 
           {tab === 'export' && (<>
           <div className="em-label">Scope</div>
-          <Seg<ExportScope> value={scope} set={setScope} aria="Scope" options={[
+          <Seg<ExportScope> value={scope} set={setScope} aria="Scope" selCount={selCount} tabRef={tabRef} options={[
             {id: 'full', label: `Full board (${nodes.length})`},
             {id: 'selection', label: `Selected only (${selCount})`},
           ]} />
 
           <div className="em-label">Format</div>
-          <Seg<ExportFormat> value={format} set={setFormat} aria="Format" options={[
+          <Seg<ExportFormat> value={format} set={setFormat} aria="Format" selCount={selCount} tabRef={tabRef} options={[
             {id: 'svg', label: 'SVG'},
             {id: 'png', label: 'PNG'},
             {id: 'json', label: 'JSON'},
@@ -200,7 +214,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           ]} />
 
           <div className="em-label">Theme</div>
-          <Seg value={theme} set={setTheme} aria="Theme" options={THEME_CHOICES as {id: string; label: string}[]} />
+          <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />
           <div className="em-note">Preview and file both use the chosen theme — what you see is what downloads.</div>
 
           <button className="em-go" onClick={doExport} disabled={busy || !preview || (format === 'png' && !scoped.nodes.length)}>
