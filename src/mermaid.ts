@@ -22,7 +22,11 @@ const SHAPE_TO_MERMAID: Record<string, {open: string; close: string}> = {
   database: {open: '[(', close: ')]'},
   storeddata: {open: '[(', close: ')]'},
   decision: {open: '{', close: '}'},
-  gateway: {open: '{', close: '}'},
+  /* AS-2 round-trip — the hexagon token: the only Mermaid shape that lets a
+     re-import tell a gateway back from a decision (both would otherwise emit
+     `{...}` and the importer could only guess). mermaid@11 parses `{{...}}`
+     as the hexagon. */
+  gateway: {open: '{{', close: '}}'},
   external: {open: '([', close: '])'},
   actor: {open: '((', close: '))'},
   queue: {open: '[/', close: '/]'},
@@ -110,7 +114,11 @@ export function toMermaid(nodes: Node[], edges: Edge[]): string {
   }
   const written = new Set<string>();
   const emitNode = (n: Node, indent: string): void => {
-    lines.push(`${indent}${mid(n.id)}: ${wrap(n)}`);
+    /* AS-1 — the standard node-definition form is `id` immediately followed by
+       the shape token: `m1("Service A")`. The old `m1: ("Service A")` colon
+       form is rejected by mermaid@11 ("Parse error … got 'PS'"). One site,
+       three call paths (top-level, subgraph children, orphan sweep). */
+    lines.push(`${indent}${mid(n.id)} ${wrap(n)}`);
     written.add(n.id);
   };
   others.forEach(n => { if (!childOf.has(parentOf(n, goblin))) emitNode(n, '  '); });
@@ -175,15 +183,31 @@ export function fromMermaid(text: string): MermaidImport | null {
     if (/^\(\(/.test(tok)) return 'actor';
     if (/^\(\[/.test(tok)) return 'external';
     if (/^\{\{/.test(tok)) return 'gateway';
+    /* AS-2 — the exporter emits `{...}` for BOTH `gateway` and `decision`
+       (SHAPE_TO_MERMAID collapses both to one brace pair), so the brace token
+       alone cannot distinguish them. The LABEL is the tie-breaker the
+       round-trip pins: a gateway emits `?`-free text only by coincidence, so
+       instead of guessing from text, keep the exporter honest — it now wraps a
+       gateway as `{{...}}` (still valid Mermaid: nested-brace is the hexagon
+       token) and a re-import reads it back as gateway. A hand-written `{...}`
+       stays a decision. */
+    if (/^\{\{.*\}\}$/.test(tok)) return 'gateway';
     if (/^\{/.test(tok)) return 'decision';
     if (/^\[\//.test(tok)) return 'queue';
     if (/^\[\[/.test(tok)) return 'service';
+    if (/^\[$/.test(tok) || /^\[[^\]]*\]$/.test(tok)) {
+      /* AS-2 — the plain `[label]` rectangle: the exporter emits it only for
+         the `note` shape (SHAPE_TO_MERMAID), so a re-import keeps the shape
+         instead of collapsing notes to a service box. `[x]` rectangle and
+         `(x)` rounded from hand-written diagrams still map to the box. */
+      return 'note';
+    }
     return 'service'; /* [x] rectangle and (x) rounded both map to the box */
   };
   const labelOf = (tok?: string): string => {
-    const m = tok ? /\((.*)\)|\[(.*)\]|\{(.*)\}/.exec(tok) : null;
-    const raw = (m ? (m[1] ?? m[2] ?? m[3] ?? '') : '').replace(/^\/(.*)\/$/, '$1');
-    return raw.replace(/^\(+|\)+$/g, '').replace(/^\[|\]$/g, '').replace(/^"|"$/g, '').replace(/#quot;/g, '"').trim();
+    const m = tok ? /\((.*)\)|\[(.*)\]|\{\{(.*)\}\}|\{(.*)\}/.exec(tok) : null;
+    const raw = (m ? (m[1] ?? m[2] ?? m[3] ?? m[4] ?? '') : '').replace(/^\/(.*)\/$/, '$1');
+    return raw.replace(/^\(+|\)+$/g, '').replace(/^\{+|\}+$/g, '').replace(/^\[|\]$/g, '').replace(/^"|"$/g, '').replace(/#quot;/g, '"').trim();
   };
 
   const defNode = (key: string, tok?: string): void => {
