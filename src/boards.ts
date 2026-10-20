@@ -2,6 +2,58 @@ import type {Node, Edge} from '@xyflow/react';
 import {type PresetId, type TemplateSpec, getPreset, asPreset} from './presets';
 import {type ThemeName} from './theme';
 
+/* ===========================================================================
+   AT-1 — THE BOOT PROBE.
+   =========================================================================== */
+
+/** Probe outcome for the boards backend (AT-1). 'server' = the /api/boards
+ *  JSON API answered; 'local' = this browser owns the boards (IndexedDB). */
+export type StorageMode = 'server' | 'local';
+
+/** Timeout for the boot probe. ~3× a LAN round-trip and well under the
+ *  800 ms autosave's human timescale: a hung connection must never hang boot. */
+export const PROBE_TIMEOUT = 2500;
+
+/** The boot probe (AT-1). Injected `fetch` (defaults to the global) keeps it
+ *  DOM-free-testable: checks/round-at-local-store.mjs drives all six rows of
+ *  the decision table in Node.
+ *
+ *  SERVER only when the answer is PROOF our API replied: ok + JSON content-
+ *  type + an Array body (`listBoards()` returns BoardMeta[] and nothing else
+ *  on this origin ever will). Any other outcome — SPA-fallback HTML on a
+ *  static host (measured: `vite preview` answers 200 text/html), a 404/5xx,
+ *  non-array JSON, a network rejection (`file://` origin), a hung connection
+ *  — converges on LOCAL. The user never sees a broken board list. */
+export async function decideStorageMode(
+  fetchImpl: typeof fetch = fetch,
+): Promise<StorageMode> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
+    let res: Response;
+    try {
+      res = await fetchImpl('/api/boards', {signal: ctrl.signal});
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!(res && res.ok && /json/i.test(res.headers?.get?.('content-type') ?? ''))) return 'local';
+    const body: unknown = await res.json();
+    return Array.isArray(body) ? 'server' : 'local';
+  } catch {
+    return 'local';
+  }
+}
+
+/* The session-wide decision. First call runs the probe; every later call
+   awaits the SAME promise — one probe, one mode, for the whole session
+   (AT-1: no mid-session flipping; a board saved mid-session goes to the
+   mode chosen at boot). */
+let modePromise: Promise<StorageMode> | null = null;
+export function probeServerModeOnce(fetchImpl?: typeof fetch): Promise<StorageMode> {
+  modePromise ??= decideStorageMode(fetchImpl);
+  return modePromise;
+}
+
 export type BoardMeta = {
   id: string;
   name: string;
