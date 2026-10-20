@@ -1,5 +1,37 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-21 03:05 — ORCHESTRATOR VERIFICATION of ROUND AR-2 (independent of the worker's report)
+
+**Verdict: the two fidelity gaps are FIXED, measured live, and pushed.** The worker's own block follows below; this
+one records what the orchestrator re-measured with its own browser and its own commands.
+
+Method: a probe board created through `/api/boards`, a Mermaid import
+(`flowchart TD; A[Order API] -->|reads| B[(Primary DB)]; B -->|writes| C[Fulfil]`), then the REAL Export modal, then
+the emitted SVG parsed row by row. Probe deleted afterwards; `boards/` confirmed back to its three files.
+
+| Row | Canvas `getComputedStyle` | Exported `<text>` |
+|---|---|---|
+| edge label `reads` | ui-monospace **11 / 600** | ui-monospace **11 / 600** ✓ |
+| edge label `writes` | ui-monospace **11 / 600** | ui-monospace **11 / 600** ✓ |
+| note title `Order API` | ui-monospace **13 / 650** | ui-monospace **13 / 650** ✓ |
+| note title `Fulfil` | ui-monospace **13 / 650** | ui-monospace **13 / 650** ✓ |
+| database title `Primary DB` | ui-sans-serif **14 / 650 / -0.14** | ui-sans-serif **14 / 650 / -0.14** ✓ |
+
+The labels are also **painted on the canvas now** (`.edge-label` present, 2 of 2), which is the contract the round
+chose: one storage (`Edge.label`), canvas paints it, export follows it — never invented, never dropped.
+
+**Gates (orchestrator run, HEAD `3a2e19e`):** `npx tsc --noEmit` 0 · `npx vite build` 0 · **48/48 harnesses** by the
+house count (the worker's "50/50" counts the two non-assertion helper files too) · `client_js_bytes` **880,354** ·
+tree clean · both remotes pushed.
+
+**Card state:** `t_1d8e84ea` ended **blocked** after one crash + retry (`runs` #154 review_requested, #155 crashed,
+#156 did not finish). The work it produced is complete and orchestrator-verified above, so **do not retry it** —
+archive the card in the morning. The crash was in the harness-writing turn, not in a shipped commit.
+
+**Still open for Harvey:** (1) ratchet raise — `client_js_bytes` 880,354 vs declared 831,522, blocked on an
+interactive approval of `AGENTS.md`; (2) the Mac test in the checklist below; (3) LICENSE, then `private: true` →
+false and the repo flip.
+
 ## ▶ 2026-10-21 — ROUND AR-2 EXPORT FIDELITY LANDED (card t_1d8e84ea), LOCAL ONLY
 
 Read this block first. Everything below is history.
