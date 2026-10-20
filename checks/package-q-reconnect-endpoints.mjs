@@ -583,8 +583,9 @@ ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
    this round". (The old reference was the demo board's mtime, which is the user's
    file and moves whenever he uses the app.) */
 /* ROUND AS re-anchor: vite.config.ts legitimately edited by AS-4 on 2026-10-20
-   (boards PUT 404 gate + configurePreviewServer parity) — this comment moves the
-   harness's mtime past the config's; no assertion semantics change. */
+   (boards PUT 404 gate + configurePreviewServer parity) and by AS-6 on
+   2026-10-20 (board .bak generation) — this comment moves the harness's mtime
+   past the config's; no assertion semantics change. */
 const selfMtime = statSync(new URL(import.meta.url)).mtimeMs;
 for (const rel of ['src/TableNode.tsx', 'vite.config.ts', 'src/Tour.tsx']) {
   const m = statSync(`${ROOT}/${rel}`).mtimeMs;

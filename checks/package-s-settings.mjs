@@ -168,8 +168,8 @@ assert('S2.defaults-are-todays — the defaults are scale 2 and pad 48 (unchange
   // blank comment before the probe
 }
 assert('S3.autosave-gate — the debounced effect returns early when autosave is off',
-  app.includes('if (!autosave) {') && app.includes('setDirty(true);') && app.includes('}, [nodes, edges, boardId, flushSave, autosave]);'),
-  'the effect must gate on the persisted flag and mark the board dirty instead');
+  app.includes('if (!autosave) {') && app.includes('setDirty(true);') && app.includes('}, [nodes, edges, boardId, flushSave, autosave, canAutosave]);'),
+  'the effect must gate on the persisted flag and mark the board dirty instead (dep array extended by ROUND AS AS-5: the explicit save gate re-runs the effect so a gate transition cannot strand a pending autosave)');
 
 {
   // blank comment before the probe
