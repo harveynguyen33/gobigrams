@@ -49,9 +49,15 @@ console.log(`  target root: ${ROOT}`);
 /* ---------------------------------------------------------------- bundle -- */
 const BOARDSDIR = join(tmpdir(), `as-boards-${process.pid}`);
 rmSync(BOARDSDIR, {recursive: true, force: true});
-const ENTRY = join(REAL_ROOT, `.as-boards-entry-${process.pid}.mjs`);
-const OUT = join(REAL_ROOT, `.as-boards-out-${process.pid}.cjs`);
-writeFileSync(ENTRY, `import cfg from './vite.config.ts';\nexport default cfg;\n`);
+const ENTRY = join(tmpdir(), `.as-boards-entry-${process.pid}.mjs`);
+/* ROUND AR-2 (t_1d8e84ea reviewer finding, MAJOR housekeeping) — the bundled
+   config used to be written INTO THE REPO ROOT and left behind: a fresh
+   `.as-boards-out-<pid>.cjs` after every run, untracked and (before the
+   orchestrator's .gitignore belt) committable by a careless `git add -A`.
+   The bundle is scratch; scratch lives in tmpdir, and whatever the path, it
+   is removed in the finally below — a crashed run must not leak either. */
+const OUT = join(tmpdir(), `.as-boards-out-${process.pid}.cjs`);
+writeFileSync(ENTRY, `import cfg from ${JSON.stringify(join(ROOT, 'vite.config.ts'))};\nexport default cfg;\n`);
 let bundled = execFileSync(join(REAL_ROOT, 'node_modules/.bin/esbuild'),
   [ENTRY, '--bundle', '--platform=node', '--format=cjs', '--log-level=error',
     '--external:vite', '--external:@vitejs/plugin-react'],
@@ -64,10 +70,22 @@ if (!assignRe.test(bundled)) {
   process.exit(2);
 }
 bundled = bundled.replace(assignRe, `BOARDS_DIR = ${JSON.stringify(BOARDSDIR)}`);
-writeFileSync(OUT, bundled);
 const require_ = createRequire(join(REAL_ROOT, 'package.json'));
+/* the bundle is `--external:vite`, so loading it must resolve `vite` —
+   and CommonJS resolution follows the REQUIRED FILE's own path, not the
+   createRequire root. The bundle therefore carries an explicit module
+   paths preamble: `module.paths` is patched to the REAL tree's
+   node_modules before the plugin body runs. (Writing OUT into the real
+   tree is what the old code did; that was the leak.) */
+writeFileSync(OUT, bundled.replace('module.exports =',
+  `module.paths.unshift(${JSON.stringify(join(REAL_ROOT, 'node_modules'))});\nmodule.exports =`));
 const cfg = require_(OUT).default;
 rmSync(ENTRY, {force: true});
+/* ROUND AR-2 — the loaded module is what matters, not the file: the bundle
+   is unlinked the moment `require_` has materialised it. The .gitignore
+   pattern stays as a belt for OLD trees, but this harness no longer relies
+   on it. */
+rmSync(OUT, {force: true});
 const plug = (cfg.plugins ?? []).find(p => p && p.name === 'diagram-studio-boards-api');
 assert('as4.0.plugin-instantiated',
   !!plug && typeof plug.configureServer === 'function',
