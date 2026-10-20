@@ -424,7 +424,12 @@ function nodeText(
 
   const titleBottomY = y + (wrapped.length - 1) * lineHeight;
   wrapped.forEach((ln, i) => {
-    lines.push(textLine(x, y + i * lineHeight, ln, {size: t.size, weight: t.weight, fill: t.fill || fg, family: titleFamily}));
+    lines.push(textLine(x, y + i * lineHeight, ln, {
+      size: t.size, weight: t.weight, fill: t.fill || fg, family: titleFamily,
+      /* AR-11 — the title's computed letter-spacing rides the emitted rows:
+         the wrap measured WITH it, so the file paints with it too. */
+      spacing: t.spacing ? String(t.spacing) : undefined,
+    }));
   });
   y = titleBottomY;
 
