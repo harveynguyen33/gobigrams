@@ -1330,8 +1330,8 @@ assert('r3g.harveys-boards-are-present-and-this-round-writes-none-of-them',
   boardNames.length >= 1 && boardNames.every(f => /^[a-z0-9]+\.json$/.test(f))
     && !/node:fs|readFileSync|writeFileSync/.test(BOARDS_SRC)
     && !/node:fs|readFileSync|writeFileSync/.test(APP_RAW),
-  `${boardNames.length} live board files present, each named as before. No filesystem handle in either file touched this round: \`src/boards.ts\` reaches boards through the \`/api/boards\` HTTP route only ` +
-  `and App.tsx imports no fs module — every write goes through the app's own API at the user's request. LISTING check, not a byte check: the dev server's HMR normalisation would make a byte hash red for an unrelated reason`);
+  `${boardNames.length} live board files present, each named as before. No filesystem handle in either file touched this round: \`src/boards.ts\` reaches boards through the storage adapter (server API or browser-local IndexedDB), never a filesystem handle ` +
+  `and App.tsx imports no fs module — every write goes through the app's own API at the user's request. LISTING check, not a byte check: the dev server's HMR normalisation would make a byte hash red for an unrelated reason. RE-ANCHORED (ROUND AT): the old prose said boards are reached "through the /api/boards HTTP route only", which AT's browser-local mode makes conditionally false; the PREDICATE (no fs handle) is unchanged and still true — IndexedDB is not fs.`);
 
 
 /* ===========================================================================

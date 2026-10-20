@@ -3033,6 +3033,14 @@ kbd {
 .boards-item .boards-item-name { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .boards-item .boards-item-meta { color: var(--dim); font-size: var(--fs-sm); }
 .boards-empty { color: var(--dim); font-size: var(--fs-md); padding: 8px 10px; }
+/* AT-1/AT-4 — the storage-mode line + the local-mode storage readout. Small,
+   dim, one line each; never a modal (spec: no scare modals, no dead buttons). */
+.boards-mode {
+  color: var(--dim); font-size: var(--fs-xs); padding: 5px 10px 3px;
+  border-bottom: 1px solid var(--border);
+}
+.boards-mode:empty { display: none; }
+.boards-storage-readout { border-bottom: none; padding-top: 0; white-space: normal; line-height: 1.45; }
 .boards-actions { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; display: flex; flex-direction: column; gap: 2px; }
 .boards-actions .pop-item[disabled] { opacity: 0.45; cursor: not-allowed; }
 .save-ind {

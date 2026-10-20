@@ -96,36 +96,76 @@ export type BoardDoc = {
 
 const LAST_KEY = 'diagram-studio:last-board';
 
-async function req<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    /* AS-4 — the status rides on the error: flushSave must NOT retry a 4xx
-       (a deleted board is not transient; retrying just burns 1s+3s before the
-       same failure) and must be able to name the 404 case to the user. */
-    const err = new Error((data as any)?.error ?? `HTTP ${res.status}`) as Error & {status?: number};
-    err.status = res.status;
-    throw err;
-  }
-  return data as T;
+/* ===========================================================================
+   AT-2 — THE STORAGE SEAM. The SAME function names and signatures App.tsx has
+   always called (`boards.listBoards/getBoard/createBoard/saveBoard/
+   deleteBoard`), now backed by the mode the boot probe chose:
+     server → src/serverBoards.ts (today's req() transport, moved verbatim)
+     local  → src/localStore.ts   (IndexedDB; volatile in-memory last resort)
+   App.tsx does NOT fork on mode — delegation happens HERE, once, behind the
+   names it already uses. The probe failure paths all converge on LOCAL, so
+   `awaitBackend()` never rejects; the only remaining failure is IndexedDB
+   itself being unavailable, where localStore's volatile fallback keeps the
+   app alive (AT-2).
+   =========================================================================== */
+import * as server from './serverBoards';
+import * as local from './localStore';
+
+/** The session's backend + mode, resolved exactly once (the memoised probe
+ *  in probeServerModeOnce — AT-1: no mid-session flipping). */
+let backendPromise: Promise<StorageMode> | null = null;
+
+async function mode(): Promise<StorageMode> {
+  backendPromise ??= probeServerModeOnce();
+  return backendPromise;
 }
 
-export const listBoards = () => req<BoardMeta[]>('/api/boards');
-export const getBoard = (id: string) => req<BoardDoc>(`/api/boards/${id}`);
-export const createBoard = (name: string) =>
-  req<BoardDoc>('/api/boards', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name})});
+/** AT-1 — the mode readout for the board-list header: server → "Saved to
+ *  server files"; local → "Saved in this browser". Resolves after the boot
+ *  probe; callers render what it returns (App.tsx holds it in state). */
+export async function storageModeLabel(): Promise<string> {
+  return (await mode()) === 'server' ? 'Saved to server files' : 'Saved in this browser';
+}
+
+export const listBoards = async (): Promise<BoardMeta[]> => {
+  if ((await mode()) === 'local') return (await local.listBoards()).map(local.toBoardMeta);
+  return server.listBoardsServer();
+};
+
+export const getBoard = async (id: string): Promise<BoardDoc> => {
+  if ((await mode()) === 'local') return await local.getBoard(id) as BoardDoc;
+  return server.getBoardServer(id);
+};
+
+export const createBoard = async (name: string): Promise<BoardDoc> => {
+  if ((await mode()) === 'local') return await local.createBoard(name) as BoardDoc;
+  return server.createBoardServer(name);
+};
 
 /** The saved document. `preset` / `legend` are board metadata and ride along
  *  unchanged — the boards API persists arbitrary JSON, so no backend edit.
  *  `theme` is LEGACY/IGNORED (PACKAGE-M fix): boards no longer store a theme,
- *  and the API no longer writes it. The param stays optional so old callers and
+ *  and neither backend writes it. The param stays optional so old callers and
  *  old files still type-check; nothing reads the value back. */
-export const saveBoard = (doc: {
+export const saveBoard = async (doc: {
   id: string; name: string; nodes: Node[]; edges: Edge[];
   preset?: PresetId; /** @deprecated (PACKAGE-M fix) — ignored; boards no longer store a theme. */ theme?: ThemeName; legend?: boolean;
-}) => req<BoardDoc>(`/api/boards/${doc.id}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(doc)});
+}): Promise<BoardDoc> => {
+  if ((await mode()) === 'local') {
+    const saved = await local.saveBoard(doc);
+    /* AT-4 #1 — persistence is requested once, on the first successful local
+       write (never at boot: an empty database has nothing to protect). */
+    local.requestPersistenceOnce();
+    return saved as BoardDoc;
+  }
+  return server.saveBoardServer(doc);
+};
 
-export const deleteBoard = (id: string) => req<{ok: boolean}>(`/api/boards/${id}`, {method: 'DELETE'});
+export const deleteBoard = async (id: string): Promise<{ok: boolean}> => {
+  if ((await mode()) === 'local') return local.deleteBoard(id);
+  return server.deleteBoardServer(id);
+};
+
 
 export const cacheLastBoard = (id: string) => {
   try { localStorage.setItem(LAST_KEY, id); } catch { /* ignore */ }

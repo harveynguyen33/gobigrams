@@ -91,6 +91,7 @@ import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
 import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, tokensFor, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
+import {isQuotaError, QUOTA_MESSAGE} from './localStore';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
@@ -1177,6 +1178,16 @@ export default function App() {
   }, [suggestTheme]);
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  /* AT-1 — the storage-mode readout for the boards popup header. Resolved from
+     the same memoised boot probe the data layer uses (boards.storageModeLabel);
+     refreshed when the popup opens, so it can never contradict the backend a
+     save just went to. */
+  const [modeLabel, setModeLabel] = useState('');
+  /* AT-4 #2 — the storage readout: "X MB used of ~Y MB — persistent | best-
+     effort" sentence. Local mode only (in server mode the browser's quota is
+     not where the boards live, so an estimate would be a non-sequitur). */
+  const [storageEstimate, setStorageEstimate] = useState('');
+  const [localMode, setLocalMode] = useState(false);
   /* PACKAGE-S §S-3 — with autosave OFF this flips true on the first unflushed
      change and false on flush; with autosave ON it is always false (never shown). */
   const [dirty, setDirty] = useState(false);
@@ -1268,6 +1279,31 @@ export default function App() {
     } catch (err) {
       flash(`Boards API error: ${err?.message ?? 'unknown'}`);
     }
+    /* AT-1 — keep the mode line in step with the backend the list came from. */
+    boards.storageModeLabel().then(label => {
+      setModeLabel(label);
+      /* AT-4 #2 — the estimate readout exists only for local mode. */
+      const isLocal = label === 'Saved in this browser';
+      setLocalMode(isLocal);
+      if (isLocal) {
+        void navigator?.storage?.estimate?.().then(est => {
+          const used = est.usage != null ? (est.usage / (1024 * 1024)).toFixed(1) : '?';
+          const quota = est.quota != null ? `~${Math.round(est.quota / (1024 * 1024))}` : '?';
+          void navigator?.storage?.persisted?.().then(persisted => {
+            setStorageEstimate(`${used} MB used of ${quota} MB — ${persisted
+              ? 'Storage is persistent'
+              : 'Best-effort storage — the browser may clear it under disk pressure. Export JSON to keep a durable copy.'}`);
+          }).catch(() => { /* no readout rather than a wrong one */ });
+        }).catch(() => { /* ditto */ });
+      } else {
+        setStorageEstimate('');
+      }
+    }).catch(() => { /* line stays as-is */ });
+    /* AT-2 — the volatile last resort: IndexedDB itself unavailable (storage
+       disabled). One-time flash; the board list still renders. */
+    import('./localStore').then(m => {
+      if (m.isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
+    }).catch(() => { /* never blocks the list */ });
   }, [flash]);
 
   const flushSave = useCallback(async () => {
@@ -1329,16 +1365,22 @@ export default function App() {
       window.setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2000);
     } catch (err) {
       setSaveState('error');
-      /* AS-4 — name the deleted-board case: a 404 means the board is gone
-         server-side (deleted here or in another tab). The tab keeps its
-         pixels (the user can still export), but the write is final and the
-         board list is refreshed so it stops offering the corpse. */
-      const status = (err as Error & {status?: number})?.status;
-      if (status === 404) {
-        flash('Save failed: this board was deleted');
-        void refreshBoards();
+      /* AT-4 #3 — quota is NOT transient and not a 4xx: the adapter tags it,
+         and the flash names the remedy instead of retrying into a full disk. */
+      if (isQuotaError(err)) {
+        flash(QUOTA_MESSAGE);
       } else {
-        flash(`Save failed: ${err?.message ?? 'unknown error'}`);
+        /* AS-4 — name the deleted-board case: a 404 means the board is gone
+           (deleted here or in another tab). The tab keeps its pixels (the
+           user can still export), but the write is final and the board list
+           is refreshed so it stops offering the corpse. */
+        const status = (err as Error & {status?: number})?.status;
+        if (status === 404) {
+          flash('Save failed: this board was deleted');
+          void refreshBoards();
+        } else {
+          flash(`Save failed: ${err?.message ?? 'unknown error'}`);
+        }
       }
     }
   }, [flash, presetId, mode, refreshBoards, canAutosave]);
@@ -5344,6 +5386,20 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             </Tooltip>
             {boardsOpen && (
               <div className="pop boards-pop">
+                {/* AT-1 — mode is VISIBLE, not guessed: one small line above the
+                    list. server → "Saved to server files"; local → "Saved in
+                    this browser". No dead buttons, no modal, no override (the
+                    mode follows the host; a manual switcher is out of scope). */}
+                <div className="boards-mode" data-storage-mode aria-live="polite">{modeLabel}</div>
+                {/* AT-4 #2 — the storage readout (local mode only): estimate()
+                    as "X MB used of ~Y MB" + ONE honesty sentence. No scare
+                    modals; the JSON export it names is the Export modal's
+                    JSON button, already in the app. */}
+                {localMode && storageEstimate && (
+                  <div className="boards-mode boards-storage-readout" data-storage-readout>
+                    {storageEstimate}
+                  </div>
+                )}
                 <div className="boards-list">
                   {boardList.map(b => (
                     <button

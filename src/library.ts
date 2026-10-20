@@ -15,6 +15,7 @@ import {type Edge, type Node} from '@xyflow/react';
 
 import {type PaletteItem} from './palette';
 import {type CustomShape} from './customShape';
+import {getLibrary as getLibraryLocal, saveLibrary as saveLibraryLocal} from './localStore';
 
 /* ---------------------------------------------------------------------------
    §6.1 — the stored item shape.
@@ -108,18 +109,42 @@ export function libraryDoc(
 }
 
 /** GET — always 200; a corrupt/hand-edited file degrades to the empty envelope
- *  server-side, so this only rejects on a genuine transport/HTTP failure. */
-export const getLibrary = () => req<LibraryDoc>('/api/library');
+ *  server-side, so this only rejects on a genuine transport/HTTP failure.
+ *  AT-2 — the boot probe decides the transport: on a static host (probe →
+ *  local) the library lives in IndexedDB through `src/localStore.ts`, built
+ *  with THESE constants; in dev/preview the server file wins, unchanged. */
+export const getLibrary = (): Promise<LibraryDoc> =>
+  voidProbe().then(server => server ? reqGet() : getLibraryLocal());
+
+async function reqGet(): Promise<LibraryDoc> {
+  return req<LibraryDoc>('/api/library');
+}
 
 /** PUT — rejects on any write failure (400 validation / 500 write error), which
  *  is what lets the caller show the "export it to a file" message (§7.2 #4).
- *  `req` throws, so a caller MUST catch; nothing here fails silently. */
-export const saveLibrary = (doc: LibraryDoc) =>
-  req<LibraryDoc>('/api/library', {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({favourites: doc.favourites, shapes: doc.shapes}),
-  });
+ *  `req` throws, so a caller MUST catch; nothing here fails silently.
+ *  AT-2 — same mode split as the GET; the local backend constructs the SAME
+ *  envelope (type/version/source from these constants) and stamps its own
+ *  `updatedAt`. */
+export const saveLibrary = (doc: LibraryDoc): Promise<LibraryDoc> =>
+  voidProbe().then(server => server
+    ? req<LibraryDoc>('/api/library', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({favourites: doc.favourites, shapes: doc.shapes}),
+      })
+    : saveLibraryLocal(doc.favourites, doc.shapes));
+
+/* The memoised probe lives in boards.ts; importing it here would make a
+   library→boards→library cycle, so the SEAM is imported from localStore's
+   sibling: boards.ts re-exports the decision. To keep the dependency one-way
+   the probe is read through a lazy dynamic import (the module graph is
+   static — boards.ts statically imports library.ts for the constants). */
+let probePromise: Promise<boolean> | null = null;
+function voidProbe(): Promise<boolean> {
+  probePromise ??= import('./boards').then(m => m.probeServerModeOnce().then(mode => mode === 'server'));
+  return probePromise;
+}
 
 /* ---------------------------------------------------------------------------
    Pure helpers — no React, no DOM, so they are trivially testable.
