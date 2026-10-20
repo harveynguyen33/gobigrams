@@ -166,7 +166,7 @@ const CUSTOM = node('n-custom', 700, 1480, {
 
 const NODES = [...FAMILY, TABLE, GROUP, GROUPED, LABEL, CUSTOM];
 const EDGES = [
-  {id: 'e1', source: 'n-rect', target: 'n-cylinder-database', data: {label: 'reads', colorKey: 'amber'}},
+  {id: 'e1', source: 'n-rect', target: 'n-cylinder-database', label: 'reads', data: {colorKey: 'amber'}},
   {id: 'e2', source: 'n-process', target: 'n-decision', data: {colorKey: 'red'}},
   /* D1 fixture: a STEEP DIAGONAL between far-apart nodes, with a PINNED
      label (labelPinned + labelOffset) — the edge's own anchor data the fix
@@ -177,10 +177,10 @@ const EDGES = [
      offscreen clone) lives in domMeasurer and is unreachable from a DOM-free
      stub — that half's RED proof is the reviewer's live export measurement
      plus this round's live repro. */
-  {id: 'e3-diag', source: 'n-rect', target: 'n-actor', data: {label: 'yes', colorKey: 'amber', labelPinned: true, labelOffset: {x: 40, y: 0}}},
+  {id: 'e3-diag', source: 'n-rect', target: 'n-actor', label: 'yes', data: {colorKey: 'amber', labelPinned: true, labelOffset: {x: 40, y: 0}}},
   /* D3 fixture: an edge INTO the grouped child must follow it to
      parent+relative (its stub endpoints resolve through the parentId chain). */
-  {id: 'e4-grp', source: 'n-queue', target: 'n-grouped', data: {label: 'into group', colorKey: 'cyan'}},
+  {id: 'e4-grp', source: 'n-queue', target: 'n-grouped', label: 'into group', data: {colorKey: 'cyan'}},
 ];
 
 const svg = exportSvg({nodes: NODES, edges: EDGES, theme: 'dark', tokens: DARK, measurer: STUB, pad: 24});

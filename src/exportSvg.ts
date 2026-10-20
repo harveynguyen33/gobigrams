@@ -89,8 +89,12 @@ export type SvgMeasurer = {
   measureText?(text: string, o: {size: number; weight: number; spacing?: number; family?: string}): number;
   /** AR-11 — the family unmeasured rows (edge labels, table cells, group
    *  titles) should inherit, when the measurer can supply one. Optional: the
-   *  emitter omits the root `font-family` when this is absent. */
-  defaultFamily?(): string | undefined;
+   *  emitter omits the root `font-family` when this is absent.
+   *  ROUND AR-2 — `kind` names the ROW's own token family ('mono' | 'sans');
+   *  the emitter calls it per UNMEASURED row so a missing element resolves
+   *  to the family the canvas paints that row in — a visible decision, not
+   *  a silent naked-metrics fallback. */
+  defaultFamily?(kind?: 'mono' | 'sans'): string | undefined;
   /** Frees any measurement scaffold (the DOM measurer's hidden <svg>). */
   dispose?(): void;
 };
@@ -114,6 +118,9 @@ export type ExportEdge = {
   data?: Record<string, unknown> | null;
   markerEnd?: unknown;
   markerStart?: unknown;
+  /** ROUND AR-2 — THE label storage. The canvas paints exactly this field
+   *  (`GoblinEdge`'s `shown`); the exporter reads it and nothing else, so a
+   *  label row exists in the file if and only if the canvas painted one. */
   label?: string;
   el?: unknown;
 };
@@ -308,9 +315,23 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
     },
     /* AR-11 — the family unmeasured rows inherit: the document body's own
        computed family is what the canvas falls back to for anything the
-       clone carries no dedicated element for. */
-    defaultFamily() {
-      try { return getComputedStyle(document.body).fontFamily || undefined; }
+       clone carries no dedicated element for.
+       ROUND AR-2 — `kind` names the ROW's token family ('mono' | 'sans',
+       undefined = the body default): an unmeasured row must fall back to
+       the family the canvas would paint it in, never to nothing. */
+    defaultFamily(kind?: 'mono' | 'sans') {
+      try {
+        if (kind === 'mono' || kind === 'sans') {
+          const probe = document.createElement('span');
+          probe.style.font = kind === 'mono' ? 'var(--mono)' : 'var(--sans)';
+          probe.style.display = 'none';
+          document.body.appendChild(probe);
+          const fam = getComputedStyle(probe).fontFamily || undefined;
+          probe.remove();
+          return fam || getComputedStyle(document.body).fontFamily || undefined;
+        }
+        return getComputedStyle(document.body).fontFamily || undefined;
+      }
       catch { return undefined; }
     },
     dispose() {
@@ -698,7 +719,13 @@ export function exportSvg(input: ExportInput): string {
     edgeParts.push(
       `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="2" marker-end="url(#${marker})"/>`,
     );
-    const label = e.data?.label ?? e.label;
+    /* ROUND AR-2 — ONE label storage: the TOP-LEVEL `label`, the same field
+       the canvas paints (`GoblinEdge`'s `shown`), `onCommitLabel` writes and
+       `migrateEdge` folds legacy `data.label` onto. The exporter must never
+       read `data.label`: that storage is painted by NOTHING, so reading it
+       emitted labels the canvas never showed (measured live: `reads`
+       exported at 10.5/500 with no family while the canvas was bare). */
+    const label = e.label;
     if (typeof label === 'string' && label) {
       /* DEFECT-1: the label anchor is the app's own parity function
          (`labelAnchor`), fed the edge's FLOW-space path endpoints — the same
@@ -716,8 +743,13 @@ export function exportSvg(input: ExportInput): string {
       const mid = {x: L.x + off.x, y: L.y + off.y};
       /* ROUND-AR-DEFECT-1 — the label row's MEASURED font (ui-monospace
          11px / 600 live). Without `edgeLabelFont` (harness stubs, or a label
-         element the clone lost) the legacy metrics stay. */
-      const lf = measurer.edgeLabelFont?.(e.id);
+         element the clone lost) the legacy metrics stay.
+         ROUND AR-2 — but NEVER naked: an unmeasured row falls back to the
+         row's TOKEN family ('mono' — `.edge-label` paints var(--mono))
+         carried explicitly on the <text>, so a missing element is visible
+         in the file instead of silently inheriting whatever the root got. */
+      const lf = measurer.edgeLabelFont?.(e.id)
+        ?? (measurer.defaultFamily ? {family: measurer.defaultFamily('mono'), size: 10.5, weight: 500, spacing: 0} : undefined);
       const lw = Math.max(24, label.length * 6.6 + 12);
       edgeParts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(ink.surface)}" stroke="${escAttr(ink.dim)}" stroke-width="0.8"/>`,

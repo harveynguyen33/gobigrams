@@ -66,9 +66,11 @@ export function toMermaidSequence(nodes: Node[], edges: Edge[]): string {
   for (const {e} of msgs) {
     const kind = (e.data as {seqMsg?: string})?.seqMsg ?? 'sync';
     const token = kind === 'return' ? '-->>' : kind === 'async' ? '-)' : '->>';
-    const d = (e.data ?? {}) as {label?: string};
-    const label = d.label ? `: ${d.label}` : '';
-    lines.push(`  ${idOf.get(e.source)} ${token} ${idOf.get(e.target)}${label}`);
+    /* ROUND AR-2 — the label is read off the ONE storage (top-level), with
+       a legacy data.label read for boards saved before the fold existed. */
+    const label = (typeof e.label === 'string' ? e.label
+      : ((e.data ?? {}) as {label?: string}).label) || '';
+    lines.push(`  ${idOf.get(e.source)} ${token} ${idOf.get(e.target)}${label ? `: ${label}` : ''}`);
   }
   return lines.join('\n');
 }
@@ -97,8 +99,11 @@ export function toMermaid(nodes: Node[], edges: Edge[]): string {
   /* edges FIRST outside subgraphs keeps Mermaid's parser happy about ids */
   for (const e of edges) {
     if (!idMap.has(e.source) || !idMap.has(e.target)) continue;
-    const d = (e.data ?? {}) as {label?: string};
-    const lbl = d.label ? `|${esc(d.label)}|` : '';
+    /* ROUND AR-2 — ONE label storage: top-level first, legacy data.label
+       read for boards saved before the migrateEdge fold existed. */
+    const lblText = typeof e.label === 'string' ? e.label
+      : ((e.data ?? {}) as {label?: string}).label;
+    const lbl = lblText ? `|${esc(lblText)}|` : '';
     lines.push(`  ${idMap.get(e.source)} -->${lbl} ${idMap.get(e.target)}`);
   }
   /* groups → subgraphs with their children (children = nodes whose position
@@ -319,7 +324,11 @@ export function mermaidToGraph(parsed: MermaidImport, startId: number, width = 2
     source: byKey.get(e.from)!,
     target: byKey.get(e.to)!,
     type: 'goblinEdge',
-    data: {label: e.label},
+    /* ROUND AR-2 — the label lives at the TOP LEVEL, the ONE storage the
+       canvas reads (`GoblinEdge`'s `shown` prop) and the exporter reads.
+       `data.label` was the unpainted storage: nothing on the canvas ever
+       read it, so an imported label exported while the canvas showed none. */
+    label: e.label,
   })).filter(e => e.source && e.target);
   return {nodes, edges, nextId: id};
 }

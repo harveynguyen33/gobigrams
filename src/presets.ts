@@ -1086,7 +1086,10 @@ const seqEdge = (id: string, source: string, target: string, label: string, kind
   source: `sq-${source}`,
   target: `sq-${target}`,
   type: 'goblinEdge',
-  data: {label, seqMsg: kind},
+  /* ROUND AR-2 — the label rides at the TOP LEVEL (the one storage the
+     canvas paints and the exporter reads); `seqMsg` stays in data. */
+  label,
+  data: {seqMsg: kind},
 });
 
 const seqSystemTemplate: TemplateSpec = {

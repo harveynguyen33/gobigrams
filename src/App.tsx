@@ -423,9 +423,26 @@ const migrateEdge = (e: Edge): Edge => {
      has a flow at all, and it is `dots`), so this migration is insurance rather
      than a repair. `flowIcon` is left untouched — it is the decoration that
      picks WHICH glyph the chip carries. */
-  const folded: Edge = ((m.data ?? {}) as any).flow === 'event'
-    ? {...m, data: {...((m.data ?? {}) as any), flow: 'icon', flowIcon: 'mail'}}
+  /* ROUND AR-2 — A LEGACY `data.label` IS FOLDED ONTO THE TOP-LEVEL LABEL.
+     Two label storages shipped by accident: mermaid imports wrote
+     `data:{label}` while every UI writer (`onCommitLabel`, the `×N`
+     parallel badge) writes top-level `label` — the ONLY storage the canvas
+     paints (`GoblinEdge`'s `shown`). An edge carrying only `data.label`
+     rendered bare on the canvas AND the exporter read `data?.label`, so
+     the file invented a label the canvas never showed. Convergence: ONE
+     storage (top level), the fold happens HERE on read (the same shape as
+     the AK-4/AN-1 folds — never rewriting the board), and the exporter
+     reads top level only. MEASURED live on :5200 (board `ar2-probe`,
+     before the fix): the top-level label `emits` painted on canvas was
+     ABSENT from the export; the `data.label` `reads` painted NOTHING on
+     canvas yet exported at 10.5/500 with no family. */
+  const foldedDataLabel: Edge = typeof (m.data as Record<string, unknown> | null)?.label === 'string' && (m.data as Record<string, unknown>).label
+    ? {...m, label: (m.data as Record<string, unknown>).label as string,
+       data: {...(m.data as Record<string, unknown>), label: undefined}}
     : m;
+  const folded: Edge = ((foldedDataLabel.data ?? {}) as any).flow === 'event'
+    ? {...foldedDataLabel, data: {...((foldedDataLabel.data ?? {}) as any), flow: 'icon', flowIcon: 'mail'}}
+    : foldedDataLabel;
   /* ROUND AN, AN-1 — A STORED `__editAt` IS FOLDED AWAY ON READ.
    *
    *  THE KEY IS A TRANSIENT SIGNAL, NOT DOCUMENT STATE (see the SKILL rule on
@@ -451,10 +468,10 @@ const migrateEdge = (e: Edge): Edge => {
    *  below — is folded too. A tolerant parse that lived past that return would
    *  miss exactly the modern boards that are most likely to carry the key. */
   const unfolded: Edge = (() => {
-    const d2 = (folded.data ?? {}) as any;
-    if (!('__editAt' in d2)) return folded;
+    const d2 = (foldedDataLabel.data ?? {}) as any;
+    if (!('__editAt' in d2)) return foldedDataLabel;
     const {__editAt: _drop, ...rest} = d2;
-    return {...folded, data: rest};
+    return {...foldedDataLabel, data: rest};
   })();
   if (!key) return unfolded;         // a genuine custom hex is left alone
   const md = (unfolded.data ?? {}) as any;
@@ -4224,15 +4241,24 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       }
       const modelEdges = new Map(o.edges.map(e => [e.id, e]));
       const exportEdges: ExportEdge[] = [];
+      /* ROUND AR-2 — buildSvg must CARRY the label: the export pipeline
+         reads `e.label` (the one storage), and this push is where the
+         model edge becomes the export edge. Asserted live: without the
+         field both painted labels vanished from the real export. */
+      const exportEdgeOf = (model: unknown): ExportEdge => {
+        const m = model as {id: string; source: string; target: string; label?: unknown; data?: Record<string, unknown> | null; el?: unknown};
+        return {
+          id: m.id, source: m.source, target: m.target,
+          label: typeof m.label === 'string' && m.label ? m.label : undefined,
+          data: m.data ?? null,
+          el: m.el,
+        };
+      };
       for (const ce of clone.querySelectorAll<HTMLElement>('.react-flow__edge')) {
         const id = ce.getAttribute('data-id') ?? '';
         const model = modelEdges.get(id);
         if (!model) continue;
-        exportEdges.push({
-          id, source: (model as any).source, target: (model as any).target,
-          data: ((model as any).data ?? null) as Record<string, unknown> | null,
-          el: ce,
-        });
+        exportEdges.push(exportEdgeOf(model));
       }
       /* let the real stylesheet apply to the offscreen mount before measuring */
       await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
