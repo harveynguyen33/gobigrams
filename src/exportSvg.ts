@@ -274,14 +274,11 @@ export function domMeasurer(): SvgMeasurer {
   };
 }
 
-/* --------------------------------------------------------------- emitters */
-
-const FONT_STACK = 'ui-monospace,Menlo,Consolas,monospace';
-
 /* ------------------------------------------------------- text wrapping (D2) */
 
-/** Monospace advance-width fallback when the injected measurer carries no
- *  `measureText` (the stub): 0.6em per glyph is the ui-monospace norm. */
+/** Advance-width fallback when the injected measurer carries no
+ *  `measureText` (the stub): 0.6em per glyph. Family-independent — the
+ *  fallback estimates, it does not pin a typeface (AR-11). */
 function estimateTextWidth(text: string, o: {size: number; spacing?: number}): number {
   return text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
 }
@@ -338,19 +335,27 @@ function tokenStyle(tokens: Record<string, string>): string {
   const lines = EXPORT_TOKENS
     .map(t => `    ${t}:${escAttr(tokens[t] ?? '')};`)
     .join('\n');
-  return `<style>\n  :root, svg {\n${lines}\n  }\n  text { font-family: ${FONT_STACK}; }\n</style>`;
+  /* AR-11 — NO blanket `text { font-family: … }` rule here: every <text>
+     carries its own measured font attributes (per-row parity). The block
+     stays for the colour tokens only. (Should a glyph-identical fallback
+     ever be needed for machines without the system font stacks, it belongs
+     on the measurer side — the emitter never substitutes a family.) */
+  return `<style>\n  :root, svg {\n${lines}\n  }\n</style>`;
 }
 
 /** One `<text>` line with explicit paint attributes (crisp + selectable —
- *  the whole point of replacing the HTML clone). */
+ *  the whole point of replacing the HTML clone). AR-11 — `family` is the
+ *  row's MEASURED family (never a constant); the root svg's inherited
+ *  font-family covers rows emitted without one. */
 function textLine(
   x: number, y: number, content: string,
-  o: {size: number; weight: number; fill: string; anchor?: string; spacing?: string; opacity?: string},
+  o: {size: number; weight: number; fill: string; anchor?: string; spacing?: string; opacity?: string; family?: string},
 ): string {
   const a = [
     `x="${x}"`, `y="${y}"`,
     `font-size="${o.size}"`, `font-weight="${o.weight}"`,
-    `fill="${escAttr(o.fill)}"`, `font-family="${FONT_STACK}"`,
+    `fill="${escAttr(o.fill)}"`,
+    o.family ? `font-family="${escAttr(o.family)}"` : '',
     o.anchor && o.anchor !== 'start' ? `text-anchor="${o.anchor}"` : '',
     o.spacing ? `letter-spacing="${o.spacing}"` : '',
     o.opacity ? `opacity="${o.opacity}"` : '',
@@ -367,7 +372,7 @@ function textLine(
  *  lines that would not fit are clipped exactly as the browser clips them). */
 function nodeText(
   n: ExportNode, box: {w: number; h: number}, t: TextRect, fg: string, dim: string, accent: string,
-  widthOf: (s: string, o: {size: number; weight: number; spacing?: number}) => number,
+  widthOf: (s: string, o: {size: number; weight: number; spacing?: number; family?: string}) => number,
 ): string {
   const d = (n.data ?? {}) as Record<string, unknown>;
   const title = String(d.title ?? d.label ?? n.id);
@@ -378,16 +383,30 @@ function nodeText(
   const hasMetric = d.metric && typeof d.metric === 'string';
   const hasKicker = d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
 
+  /* AR-11 — the row's own measured font, emitted verbatim on its <text>.
+     A row the measurer reported no font for keeps the legacy fixed metrics
+     and inherits the root's font-family. */
+  const kickerFont = t.rows?.kicker;
+  const subFont = t.rows?.sub;
+  const metricFont = t.rows?.metric;
+  const titleFamily = t.family || '';
+
   if (hasKicker) {
-    lines.push(textLine(x, y, String(d.kicker).toUpperCase(), {size: 9.5, weight: 500, fill: t.fill || dim, spacing: '1.1'}));
+    lines.push(textLine(x, y, String(d.kicker).toUpperCase(), {
+      size: kickerFont?.size ?? 9.5, weight: kickerFont?.weight ?? 500,
+      fill: t.fill || dim, spacing: String(kickerFont?.spacing ?? 1.1),
+      family: kickerFont?.family,
+    }));
     y += 15;
   }
 
   /* wrap the title into the TITLE's content width when the measurer found a
      title element (AR-10 — the canvas wraps .node-title at its own box, which
-     is wider than .node-body for some layouts); body width otherwise. */
+     is wider than .node-body for some layouts); body width otherwise. AR-11 —
+     the width function measures in the TITLE's own family, so the wrap
+     decision is the one a consumer re-derives from the emitted file. */
   const availW = Math.max(12, t.titleW ?? t.w);
-  const meas = (s: string) => widthOf(s, {size: t.size, weight: t.weight, spacing: t.spacing});
+  const meas = (s: string) => widthOf(s, {size: t.size, weight: t.weight, spacing: t.spacing, family: titleFamily});
   const lineHeight = Math.round(t.size * 1.35);
   let wrapped = wrapText(title, availW, meas);
   /* … then clamp to the height the body has left (the CSS clip above). The
@@ -405,17 +424,23 @@ function nodeText(
 
   const titleBottomY = y + (wrapped.length - 1) * lineHeight;
   wrapped.forEach((ln, i) => {
-    lines.push(textLine(x, y + i * lineHeight, ln, {size: t.size, weight: t.weight, fill: t.fill || fg}));
+    lines.push(textLine(x, y + i * lineHeight, ln, {size: t.size, weight: t.weight, fill: t.fill || fg, family: titleFamily}));
   });
   y = titleBottomY;
 
   if (hasSub) {
     y += lineHeight;
-    lines.push(textLine(x, y, String(d.sub), {size: 11.5, weight: 450, fill: dim}));
+    lines.push(textLine(x, y, String(d.sub), {
+      size: subFont?.size ?? 11.5, weight: subFont?.weight ?? 450,
+      fill: dim, family: subFont?.family,
+    }));
   }
   if (hasMetric) {
     y += 20;
-    lines.push(textLine(x, y, String(d.metric) + (d.metricUnit ? ` ${d.metricUnit}` : ''), {size: 20, weight: 700, fill: accent}));
+    lines.push(textLine(x, y, String(d.metric) + (d.metricUnit ? ` ${d.metricUnit}` : ''), {
+      size: metricFont?.size ?? 20, weight: metricFont?.weight ?? 700,
+      fill: accent, family: metricFont?.family,
+    }));
   }
   return lines.join('');
 }
@@ -514,11 +539,17 @@ export function exportSvg(input: ExportInput): string {
      (parentId chain resolved), never the stored relative `position`. */
   const abs = new Map(nodes.map(n => [n.id, absPosition(n, byId)]));
   /* DEFECT-2 — one width function for every wrap: the injected measurer when
-     it can really measure, the monospace estimator otherwise. */
-  const widthOf: (s: string, o: {size: number; weight: number; spacing?: number}) => number =
+     it can really measure, the glyph-count estimator otherwise. AR-11: the
+     row family rides along so the wrap measures in the SAME family the
+     emitter writes to the file. */
+  const widthOf: (s: string, o: {size: number; weight: number; spacing?: number; family?: string}) => number =
     measurer.measureText
       ? (s, o) => measurer.measureText!(s, o)
       : (s, o) => estimateTextWidth(s, o);
+  /* AR-11 — the family unmeasured rows (edge labels, table cells, group
+     titles, legacy textLine calls) inherit, supplied by the measurer; the
+     attribute is omitted entirely when it has none to give. */
+  const inheritFamily = measurer.defaultFamily?.() ?? '';
   const ink = {
     fg: tokens['--fg'] || '#e8e8ea',
     dim: tokens['--dim'] || '#8a8a92',
@@ -669,7 +700,10 @@ export function exportSvg(input: ExportInput): string {
     nodeParts.push('</g>');
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${escAttr(input.theme)}">` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${escAttr(input.theme)}"` +
+    /* AR-11 — unmeasured rows (edge labels, table cells, group titles)
+       inherit this; measured rows carry their own family attributes. */
+    (inheritFamily ? ` font-family="${escAttr(inheritFamily)}"` : '') + `>` +
     `<rect width="${w}" height="${h}" fill="${escAttr(ink.bg)}"/>` +
     tokenStyle(tokens) +
     (defs.length ? `<defs>${defs.join('')}</defs>` : '') +
