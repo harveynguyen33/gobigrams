@@ -12,6 +12,11 @@ dist/
 .DS_Store
 .vite/
 
+# harness scratch — checks/round-as-boards-put.mjs writes its probe output into the
+# repo root and used to leave it behind untracked (flagged by the reviewer as MAJOR
+# housekeeping 2026-10-21). The leak is being closed in the harness; this is the belt.
+.as-boards-out-*.cjs
+
 # local env — never commit secrets
 .env
 .env.local
