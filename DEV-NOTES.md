@@ -41,6 +41,14 @@ src/
 
 Persistence: dev middleware in `vite.config.ts` → `/api/boards` (+ `/:id`) writing one
 JSON file per board to `boards/` (git-ignored). Debounced 800 ms autosave.
+PUT on a board id that does not exist answers 404 and writes nothing — a deleted
+board cannot resurrect through an in-flight autosave (AS-4). RECOVERY: every board
+write keeps ONE previous generation beside the file — `boards/<id>.json.bak` holds
+the document AS IT WAS before the latest save (AS-6); if a save destroys content,
+restore by copying the `.bak` over the `.json` (same one-generation scheme as
+`boards/library.json.bak`). `vite preview` serves the same `/api/*` middleware, so
+`npm run build && npm run preview` is self-hostable; a dumb static host (no server
+process) is NOT supported.
 
 ## Design tokens
 

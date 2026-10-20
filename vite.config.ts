@@ -300,6 +300,13 @@ function boardsApi(): Plugin {
               // `doc.theme`/`prev.theme` forward here.
               ...(typeof doc.legend === 'boolean' ? {legend: doc.legend} : null),
             };
+            // AS-6 — ONE `.bak` generation before the new document lands, the
+            // exact treatment the library document already gets above: the
+            // endpoint is unauthenticated and un-merged, so a bad write (an
+            // emptied canvas, a stale tab) must not destroy the ONLY copy of a
+            // board. The backup holds the PREVIOUS generation; the write below
+            // is atomic (temp + rename).
+            if (fs.existsSync(file)) fs.renameSync(file, `${file}.bak`);
             writeJsonAtomic(file, out);
             return send(200, out);
           }
