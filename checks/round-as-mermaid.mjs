@@ -68,7 +68,7 @@ const boardNodes = [
   {id: 'n7', type: 'goblin', position: {x: 0, y: 280}, data: {shape: 'queue', title: 'ingest queue'}},
   {id: 'n8', type: 'goblin', position: {x: 220, y: 280}, data: {shape: 'gateway', title: 'API gateway'}},
   {id: 'n9', type: 'goblin', position: {x: 700, y: 0}, data: {shape: 'group', title: 'Cluster G'}},
-  {id: 'n10', type: 'goblin', position: {x: 710, y: 60}, data: {shape: 'service', title: 'Inner service'}},
+  {id: 'n10', type: 'goblin', position: {x: 710, y: 60}, parentId: 'n9', data: {shape: 'service', title: 'Inner service'}},
 ];
 const boardEdges = [
   {id: 'e1', source: 'n1', target: 'n2', data: {label: 'reads'}},

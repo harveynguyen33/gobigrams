@@ -247,6 +247,16 @@ export function fromMermaid(text: string): MermaidImport | null {
     const labelSpans: {start: number; text: string}[] = [];
     let scrubbed = line.replace(/\|[^|]*\|/g, (m0, off) => { labelSpans.push({start: off, text: m0}); return '\u0000'.repeat(m0.length); });
     scrubbed = scrubbed.replace(/--\s+[^\s-][^-]*?\s*--(>)?/g, m0 => '\u0000'.repeat(m0.length));
+    /* AS-2 — backward compatibility with the OLD export's colon form
+       (`m1: ("Title")`, emitted by every AQ21..AR1 build): ONE `:` plus
+       optional space between an id and a shape token is whitespace. The strip
+       is junction-only and GLOBAL: it fires only where a shape token ACTUALLY
+       follows the colon, so `m1("port: 8080")` (colon inside the label, no
+       id:token junction), `classDef`-style lines and `A -->|x| B: note`
+       (colon with no token after) are untouched. READ-side only: the exporter
+       never emits the colon again (AS-1). */
+    scrubbed = scrubbed.replace(/([A-Za-z_]\w*)\s*:\s*(?=(\[\(|\(\(|\(\[|\{\{|\[\/|\[\[|\(|\[|\{))/g,
+      (m0, id) => `${id} `);
     const nodeRe = new RegExp(NODE, 'g');
     const spans: {start: number; end: number; key: string; tok?: string}[] = [];
     let nm: RegExpExecArray | null;
