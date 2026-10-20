@@ -38,7 +38,14 @@ const LAST_KEY = 'diagram-studio:last-board';
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((data as any)?.error ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    /* AS-4 — the status rides on the error: flushSave must NOT retry a 4xx
+       (a deleted board is not transient; retrying just burns 1s+3s before the
+       same failure) and must be able to name the 404 case to the user. */
+    const err = new Error((data as any)?.error ?? `HTTP ${res.status}`) as Error & {status?: number};
+    err.status = res.status;
+    throw err;
+  }
   return data as T;
 }
 

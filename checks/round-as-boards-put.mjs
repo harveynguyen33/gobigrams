@@ -133,17 +133,32 @@ assert('as4.a5.invalid-id-still-rejected',
   [400, 404].includes(r4.res.statusCode),
   `PUT with a traversal-shaped id -> HTTP ${r4.res.statusCode}`);
 
-/* ===========================================================================
- * §B — AS-6: a board write keeps ONE .bak generation (the first document's
- * bytes survive the second save).
+/* §B — AS-6: a board write keeps ONE .bak generation (the first document's
+ * bytes survive the second save). A board must EXIST before a PUT succeeds
+ * (AS-4), so the fixture creates it through the API's own POST route — the
+ * same path the client uses.
  * =========================================================================== */
 rmSync(boardPath('as-bak'), {force: true});
 rmSync(boardPath('as-bak') + '.bak', {force: true});
+const created = await drive(plug, 'POST', '/api/boards', put({name: 'as-bak'}));
+const bakId = created.res.statusCode === 201 ? JSON.parse(created.res.body).id : null;
+if (!bakId) {
+  console.error(`POST /api/boards failed: HTTP ${created.res.statusCode} ${created.res.body} — .bak assertions cannot run`);
+  process.exit(1);
+}
 const v1 = doc([node('b1'), node('b2'), node('b3'), node('b4')], [{id: 'e1', source: 'b1', target: 'b2'}]);
-const rb1 = await drive(plug, 'PUT', '/api/boards/as-bak', put(v1));
-const rb2 = await drive(plug, 'PUT', '/api/boards/as-bak', put(doc([], [])));  /* the incident's shape: a 0-node overwrite */
-const bakRaw = existsSync(boardPath('as-bak') + '.bak') ? rf(boardPath('as-bak') + '.bak', 'utf8') : null;
-const curRaw = rf(boardPath('as-bak'), 'utf8');
+const rb1 = await drive(plug, 'PUT', `/api/boards/${bakId}`, put(v1));
+if (rb1.res.statusCode !== 200) {
+  console.error(`first PUT ${bakId} failed: HTTP ${rb1.res.statusCode} ${rb1.res.body} — .bak assertions cannot run`);
+  process.exit(1);
+}
+const rb2 = await drive(plug, 'PUT', `/api/boards/${bakId}`, put(doc([], [])));  /* the incident's shape: a 0-node overwrite */
+if (rb2.res.statusCode !== 200) {
+  console.error(`second PUT ${bakId} failed: HTTP ${rb2.res.statusCode} ${rb2.res.body} — .bak assertions cannot run`);
+  process.exit(1);
+}
+const bakRaw = existsSync(boardPath(bakId) + '.bak') ? rf(boardPath(bakId) + '.bak', 'utf8') : null;
+const curRaw = existsSync(boardPath(bakId)) ? rf(boardPath(bakId), 'utf8') : null;
 const bakDoc = bakRaw && JSON.parse(bakRaw);
 assert('as6.b1.bak-holds-first-document',
   bakDoc && bakDoc.nodes.length === 4 && bakDoc.edges.length === 1,

@@ -168,18 +168,14 @@ function listBoards() {
 
 /** Inline dev-server plugin: a tiny JSON file-backed boards API. */
 function boardsApi(): Plugin {
-  return {
-    name: 'diagram-studio-boards-api',
-    configureServer(server) {
-      // keep drawings out of version control
-      const gi = path.resolve(__dirname, '.gitignore');
-      try {
-        const cur = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
-        if (!/^boards\/$/m.test(cur)) fs.writeFileSync(gi, cur + (cur.endsWith('\n') || !cur ? '' : '\n') + 'boards/\n');
-      } catch { /* best effort */ }
-
-      server.middlewares.use((req: any, res: any, next: any) => {
-        const url = new URL(req.url, 'http://localhost');
+  /* AS-4 — the ONE middleware registration, wired into BOTH configureServer
+     and configurePreviewServer, so `vite preview` (a self-hosted public
+     release: npm run build && npm run preview) serves /api/* exactly like the
+     dev server. TRUE static hosting (dumb CDN, file://) remains unsupported —
+     a server process is required, stated in README/DEV-NOTES. */
+  const registerMiddlewares = (server: {middlewares: {use: (fn: (req: any, res: any, next: any) => void) => void}}) => {
+    server.middlewares.use((req: any, res: any, next: any) => {
+      const url = new URL(req.url, 'http://localhost');
         if (!url.pathname.startsWith('/api/')) return next();
 
         const send = (code: number, data: any) => {
@@ -282,7 +278,14 @@ function boardsApi(): Plugin {
             }
             const err = validateDoc(doc);
             if (err) return send(400, {error: err});
+            // AS-4 — a PUT on a board that does not exist must NOT resurrect
+            // it: after a DELETE (possibly from another tab), an in-flight or
+            // debounced autosave used to re-create the file from the writer's
+            // stale copy. 404 — the same answer GET and DELETE give for the
+            // same condition — after body validation, before any write, so no
+            // file and no .bak ever appears for a missing id.
             const prev = readBoard(id);
+            if (!prev) return send(404, {error: 'not found'});
             fs.mkdirSync(BOARDS_DIR, {recursive: true});
             const out = {
               id, name: typeof doc.name === 'string' ? doc.name : (prev?.name ?? 'Untitled'),
@@ -310,7 +313,22 @@ function boardsApi(): Plugin {
 
           return send(405, {error: 'method not allowed'});
         })().catch((e: any) => send(500, {error: String(e)}));
-      });
+  });
+  };
+  return {
+    name: 'diagram-studio-boards-api',
+    configureServer(server) {
+      // keep drawings out of version control
+      const gi = path.resolve(__dirname, '.gitignore');
+      try {
+        const cur = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
+        if (!/^boards\/$/m.test(cur)) fs.writeFileSync(gi, cur + (cur.endsWith('\n') || !cur ? '' : '\n') + 'boards/\n');
+      } catch { /* best effort */ }
+      registerMiddlewares(server);
+    },
+    /* AS-4 — release parity: `npm run preview` serves the same API. */
+    configurePreviewServer(server) {
+      registerMiddlewares(server);
     },
   };
 }

@@ -1229,6 +1229,16 @@ export default function App() {
     });
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
 
+  /* AS-4 — the board list refresher, declared BEFORE flushSave so the 404
+     branch can call it (and name it in deps) without a TDZ ordering problem. */
+  const refreshBoards = useCallback(async () => {
+    try {
+      setBoardList(await boards.listBoards());
+    } catch (err) {
+      flash(`Boards API error: ${err?.message ?? 'unknown'}`);
+    }
+  }, [flash]);
+
   const flushSave = useCallback(async () => {
     setDirty(false); /* PACKAGE-S §S-3 */
     const board = curBoardRef.current;
@@ -1263,6 +1273,12 @@ export default function App() {
           saved = await boards.saveBoard(payload());
           break;
         } catch (err) {
+          /* AS-4 — a 4xx is FINAL: a deleted board is not transient, so no
+             retry (the old loop would burn 1s+3s re-PUTting a corpse and the
+             old server would have resurrected it). Only transient failures
+             (network blips, 5xx) get the backoff. */
+          const status = (err as Error & {status?: number})?.status;
+          if (status !== undefined && status >= 400 && status < 500) throw err;
           if (attempt >= 2 || seq !== saveSeq.current) throw err;
           await new Promise(r => setTimeout(r, attempt === 0 ? 1000 : 3000));
         }
@@ -1280,9 +1296,19 @@ export default function App() {
       window.setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2000);
     } catch (err) {
       setSaveState('error');
-      flash(`Save failed: ${err?.message ?? 'unknown error'}`);
+      /* AS-4 — name the deleted-board case: a 404 means the board is gone
+         server-side (deleted here or in another tab). The tab keeps its
+         pixels (the user can still export), but the write is final and the
+         board list is refreshed so it stops offering the corpse. */
+      const status = (err as Error & {status?: number})?.status;
+      if (status === 404) {
+        flash('Save failed: this board was deleted');
+        void refreshBoards();
+      } else {
+        flash(`Save failed: ${err?.message ?? 'unknown error'}`);
+      }
     }
-  }, [flash, presetId, mode]);
+  }, [flash, presetId, mode, refreshBoards]);
 
   // Debounced autosave whenever nodes/edges change (and a board is loaded).
   // I6: depend only on the board id (via ref) + nodes/edges so the effect does
@@ -1306,14 +1332,6 @@ export default function App() {
     saveTimer.current = window.setTimeout(() => { void flushSave(); }, 800);
     return () => window.clearTimeout(saveTimer.current);
   }, [nodes, edges, boardId, flushSave, autosave]);
-
-  const refreshBoards = useCallback(async () => {
-    try {
-      setBoardList(await boards.listBoards());
-    } catch (err) {
-      flash(`Boards API error: ${err?.message ?? 'unknown'}`);
-    }
-  }, [flash]);
 
   // First load: open the last board, or the newest, or seed one from the
   // current in-memory starter diagram. Guarded against StrictMode's
