@@ -25,17 +25,37 @@ import {asShape, shapeFrameSvg} from './shapes';
 import {EXPORT_TOKENS} from './theme';
 import {labelAnchor, type LabelPos} from './edgeLabel';
 
+/** One measured text ROW's font — read off that row's own live element.
+ *  AR-11: the canvas sets a DIFFERENT family per row (`.node-title` →
+ *  `var(--sans)`, kicker/sub/metric → `var(--mono)`), so parity requires the
+ *  emission and the wrap to use the ROW's font, not a file-wide one. */
+export type RowFont = {
+  family: string;
+  size: number;
+  weight: number;
+  /** px, already normalised (`normal` → 0). */
+  spacing: number;
+};
+
 /** A measured text block, relative to its node's top-left corner.
  *  AR-10 — `titleW` (when the measurer found a title element) is the TITLE's
  *  own content width — rect width minus its horizontal padding — which the
  *  live canvas wraps `.node-title` at. The exporter must wrap to THAT, not to
  *  the body width: for some node layouts the title sits wider than `.node-body`
  *  and wrapping to the body emitted one line too many. `spacing` is the
- *  title's computed letter-spacing, included in the measured advance. */
+ *  title's computed letter-spacing, included in the measured advance.
+ *  AR-11 — `family` is the TITLE row's computed family, `rows[k].family`
+ *  each other row's, so the emitter paints every row in the typeface the
+ *  canvas measured it in. */
 export type TextRect = {
   x: number; y: number; w: number; h: number;
   size: number; weight: number; fill: string; anchor: string;
   titleW?: number; spacing?: number;
+  /** AR-11 — the title row's computed font family (per-row parity). */
+  family?: string;
+  /** Per-row font overrides for the synthetic rows (kicker / sub / metric);
+   *  a row without an entry keeps the exporter's legacy fixed metrics. */
+  rows?: Partial<Record<'kicker' | 'sub' | 'metric', RowFont>>;
 };
 
 /** Injected measurements. `nodeEl`/`edgeEl` are the themed clone's live
@@ -55,8 +75,14 @@ export type SvgMeasurer = {
   } | null;
   /** DEFECT-2 — width of `text` in px under the SAME font metrics the
    *  emitter paints with (family, size, weight, letter-spacing). Optional:
-   *  without it the wrap falls back to the monospace 0.6em estimator. */
-  measureText?(text: string, o: {size: number; weight: number; spacing?: number}): number;
+   *  without it the wrap falls back to the monospace 0.6em estimator.
+   *  AR-11 — `family` is the row's computed family (as the emitter writes it
+   *  to the file); the wrap decision and the emission MUST use the same one. */
+  measureText?(text: string, o: {size: number; weight: number; spacing?: number; family?: string}): number;
+  /** AR-11 — the family unmeasured rows (edge labels, table cells, group
+   *  titles) should inherit, when the measurer can supply one. Optional: the
+   *  emitter omits the root `font-family` when this is absent. */
+  defaultFamily?(): string | undefined;
   /** Frees any measurement scaffold (the DOM measurer's hidden <svg>). */
   dispose?(): void;
 };
@@ -148,21 +174,43 @@ export function domMeasurer(): SvgMeasurer {
       const body = el.querySelector('.node-body') ?? el.querySelector('.lo-wrap') ?? el;
       const titleEl = el.querySelector('.node-title') ?? el.querySelector('.lo-title');
       let size = 14.5, weight = 650, fill = '', spacing = 0, titleW: number | undefined;
+      /* AR-11 — per-row font parity: each row's family is read off ITS OWN
+         element's computed style (the canvas paints .node-title in var(--sans)
+         and kicker/sub/metric in var(--mono)), then travels to the emitter so
+         every emitted <text> is set in the typeface the measurement used. */
+      const rowFont = (rowEl: Element | null): RowFont | undefined => {
+        if (!rowEl) return undefined;
+        const cs = getComputedStyle(rowEl);
+        return {
+          family: cs.fontFamily || '',
+          size: parseFloat(cs.fontSize) || 0,
+          weight: parseInt(cs.fontWeight, 10) || 0,
+          spacing: cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0),
+        };
+      };
+      const rows: TextRect['rows'] = {};
+      const kickEl = el.querySelector('.node-kicker');
+      const subEl = el.querySelector('.node-sub');
+      const metricEl = el.querySelector('.node-metric');
+      if (kickEl) rows.kicker = rowFont(kickEl);
+      if (subEl) rows.sub = rowFont(subEl);
+      if (metricEl) rows.metric = rowFont(metricEl);
       if (titleEl) {
         const cs = getComputedStyle(titleEl);
         size = parseFloat(cs.fontSize) || size;
         weight = parseInt(cs.fontWeight, 10) || weight;
         fill = cs.color || '';
+        spacing = cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0);
         /* AR-10 — wrap to the TITLE's own content width (the canvas wraps
            .node-title at ITS box, which can be wider than .node-body), with
            the title's letter-spacing folded into the measured advance. */
         const padL = parseFloat(cs.paddingLeft) || 0;
         const padR = parseFloat(cs.paddingRight) || 0;
         titleW = Math.max(12, titleEl.getBoundingClientRect().width - padL - padR);
-        spacing = cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0);
       }
       const box = rel(el, body as Element);
-      return {...box, size, weight, fill, anchor: 'start', titleW, spacing};
+      return {...box, size, weight, fill, anchor: 'start', titleW, spacing,
+        family: titleEl ? rowFont(titleEl)?.family : undefined, rows};
     },
     edgePath(edgeEl) {
       const el = edgeEl as Element | null;
@@ -189,8 +237,9 @@ export function domMeasurer(): SvgMeasurer {
       }
       return {d, start: {x: sx, y: sy}, end: {x: tx, y: ty}};
     },
-    /* DEFECT-2 — real glyph widths via a hidden SVG <text> carrying the same
-       FONT_STACK/size/weight the emitter writes, so the wrap decision is the
+    /* DEFECT-2 — real glyph widths via a hidden SVG <text> carrying the ROW's
+       own font (family/size/weight/spacing — AR-11: the family comes IN with
+       the row, never from a stack constant here), so the wrap decision is the
        decision the browser will itself re-derive when painting the file. */
     measureText(text, o) {
       try {
@@ -198,10 +247,10 @@ export function domMeasurer(): SvgMeasurer {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement;
           svg.setAttribute('style', 'position:absolute;left:-99999px;top:0;width:0;height:0;overflow:hidden');
           measTextEl = document.createElementNS('http://www.w3.org/2000/svg', 'text') as SVGTextElement;
-          measTextEl.setAttribute('font-family', FONT_STACK);
           svg.appendChild(measTextEl);
           document.body.appendChild(svg);
         }
+        if (o.family) measTextEl.setAttribute('font-family', o.family);
         measTextEl.setAttribute('font-size', String(o.size));
         measTextEl.setAttribute('font-weight', String(o.weight));
         measTextEl.setAttribute('letter-spacing', String(o.spacing ?? 0));
@@ -210,6 +259,13 @@ export function domMeasurer(): SvgMeasurer {
       } catch {
         return text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
       }
+    },
+    /* AR-11 — the family unmeasured rows inherit: the document body's own
+       computed family is what the canvas falls back to for anything the
+       clone carries no dedicated element for. */
+    defaultFamily() {
+      try { return getComputedStyle(document.body).fontFamily || undefined; }
+      catch { return undefined; }
     },
     dispose() {
       try { (measTextEl?.parentNode ?? null)?.parentNode?.removeChild(measTextEl!.parentNode!); } catch { /* best effort */ }
