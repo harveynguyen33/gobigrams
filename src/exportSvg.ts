@@ -53,6 +53,11 @@ export type TextRect = {
   titleW?: number; spacing?: number;
   /** AR-11 — the title row's computed font family (per-row parity). */
   family?: string;
+  /** ROUND AR-2 — 'note' when the measurer actually found and measured a
+   *  `.note-title`. The emitter keys its note-row fallback (the row's token
+   *  family, applied VISIBLY) off the absence of a measured family, and
+   *  this kind documents that the block came from a note element. */
+  kind?: 'note';
   /** Per-row font overrides for the synthetic rows (kicker / sub / metric /
    *  table columns / group title);
    *  a row without an entry keeps the exporter's legacy fixed metrics. */
@@ -206,8 +211,14 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
     text(nodeEl) {
       const el = nodeEl as Element | null;
       if (!el || typeof el.querySelector !== 'function') return null;
-      const body = el.querySelector('.node-body') ?? el.querySelector('.lo-wrap') ?? el;
-      const titleEl = el.querySelector('.node-title') ?? el.querySelector('.lo-title');
+      /* ROUND AR-2 — a NOTE node's title lives in `.note-title` (DOM:
+         `.note-node > .note-body > .note-title`); there is no `.node-title`
+         on a note, so before this the measurer reported its 14.5/650
+         no-family fallback for every note title while the canvas paints
+         `.note-title` at its own computed font (13px/650 mono live). */
+      const isNote = !!el.querySelector('.note-title');
+      const body = el.querySelector('.node-body') ?? el.querySelector('.note-body') ?? el.querySelector('.lo-wrap') ?? el;
+      const titleEl = el.querySelector('.node-title') ?? el.querySelector('.lo-title') ?? el.querySelector('.note-title');
       let size = 14.5, weight = 650, fill = '', spacing = 0, titleW: number | undefined;
       /* AR-11 — per-row font parity: each row's family is read off ITS OWN
          element's computed style (the canvas paints .node-title in var(--sans)
@@ -248,8 +259,14 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
         titleW = Math.max(12, titleEl.getBoundingClientRect().width - padL - padR);
       }
       const box = rel(el, body as Element);
+      /* ROUND AR-2 — a note the measurer could NOT find a title on (a stub
+         element in a harness, or a DOM drift) must not look measured: the
+         family stays undefined so the emitter's token-family fallback for
+         the note row ('sans' — the canvas note paints var(--sans)-derived
+         styles through `.note-node`) applies, visibly. */
       return {...box, size, weight, fill, anchor: 'start', titleW, spacing,
-        family: titleEl ? rowFont(titleEl)?.family : undefined, rows};
+        family: titleEl ? rowFont(titleEl)?.family : undefined,
+        kind: isNote && titleEl ? 'note' : undefined, rows};
     },
     edgePath(edgeEl) {
       const el = edgeEl as Element | null;
@@ -724,7 +741,7 @@ export function exportSvg(input: ExportInput): string {
        `migrateEdge` folds legacy `data.label` onto. The exporter must never
        read `data.label`: that storage is painted by NOTHING, so reading it
        emitted labels the canvas never showed (measured live: `reads`
-       exported at 10.5/500 with no family while the canvas was bare). */
+       exported at 10.5/500 no-family while the canvas was bare). */
     const label = e.label;
     if (typeof label === 'string' && label) {
       /* DEFECT-1: the label anchor is the app's own parity function
@@ -790,8 +807,18 @@ export function exportSvg(input: ExportInput): string {
       );
     } else if (asShape(n.data?.shape) === 'note') {
       nodeParts.push(noteMarkup(s, ink.surface, ink.dim));
-      const nt = input.measurer.text(n.el);
-      nodeParts.push(nodeText(n, s, nt ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
+      const nt = measurer.text(n.el);
+      /* ROUND AR-2 — an UNMEASURED note row (no `.note-title` found —
+         stub measurers, or a DOM drift) must never export the naked
+         14.5/650-no-family shape again: the row carries its TOKEN family
+         ('sans' — the note paints the sans-derived body styles) explicitly,
+         so the fallback is a visible decision in the file. */
+      const noteText = nt
+        ? (nt.family || measurer.defaultFamily
+            ? {...nt, family: nt.family ?? measurer.defaultFamily!('sans')}
+            : nt)
+        : nt;
+      nodeParts.push(nodeText(n, s, noteText ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     } else if (type === 'table') {
       const tt = input.measurer.text(n.el);
       nodeParts.push(tableMarkup(n, s, accent, ink.fg, ink.dim, tt));
