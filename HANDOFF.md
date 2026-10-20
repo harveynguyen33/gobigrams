@@ -1,5 +1,67 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-20 (overnight) — ROUND AR + ROUND AS LANDED, 2 AR DEFECTS OPEN, ROUND AT QUEUED
+
+Read this block first. Everything below is history.
+
+**Tree:** branch `main`, HEAD recorded in the commit that added this block; ~28 commits ahead of origin
+(Forgejo) and github-mirror, both of which sat at `26baec6` before tonight.
+
+**Gates measured at HEAD (orchestrator, not self-reported):** `npx tsc --noEmit` 0 · `npx vite build` 0 ·
+**46/46 harnesses green** · `client_js_bytes` **870,070** (declared ceiling still 831,522 — see OPEN #3) ·
+dev server `:5200` HTTP 200.
+
+**ROUND AR — Harvey's two defects, plus everything the round grew into**
+- SVG export is REAL VECTOR now (`src/exportSvg.ts`, no `foreignObject`). Measured on a live export: the preview
+  canvas went from **0 to 20,668 of 64,922** pixels differing from the background; the file opened as an image
+  document went from **2 colours to 945**; the file shrank 20,773 → 1,867 bytes; all five themes produce different
+  output; PNG is untouched (2× the viewBox).
+- The flicker is gone: all **12/12** `.em-seg` buttons survive a state change (was 0/12), the primary button no
+  longer flips to "Rendering…" during preview rebuilds, and an unrelated App re-render no longer rebuilds the
+  preview.
+- Reviewer-found defects repaired: diagonal-edge labels sit inside the viewBox (were at x=855.8 and x=1,445.9 on a
+  658-wide canvas), long titles wrap inside the box, group children export at absolute positions. Each carries a
+  harness assertion that is RED on `8fde9dc` (20/24).
+- React Flow attribution KEPT and themed (Harvey's decision): visible, themed on all five themes, not overlapping
+  the controls.
+- Console clean on a fresh load (Tooltip's React 19 `element.ref` read fixed); copy fixed ("colors",
+  "1 node · 0 edges"); every text row is measured AND emitted with its own computed font.
+
+**ROUND AS — Mermaid contract + data safety**
+- Mermaid export emits the standard `id("label")` form; zero colon-form lines. The importer reads its own output
+  losslessly — **9/9 nodes keep label AND shape** — and still reads the old colon form (round node, database,
+  edge lines, inside a subgraph), keeps a colon inside a label (`port: 8080`), and skips `%%` comments.
+- A Mermaid import is ONE undo entry (pushHistory before the append, no history wipe; failed parse = zero entries).
+- `PUT /api/boards/<missing>` → **404, no file, no resurrection** (measured live), and the client never retries 4xx.
+- `vite preview` serves `/api/*` via `configurePreviewServer`.
+- Board writes keep **ONE `.bak` generation** (measured live: PUT A then PUT B leaves `.bak` holding doc A), and the
+  implicit autosave guard became an explicit named predicate — HARDENING, not a fix: the 2026-10-19 board loss has
+  no proven cause.
+- Incident on record: `boards/mvaf8pkt162b2aed.json` went to 0 nodes at 00:06:10 on 2026-10-19, no backup existed,
+  cause undetermined. AS-6 exists so a second overwrite is recoverable.
+
+**OPEN (neither blocks the push)**
+1. **AR defect — three text rows still export in the wrong typeface: edge label (canvas mono 11/600), table column
+   (mono 11/400), group title (mono 12/600) all emit sans 10.5 with no `font-family`. `round-ar-font-parity`
+   currently asserts the wrong behaviour, so it is green while parity is wrong.** Queued as kanban `t_aa6accb1`.
+2. **AR defect — intermittent React key warning**, 1 of 4 fresh loads, no stack in the production build; needs a
+   dev-build repro (same card).
+3. **Ratchet raise is BLOCKED on an interactive approval.** Harvey approved it verbally; `AGENTS.md` is a protected
+   agent-instruction file, the approval prompt cannot be answered while he is away, and the gate refused the write
+   for the orchestrator too. Measured `870,070` vs declared `831,522` (which was already exceeded before this work,
+   at 859,044). Nothing was edited — do not read this as a silent raise.
+
+**QUEUED (kanban, gateway-dispatched so it survives a closed chat session):** `t_aa6accb1` = the two AR defects →
+ROUND AT (`ROUND-AT-SPEC.md`, 7 items, browser-local storage) → reviewer verification. Workers commit locally and
+never push; the orchestrator pushes after measuring.
+
+**MORNING CHECKLIST (5 minutes, on the Mac)**
+1. Export SVG → open the file in Preview/Figma: shapes AND real selectable text, not a background-only rectangle.
+2. Export modal: click SVG / PNG / each theme — no button flicker, no label flashing "Rendering…".
+3. Mermaid: export a board, paste the text back into Import → titles and shapes survive; one Cmd+Z removes it.
+4. Boards: save a board twice → a `.bak` appears beside it in `boards/`.
+5. Approve the ratchet: `AGENTS.md` → `ratchet.ceiling` → `870070` (the reason comment is written and waiting).
+
 ## ▶ ROUND AR PASS 2 (coder, 2026-10-19) — AR-1 landed at e0fb1d0; ONE ORCHESTRATOR ACTION OPEN
 
 AR-1 (SVG vector serializer) is COMMITTED at `e0fb1d0` (local, not pushed):
