@@ -729,6 +729,13 @@ export default function App() {
      is already gated on `nodes.length === 0`. `boardLoaded` is what keeps that
      panel from claiming "This board is empty" during the load. */
   const [boardLoaded, setBoardLoaded] = useState(false);
+  /* AS-5 — the save gate's LOADED-ID half: the id of the document the loader
+     actually applied, set by applyBoard (and ONLY applyBoard — every path that
+     arrives here went through a successful load), cleared when the canvas
+     returns to no-board. A save runs only when this EQUALS the in-memory doc's
+     id: a flush landing while the NEXT board is still loading, a debounce
+     firing mid-load, or a failed load can never write another board's file. */
+  const [boardLoadedDocId, setBoardLoadedDocId] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [sel, setSel] = useState<string | null>(null);
@@ -1223,11 +1230,35 @@ export default function App() {
       setSelEdgeId(null);
       setSelCount(0);
       setCurBoard(doc);
+      /* AS-5 — ARM the save gate: this is the ONE place a doc is applied after
+         a successful load, so it is the one place the loaded id is set. Every
+         path out of applyBoard (open, first boot, delete-reseed, duplicate)
+         went through a real load. Until this line runs for the NEW doc, the
+         gate is closed — a flush landing mid-switch writes nothing. */
+      setBoardLoadedDocId(doc.id);
       boards.cacheLastBoard(doc.id);
       /* HARVEY 2026-10-13 — maxZoom 1: a 1-node board must not zoom to 250%. */
       setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
     });
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
+
+  /* AS-5 — THE SAVE GATE, stated once and named. A save (debounced autosave
+     scheduled, or a flush writing) runs only when BOTH hold:
+       (a) a board document has been LOADED — `boardLoaded` is the loader's
+           explicit flag (first boot with no last-board keeps it false until
+           the bootstrap resolves one way or the other; a failed load re-arms
+           nothing), and
+       (b) the id the LOADER applied (`boardLoadedDocId`, set by applyBoard
+           and cleared on board switch) EQUALS the id of the doc currently in
+           memory (`curBoardRef`) — so a flush landing while the next board is
+           still loading, a debounce firing mid-load, or any stale-doc window
+           writes nothing.
+     This replaces the old implicit `boardId`/`skipAutosave` combination.
+     HARDENING, not a fix for a proven race: the 2026-10-19 data-loss incident
+     is UNDETERMINED (see ROUND-AS-SPEC Amendment 1); this gate removes the
+     unproven candidates' shared precondition — a save running when the
+     in-memory doc is not the loaded doc. */
+  const canAutosave = boardLoaded && boardLoadedDocId !== null && boardLoadedDocId === curBoardRef.current?.id;
 
   /* AS-4 — the board list refresher, declared BEFORE flushSave so the 404
      branch can call it (and name it in deps) without a TDZ ordering problem. */
@@ -1242,7 +1273,9 @@ export default function App() {
   const flushSave = useCallback(async () => {
     setDirty(false); /* PACKAGE-S §S-3 */
     const board = curBoardRef.current;
-    if (!board) return;
+    /* AS-5 — the explicit save gate: no write unless a board doc is LOADED and
+       its id matches the in-memory doc. (The old guard was just `!board`.) */
+    if (!canAutosave || !board) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = undefined;
     const seq = ++saveSeq.current;
@@ -1308,7 +1341,7 @@ export default function App() {
         flash(`Save failed: ${err?.message ?? 'unknown error'}`);
       }
     }
-  }, [flash, presetId, mode, refreshBoards]);
+  }, [flash, presetId, mode, refreshBoards, canAutosave]);
 
   // Debounced autosave whenever nodes/edges change (and a board is loaded).
   // I6: depend only on the board id (via ref) + nodes/edges so the effect does
@@ -1316,7 +1349,12 @@ export default function App() {
   // the debounced save actually fires, not on every keystroke/drag tick.
   const boardId = curBoard?.id;
   useEffect(() => {
-    if (!boardId) return;
+    /* AS-5 — the explicit save gate REPLACES the old bare `if (!boardId)`
+       check: nothing is scheduled unless a doc is LOADED and the loaded id
+       matches the in-memory doc (a debounce firing during a board switch or
+       mid-load used to pass the old check and write the WRONG — or empty —
+       graph to the PREVIOUS board's file). */
+    if (!canAutosave) return;
     /* PACKAGE-S §S-3 — autosave OFF: nothing is scheduled; the change is DIRTY
        until Save / Cmd+S flushes. The dirty marker is the only signal. */
     if (!autosave) {
@@ -1331,7 +1369,7 @@ export default function App() {
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => { void flushSave(); }, 800);
     return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, boardId, flushSave, autosave]);
+  }, [nodes, edges, boardId, flushSave, autosave, canAutosave]);
 
   // First load: open the last board, or the newest, or seed one from the
   // current in-memory starter diagram. Guarded against StrictMode's

@@ -205,10 +205,13 @@ assert('as5.c2.predicate-covers-loaded-and-id-match',
   /boardLoaded/.test(gateSpan) && /boardLoadedDocId/.test(gateSpan) && /curBoardRef\.current\?\.id/.test(gateSpan),
   'the predicate reads the loaded flag (boardLoaded), the loaded id (boardLoadedDocId) and the in-memory doc id');
 /* the implicit combination is replaced at the consumers */
-const effectAnchor = APP.indexOf('useEffect(() => {\n    if (!boardId) return;');
-const effectSpan = effectAnchor >= 0 ? APP.slice(effectAnchor, effectAnchor + 900) : '';
+const effectAnchor = APP.indexOf("useEffect(() => {\n    /* AS-5");
+const effectSpan = effectAnchor >= 0 ? APP.slice(effectAnchor, effectAnchor + 900)
+  : APP.indexOf('if (!canAutosave) return;') >= 0
+    ? APP.slice(APP.indexOf('if (!canAutosave) return;') - 400, APP.indexOf('if (!canAutosave) return;') + 700)
+    : '';
 assert('as5.c3.autosave-effect-uses-the-predicate',
-  effectAnchor >= 0 && effectSpan.includes('canAutosave'),
+  APP.indexOf('if (!canAutosave) return;') >= 0 && effectSpan.includes('canAutosave') && effectSpan.includes('useEffect'),
   'the autosave effect gates its schedule on `canAutosave` (not the bare boardId)');
 const flushAnchor = APP.indexOf('const flushSave = useCallback');
 const flushSpan = APP.slice(...braceSpan(APP, flushAnchor));
@@ -244,13 +247,13 @@ if (gateExpr) {
   };
 }
 assert('as5.c6.gate-false-on-all-loss-cases',
-  !!drive && !drive.firstBoot && !drive.loadingSwitch && !drive.debounceDuringLoad && !drive.failedLoad,
-  drive
-    ? `driven: first-boot-no-board=${drive.firstBoot} switch-while-loading=${drive.loadingSwitch} debounce-during-load=${drive.debounceDuringLoad} failed-load=${drive.failedLoad} — all FALSE`
+  !!gateCases && !gateCases.firstBoot && !gateCases.loadingSwitch && !gateCases.debounceDuringLoad && !gateCases.failedLoad,
+  gateCases
+    ? `driven: first-boot-no-board=${gateCases.firstBoot} switch-while-loading=${gateCases.loadingSwitch} debounce-during-load=${gateCases.debounceDuringLoad} failed-load=${gateCases.failedLoad} — all FALSE`
     : 'predicate not executable');
 assert('as5.c7.gate-true-only-when-loaded-and-ids-match',
-  !!drive && drive.loadedMatch === true,
-  drive ? `loaded + ids match (${drive.loadedMatch}) — the save runs` : 'predicate not executable');
+  !!gateCases && gateCases.loadedMatch === true,
+  gateCases ? `loaded + ids match (${gateCases.loadedMatch}) — the save runs` : 'predicate not executable');
 
 console.log(results.every(r => r.pass) ? '\nALL GREEN' : `\n${results.filter(r => !r.pass).length} FAILURE(S)`);
 process.exit(results.every(r => r.pass) ? 0 : 1);
