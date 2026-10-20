@@ -32,6 +32,14 @@ archive the card in the morning. The crash was in the harness-writing turn, not 
 interactive approval of `AGENTS.md`; (2) the Mac test in the checklist below; (3) LICENSE, then `private: true` →
 false and the repo flip.
 
+**ROUND AT — the static-host live pass, measured by the orchestrator (2026-10-21 02:40, and independently by the
+reviewer):** built `dist/`, served it with a dumb static server (`python3 -m http.server`, no SPA plugin, no API), then
+loaded the app: `GET /api/boards` answered **404 text/html**, the app fell into **local mode** and the boards popup
+read **"Saved in this browser"**; IndexedDB `diagram-studio` existed at **version 1**; a 4th node added to the seeded
+"first board" **survived a reload** (4 nodes before, 4 after); console capture over the whole run was **empty**.
+The vault capture of 2026-10-21 tagged this pass UNVERIFIED because this block did not exist when it ran — the tag is
+wrong, the evidence is above, and a correction is queued for the vault.
+
 ## ▶ 2026-10-21 — ROUND AR-2 EXPORT FIDELITY LANDED (card t_1d8e84ea), LOCAL ONLY
 
 Read this block first. Everything below is history.
