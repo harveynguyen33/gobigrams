@@ -4201,15 +4201,19 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   const fileRef = useRef<HTMLInputElement>(null);
 
   /* AQ21 — the export modal's Mermaid import lands here. Fresh ids, grid
-     layout, then the same apply path as a JSON import (history reset). */
+     layout. AS-3: the import is ADDITIVE (setNodes/setEdges append), so it is
+     ONE undo entry: pushHistory() snapshots the pre-import graph (and clears
+     `future`, the redo contract) BEFORE the append — a single Cmd+Z removes
+     exactly the import, redo restores it. (The old code wiped history here,
+     which was copied from the JSON import — but that path REPLACES the
+     board; this one appends, so the reset destroyed undoable work.) */
   useEffect(() => {
     const h = (ev: Event) => {
       const parsed = (ev as CustomEvent).detail;
       if (!parsed) return;
       const {nodes: mmNodes, edges: mmEdges, nextId} = mermaidToGraph(parsed, idc);
       idc = nextId;
-      past.current = [];
-      future.current = [];
+      pushHistory();
       setNodes(ns => [...ns, ...mmNodes]);
       setEdges(es => [...es, ...mmEdges]);
       bumpHist(v => v + 1);
