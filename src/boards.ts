@@ -29,10 +29,19 @@ export async function decideStorageMode(
 ): Promise<StorageMode> {
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
+    /* The deadline REJECTS (and aborts) — racing it against the fetch means a
+       connection that never answers (and a stub that ignores the signal)
+       still converges on LOCAL at PROBE_TIMEOUT instead of hanging boot. */
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        ctrl.abort();
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      }, PROBE_TIMEOUT);
+    });
     let res: Response;
     try {
-      res = await fetchImpl('/api/boards', {signal: ctrl.signal});
+      res = await Promise.race([fetchImpl('/api/boards', {signal: ctrl.signal}), deadline]);
     } finally {
       clearTimeout(timer);
     }
