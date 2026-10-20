@@ -1,5 +1,70 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-21 — ROUND AR-2 EXPORT FIDELITY LANDED (card t_1d8e84ea), LOCAL ONLY
+
+Read this block first. Everything below is history.
+
+**Tree:** branch `main`, HEAD `132a44e`, tree clean, NOT pushed (card rule: local only).
+Commits, one concern each: `c7bec65` (defect B — one edge-label storage),
+`ade55f2` (defect A — note titles measured), `132a44e` (harness — as-boards leak closed
++ `checks/round-ar2-export-fidelity.mjs`).
+
+**Gates measured at HEAD:** `tsc --noEmit` 0 · `vite build` 0 · `client_js_bytes` **880,354**
+(ceiling 831,522 still blocked on human approval — reported, not raised) · **50/50 harnesses
+green** · goblin-verify exit 0 (22 PASS / 0 FAIL / 5 SKIP) · goblin-bans exit 0 · dev `:5200` HTTP 200.
+
+**DEFECT B — the edge-label seam, contract DECIDED AND RECORDED (commit message + here):**
+the TOP-LEVEL `Edge.label` is the ONE storage; the canvas paints exactly it (`GoblinEdge`'s
+`shown`), and every reader (exporter, mermaid re-export) reads it and nothing else. Legacy
+`data.label` is folded onto top-level in `migrateEdge` on read (never rewriting the board),
+so mermaid-imported boards get PAINTED labels (contract (a) via storage convergence). The
+exporter emits a label row iff the canvas painted one — it never invents, never drops.
+Before (live :5200, real Export modal, probe board): `emits` painted but ABSENT from the
+export; `reads` unpainted but exported `10.5/500` no-family. After (same board, same modal):
+both export `<text font-size="11" font-weight="600" font-family="ui-monospace, …">`,
+byte-matching the canvas `getComputedStyle` (ui-monospace 11px/600). NOTE: the first "after"
+run still dropped both labels — `buildSvg`'s `exportEdges.push` was the drop point the
+reviewer named; `exportEdgeOf` now carries `label`. The fix chain was only declared done
+after the LIVE re-measurement, not the harness alone.
+
+**DEFECT A — note nodes:** the measurer now reads `.note-title` (`.note-node > .note-body >
+.note-title`); measured metrics travel verbatim. Before: `Order API` exported `14.5/650`
+no-family; canvas truth `getComputedStyle(.note-title)` = ui-monospace 13px/650. After:
+exports `font-size="13" font-weight="650" font-family="ui-monospace, …"` — a live byte match.
+
+**FALLBACK RULE (both defects):** a row whose measurement fails never exports naked metrics
+again — it carries its row-kind TOKEN family via `defaultFamily('mono' | 'sans')` on the
+`<text>` itself, so a missing element is visible in the file instead of looking like a decision.
+
+**HARNESS:** `checks/round-ar2-export-fidelity.mjs` — 14 assertions. RED on `5d79bd8`
+(8 FAIL: A-note-title 12/500 fallback row, A2 token family, B invented data-label row,
+B2 no token family, B3 no fold, B4 mermaid data-label, H1/H2 leak) → GREEN at HEAD.
+RED run verbatim in the card report; the three emitter rows additionally RED-proven via a
+pinned worktree at `5d79bd8` (3 identical FAIL rows, 3 consecutive runs).
+`round-ar-svg-export.mjs` + `round-as-mermaid.mjs` fixtures re-anchored to the top-level
+label storage (both RED before re-anchor on this tree, GREEN after).
+
+**HOUSEKEEPING (reviewer's MAJOR finding):** `round-as-boards-put.mjs` no longer writes
+`.as-boards-out-*.cjs` into the repo root — bundle + entry live in tmpdir, the bundle
+unlinked the moment `require_` materialises it (a `module.paths.unshift` preamble fixes the
+CJS resolution that had motivated the root write). Asserted behaviourally: the AR-2 harness
+runs the real AS harness in a temp root and requires zero `.as-boards-out-*` leftovers.
+Repo root confirmed clean.
+
+**boards/ restored:** only `library.json`, `library.json.bak`, `mvaf8pkt162b2aed.json`
+(the pre-existing empty `Untitled`); the probe board went in and out via `/api/boards`
+only (PUT then DELETE), including its `.bak`.
+
+**NOT VERIFIED / open:**
+- The `defaultFamily('mono'|'sans')` probe-element resolution is exercised live only for
+  the edge-label path (both probe labels MEASURED, so the fallback path fired only in the
+  harness stubs). A DOM drift that hides `.edge-label` would now export mono 10.5/500 —
+  visibly, with family — but that visible-fallback state has not been produced live.
+- `client_js_bytes` 880,354 > ceiling 831,522: the ratchet raise remains a human approval
+  (OPEN #3 below, unchanged).
+- Mermaid IMPORT of a `data:{label}` board was verified via the migrateEdge fold + the
+  live `reads` painting, not by re-running a full mermaid import in the browser.
+
 ## ▶ 2026-10-20 (overnight) — ROUND AR + ROUND AS LANDED, 2 AR DEFECTS OPEN, ROUND AT QUEUED
 
 Read this block first. Everything below is history.
