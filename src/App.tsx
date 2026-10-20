@@ -4198,8 +4198,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
         : tokensFor(eff, EXPORT_TOKENS);
       /* DEFECT-2: one measurer per export, with measureText for the wrap —
-         disposed in the finally so the hidden measuring <svg> never leaks. */
-      const measure = domMeasurer();
+         disposed in the finally so the hidden measuring <svg> never leaks.
+         ROUND-AR-DEFECT-1: the measurer gets the CLONE ROOT so it can read
+         the portalled `.edge-label[data-edge-id]` rows the EdgeLabelRenderer
+         paints outside each edge's own element. */
+      const measure = domMeasurer(() => clone);
       try {
         return exportSvg({
           nodes: exportNodes,

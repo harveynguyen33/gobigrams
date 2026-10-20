@@ -13,11 +13,16 @@
  *     lines, wide family → more lines, both the canonical greedy counts),
  *   - `measureText` is called WITH the row family,
  *   - the source carries no font-stack literal,
- *   - the root svg inherits a measurer-supplied fallback family (and none
- *     when the measurer supplies no default).
+ *   - ROUND-AR-DEFECT-1: the three rows the reviewer measured WRONG
+ *     (edge label, table column, group title) are asserted BY NAME to carry
+ *     their own MEASURED family on the emitted <text> — the measurer stub
+ *     supplies distinct fonts per row and the assertion is that the emitted
+ *     bytes match, not that the rows silently inherit a root fallback.
  *
  * Negative control: AR_ROOT pointed at the mono-hard-coded tree (ffafce9) —
- * the family rows FAIL there. RED, not a silent pass.
+ * the family rows FAIL there. RED, not a silent pass. The DEFECT-1 rows were
+ * additionally proven RED on the pre-fix commit ee1611e (they inherited the
+ * root family there while this harness asserted the measured one).
  */
 import {readFileSync, writeFileSync, rmSync, existsSync} from 'node:fs';
 import {join, dirname} from 'node:path';
@@ -81,6 +86,12 @@ const {exportSvg, EXPORT_TOKENS} = MOD;
 const SANS = 'TestSans, sans-serif';
 const WIDE = 'TestWideDisplay';
 const MONO = 'TestMono';
+/* ROUND-AR-DEFECT-1 — four DISTINCT family strings, so an emitted row that
+   inherits the root fallback (or a sibling row's family) can never satisfy
+   its own assertion. */
+const ELABEL = 'TestEdgeLabelMono';
+const TCOL = 'TestTableColMono';
+const GTITLE = 'TestGroupTitleMono';
 
 const advanceOf = (text, o = {}) =>
   text.length * (o.family === SANS ? 5.8 : o.family === WIDE ? 13.05 : 13.05) +
@@ -98,10 +109,16 @@ const stub = (family, opts = {}) => {
           kicker: {family: MONO, size: 9.5, weight: 500, spacing: 1.1},
           sub: {family: MONO, size: 11.5, weight: 450, spacing: 0},
           metric: {family: MONO, size: 20, weight: 700, spacing: 0},
+          /* ROUND-AR-DEFECT-1 — the re-anchored rows each carry their OWN
+             measured font; the harness asserts the emitted <text> matches
+             THESE, so a root-fallback inheritance fails loudly. */
+          tcol: {family: TCOL, size: 11, weight: 400, spacing: 0},
+          groupTitle: {family: GTITLE, size: 12, weight: 600, spacing: 0.2},
         },
       };
     },
     edgePath() { return null; },
+    edgeLabelFont() { return {family: ELABEL, size: 11, weight: 600, spacing: 0}; },
     measureText(text, o) { calls.push(o ?? null); return advanceOf(text, o); },
     ...(opts.noDefaultFamily ? {} : {defaultFamily: () => family}),
   };
@@ -182,8 +199,64 @@ console.log('\nF1/F4/F7/F8 — per-row family reaches the emitted <text>');
   assert('F7-root-inherits-measurer-default',
     rootTag.includes(`font-family="${SANS}"`),
     rootTag.includes('font-family')
-      ? `root svg font-family = ${/font-family="([^"]*)"/.exec(rootTag)?.[1]} (unmeasured rows: edge labels, tables, group titles — inherit it)`
+      ? `root svg font-family = ${/font-family="([^"]*)"/.exec(rootTag)?.[1]} (rows WITHOUT a dedicated element still inherit it)`
       : 'root svg carries no measurer-supplied fallback family');
+
+  /* ROUND-AR-DEFECT-1 — the three rows the reviewer measured WRONG must each
+     carry THEIR OWN measured family on the emitted <text>. The stub families
+     are distinct from the root fallback, so silent inheritance is RED here
+     (and was RED on the pre-fix tree, recorded in the header). */
+  console.log('\nDEFECT-1 — edge label / table column / group title carry their MEASURED family');
+  {
+    /* edge label: a labelled edge between two nodes */
+    const el = stub(SANS);
+    const full = exportSvg({
+      nodes: [mkNode('n-a', {title: 'Alpha'}), mkNode('n-b', {title: 'Beta'})],
+      edges: [{id: 'e-lab', source: 'n-a', target: 'n-b', data: {label: 'events'}, label: 'events'}],
+      theme: 'dark', tokens, measurer: el.measurer, pad: 10,
+    });
+    const labAttrs = textAttrs(full, 'events');
+    assert('D1-edge-label-row-family',
+      labAttrs.length >= 1 && labAttrs.every(a => a.includes(`font-family="${ELABEL}"`)) &&
+        labAttrs.every(a => a.includes('font-size="11"') && a.includes('font-weight="600"')),
+      labAttrs.length
+        ? `edge label <text> attrs: ${labAttrs[0]}`
+        : 'no edge label <text> emitted');
+
+    /* table column: `.tnode-cname` rows via rows.tcol */
+    const tb = stub(SANS);
+    const tableNode = {
+      ...mkNode('n-tbl', {title: 'users'}),
+      type: 'table',
+      data: {columns: [{name: 'user_id', pk: true}, {name: 'email'}]},
+    };
+    const tblSvg = exportSvg({
+      nodes: [tableNode], edges: [], theme: 'dark', tokens, measurer: tb.measurer, pad: 10,
+    });
+    const colAttrs = textAttrs(nodeBlock(tblSvg, 'n-tbl'), 'user_id');
+    assert('D1-table-column-row-family',
+      colAttrs.length >= 1 && colAttrs.every(a => a.includes(`font-family="${TCOL}"`)) &&
+        colAttrs.every(a => a.includes('font-size="11"') && a.includes('font-weight="400"')),
+      colAttrs.length
+        ? `table column <text> attrs: ${colAttrs[0]}`
+        : 'no table column <text> emitted');
+
+    /* group title: `.group-label` rows via rows.groupTitle */
+    const gr = stub(SANS);
+    const groupNode = {...mkNode('n-g', {title: 'Core Domain'}), data: {shape: 'group', title: 'Core Domain'}};
+    const child = {...mkNode('n-c', {title: 'Inside'}), parentId: 'n-g'};
+    const grSvg = exportSvg({
+      nodes: [groupNode, child], edges: [], theme: 'dark', tokens, measurer: gr.measurer, pad: 10,
+    });
+    const gBlock = grSvg.split(`<g data-ar-node="n-g"`)[1]?.split('</g>')[0] ?? '';
+    const gtAttrs = textAttrs(gBlock, 'Core Domain');
+    assert('D1-group-title-row-family',
+      gtAttrs.length >= 1 && gtAttrs.every(a => a.includes(`font-family="${GTITLE}"`)) &&
+        gtAttrs.every(a => a.includes('font-size="12"') && a.includes('font-weight="600"')),
+      gtAttrs.length
+        ? `group title <text> attrs: ${gtAttrs[0]}`
+        : 'no group title <text> emitted');
+  }
 
   const {measurer: bare} = stub(SANS, {noDefaultFamily: true});
   const bareRoot = /^<svg\b[^>]*>/.exec(run(bare, [mkNode('n-bare', {title: 'x'})]))?.[0] ?? '';

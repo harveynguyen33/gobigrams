@@ -53,9 +53,10 @@ export type TextRect = {
   titleW?: number; spacing?: number;
   /** AR-11 — the title row's computed font family (per-row parity). */
   family?: string;
-  /** Per-row font overrides for the synthetic rows (kicker / sub / metric);
+  /** Per-row font overrides for the synthetic rows (kicker / sub / metric /
+   *  table columns / group title);
    *  a row without an entry keeps the exporter's legacy fixed metrics. */
-  rows?: Partial<Record<'kicker' | 'sub' | 'metric', RowFont>>;
+  rows?: Partial<Record<'kicker' | 'sub' | 'metric' | 'tcol' | 'groupTitle', RowFont>>;
 };
 
 /** Injected measurements. `nodeEl`/`edgeEl` are the themed clone's live
@@ -73,6 +74,13 @@ export type SvgMeasurer = {
     start: {x: number; y: number};
     end: {x: number; y: number};
   } | null;
+  /** ROUND-AR-DEFECT-1 — the computed font of the edge's own LABEL row.
+   *  `.edge-label` is NOT inside `.react-flow__edge`: React Flow's
+   *  `EdgeLabelRenderer` portals it into `.react-flow__edgelabel-renderer`
+   *  (a sibling of the edge SVGs), so the measurer must reach it through the
+   *  CLONE ROOT by `data-edge-id`. Optional — a harness stub that cannot
+   *  supply one simply leaves the emitter's legacy metrics in place. */
+  edgeLabelFont?(edgeId: string): RowFont | undefined;
   /** DEFECT-2 — width of `text` in px under the SAME font metrics the
    *  emitter paints with (family, size, weight, letter-spacing). Optional:
    *  without it the wrap falls back to the monospace 0.6em estimator.
@@ -156,11 +164,31 @@ function nodeSize(n: ExportNode): {w: number; h: number} {
 
 /* ------------------------------------------------------------ measurer: DOM */
 
+/** getComputedStyle → RowFont for one live element. Module-level so both the
+ *  node measurer (`text`) and `edgeLabelFont` share the exact same read —
+ *  ROUND-AR-DEFECT-1: every measured row goes through ONE font reader. */
+function rowFontOf(rowEl: Element): RowFont | undefined {
+  try {
+    const cs = getComputedStyle(rowEl);
+    return {
+      family: cs.fontFamily || '',
+      size: parseFloat(cs.fontSize) || 0,
+      weight: parseInt(cs.fontWeight, 10) || 0,
+      spacing: cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** getComputedStyle-backed measurer for the live (themed, offscreen) clone.
  *  Text boxes are read relative to the node element, so they are directly
  *  usable inside the node's box. Never called at module load — the bundle is
- *  safe for the Node harness, which never imports this symbol's behaviour. */
-export function domMeasurer(): SvgMeasurer {
+ *  safe for the Node harness, which never imports this symbol's behaviour.
+ *  `root` (optional) hands the measurer the clone's viewport element so it
+ *  can reach rows that live OUTSIDE an edge's own element (the
+ *  `EdgeLabelRenderer` portal: `.edge-label[data-edge-id]`). */
+export function domMeasurer(root?: () => unknown): SvgMeasurer {
   let measTextEl: SVGTextElement | null = null;
   const rel = (el: Element, inner: Element) => {
     const nb = el.getBoundingClientRect();
@@ -177,17 +205,10 @@ export function domMeasurer(): SvgMeasurer {
       /* AR-11 — per-row font parity: each row's family is read off ITS OWN
          element's computed style (the canvas paints .node-title in var(--sans)
          and kicker/sub/metric in var(--mono)), then travels to the emitter so
-         every emitted <text> is set in the typeface the measurement used. */
-      const rowFont = (rowEl: Element | null): RowFont | undefined => {
-        if (!rowEl) return undefined;
-        const cs = getComputedStyle(rowEl);
-        return {
-          family: cs.fontFamily || '',
-          size: parseFloat(cs.fontSize) || 0,
-          weight: parseInt(cs.fontWeight, 10) || 0,
-          spacing: cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0),
-        };
-      };
+         every emitted <text> is set in the typeface the measurement used.
+         ROUND-AR-DEFECT-1: the read itself is the shared `rowFontOf`. */
+      const rowFont = (rowEl: Element | null): RowFont | undefined =>
+        rowEl ? rowFontOf(rowEl) : undefined;
       const rows: TextRect['rows'] = {};
       const kickEl = el.querySelector('.node-kicker');
       const subEl = el.querySelector('.node-sub');
@@ -195,6 +216,17 @@ export function domMeasurer(): SvgMeasurer {
       if (kickEl) rows.kicker = rowFont(kickEl);
       if (subEl) rows.sub = rowFont(subEl);
       if (metricEl) rows.metric = rowFont(metricEl);
+      /* ROUND-AR-DEFECT-1 — the two remaining MEASURED node rows: an ERD
+         table's column names (`.tnode-cname`) and a group's floating title
+         (`.group-label`). Each is read off its OWN element so the emitter
+         paints it in the typeface the canvas measured, exactly as AR-11 did
+         for kicker/sub/metric. Columns share one row entry (they all carry
+         the same computed font); a group without a label element falls back
+         to the legacy fixed metrics. */
+      const tcolEl = el.querySelector('.tnode-cname');
+      if (tcolEl) rows.tcol = rowFont(tcolEl);
+      const groupTitleEl = el.querySelector('.group-label');
+      if (groupTitleEl) rows.groupTitle = rowFont(groupTitleEl);
       if (titleEl) {
         const cs = getComputedStyle(titleEl);
         size = parseFloat(cs.fontSize) || size;
@@ -236,6 +268,20 @@ export function domMeasurer(): SvgMeasurer {
            makes the label fall back to the pathless anchor below */
       }
       return {d, start: {x: sx, y: sy}, end: {x: tx, y: ty}};
+    },
+    /* ROUND-AR-DEFECT-1 — the edge's label row font, read off the portalled
+       `.edge-label[data-edge-id]` element inside the clone root. */
+    edgeLabelFont(edgeId) {
+      try {
+        const r = root?.();
+        if (!r || typeof (r as Element).querySelector !== 'function') return undefined;
+        const labelEl = (r as Element).querySelector(
+          `.edge-label[data-edge-id="${CSS.escape(edgeId)}"]`,
+        );
+        return labelEl ? rowFontOf(labelEl) : undefined;
+      } catch {
+        return undefined;
+      }
     },
     /* DEFECT-2 — real glyph widths via a hidden SVG <text> carrying the ROW's
        own font (family/size/weight/spacing — AR-11: the family comes IN with
@@ -458,16 +504,21 @@ function noteMarkup(s: {w: number; h: number}, surface: string, dim: string): st
   ].join('');
 }
 
-/** ERD table: header band + colour strip + one row per visible column. */
-function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, fg: string, dim: string): string {
+/** ERD table: header band + colour strip + one row per visible column.
+ *  ROUND-AR-DEFECT-1 — `t` (when the measurer found the table's DOM) carries
+ *  the `.tnode-cname` row font in `rows.tcol`, so each column line is painted
+ *  in the measured family/size/weight instead of the legacy sans defaults. */
+function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, fg: string, dim: string,
+  t?: TextRect | null): string {
   const d = (n.data ?? {}) as Record<string, unknown>;
   const cols: Array<Record<string, unknown> | string> = Array.isArray(d.columns) ? d.columns : [];
   const headerH = 24;
+  const colFont = t?.rows?.tcol;
   const parts: string[] = [
     `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(accent)}" stroke-width="1.5"/>`,
     `<rect x="1" y="1" width="${s.w - 2}" height="${headerH}" rx="6" fill="${escAttr(accent)}" fill-opacity="0.16"/>`,
     `<rect x="1" y="${headerH}" width="4" height="${Math.max(s.h - headerH - 2, 0)}" fill="${escAttr(accent)}"/>`,
-    textLine(12, 17, String(d.name ?? d.title ?? n.id), {size: 12, weight: 650, fill: fg}),
+    textLine(12, 17, String(d.name ?? d.title ?? n.id), {size: 12, weight: 650, fill: fg, family: t?.family}),
   ];
   const rowH = cols.length ? Math.min(18, (s.h - headerH - 4) / cols.length) : 0;
   cols.forEach((c, i) => {
@@ -477,7 +528,10 @@ function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, f
     if (typeof c !== 'string' && (c.pk || c.isPrimary || c.primaryKey)) {
       parts.push(`<circle cx="8" cy="${y - 4}" r="2.4" fill="${escAttr(accent)}"/>`);
     }
-    parts.push(textLine(16, y, name, {size: 10.5, weight: 450, fill: dim}));
+    parts.push(textLine(16, y, name, {
+      size: colFont?.size ?? 10.5, weight: colFont?.weight ?? 450, fill: dim,
+      family: colFont?.family,
+    }));
   });
   return parts.join('');
 }
@@ -617,9 +671,18 @@ export function exportSvg(input: ExportInput): string {
     groupParts.push(
       `<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(nodeColor(g, tokens))}" stroke-width="1.2" stroke-dasharray="8 5"/>`,
     );
+    /* ROUND-AR-DEFECT-1 — the group title is a MEASURED row now: its font
+       comes off the clone's `.group-label` element (12px / 600 mono live),
+       not the legacy sans 10.5 / 550 defaults. `spacing` too when measured. */
     const gt = input.measurer.text(g.el);
     const title = String(g.data?.title ?? g.id);
-    groupParts.push(textLine(10, 14, title, {size: 10.5, weight: 550, fill: gt?.fill || ink.dim, spacing: '1'}));
+    const gtf = gt?.rows?.groupTitle;
+    groupParts.push(textLine(10, 14, title, {
+      size: gtf?.size ?? 10.5, weight: gtf?.weight ?? 550,
+      fill: gtf?.family ? (gt?.fill || ink.dim) : (gt?.fill || ink.dim),
+      family: gtf?.family,
+      spacing: gtf && gtf.spacing ? String(gtf.spacing) : '1',
+    }));
     groupParts.push('</g>');
   }
 
@@ -651,10 +714,17 @@ export function exportSvg(input: ExportInput): string {
            y: (abs.get(s.id)!.y + abs.get(t.id)!.y + nodeSize(s).h - nodeSize(t).h) / 2}
         : edgeLabelAnchor(route, d);
       const mid = {x: L.x + off.x, y: L.y + off.y};
+      /* ROUND-AR-DEFECT-1 — the label row's MEASURED font (ui-monospace
+         11px / 600 live). Without `edgeLabelFont` (harness stubs, or a label
+         element the clone lost) the legacy metrics stay. */
+      const lf = measurer.edgeLabelFont?.(e.id);
       const lw = Math.max(24, label.length * 6.6 + 12);
       edgeParts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(ink.surface)}" stroke="${escAttr(ink.dim)}" stroke-width="0.8"/>`,
-        textLine(mid.x - lw / 2 + 6, mid.y + 4, label, {size: 10.5, weight: 500, fill: ink.dim}),
+        textLine(mid.x - lw / 2 + 6, mid.y + 4, label, {
+          size: lf?.size ?? 10.5, weight: lf?.weight ?? 500, fill: ink.dim,
+          family: lf?.family, spacing: lf?.spacing ? String(lf.spacing) : undefined,
+        }),
       );
     }
   }
@@ -691,7 +761,8 @@ export function exportSvg(input: ExportInput): string {
       const nt = input.measurer.text(n.el);
       nodeParts.push(nodeText(n, s, nt ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     } else if (type === 'table') {
-      nodeParts.push(tableMarkup(n, s, accent, ink.fg, ink.dim));
+      const tt = input.measurer.text(n.el);
+      nodeParts.push(tableMarkup(n, s, accent, ink.fg, ink.dim, tt));
     } else {
       /* goblin: the ShapeFrame geometry, ONE source (src/shapes.tsx) */
       nodeParts.push(
