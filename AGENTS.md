@@ -24,8 +24,12 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 883660
-# RAISED 2026-10-21 (3rd raise today), Harvey-approved, measured at HEAD ba3bee0: 883660.
+ratchet.ceiling: 883721
+# RAISED 2026-10-21 (4th raise today), Harvey-approved, measured at HEAD 6d9459b: 883721.
+# Reason: ROUND AW canvas frame tint - shapeFrameMarkup emits the fill through a style attribute
+# (fill:var(--nc);fill-opacity:0.09) because var() is invalid in an SVG presentation attribute,
+# which is what had forced fill="transparent" and made the canvas the only surface without the
+# node tint. +61 bytes over the previous ceiling.
 # Reason: ROUND AV export colour parity - the SVG emitter now lifts every node icon out of the
 # themed clone as real vector primitives (frameMarkup gained an optional icon block instead of a
 # deferred unicode fallback), and the PNG path resolves the frame fill and the icon ink to literal
