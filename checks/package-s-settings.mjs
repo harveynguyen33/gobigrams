@@ -144,8 +144,14 @@ assert('S1.align-guides-persisted — App lazy-inits alignGuides from prefs and 
   // blank comment before the probe
 }
 assert('S2.png-scale — exportPng consumes the stored scale (pixelRatio) and the stored padding',
-  app.includes('pixelRatio: pngScale') && app.includes('const pad = pngPad'),
-  'the two hard-coded values (pixelRatio 2, pad 48) must read the persisted state');
+  /* ROUND AY item 4 re-anchored this probe: the DOM-clone path (`pixelRatio: pngScale`,
+     `const pad = pngPad`) was demolished with html-to-image. The BEHAVIOUR is unchanged — both
+     persisted prefs still drive the raster — but through the new seam: the scale goes to
+     `rasterise({scale: pngScale})` and the padding is applied to the scene bounds in `buildSvg`
+     (`pad: pngPad`). Assert the new wiring, not the deleted one. */
+  (app.includes('scale: pngScale') && app.includes('rasterise(svg'))
+    && (app.includes('pad: pngPad') || app.includes('const pad = pngPad')),
+  'the two hard-coded values (scale 2, pad 48) must read the persisted state');
 
 {
   // blank comment before the probe

@@ -31,6 +31,18 @@ const {chromium} = require_('playwright-core');
 
 const APP = process.env.AY_APP_URL || 'http://localhost:5200/';
 const OUT = join(REPO, 'checks', 'fixtures', 'round-ay-png-before');
+
+/* THIS IS A CAPTURE DRIVER, NOT AN ASSERTION HARNESS — it launches Chromium against a live
+ * dev server and OVERWRITES the committed "before" baselines. Running it as part of a plain
+ * `for f in checks/*.mjs` sweep silently replaced the item-4 baseline PNGs with captures of the
+ * CURRENT code, which would make the pixel gate circular (measured: the sweep rewrote 278 KB
+ * baselines to 203 KB captures from different probe boards). It therefore no-ops unless the
+ * caller asks for it explicitly:  AY_CAPTURE=1 node checks/round-ay-png-capture.mjs          */
+if (process.env.AY_CAPTURE !== '1') {
+  console.log('round-ay-png-capture: SKIP (capture driver — set AY_CAPTURE=1 to regenerate the before-baselines)');
+  process.exit(0);
+}
+
 mkdirSync(OUT, {recursive: true});
 
 /* ---- the probe board: the standard repro set (icon + tint + edge + label
