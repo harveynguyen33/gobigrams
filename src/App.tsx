@@ -4359,6 +4359,67 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
        rasterise even where its element survives (e.g. an EdgeLabelRenderer
        portal row kept for label parity). */
     target.querySelectorAll('.selected').forEach(el2 => el2.classList.remove('selected'));
+    /* ROUND AV, DEFECT-2 (PNG fill) — the shape frames carry
+       fill="transparent" fill-opacity="0.09" (src/shapes.tsx
+       shapeFrameMarkup). The card describes this as a color-mix resolution
+       failure; MEASURED here it is simpler and nastier: html-to-image
+       rasterises `fill="transparent"` as FULLY transparent and drops the
+       separate fill-opacity — an isolated <rect fill="transparent"
+       fill-opacity="0.09"> over #f7f7f8 rasterises bg-plain (247,247,248),
+       while the same rect with fill="rgba(accent, 0.09)" rasterises the
+       correct tint (225,234,238). Fix: fold the pair into ONE concrete paint.
+       The themed clone is IN the document (2 rAF), so its computed style
+       carries the resolved accent — read each frame primitive's computed
+       stroke/fill and, when fill-opacity < 1, rewrite fill as
+       rgba(r,g,b,opacity) inline. Inline beats the attribute in
+       html-to-image's serialisation, so the raster shows exactly the canvas
+       tint. Engine-independent: no transparent-fill + opacity pair survives.
+       (Live canvas truth: computed fill reports rgba(0,0,0,0) because Chrome
+       resolves `transparent` at computed-value time — the ACCENT comes from
+       the sibling stroke, so the tint is derived from stroke when the fill
+       has no chroma.) */
+    target.querySelectorAll<SVGElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon').forEach(elm => {
+      const cs = getComputedStyle(elm);
+      const op = parseFloat(cs.fillOpacity || '1');
+      const stroke = cs.stroke || '';
+      if (!(op > 0 && op < 1)) return;
+      /* derive the accent: the frame paints stroke=<accent> and the fill is
+         achromatic (transparent) — the canvas tint IS accent × opacity */
+      const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(stroke);
+      if (!m) return;
+      elm.style.setProperty('fill', `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${op})`);
+      elm.style.setProperty('fill-opacity', '1');
+    });
+    /* ROUND AV (operator addition) — the ICON ink must not depend on
+       inherited CSS either. The icons are lucide svgs painting
+       stroke="currentColor"; on engines whose detached-clone computed style
+       loses the `.node-ico { color: var(--nc) }` chain (the AU-1 class), the
+       glyph paints nothing. Walk every icon svg: give it explicit
+       width/height/overflow (a dimension-less detached svg clips itself —
+       measured 17px on canvas), resolve its ink ONCE from the live computed
+       style, and write stroke/stroke-width/fill explicitly onto every child
+       primitive. After this pass no icon pixel depends on var(),
+       currentColor, or color-mix. */
+    target.querySelectorAll<SVGSVGElement>('.node-ico svg').forEach(svg => {
+      svg.setAttribute('width', '17');
+      svg.setAttribute('height', '17');
+      svg.style.width = '17px';
+      svg.style.height = '17px';
+      svg.style.overflow = 'visible';
+      const cs = getComputedStyle(svg);
+      const ink = (cs.stroke && cs.stroke !== 'none' && !cs.stroke.includes('var(') && cs.stroke !== 'currentColor')
+        ? cs.stroke
+        : cs.color;
+      const sw = parseFloat(cs.strokeWidth) || 2;
+      const fill = (cs.fill && cs.fill !== 'none' && !cs.fill.includes('var(')) ? cs.fill : 'none';
+      svg.querySelectorAll<SVGElement>('path, circle, ellipse, rect, polyline, line, polygon').forEach(kid => {
+        kid.setAttribute('stroke', ink);
+        kid.setAttribute('stroke-width', String(sw));
+        kid.setAttribute('fill', fill);
+        kid.setAttribute('stroke-linecap', 'round');
+        kid.setAttribute('stroke-linejoin', 'round');
+      });
+    });
     try {
       await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
       const dataUrl = await Promise.race([
