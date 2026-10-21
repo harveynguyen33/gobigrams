@@ -62,6 +62,16 @@ export type TextRect = {
    *  table columns / group title);
    *  a row without an entry keeps the exporter's legacy fixed metrics. */
   rows?: Partial<Record<'kicker' | 'sub' | 'metric' | 'tcol' | 'groupTitle', RowFont>>;
+  /** ROUND AX (t_17334591) — MEASURED per-row geometry, node-relative px.
+   *  `runs[row].x` is the TEXT RUN's own left edge (past the icon + gap on
+   *  the title row — the canvas's flex layout), NOT the row container's:
+   *  emitting the container x painted the 17px glyph over the word. When a
+   *  run x is absent the row keeps the container x (icon-less rows). */
+  runs?: Partial<Record<'kicker' | 'title' | 'sub' | 'metric', {x: number}>>;
+  /** ROUND AX — measured row-rect tops + the ascent of that row's font, so
+   *  each baseline is `top + ascent` (the canvas row model) instead of the
+   *  legacy fixed row pitch that drifts on every node whose rows differ. */
+  baselineTops?: Partial<Record<'kicker' | 'title' | 'sub' | 'metric', {top: number; ascent: number}>>;
 };
 
 /** Injected measurements. `nodeEl`/`edgeEl` are the themed clone's live
@@ -257,6 +267,64 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
       if (tcolEl) rows.tcol = rowFont(tcolEl);
       const groupTitleEl = el.querySelector('.group-label');
       if (groupTitleEl) rows.groupTitle = rowFont(groupTitleEl);
+      /* ROUND AX (t_17334591) — the MEASURED text-run x per row. The title
+         row is `.node-title` (flex): icon first, then the text span — the
+         ROW's box left edge is the icon's, not the text's. A Range over the
+         title's own text node gives the text run's client rect; converted
+         node-relative here so the emitter can start the glyphs PAST the icon
+         (iconX + iconW + gap, measured — never assumed). Rows without a
+         dedicated text element (kicker/sub/metric) are their own run: their
+         box left edge IS the text's left edge. */
+      const runXOf = (rowEl: Element | null): number | undefined => {
+        try {
+          if (!rowEl) return undefined;
+          const textNode = [...rowEl.childNodes].find(
+            (c): c is Text => c.nodeType === Node.TEXT_NODE && !!(c.textContent ?? '').trim());
+          const r = document.createRange();
+          if (textNode) {
+            r.selectNodeContents(textNode);
+            const rects = r.getClientRects();
+            const first = rects.length ? rects[0] : null;
+            if (first && first.width > 0) return first.left - el.getBoundingClientRect().left;
+          }
+          return rowEl.getBoundingClientRect().left - el.getBoundingClientRect().left;
+        } catch { return undefined; }
+      };
+      const runs: TextRect['runs'] = {
+        kicker: kickEl ? {x: runXOf(kickEl)} : undefined,
+        title: titleEl ? {x: runXOf(titleEl)} : undefined,
+        sub: subEl ? {x: runXOf(subEl)} : undefined,
+        metric: metricEl ? {x: runXOf(metricEl)} : undefined,
+      };
+      /* ROUND AX — the MEASURED row tops + each row-font's ascent: the canvas
+         stacks rows at their own rect tops (pitch 17 then 23 on the defect
+         card's node — NOT a fixed pitch). `top` is the row rect's top edge
+         node-relative; `ascent` is the font's ascent read off the SAME
+         element the baseline hangs from (fontBoundingBoxAscent of the row's
+         computed font, sized by that row's font-size — not the title's). */
+      const ascentOf = (font: RowFont | undefined): number => {
+        try {
+          const c = document.createElement('canvas').getContext('2d');
+          if (!c) return 0;
+          const size = font?.size ?? 14.5;
+          const weight = font?.weight ?? 650;
+          const family = font?.family || getComputedStyle(document.body).fontFamily || 'sans-serif';
+          c.font = `${weight} ${size}px ${family}`;
+          const m = c.measureText('Mg');
+          return m.fontBoundingBoxAscent || m.actualBoundingBoxAscent || size * 0.78;
+        } catch { return 0; }
+      };
+      const topOf = (rowEl: Element | null): number | undefined => {
+        try {
+          if (!rowEl) return undefined;
+          return rowEl.getBoundingClientRect().top - el.getBoundingClientRect().top;
+        } catch { return undefined; }
+      };
+      const baselineTops: TextRect['baselineTops'] = {};
+      if (kickEl) { const top = topOf(kickEl); if (top !== undefined) baselineTops.kicker = {top, ascent: ascentOf(rows.kicker)}; }
+      if (titleEl) { const top = topOf(titleEl); if (top !== undefined) baselineTops.title = {top, ascent: ascentOf(rowFont(titleEl))}; }
+      if (subEl) { const top = topOf(subEl); if (top !== undefined) baselineTops.sub = {top, ascent: ascentOf(rows.sub)}; }
+      if (metricEl) { const top = topOf(metricEl); if (top !== undefined) baselineTops.metric = {top, ascent: ascentOf(rows.metric)}; }
       if (titleEl) {
         const cs = getComputedStyle(titleEl);
         size = parseFloat(cs.fontSize) || size;
@@ -278,7 +346,7 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
          styles through `.note-node`) applies, visibly. */
       return {...box, size, weight, fill, anchor: 'start', titleW, spacing,
         family: titleEl ? rowFont(titleEl)?.family : undefined,
-        kind: isNote && titleEl ? 'note' : undefined, rows};
+        kind: isNote && titleEl ? 'note' : undefined, rows, runs, baselineTops};
     },
     /* ROUND AV — the node's icon glyph: the second svg per node (the lucide
        glyph inside `.node-ico`). Geometry is read node-relative (the same
@@ -539,8 +607,25 @@ function nodeText(
   const d = (n.data ?? {}) as Record<string, unknown>;
   const title = String(d.title ?? d.label ?? n.id);
   const lines: string[] = [];
-  let y = t.y + Math.min(t.size, t.h > 60 ? 16 : t.h * 0.3) + 4;
-  const x = t.x;
+  /* ROUND AX (t_17334591) — the measured ROW MODEL when the measurer found
+     one, the legacy stack only for measurers that cannot supply it (the
+     stubs). Baseline = measured row top + that row's measured ascent; x =
+     that row's measured TEXT RUN x (past the icon on the title row). */
+  const titleTop = t.baselineTops?.title;
+  const yTitleStart = titleTop
+    ? titleTop.top + titleTop.ascent
+    : t.y + Math.min(t.size, t.h > 60 ? 16 : t.h * 0.3) + 4;
+  const xRow = t.x;
+  /* the title's own run x when measured (icon before it → run x > row x);
+     kicker/sub/metric carry no icon so their run x IS the row x — but read
+     it from the measurement when present, per the card's "same check". */
+  const runOf = (row: 'kicker' | 'title' | 'sub' | 'metric'): number =>
+    t.runs?.[row]?.x ?? xRow;
+  const topOf = (row: 'kicker' | 'sub' | 'metric', legacyOffset: number): number => {
+    const bt = t.baselineTops?.[row];
+    return bt ? bt.top + bt.ascent : yTitleStart + legacyOffset;
+  };
+  let y = yTitleStart;
   const hasSub = d.sub && typeof d.sub === 'string';
   const hasMetric = d.metric && typeof d.metric === 'string';
   const hasKicker = d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
@@ -554,12 +639,17 @@ function nodeText(
   const titleFamily = t.family || '';
 
   if (hasKicker) {
-    lines.push(textLine(x, y, String(d.kicker).toUpperCase(), {
+    /* ROUND AX — the kicker sits ABOVE the title: measured top+ascent, or
+       one legacy line above the title's first baseline. */
+    const yKick = t.baselineTops?.kicker
+      ? t.baselineTops.kicker.top + t.baselineTops.kicker.ascent
+      : yTitleStart - 15;
+    lines.push(textLine(runOf('kicker'), yKick, String(d.kicker).toUpperCase(), {
       size: kickerFont?.size ?? 9.5, weight: kickerFont?.weight ?? 500,
       fill: t.fill || dim, spacing: String(kickerFont?.spacing ?? 1.1),
       family: kickerFont?.family,
     }));
-    y += 15;
+    y = Math.max(y, yKick + 15);
   }
 
   /* wrap the title into the TITLE's content width when the measurer found a
@@ -586,7 +676,7 @@ function nodeText(
 
   const titleBottomY = y + (wrapped.length - 1) * lineHeight;
   wrapped.forEach((ln, i) => {
-    lines.push(textLine(x, y + i * lineHeight, ln, {
+    lines.push(textLine(runOf('title'), y + i * lineHeight, ln, {
       size: t.size, weight: t.weight, fill: t.fill || fg, family: titleFamily,
       /* AR-11 — the title's computed letter-spacing rides the emitted rows:
          the wrap measured WITH it, so the file paints with it too. */
@@ -596,15 +686,17 @@ function nodeText(
   y = titleBottomY;
 
   if (hasSub) {
-    y += lineHeight;
-    lines.push(textLine(x, y, String(d.sub), {
+    /* ROUND AX — measured sub-row baseline; the legacy `+lineHeight` step
+       otherwise (the sub hangs one title line below the title's last). */
+    y = topOf('sub', lineHeight);
+    lines.push(textLine(runOf('sub'), y, String(d.sub), {
       size: subFont?.size ?? 11.5, weight: subFont?.weight ?? 450,
       fill: dim, family: subFont?.family,
     }));
   }
   if (hasMetric) {
-    y += 20;
-    lines.push(textLine(x, y, String(d.metric) + (d.metricUnit ? ` ${d.metricUnit}` : ''), {
+    y = topOf('metric', hasSub ? 20 : lineHeight + 20);
+    lines.push(textLine(runOf('metric'), y, String(d.metric) + (d.metricUnit ? ` ${d.metricUnit}` : ''), {
       size: metricFont?.size ?? 20, weight: metricFont?.weight ?? 700,
       fill: accent, family: metricFont?.family,
     }));

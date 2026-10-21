@@ -488,6 +488,115 @@ assert('D3-edge-follows-child', isFinite(wantIntoTextX) && Math.abs(intoGrp.x - 
   `'into group' text at (${intoGrp.x?.toFixed(1)},${intoGrp.y?.toFixed(1)}) vs plate on midpoint to ABSOLUTE child centre (${wantInto?.x.toFixed(1)},${wantInto?.y.toFixed(1)}) → text (${wantIntoTextX?.toFixed(1)},${wantIntoTextY?.toFixed(1)})`);
 
 
+/* ==================================================== ROUND AX (t_17334591) =
+   DEFECT 1 — the title text must start PAST the icon, and every baseline must
+   come from the measured row model. DOM-free, stub measurer, output geometry.
+
+   A stub measurer that reports an ICON at the title row's own left edge
+   (iconX == textX, the canvas's layout: the icon sits at the row start, the
+   text run begins after icon + gap) is exactly Harvey's repro: the emitted
+   title <text> must NOT share the icon's x. Rows measured with a `runs`
+   array carry the text run's own left edge per row, and the emitter must use
+   IT (not the row-container x) when one exists — with measured baselineTops
+   so the baselines land where the canvas rows sit. */
+const AX_MEASURER = {
+  /* The row model: title row top 62.14 with the icon 17px wide + a 7px gap
+     (the CSS `gap: 7px`) before the text; kicker top 45.14, sub top 85.14 —
+     the LIVE numbers from the defect card. */
+  text() {
+    return {
+      x: 11.390625, y: 45.140625, w: 158, h: 66, size: 14.5, weight: 650,
+      fill: '#17171b', anchor: 'start',
+      rows: {
+        kicker: {family: 'mono-test', size: 11, weight: 500, spacing: 1.21},
+        sub: {family: 'mono-test', size: 12, weight: 400, spacing: 0},
+      },
+      /* measured per-row text-run left edges (px, node-relative) + row tops */
+      runs: {
+        kicker: {x: 11.390625},
+        title: {x: 35.390625},
+        sub: {x: 11.390625},
+      },
+      /* measured row-rect tops + the ascent of that row's own font — the
+         baseline of each emitted <text> must be top + ascent (±1px) */
+      baselineTops: {
+        kicker: {top: 45.140625, ascent: 8},
+        title: {top: 62.140625, ascent: 11},
+        sub: {top: 85.140625, ascent: 9},
+      },
+    };
+  },
+  icon() {
+    return {
+      x: 11.390625, y: 62.140625, w: 17, h: 17, viewBox: '0 0 24 24',
+      primitives: [{tag: 'path', attrs: {d: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z'}}],
+      stroke: '#8b7cf6', strokeWidth: 2, fill: 'none',
+    };
+  },
+  edgePath() { return null; },
+};
+const axNode = node('n-axicon', 0, 0,
+  {shape: 'database', kicker: 'database', title: 'Database', sub: 'primary', colorKey: 'violet'},
+  {measured: {width: 190, height: 129}});
+const axSvg = exportSvg({nodes: [axNode], edges: [], theme: 'light', tokens: LIGHT, measurer: AX_MEASURER, pad: 24});
+const axBlock = nodeBlock(axSvg, 'n-axicon') ?? '';
+
+/* AX1 — HARNESS (the card's required row): with an icon before the title, the
+   title text's x is STRICTLY greater than the icon's x + the icon width. */
+const axTitleText = (() => {
+  for (const m of axBlock.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
+    if (m[2] !== 'Database') continue;
+    const x = /(?:^| )x="(-?[\d.]+)"/.exec(m[1]);
+    if (x) return {x: parseFloat(x[1]), attrs: m[1]};
+  }
+  return null;
+})();
+const axIcon = /<svg x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" viewBox="0 0 24 24"/.exec(axBlock);
+const axTitleOk = !!axTitleText && !!axIcon &&
+  axTitleText.x > parseFloat(axIcon[1]) + parseFloat(axIcon[3]) - 1e-6;
+assert('AX1-title-x-past-icon', axTitleOk,
+  axTitleText && axIcon
+    ? `title text x=${axTitleText.x} vs icon x+w=${parseFloat(axIcon[1]) + parseFloat(axIcon[3])} (icon ${axIcon[3]}px wide at x=${axIcon[1]})`
+    : `title <text> or icon <svg> missing from the emitted node block`);
+
+/* AX2 — the kicker and sub rows, which have NO icon, keep the row-container x
+   (the measured run x for an icon-less row IS the row x — 11.390625 here). */
+const axKicker = /<text x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="11"[^>]*>DATABASE<\/text>/.exec(axBlock);
+const axSub = /<text x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="12"[^>]*>primary<\/text>/.exec(axBlock);
+assert('AX2-iconless-rows-keep-row-x',
+  !!axKicker && Math.abs(parseFloat(axKicker[1]) - 11.390625) <= 0.01 &&
+  !!axSub && Math.abs(parseFloat(axSub[1]) - 11.390625) <= 0.01,
+  `kicker x=${axKicker?.[1]}, sub x=${axSub?.[1]} (row x 11.390625 — no icon precedes either row)`);
+
+/* AX3 — BASELINES come from the measured row tops + ascent, not the fixed
+   pitch: title baseline = top 62.140625 + ascent 11 = 73.14; sub = 85.14 + 9
+   = 94.14; kicker (no measured top → the block top + its own ascent path
+   unchanged in this round, but its y must equal block-top y + its ascent). */
+const axTitleY = (() => {
+  for (const m of axBlock.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
+    if (m[2] !== 'Database') continue;
+    const y = /(?:^| )y="(-?[\d.]+)"/.exec(m[1]);
+    if (y) return parseFloat(y[1]);
+  }
+  return NaN;
+})();
+const axTitleWant = 62.140625 + 11;
+assert('AX3-title-baseline-from-row-model', Math.abs(axTitleY - axTitleWant) <= 1,
+  `title baseline y=${axTitleY.toFixed(2)} vs measured top 62.14 + ascent 11 = ${axTitleWant.toFixed(2)} (±1px)`);
+const axSubY = axSub ? parseFloat(axSub[2]) : NaN;
+const axSubWant = 85.140625 + 9;
+assert('AX3b-sub-baseline-from-row-model', Math.abs(axSubY - axSubWant) <= 1,
+  `sub baseline y=${axSubY.toFixed(2)} vs measured top 85.14 + ascent 9 = ${axSubWant.toFixed(2)} (±1px)`);
+
+/* AX4 — the stub path WITHOUT runs/icon (legacy measurers) must still export:
+   the emitter falls back to the row-container x and the legacy stack, so the
+   old A3 title emission holds on the plain STUB fixtures. Guarded above by
+   the whole existing suite; this row pins the icon-less title x explicitly. */
+const plainBlock = nodeBlock(svg, 'n-rect') ?? '';
+const plainTitle = /<text x="14"[^>]*font-size="14\.5"[^>]*font-weight="650"[^>]*>Node rect<\/text>/.exec(plainBlock);
+assert('AX4-legacy-stub-unchanged', !!plainTitle,
+  `plain-stub title keeps the stub text box x=14 — no icon, no runs in that measurer`);
+
 /* ------------------------------------------------------------------ end -- */
 
 const fails = results.filter(r => !r.pass);
