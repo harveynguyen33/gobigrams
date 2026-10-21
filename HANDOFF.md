@@ -1,5 +1,69 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-21 19:xx — ROUND BA — inline SVG paint on the PNG clone + 1.11.11 pin (card t_a272757e), LOCAL ONLY
+
+**Tree:** `main`, HEAD `b6d4a85`, clean except the pre-existing uncommitted `.gitignore`
+(research/ ignore — belongs to the architect's untracked research tree, NOT mine to commit).
+One commit. NOT pushed (card rule).
+
+**What landed (b6d4a85):** `buildPng` (src/App.tsx) now walks EVERY `<svg>` in the themed
+clone before `toPng` and writes the computed paint as explicit presentation attributes
+(stroke, fill, stroke-width, stroke-dasharray, stroke-linecap, stroke-linejoin, opacity,
+fill-opacity, stroke-opacity, color, marker-end, marker-start; `<text>` also font-family/
+font-size/font-weight/letter-spacing). currentColor resolves to the element's computed
+color; none/empty computed values are skipped so existing attributes survive. Values are
+read off the ATTACHED themed clone (mountThemed keeps it in-document with the export
+theme applied), with the live viewport's path-matched svg as a fallback source. AU-1
+chrome sanitiser and the ROUND AV icon/fill passes untouched (additive).
+`package.json`: html-to-image `^1.11.13` → `1.11.11` exact.
+
+**Harness:** `checks/round-ba-svg-inline-paint.mjs` — 10 source-contract assertions.
+RED proven on a byte-identical copy of 92f8660's App.tsx (BA1–BA4 fail, exit 1); GREEN
+on the fix tree (10/10). Full sweep: 55/55 checks/*.mjs green on the fix tree.
+
+**PIN DECISION — 1.11.11, measured:** React Flow's docs pin 1.11.11 and say versions
+after it "are not exporting images properly" (upstream issue #516; verified live on
+reactflow.dev/examples/misc/download-image). Source diff of the two tarballs: 1.11.13 is
+the tree that (1) added the SVG early-return in `cloneChildren` (svg subtrees are
+deep-cloned WITHOUT decorate()/cloneCSSStyle() — the mechanism this card fixes around),
+(2) replaced `toArray(sourceStyle)` with the getStyleProperties list that omits
+`overflow` and floors font sizes (`Math.floor(px) - 0.1`), (3) restricted iframe option
+plumbing. Pixel probe with the paint walk in place is byte-equal between the versions
+(numbers below), so the pin costs nothing measured and removes the only tree carrying
+the regression. Gates re-run ON 1.11.11: tsc 0, build 0, `client_js_bytes` 885,975
+(ceiling 900,000 — NO raise needed), goblin-verify 22 PASS / 0 FAIL, 55/55 harnesses.
+
+**LIVE PROBE (Harvey's board copied to probe `mvi4r4tif5872725` via /api/boards POST +
+file copy with id rewritten; exported 2x light+dark through the REAL Export modal;
+probe file + board removed after; `boards/` back to Harvey's files only; NEVER called
+DELETE /api/boards):**
+
+| metric (±40/channel) | light before→after | dark before→after |
+|---|---|---|
+| (a) violet tint px | 693 → 693 | 4821 → 4821 |
+| (a) cyan tint px | 0 → 0 | 2508 → 2508 |
+| (a) green tint px | 0 → 0 | 3286 → 3286 |
+| (b) edge slate px | 4199 → 4441 (+5.8%) | **3794 → 5583 (+47%)** |
+| (c) icon glyph px (violet box) | 23 → 23 | 123 → 123 |
+| (d) selection blue #3b82f6 | 0 → 0 | 0 → 0 |
+
+**HONEST READING (the card asks for this explicitly):** on THIS machine (Chromium via
+playwright-core 1.62.1, headless), (a), (c) and (d) were ALREADY CORRECT before this
+card — the ROUND AV icon pass already inlined the icon ink, the AV fill pass already
+folded the transparent frame fill, and AU-1 already stripped the chrome. What reproduced
+here is (b): the connector's rasterised pixel mass grew 47% in dark / 5.8% in light —
+the edge svg subtree (stroke var + marker refs) is the live instance of the
+no-svg-decoration class of failure; the walk inlines its stroke/dash/markers explicitly.
+The light-theme (a)=0 rows are expected: light-theme tint sits inside ±40 of a
+near-white mix, outside the band of the pure accent token — the dark numbers are the
+tint's real signal. The 13.9px font floor did NOT manifest in an exported pixel
+difference here (title text is painted by the HTML-side clone, where cloneCSSStyle's
+`cssText` branch runs, not the property-list branch); the floor is real in the 1.11.13
+source (clone-node.js:172) and is absent-from-effect, not fixed, in this round.
+
+**Follow-ups (new cards, not this one):** B = outline-text, C = font embedding/PDF,
+per the study. The `.gitignore` research/ line is the architect's to land.
+
 ## ▶ 2026-10-21 03:05 — ORCHESTRATOR VERIFICATION of ROUND AR-2 (independent of the worker's report)
 
 **Verdict: the two fidelity gaps are FIXED, measured live, and pushed.** The worker's own block follows below; this
