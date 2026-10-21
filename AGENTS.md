@@ -24,7 +24,16 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 831522
+ratchet.ceiling: 880354
+# RAISED 2026-10-21, Harvey-approved in session, measured not guessed: 831522 -> 880354.
+# Reason: ROUND AR replaced the SVG export's HTML-in-foreignObject clone with a real vector
+# serializer (src/exportSvg.ts + the per-row measured font path + the note-node measurer),
+# ROUND AS added the Mermaid round-trip contract, the import-history guard, the boards
+# PUT/bak contract and the explicit canAutosave gate, and ROUND AT added browser-local
+# storage (localStore.ts + the boot probe + the storage-mode UI). Measured at HEAD 338a786:
+# 880,354 bytes. Part of this raise pays a pre-existing debt: the ceiling was already
+# exceeded BEFORE this work (859,044 at 26baec6) and no gate was enforcing it.
+# A further raise must be recorded here the same way, with its own measured number.
 runtime_data: [.gob/state.json]
 layers:
 replay.env: GOBLIN_PRE_COMMIT
