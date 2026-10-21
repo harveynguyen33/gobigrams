@@ -311,11 +311,27 @@ function boardsApi(): Plugin {
             return send(200, out);
           }
 
-          // DELETE /api/boards/:id
+          // DELETE /api/boards/:id — AS-7: ARCHIVE, never unlink. This endpoint
+          // is unauthenticated and un-merged: the incident of 2026-10-21 (a
+          // worker's probe sweep deleted the live board; only the one-.bak
+          // generation saved it) showed any caller that sweeps the board list
+          // can destroy a real board. The file is RENAMED to
+          // `<id>.deleted-<UTC-stamp>.json` instead, so every delete leaves a
+          // recoverable artefact and no code path here removes bytes. The
+          // archive stays until a human (or an explicit purge step,
+          // scripts/purge-deleted-boards.mjs — dry-run by default) removes
+          // archives older than a stated age. Nothing is ever deleted
+          // automatically.
           if (method === 'DELETE') {
             if (!fs.existsSync(file)) return send(404, {error: 'not found'});
-            fs.unlinkSync(file);
-            return send(200, {ok: true});
+            const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+            const archive = path.join(BOARDS_DIR, `${id}.deleted-${stamp}.json`);
+            try {
+              fs.renameSync(file, archive);
+            } catch (e: any) {
+              return send(500, {error: String(e)});
+            }
+            return send(200, {ok: true, archived: path.basename(archive)});
           }
 
           return send(405, {error: 'method not allowed'});

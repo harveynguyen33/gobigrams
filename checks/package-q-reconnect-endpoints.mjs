@@ -586,6 +586,10 @@ ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
    (boards PUT 404 gate + configurePreviewServer parity) and by AS-6 on
    2026-10-20 (board .bak generation) — this comment moves the harness's mtime
    past the config's; no assertion semantics change. */
+/* ROUND AS-7 re-anchor: vite.config.ts legitimately edited by AS-7 on
+   2026-10-21 (DELETE archives instead of unlinking, incident-driven) — this
+   comment again moves the harness's mtime past the config's; no assertion
+   semantics change. */
 const selfMtime = statSync(new URL(import.meta.url)).mtimeMs;
 for (const rel of ['src/TableNode.tsx', 'vite.config.ts', 'src/Tour.tsx']) {
   const m = statSync(`${ROOT}/${rel}`).mtimeMs;
