@@ -101,6 +101,11 @@ export function asShape(v: unknown): Shape {
   return typeof v === 'string' && (SHAPE_IDS as string[]).includes(v) ? (v as Shape) : 'service';
 }
 
+/* ROUND AG (recorded, unchanged — round-ag-colors ag15 reads this declaration
+   verbatim): the 9% mix as a presentation VALUE. It cannot ride a fill
+   ATTRIBUTE (var() is invalid there), which is exactly how the canvas ended
+   up with fill="transparent" — see shapeFrameMarkup below for where it
+   actually paints from now on. */
 const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent)';
 
 /* ROUND AR, AR-1 — THE SHAPE GEOMETRY, AS DATA.
@@ -117,13 +122,20 @@ const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent
  * `plainCylinder` flag does. */
 
 type FramePaint = {
-  fill: string; stroke: string; strokeWidth?: number;
+  fill?: string; stroke: string; strokeWidth?: number;
   fillOpacity?: string; dash?: string; plain?: boolean;
+  /* ROUND AW — the CANVAS tint as ONE inline style: `fill:var(--nc)`.
+     var() is valid in a style attribute, never in a presentation attribute, so the
+     canvas paint can only live here. The 9% alpha rides the unconditional
+     fill-opacity attribute (buildPng's opacity-keyed resolution pass still reads
+     it). OPTIONAL: the exporter's call sites keep passing literal fill +
+     fill-opacity attributes and compile unchanged. */
+  fillStyle?: string;
 };
 
 function frameMarkup(shape: Shape, p: FramePaint): string {
   const sw = p.strokeWidth ?? 1.5;
-  const a = `fill="${p.fill}"${p.fillOpacity ? ` fill-opacity="${p.fillOpacity}"` : ''} stroke="${p.stroke}" stroke-width="${sw}" stroke-linejoin="round"`;
+  const a = `${p.fill ? `fill="${p.fill}"` : ''}${p.fillOpacity ? ` fill-opacity="${p.fillOpacity}"` : ''}${p.fillStyle ? ` style="${p.fillStyle}"` : ''} stroke="${p.stroke}" stroke-width="${sw}" stroke-linejoin="round"`;
   const line = `fill="none" stroke="${p.stroke}" stroke-width="${sw}"`;
   const accent = p.stroke;
   switch (shape) {
@@ -210,12 +222,22 @@ export function shapeFrameSvg(shape: Shape, paint: FramePaint): string {
 }
 
 /** The live render path: the SAME table, wrapped in the frame svg the canvas
- *  has always mounted. `nc` is the resolved `--nc` colour; `plain` matches the
- *  `plainCylinder` flag's semantics (undefined = plain, per AQ10). */
+ *  always mounted. `nc` is the resolved `--nc` colour; `plain` matches the
+ *  `plainCylinder` flag's semantics (undefined = plain, per AQ10).
+ *  ROUND AW (Harvey, decision A 2026-10-21) — the canvas must PAINT the tint.
+ *  It used to pass fill:'transparent' + fillOpacity:'0.09', so every frame
+ *  primitive carried fill="transparent" fill-opacity="0.09": opacity ×
+ *  transparent = transparent, and the orphan 0.09 never painted. The fill is
+ *  a real `--nc` at 9% now, via an inline STYLE — the one place var() is
+ *  valid. It stays a separate fill-opacity (NOT a color-mix alpha) so
+ *  buildPng's opacity-keyed resolution pass (ROUND AV defect-2) still reads
+ *  computed fillOpacity 0.09 and rewrites the clone's fill as rgba. */
 export function shapeFrameMarkup(shape: Shape, nc: string, plain: boolean): string {
   return frameMarkup(shape, {
-    fill: 'transparent', stroke: nc,
-    fillOpacity: '0.09', plain,
+    stroke: nc,
+    fillOpacity: '0.09',
+    fillStyle: `fill:${nc}`,
+    plain,
   });
 }
 
