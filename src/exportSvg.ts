@@ -24,6 +24,7 @@ import {resolveColor} from './colors';
 import {asShape, shapeFrameSvg} from './shapes';
 import {EXPORT_TOKENS} from './theme';
 import {labelAnchor, type LabelPos} from './edgeLabel';
+import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
 
 /** One measured text ROW's font — read off that row's own live element.
  *  AR-11: the canvas sets a DIFFERENT family per row (`.node-title` →
@@ -807,259 +808,172 @@ function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; 
 
 /* -------------------------------------------------------------------- main */
 
+/** ROUND AY — the LEGACY compose shim: buildScene (sync, stub path) +
+ *  emitSvg. Kept so the 10+ harnesses that import `exportSvg(input)` keep
+ *  compiling and byte-acting. The APP path (App.tsx buildSvg) uses the async
+ *  buildScene + the bounds pass + emitSvg directly (item 2). */
 export function exportSvg(input: ExportInput): string {
-  const pad = input.pad ?? 24;
-  const tokens = input.tokens;
-  const measurer = input.measurer;
-  const nodes = input.nodes.filter(n => n && typeof n.id === 'string');
-  const byId = new Map(nodes.map(n => [n.id, n]));
-  const edges = input.edges.filter(e => e && byId.has(e.source) && byId.has(e.target));
-  /* DEFECT-3 — every geometry use below consumes the ABSOLUTE position
-     (parentId chain resolved), never the stored relative `position`. */
-  const abs = new Map(nodes.map(n => [n.id, absPosition(n, byId)]));
-  /* DEFECT-2 — one width function for every wrap: the injected measurer when
-     it can really measure, the glyph-count estimator otherwise. AR-11: the
-     row family rides along so the wrap measures in the SAME family the
-     emitter writes to the file. */
-  const widthOf: (s: string, o: {size: number; weight: number; spacing?: number; family?: string}) => number =
-    measurer.measureText
-      ? (s, o) => measurer.measureText!(s, o)
-      : (s, o) => estimateTextWidth(s, o);
-  /* AR-11 — the family unmeasured rows (edge labels, table cells, group
-     titles, legacy textLine calls) inherit, supplied by the measurer; the
-     attribute is omitted entirely when it has none to give. */
-  const inheritFamily = measurer.defaultFamily?.() ?? '';
-  const ink = {
-    fg: tokens['--fg'] || '#e8e8ea',
-    dim: tokens['--dim'] || '#8a8a92',
-    surface: tokens['--surface'] || '#141417',
-    bg: tokens['--bg'] || '#0b0b0d',
-  };
+  const scene = exportSceneOf(input);
+  return emitSvg(scene, {tokens: input.tokens, inheritFamily: input.measurer.defaultFamily?.() ?? ''});
+}
 
-  /* content bounds → viewBox (same arithmetic as the PNG path); D3: absolute */
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const n of nodes) {
-    const s = nodeSize(n);
-    const p = abs.get(n.id)!;
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x + s.w);
-    maxY = Math.max(maxY, p.y + s.h);
-  }
-  if (!nodes.length) { minX = minY = 0; maxX = 800; maxY = 400; }
-  const w = Math.ceil(maxX - minX) + pad * 2;
-  const h = Math.ceil(maxY - minY) + pad * 2;
-  const off = {x: pad - minX, y: pad - minY};
+/** Alias kept for the App.tsx import name used mid-migration. */
+export const exportSvgOf = exportSvg;
 
-  /* Edge `d` coordinates are MODEL space in both paths (the DOM clone's
-     React Flow routes use flow coordinates = absolute model coordinates, and
-     the stub routes are computed from absolute positions). Labels derive from
-     the SAME coordinates — see `edgeLabelAnchor` below. */
-  const edgeParts: string[] = [`<g transform="translate(${off.x},${off.y})">`];
+/** Synchronous buildScene for the legacy compose: harness measurers are
+ *  DOM-free and deterministic (no fonts await needed). The legacy harnesses
+ *  bundle ONLY src/exportSvg.ts (their esbuild entry never imports
+ *  exportScene.ts), so the scene build must live HERE in that bundle —
+ *  delegate through the SAME body the app path uses by importing it
+ *  directly (a real import, not the runtime bridge: the bridge exists for
+ *  the app bundle where exportSvg is a re-export shim). */
+export function exportSceneOf(input: ExportInput): Scene {
+  return sceneSync(input);
+}
+
+
+/* ROUND AY items 2+3 — the emitter is a PURE function of (Scene, ctx) (D4):
+ * it never touches `document` and never re-reads the DOM or CSS. The Scene
+ * arrives fully resolved from `src/exportScene.ts` (absolute coords, literal
+ * colours, baked baselines, cache-served wrap); `ctx` carries the font seam
+ * (`fontEmbedCss` — empty until Harvey's fork decision) and the BOUNDS:
+ * either the bbox-derived bounds (spec §3, the live path) or the scene's
+ * own node-box arithmetic (the harness/stub path, `boundsSource: 'boxes'`). */
+export type EmitCtx = {
+  /** ROUND AY item 2 — the font-embedding seam (DECISION RESERVED FOR
+   *  HARVEY): when present, emitted verbatim inside <defs><style>. Empty
+   *  until the fork is decided; Route 1 would fill it with the subset
+   *  base64 WOFF2 @font-face CSS. */
+  fontEmbedCss?: string;
+  /** Bounds override from the getBBox pass (spec §3). When absent the
+   *  scene's own bounds are used ('boxes' source). */
+  bounds?: Bounds;
+  /** The scene's token map (for the informational <style> block — D3:
+   *  nothing painted depends on it). */
+  tokens?: Record<string, string>;
+  /** AR-11 — the family unmeasured rows inherit (from the measurer's
+   *  defaultFamily; the emitter itself never invents one). */
+  inheritFamily?: string;
+};
+
+/** The content group: groups (behind), edges, nodes — the canvas z-order —
+ *  WITHOUT the root svg / bg rect / token style. The bounds pass (spec §3)
+ *  mounts exactly this string to measure getBBox, so the measured group and
+ *  the painted group are THE SAME bytes. Returns the group markup plus the
+ *  collected marker defs (the AU-3 contract — the caller places <defs>
+ *  before the content in the root svg). */
+export function emitContent(scene: Scene): {content: string; markerDefs: string[]} {
+  const parts: string[] = [];
   const defs: string[] = [];
-  /* ROUND AU, DEFECT-3 — the arrowhead is the CANVAS's own marker contract,
-     not an invented shape. The canvas renders React Flow's built-in
-     `arrowclosed` marker (node_modules/@xyflow/react Marker + ArrowClosedSymbol):
+  emitContentInto(scene, parts, defs);
+  return {content: parts.join(''), markerDefs: defs};
+}
 
-       <marker markerWidth={w} markerHeight={h} viewBox="-10 -10 20 20"
-               markerUnits="strokeWidth" orient="auto-start-reverse"
-               refX="0" refY="0">
-         <polyline points="-5,-4 0,0 -5,4 -5,-4" (closed: fill = stroke = colour)
-                   stroke-linecap="round" stroke-linejoin="round"/>
-       </marker>
-
-     where w/h are the EDGE's own markerEnd.width/height (makeEdge/plainMarker
-     writes 14/14; sequence heads 18/12). The old emitter hard-coded a 7/7
-     viewBox-0-0-10-10 OPEN triangle at stroke-width 2 — half the canvas size
-     and a different shape. The mapping (recorded per the card): markerWidth/
-     markerHeight = the edge's markerEnd numbers verbatim, the same RF viewBox
-     and closed polyline, markerUnits left at strokeWidth so the consumer's
-     scaling matches the canvas exactly (canvas edge stroke-width 1.8 → the
-     path below carries the same 1.8), colour from the SAME resolveColor chain
-     the stroke uses. A bare-string markerEnd (or none) falls back to the
-     plainMarker default 14/14. */
+/** The bounds-pass variant: emits with a KNOWN offset (the final viewBox
+ *  arithmetic), collecting marker defs into `defs`. */
+export function emitContentInto(scene: Scene, parts: string[], defs: string[]): void {
+  const pad = scene.pad;
+  const b: Bounds = scene.bounds;
+  const off = {x: pad - b.minX, y: pad - b.minY};
+  const rowEl = (r: SceneTextRow): string => textLine(r.x, r.baselineY, r.content, {
+    size: r.size, weight: r.weight, fill: r.fill,
+    family: r.family, anchor: r.anchor,
+    spacing: r.spacing !== undefined ? String(r.spacing) : undefined,
+  });
+  /* groups first (behind everything) */
+  for (const g of scene.groups) {
+    const cb = (g as SceneNode & {childBounds?: Bounds}).childBounds
+      ?? {minX: g.absX, minY: g.absY, maxX: g.absX + g.w, maxY: g.absY + g.h};
+    const left = cb.minX + off.x - 12, top = cb.minY + off.y - 12;
+    const lw = (cb.maxX - cb.minX) + 24, lh = (cb.maxY - cb.minY) + 24;
+    parts.push(`<g data-ar-node="${escAttr(g.id)}" transform="translate(${left},${top})">`);
+    parts.push(`<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(g.accent)}" stroke-width="1.2" stroke-dasharray="8 5"/>`);
+    for (const r of g.rows) parts.push(rowEl(r));
+    parts.push('</g>');
+  }
+  /* edges */
+  parts.push(`<g transform="translate(${off.x},${off.y})">`);
   const markerId = (color: string, w: number, h: number): string => {
     const id = 'ar-mk-' + Math.abs(hashStr(`${color}|${w}x${h}`)).toString(36);
     if (!defs.some(d => d.includes(`id="${id}"`))) {
       defs.push(
         `<marker id="${id}" markerWidth="${w}" markerHeight="${h}" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse">` +
-        `<polyline points="-5,-4 0,0 -5,4 -5,-4" fill="${escAttr(color)}" stroke="${escAttr(color)}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker>`,
-      );
+        `<polyline points="-5,-4 0,0 -5,4 -5,-4" fill="${escAttr(color)}" stroke="${escAttr(color)}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker>`);
     }
     return id;
   };
-
-  /* groups / boundaries FIRST (behind everything), then edges, then nodes —
-     the canvas' own z-order. */
-  const isGroup = (n: ExportNode) => asShape(n.data?.shape) === 'group';
-  const groupParts: string[] = [];
-  for (const g of nodes.filter(isGroup)) {
-    const kids = nodes.filter(n => n.parentId === g.id && !isGroup(n));
-    let b = {minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity};
-    for (const k of kids) {
-      const s = nodeSize(k);
-      const p = abs.get(k.id)!; /* D3: child bounds in ABSOLUTE space */
-      b.minX = Math.min(b.minX, p.x); b.minY = Math.min(b.minY, p.y);
-      b.maxX = Math.max(b.maxX, p.x + s.w); b.maxY = Math.max(b.maxY, p.y + s.h);
-    }
-    if (!kids.length) { const s = nodeSize(g); const p = abs.get(g.id)!; b = {minX: p.x, minY: p.y, maxX: p.x + s.w, maxY: p.y + s.h}; }
-    /* model space here: the off group translate already carries `off` */
-    const left = b.minX + off.x - 12, top = b.minY + off.y - 12;
-    const lw = (b.maxX - b.minX) + 24, lh = (b.maxY - b.minY) + 24;
-    groupParts.push(
-      `<g data-ar-node="${escAttr(g.id)}" transform="translate(${left},${top})">`,
-    );
-    groupParts.push(
-      `<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(nodeColor(g, tokens))}" stroke-width="1.2" stroke-dasharray="8 5"/>`,
-    );
-    /* ROUND-AR-DEFECT-1 — the group title is a MEASURED row now: its font
-       comes off the clone's `.group-label` element (12px / 600 mono live),
-       not the legacy sans 10.5 / 550 defaults. `spacing` too when measured. */
-    const gt = input.measurer.text(g.el);
-    const title = String(g.data?.title ?? g.id);
-    const gtf = gt?.rows?.groupTitle;
-    groupParts.push(textLine(10, 14, title, {
-      size: gtf?.size ?? 10.5, weight: gtf?.weight ?? 550,
-      fill: gtf?.family ? (gt?.fill || ink.dim) : (gt?.fill || ink.dim),
-      family: gtf?.family,
-      spacing: gtf && gtf.spacing ? String(gtf.spacing) : '1',
-    }));
-    groupParts.push('</g>');
-  }
-
-  /* DEFECT-1 removed the clone→model `origin` shift: labels now derive from
-     the edge route's own flow-space endpoints, not from any clone-space rect. */
-
-  for (const e of edges) {
-    const s = byId.get(e.source)!;
-    const t = byId.get(e.target)!;
-    const color = resolveVar(resolveColor(e.data), tokens);
-    const route = (e.el ? input.measurer.edgePath(e.el) : null) ?? stubEdgePath(e, s, t, abs);
-    /* ROUND AU, DEFECT-3 — the marker numbers come from the edge's OWN
-       markerEnd (the same source the canvas reads), never a constant. */
-    const me = (typeof e.markerEnd === 'object' && e.markerEnd !== null ? e.markerEnd : {}) as {width?: unknown; height?: unknown};
-    const mw = typeof me.width === 'number' && isFinite(me.width) && me.width > 0 ? me.width : 14;
-    const mh = typeof me.height === 'number' && isFinite(me.height) && me.height > 0 ? me.height : 14;
-    const marker = markerId(color, mw, mh);
-    edgeParts.push(
-      `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="1.8" marker-end="url(#${marker})"/>`,
-    );
-    /* ROUND AR-2 — ONE label storage: the TOP-LEVEL `label`, the same field
-       the canvas paints (`GoblinEdge`'s `shown`), `onCommitLabel` writes and
-       `migrateEdge` folds legacy `data.label` onto. The exporter must never
-       read `data.label`: that storage is painted by NOTHING, so reading it
-       emitted labels the canvas never showed (measured live: `reads`
-       exported at 10.5/500 no-family while the canvas was bare). */
-    const label = e.label;
-    if (typeof label === 'string' && label) {
-      /* DEFECT-1: the label anchor is the app's own parity function
-         (`labelAnchor`), fed the edge's FLOW-space path endpoints — the same
-         expression GoblinEdge.tsx paints with, so export matches canvas.
-         `midX`/`midY` used to be a viewport-space bounding-rect centre (both
-         wrong space and wrong point on a diagonal). Degenerate ends ({0,0}
-         both — a path the clone could not measure) fall back to the stub's
-         geometric centre so the label never vanishes. */
-      const degenerate = route.start.x === 0 && route.start.y === 0 && route.end.x === 0 && route.end.y === 0;
-      const d = (e.data ?? {}) as Record<string, unknown>;
-      const L = degenerate
-        ? {x: (abs.get(s.id)!.x + abs.get(t.id)!.x + nodeSize(s).w - nodeSize(t).w) / 2,
-           y: (abs.get(s.id)!.y + abs.get(t.id)!.y + nodeSize(s).h - nodeSize(t).h) / 2}
-        : edgeLabelAnchor(route, d);
-      const mid = {x: L.x + off.x, y: L.y + off.y};
-      /* ROUND-AR-DEFECT-1 — the label row's MEASURED font (ui-monospace
-         11px / 600 live). Without `edgeLabelFont` (harness stubs, or a label
-         element the clone lost) the legacy metrics stay.
-         ROUND AR-2 — but NEVER naked: an unmeasured row falls back to the
-         row's TOKEN family ('mono' — `.edge-label` paints var(--mono))
-         carried explicitly on the <text>, so a missing element is visible
-         in the file instead of silently inheriting whatever the root got. */
-      const lf = measurer.edgeLabelFont?.(e.id)
-        ?? (measurer.defaultFamily ? {family: measurer.defaultFamily('mono'), size: 10.5, weight: 500, spacing: 0} : undefined);
-      const lw = Math.max(24, label.length * 6.6 + 12);
-      edgeParts.push(
-        `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(ink.surface)}" stroke="${escAttr(ink.dim)}" stroke-width="0.8"/>`,
-        textLine(mid.x - lw / 2 + 6, mid.y + 4, label, {
-          size: lf?.size ?? 10.5, weight: lf?.weight ?? 500, fill: ink.dim,
-          family: lf?.family, spacing: lf?.spacing ? String(lf.spacing) : undefined,
-        }),
-      );
-    }
-  }
-  edgeParts.push('</g>');
-
-  const nodeParts: string[] = [];
-  for (const n of nodes) {
-    if (isGroup(n)) continue;
-    const s = nodeSize(n);
-    const accent = nodeColor(n, tokens);
-    const type = n.type ?? (n.data?.columns ? 'table' : 'goblin');
-    const p = abs.get(n.id)!; /* D3: absolute, so a grouped child lands at parent+relative */
-    nodeParts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${p.x + off.x},${p.y + off.y})">`);
-    if (type === 'label') {
-      const lt = input.measurer.text(n.el);
-      const title = String(n.data?.title ?? n.id);
-      nodeParts.push(textLine(s.w / 2, lt ? lt.y + lt.size + 4 : s.h / 2, title, {
-        size: lt?.size ?? 14.5, weight: lt?.weight ?? 650, fill: lt?.fill || ink.fg, anchor: 'middle',
-      }));
-      if (n.data?.sub) {
-        nodeParts.push(textLine(s.w / 2, (lt ? lt.y + lt.size + 4 : s.h / 2) + 18, String(n.data.sub), {
-          size: 11.5, weight: 450, fill: ink.dim, anchor: 'middle',
+  for (const e of scene.edges) {
+    const marker = markerId(e.color, e.marker.w, e.marker.h);
+    parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}" marker-end="url(#${marker})"/>`);
+    if (e.label) {
+      const lw = Math.max(24, e.label.row.content.length * 6.6 + 12);
+      const mid = {x: e.label.x + off.x, y: e.label.y + off.y};
+      parts.push(
+        `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(scene.surface)}" stroke="${escAttr(scene.dim)}" stroke-width="0.8"/>`,
+        textLine(mid.x - lw / 2 + 6, mid.y + 4, e.label.row.content, {
+          size: e.label.row.size, weight: e.label.row.weight, fill: e.label.row.fill,
+          family: e.label.row.family,
+          spacing: e.label.row.spacing !== undefined ? String(e.label.row.spacing) : undefined,
         }));
-      }
-    } else if (type === 'customshape') {
-      const svg = typeof n.data?.svg === 'string' && n.data.svg ? n.data.svg : '';
-      nodeParts.push(
-        svg
-          ? `<g transform="scale(${s.w / 200},${s.h / 100})">${svg}</g>`
-          : `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(accent)}" stroke-width="1.5"/>`,
-      );
-    } else if (asShape(n.data?.shape) === 'note') {
-      nodeParts.push(noteMarkup(s, ink.surface, ink.dim));
-      const nt = measurer.text(n.el);
-      /* ROUND AR-2 — an UNMEASURED note row (no `.note-title` found —
-         stub measurers, or a DOM drift) must never export the naked
-         14.5/650-no-family shape again: the row carries its TOKEN family
-         ('sans' — the note paints the sans-derived body styles) explicitly,
-         so the fallback is a visible decision in the file. */
-      const noteText = nt
-        ? (nt.family || measurer.defaultFamily
-            ? {...nt, family: nt.family ?? measurer.defaultFamily!('sans')}
-            : nt)
-        : nt;
-      nodeParts.push(nodeText(n, s, noteText ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
-    } else if (type === 'table') {
-      const tt = input.measurer.text(n.el);
-      nodeParts.push(tableMarkup(n, s, accent, ink.fg, ink.dim, tt));
-    } else {
-      /* goblin: the ShapeFrame geometry, ONE source (src/shapes.tsx) */
-      nodeParts.push(
-        `<svg x="0" y="0" width="${s.w}" height="${s.h}" viewBox="0 0 200 100" preserveAspectRatio="none">` +
-        shapeFrameSvg(asShape(n.data?.shape), {fill: accent, stroke: accent, fillOpacity: '0.09', plain: n.data?.plainCylinder !== false}) +
-        `</svg>`,
-      );
-      /* ROUND AV — the ICON glyph next to the title: the canvas paints a
-         second svg per node (`.node-ico svg`, lucide primitives in the node's
-         accent). The emitter used to drop it — the coloured glyph vanished
-         from every export. Lift the measured primitives verbatim, with the
-         accent resolved explicitly (never currentColor/var()). */
-      const ico = measurer.icon?.(n.el) ?? null;
-      if (ico) nodeParts.push(iconMarkup(ico));
-      const t = input.measurer.text(n.el);
-      nodeParts.push(nodeText(n, s, t ?? {x: 13, y: s.h * 0.18, w: s.w * 0.72, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     }
-    nodeParts.push('</g>');
   }
+  parts.push('</g>');
+  /* nodes */
+  for (const n of scene.nodes) {
+    const s = {w: n.w, h: n.h};
+    parts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${n.absX + off.x},${n.absY + off.y})">`);
+    if (n.kind === 'label') {
+      for (const r of n.rows) parts.push(rowEl(r));
+    } else if (n.kind === 'customshape') {
+      parts.push(
+        n.rawSvg
+          ? `<g transform="scale(${s.w / 200},${s.h / 100})">${n.rawSvg}</g>`
+          : `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(n.accent)}" stroke-width="1.5"/>`);
+    } else if (n.frame === 'note') {
+      parts.push(noteMarkup(s, scene.surface, scene.dim));
+      for (const r of n.rows) parts.push(rowEl(r));
+    } else if (n.kind === 'table') {
+      parts.push(tableMarkup(n as never, s, n.accent, scene.fg, scene.dim, n.textRect));
+    } else {
+      parts.push(
+        `<svg x="0" y="0" width="${s.w}" height="${s.h}" viewBox="0 0 200 100" preserveAspectRatio="none">` +
+        shapeFrameSvg(asShape(n.data?.shape), {fill: n.accent, stroke: n.accent, fillOpacity: '0.09', plain: (n as SceneNode & {plain?: boolean}).plain !== false}) +
+        `</svg>`);
+      if (n.icon) parts.push(iconMarkup(n.icon));
+      for (const r of n.rows) parts.push(rowEl(r));
+    }
+    parts.push('</g>');
+  }
+}
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${escAttr(input.theme)}"` +
-    /* AR-11 — unmeasured rows (edge labels, table cells, group titles)
-       inherit this; measured rows carry their own family attributes. */
+export function emitSvg(scene: Scene, ctx: EmitCtx = {}): string {
+  const pad = scene.pad;
+  /* bounds: the bbox pass overrides; else the scene's boxes */
+  const b: Bounds = ctx.bounds ?? scene.bounds;
+  const w = Math.ceil(b.maxX - b.minX) + pad * 2;
+  const h = Math.ceil(b.maxY - b.minY) + pad * 2;
+  const inheritFamily = ctx.inheritFamily ?? '';
+
+  /* the content derives its own offset from the SAME bounds the viewBox
+   * uses, so the measured (mounted content) bytes and the painted bytes
+   * agree — the spec §3 mount measures what the file paints. */
+  const parts: string[] = [];
+  const defs: string[] = [];
+  emitContentInto(scene, parts, defs);
+  const content = parts.join('');
+  /* the token <style> block stays in the file (other tooling reads it) but
+   * nothing painted depends on it (D3) */
+  const styleBlock = ctx.tokens ? tokenStyle(ctx.tokens) : '';
+  const fontBlock = ctx.fontEmbedCss ? `<style>\n${ctx.fontEmbedCss}\n</style>` : '';
+  const allDefs = [...defs];
+  if (fontBlock) allDefs.push(fontBlock);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" data-theme="${escAttr(scene.theme)}"` +
     (inheritFamily ? ` font-family="${escAttr(inheritFamily)}"` : '') + `>` +
-    `<rect width="${w}" height="${h}" fill="${escAttr(ink.bg)}"/>` +
-    tokenStyle(tokens) +
-    (defs.length ? `<defs>${defs.join('')}</defs>` : '') +
-    groupParts.join('') +
-    edgeParts.join('') +
-    nodeParts.join('') +
+    `<rect width="${w}" height="${h}" fill="${escAttr(scene.bg)}"/>` +
+    styleBlock +
+    (allDefs.length ? `<defs>${allDefs.join('')}</defs>` : '') +
+    content +
     `</svg>`;
 }
 

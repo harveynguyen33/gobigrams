@@ -157,8 +157,10 @@ const shapesSrc = readFileSync(join(ROOT, 'src', 'shapes.tsx'), 'utf8');
 const exportSrc = readFileSync(join(ROOT, 'src', 'exportSvg.ts'), 'utf8');
 
 /* The exporter call site (exportSvg.ts) still speaks LITERALS — nobody
-   "simplified" it onto the canvas path. */
-const callSite = /shapeFrameSvg\(asShape\(n\.data\?\.shape\), \{fill: accent, stroke: accent, fillOpacity: '0\.09'/.test(exportSrc);
+   "simplified" it onto the canvas path. ROUND AY: the call moved into the
+   scene emitter (emitContentInto) but the CONTRACT is the same call shape
+   with the scene's resolved accent. */
+const callSite = /shapeFrameSvg\(asShape\(n\.data\?\.shape\), \{fill: (?:accent|n\.accent), stroke: (?:accent|n\.accent), fillOpacity: '0\.09'/.test(exportSrc);
 assert('aw4-exporter-call-site-still-literal', callSite,
   'exportSvg.ts still passes {fill: accent, stroke: accent, fillOpacity: \'0.09\'} — the export contract did not move');
 

@@ -53,7 +53,8 @@ import BoardDialog, {type BoardDialogResult} from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
-import {exportSvg, domMeasurer, type ExportNode, type ExportEdge} from './exportSvg';
+import {exportSvgOf, domMeasurer, type ExportNode, type ExportEdge} from './exportSvg';
+
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
@@ -4300,7 +4301,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          paints outside each edge's own element. */
       const measure = domMeasurer(() => clone);
       try {
-        return exportSvg({
+        return exportSvgOf({
           nodes: exportNodes,
           edges: exportEdges,
           theme: eff,
