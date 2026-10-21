@@ -1,5 +1,80 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-21 23:xx — ROUND AY — SVG-first export pipeline, items 1-6 COMPLETE (card t_822ff5a3), LOCAL ONLY
+
+**Tree:** `main`, HEAD `1678994`. NOT pushed (card rule). Boards clean: Harvey's `Untitled`
+(mvaf8pkt162b2aed) + library only — every AY probe board was created via POST /api/boards
+and removed by direct file delete of its own server-minted id (no DELETE HTTP calls).
+
+**Commits (one item per commit, per the spec):**
+- `77264d4` item 1 — persisted text-metrics cache (`src/textMetrics.ts`, fonts-epoch guard)
+- `33863d5` items 2+3 — `src/exportScene.ts` (buildScene) + `emitSvg` (pure emitter) + getBBox bounds seam
+- `aaf71fa` item 3 — bounds harness (10 assertions, RED on 77264d4)
+- `d370fbe` item 4 — PNG = rasterise(svgString) (`src/exportPng.ts`, the buildPng flip, the pixel gate)
+- `0e61f0b` item 5 — demolition: html-to-image dep + toPng import + collectCss deleted
+- `1678994` item 6 — font-fork annex (REPORT ONLY)
+
+**Item 4's hard gate — the pixel-diff numbers (BEFORE fixtures committed under
+`checks/fixtures/round-ay-png-before/`, captured from the html-to-image path BEFORE the flip):**
+- probe light 2×: 242,497 / 4,761,264 px changed (5.093%) — clusters: the Worker node's
+  lucide icon (34×34, re-rasterised glyph hinting), the orders table + note + group frame
+  AA rings (~2-4% each; html-to-image's foreignObject text raster vs the SVG engine's),
+  text ink/shapes byte-identical
+- probe dark 2×: 327,214 / 4,761,264 (6.872%) — same clusters, dark AA floors differ more
+- custom light 2×: 18,721 / 232,064 (8.067%) — ONE cluster = the artwork's AA ring
+  (after the nested-svg sizing fix below; the pre-fix diff was 48.4% = the artwork
+  painted at the wrong scale)
+- fixture round-trip control: re-capture on the UNFLIPPED tree → **0.000%** (the
+  DOM-clone path is deterministic; every diff above is the flip, not capture noise)
+- selection: selected vs unselected exports **BYTE-IDENTICAL** (AU-1 structurally
+  replaced — the scene carries no selection state). The 548 raw px within ±40 of --sel
+  are the orders table's OWN #4465e9 accent (dr9/dg29/db3 inside the radius), present
+  in both exports. The old live measurement was 4948 EXTRA px when selected.
+- edge/tint/icon ink: non-bg px 425,831 (light) / 436,901 (dark) — all present.
+
+**Root cause fixed inside item 4 (nested-svg sizing):** a custom shape's inlined user
+SVG without width/height defaults to 100%/100% of the ROOT viewport in `<img>` context
+→ the artwork painted 296×148 viewBox-fit instead of the node box (teal bbox measured
+(53,77)-(295,195) vs intended (50,50)-(245,147)). The emitter now injects the node box
+as explicit width/height when the raw string lacks them (exportSvg.ts customshape
+branch). The old path never hit this (its img-src document had one root svg).
+
+**Item 5 numbers:** `client_js_bytes` 889,291 (item 3) → 875,753 (item 4 flip) →
+**875,145** (item 5, ceiling 900,000 — NO raise). `grep html-to-image src/ package.json`
+→ only two historical comment mentions (App.tsx's replacement note, exportPng.ts's
+pixelRatio provenance); 0 imports, 0 dependency entries; package-lock cleaned via
+`npm install --package-lock-only`.
+
+**Item 6 annex (Harvey decides; NOTHING shipped):** Route 2 (today) 4,685 B file,
+7 text rows, +0 B; optional per-line textLength lock = +294 B (SVG 1.1 caveat: glyph
+placement unpredictable, don't combine with wrapping). Route 1 (OFL subset+embed,
+report's 63-glyph × 140 B corpus): the file carries 4 family@weight pairs
+(mono@400/600/700, sans@650) → **+35,280 B raw / +45,920 B base64 per export**
+(~45.9 KB) + the whole-app reflow. The `fontEmbedCss` seam (item 2) sits ready.
+
+**Harnesses (each new assertion RED-proven on its parent commit):**
+- `round-ay-png-rasterise.mjs` 12/12 (RED on aaf71fa via `round-ay-red-item4.mjs`)
+- `round-ay-png-capture.mjs` — the BEFORE driver (v2: fixes v1's leaked probe boards —
+  the server-minted id was overwritten so cleanup rmSync'd the wrong ids — and v1's
+  wrong-board boot; asserts the booted id + canvas node count + PNG ink before saving)
+- `round-ay-png-diff.mjs` — the live pixel gate (re-runnable; AFTER captures ignored
+  if stale)
+- `round-ba-svg-inline-paint.mjs` RETIRED-IN-PLACE (5 assertions on the supersession
+  contract: no clone walk, no computed-style inlining, buildSvg+rasterise, no toPng)
+- `round-au-export-parity` 14/14, `round-av-colour-parity` 11/11, `round-aw-canvas-tint`
+  19/19 — clone-pass assertions re-homed onto the rasterise contract per the spec table
+- `round-ay-font-annex.mjs` — the item-6 reporter
+
+**Gates at HEAD:** tsc 0 · vite build 0 · goblin-verify 22/22 · export family re-run
+BY HAND (ar-svg-export, au, av, ar2, ar-font-parity, ba, aw, ay-text-cache, ay-bounds,
+as-mermaid, ar-pass3, ar-modal-stability, ay-png-rasterise — all GREEN) · bytes 875,145.
+
+**NOT done / follow-ups:** the two standalone RED drivers (`round-ay-red-item1/3.mjs`)
+predate this run and stay as-is. AU-1's live chrome assertion now lives in the pixel
+gate's selection test. `SEQUENCE_ENABLED=false` respected (all probes ran under it);
+Mermaid round-trip green.
+
+
 ## ▶ 2026-10-21 19:xx — ROUND BA — inline SVG paint on the PNG clone + 1.11.11 pin (card t_a272757e), LOCAL ONLY
 
 **Tree:** `main`, HEAD `b6d4a85`, clean except the pre-existing uncommitted `.gitignore`
