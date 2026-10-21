@@ -675,12 +675,33 @@ export function exportSvg(input: ExportInput): string {
      the SAME coordinates — see `edgeLabelAnchor` below. */
   const edgeParts: string[] = [`<g transform="translate(${off.x},${off.y})">`];
   const defs: string[] = [];
-  const markerId = (color: string): string => {
-    const id = 'ar-mk-' + Math.abs(hashStr(color)).toString(36);
+  /* ROUND AU, DEFECT-3 — the arrowhead is the CANVAS's own marker contract,
+     not an invented shape. The canvas renders React Flow's built-in
+     `arrowclosed` marker (node_modules/@xyflow/react Marker + ArrowClosedSymbol):
+
+       <marker markerWidth={w} markerHeight={h} viewBox="-10 -10 20 20"
+               markerUnits="strokeWidth" orient="auto-start-reverse"
+               refX="0" refY="0">
+         <polyline points="-5,-4 0,0 -5,4 -5,-4" (closed: fill = stroke = colour)
+                   stroke-linecap="round" stroke-linejoin="round"/>
+       </marker>
+
+     where w/h are the EDGE's own markerEnd.width/height (makeEdge/plainMarker
+     writes 14/14; sequence heads 18/12). The old emitter hard-coded a 7/7
+     viewBox-0-0-10-10 OPEN triangle at stroke-width 2 — half the canvas size
+     and a different shape. The mapping (recorded per the card): markerWidth/
+     markerHeight = the edge's markerEnd numbers verbatim, the same RF viewBox
+     and closed polyline, markerUnits left at strokeWidth so the consumer's
+     scaling matches the canvas exactly (canvas edge stroke-width 1.8 → the
+     path below carries the same 1.8), colour from the SAME resolveColor chain
+     the stroke uses. A bare-string markerEnd (or none) falls back to the
+     plainMarker default 14/14. */
+  const markerId = (color: string, w: number, h: number): string => {
+    const id = 'ar-mk-' + Math.abs(hashStr(`${color}|${w}x${h}`)).toString(36);
     if (!defs.some(d => d.includes(`id="${id}"`))) {
       defs.push(
-        `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
-        `<path d="M0 0 L10 5 L0 10 Z" fill="${escAttr(color)}"/></marker>`,
+        `<marker id="${id}" markerWidth="${w}" markerHeight="${h}" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse">` +
+        `<polyline points="-5,-4 0,0 -5,4 -5,-4" fill="${escAttr(color)}" stroke="${escAttr(color)}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker>`,
       );
     }
     return id;
@@ -732,9 +753,14 @@ export function exportSvg(input: ExportInput): string {
     const t = byId.get(e.target)!;
     const color = resolveVar(resolveColor(e.data), tokens);
     const route = (e.el ? input.measurer.edgePath(e.el) : null) ?? stubEdgePath(e, s, t, abs);
-    const marker = markerId(color);
+    /* ROUND AU, DEFECT-3 — the marker numbers come from the edge's OWN
+       markerEnd (the same source the canvas reads), never a constant. */
+    const me = (typeof e.markerEnd === 'object' && e.markerEnd !== null ? e.markerEnd : {}) as {width?: unknown; height?: unknown};
+    const mw = typeof me.width === 'number' && isFinite(me.width) && me.width > 0 ? me.width : 14;
+    const mh = typeof me.height === 'number' && isFinite(me.height) && me.height > 0 ? me.height : 14;
+    const marker = markerId(color, mw, mh);
     edgeParts.push(
-      `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="2" marker-end="url(#${marker})"/>`,
+      `<path d="${escAttr(route.d)}" fill="none" stroke="${escAttr(color)}" stroke-width="1.8" marker-end="url(#${marker})"/>`,
     );
     /* ROUND AR-2 — ONE label storage: the TOP-LEVEL `label`, the same field
        the canvas paints (`GoblinEdge`'s `shown`), `onCommitLabel` writes and
