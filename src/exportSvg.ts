@@ -925,9 +925,24 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[]): 
     if (n.kind === 'label') {
       for (const r of n.rows) parts.push(rowEl(r));
     } else if (n.kind === 'customshape') {
+      /* ROUND AY item 4 — the raw user SVG is inlined under a scale() wrapper.
+       * A nested <svg> WITHOUT width/height defaults to 100%/100% of the
+       * NEAREST VIEWPORT — inside a standalone file that is the ROOT svg, so
+       * the artwork painted at viewport size (measured: viewBox-fit scaled it
+       * to 296x148, teal bbox (53,77)-(295,195) instead of (50,50)-(245,147))
+       * instead of the node box. The canvas never hit this (its <img> src has
+       * one root svg with intrinsic size). Give the nested svg the node box as
+       * explicit width/height so the scale() wrapper's arithmetic is the ONLY
+       * sizing force. (If the user string carries its own width/height we keep
+       * it — verbatim inlining, per the AU spec table.) */
+      const sized = n.rawSvg
+        ? /<svg[^>]*\swidth="/.test(n.rawSvg)
+          ? n.rawSvg
+          : n.rawSvg.replace(/<svg([^>]*)>/i, `<svg$1 width="${s.w}" height="${s.h}">`)
+        : n.rawSvg;
       parts.push(
-        n.rawSvg
-          ? `<g transform="scale(${s.w / 200},${s.h / 100})">${n.rawSvg}</g>`
+        sized
+          ? `<g transform="scale(${s.w / 200},${s.h / 100})">${sized}</g>`
           : `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(n.accent)}" stroke-width="1.5"/>`);
     } else if (n.frame === 'note') {
       parts.push(noteMarkup(s, scene.surface, scene.dim));

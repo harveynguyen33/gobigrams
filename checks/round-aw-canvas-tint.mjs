@@ -176,15 +176,18 @@ assert('aw4-shapeframemarkup-signature-unchanged',
   /export function shapeFrameMarkup\(shape: Shape, nc: string, plain: boolean\): string/.test(shapesSrc),
   'shapeFrameMarkup(shape, nc, plain) keeps its signature — ShapeFrame and every caller compile unchanged');
 
-/* buildPng's opacity-keyed resolution pass is still there — the PNG half of
-   the three-surface parity depends on it (round-av defect-2). */
+/* buildPng's opacity-keyed resolution pass — ROUND AY item 4 RE-HOME: the
+   clone-side rgba() fold is DELETED; the tint resolution moved INTO
+   buildScene (the emitter writes fill=<accent literal> fill-opacity="0.09"),
+   and buildPng just rasterises that svgString. The new-form assertion: the
+   builder delegates to the scene path and contains no fill rewriting. */
 const appSrc = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
 const pngStart = appSrc.indexOf('const buildPng');
 const pngEnd = appSrc.indexOf('\n  // ---- import JSON ----', pngStart);
 const pngBody = pngStart >= 0 && pngEnd > pngStart ? appSrc.slice(pngStart, pngEnd) : '';
 assert('aw4-buildpng-opacity-keyed-resolution-pass',
-  pngBody.includes('fillOpacity') && pngBody.includes('rgba('),
-  'buildPng still rewrites low-opacity fills as rgba(r,g,b,op) on the themed clone — the PNG tint rides on this pass');
+  /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody) && !/rgba\(/.test(pngBody),
+  'buildPng performs NO fill rewriting — the tint arrives in the svgString from the scene (fill=<accent> fill-opacity=0.09), rasterised as-is (the live tint proof is the pixel-diff)');
 
 /* ------------------------------------------------------------------ end -- */
 

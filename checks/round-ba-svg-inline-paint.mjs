@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 /**
- * ROUND BA harness — card t_a272757e (OPTION A stopgap): inline SVG
- * presentation properties on the PNG clone BEFORE `toPng` runs.
+ * ROUND BA harness — RETIRED-IN-PLACE at ROUND AY item 4 (spec table:
+ * "round-ba-svg-inline-paint.mjs | RETIRED — asserts the deleted clone path;
+ * live assertions re-homed to item 4").
  *
- * WHY (research/export-architecture-report.md, measured upstream):
- * html-to-image@1.11.13 `lib/clone-node.js` — `cloneChildren()` returns
- * immediately for an SVG element and `cloneSingleNode` deep-clones SVGs
- * WITHOUT `decorate()`/`cloneCSSStyle()`. The detached clone carries no
- * stylesheet, so every `<path>`/`<text>` inside an SVG subtree computes to
- * nothing: edges lose their stroke, icons lose their ink, frames lose their
- * fill. The same file floors font sizes (Math.floor(px) - 0.1 → 14px exports
- * as 13.9px) and omits the `overflow` shorthand.
+ * HISTORY: card t_a272757e (the OPTION A stopgap) asserted a source contract
+ * on buildPng — the AU/AV/BA clone-patch passes that inlined computed paint
+ * onto the html-to-image clone before toPng. OPTION B (ROUND AY item 4)
+ * deletes that whole path: buildPng is now `buildSvg(o)` + `rasterise(svg)`,
+ * and every paint value arrives in the svgString as a literal attribute from
+ * the scene emitter (one painter per pixel class, D5).
  *
- * FIX CONTRACT (card step 1): in buildPng, after the clone is prepared and
- * BEFORE toPng, walk EVERY `<svg>` in the clone and, for each element inside
- * it, write the COMPUTED paint (read from the ORIGINAL element, matched by
- * path — the clone is detached, its own computed styles are useless) as
- * explicit presentation attributes:
- *   stroke, fill, stroke-width, stroke-dasharray, stroke-linecap,
- *   stroke-linejoin, opacity, fill-opacity, stroke-opacity, color,
- *   marker-end, marker-start
- * and for `<text>` additionally font-family, font-size, font-weight,
- * letter-spacing. currentColor resolves to the element's computed color.
- * Attributes are preserved where the computed value is none/empty.
+ * The still-meaningful live assertions are RE-HOMED:
+ *   edge pixels / tint / icon ink / marker paint → the scene-emitter
+ *   harnesses (round-au-export-parity, round-av-colour-parity, both re-run
+ *   GREEN by hand) + the item-4 pixel-diff live pass
+ *   (checks/fixtures/round-ay-png-before vs round-ay-png-diff.mjs, 0
+ *   selection-blue px re-proven on the new path).
  *
- * Asserted here as a SOURCE CONTRACT on buildPng (same pattern as the AU/AV
- * harnesses — the builder is App wiring; the rasterised-pixels half is the
- * live probe pass documented on the card). RED on 92f8660.
+ * THIS FILE now asserts the SUPERSESSION CONTRACT (still RED on the BA-era
+ * tree, where buildPng carries the clone walks and imports html-to-image):
+ *   BA1'  buildPng performs NO per-svg clone walk (the passes are gone)
+ *   BA2'  buildPng's body names no computed-style paint inlining
+ *   BA3'  buildPng delegates to buildSvg and rasterise (the flip)
+ *   BA4'  html-to-image's toPng no longer appears in src/App.tsx at all
+ * (BA4' goes fully green at item 5 when the import and the dependency are
+ * removed; until then the import line — now annotated — is the only hit and
+ * this assertion checks the buildPng body, not the file.)
  */
 import {readFileSync} from 'node:fs';
 import {join, dirname} from 'node:path';
@@ -41,7 +41,7 @@ const assert = (id, pass, detail = '') => {
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${id}  —  ${detail}`);
 };
 
-console.log('ROUND BA — inline SVG presentation properties on the PNG clone');
+console.log('ROUND BA — SUPERSEDED by ROUND AY item 4 (the rasterise flip)');
 console.log(`  target root: ${ROOT}`);
 
 const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
@@ -51,79 +51,36 @@ const pngBody = pngStart >= 0 && pngEnd > pngStart ? app.slice(pngStart, pngEnd)
 
 assert('BA0-buildPng-found', pngBody !== '', 'buildPng body isolated from src/App.tsx');
 
-/* --- BA1: a general per-svg clone walk exists (not just the .node-ico pass).
- * The card's fix walks EVERY <svg> in the clone; the pre-existing icon pass
- * queries only `.node-ico svg`. The general pass must query the svg element
- * itself (`svg`, i.e. querySelectorAll('svg') / ('svg *')) INSIDE buildPng. */
-const generalWalk = /querySelectorAll<SVGSVGElement>\('svg'\)/.test(pngBody);
-assert('BA1-general-svg-clone-walk', generalWalk,
+/* BA1' — the general per-svg clone walk is GONE (no querySelectorAll on svg
+ * anywhere in the builder; the scene path never touches a clone). */
+const generalWalk = /querySelectorAll(<[^>]+>)?\(\s*['"]svg/.test(pngBody);
+assert('BA1-no-svg-clone-walk', pngBody !== '' && !generalWalk,
   generalWalk
-    ? "buildPng walks every <svg> in the clone (querySelectorAll<SVGSVGElement>('svg')), not only the icon/frame passes"
-    : "no general <svg> walk in buildPng — only the .node-ico icon pass (the RED shape)");
+    ? 'buildPng still walks clone svgs — the demolition has not happened'
+    : "buildPng contains no svg clone walk (the BA paint passes are deleted; the svgString's primitives are already literal)");
 
-/* --- BA2: the card's paint list is written as kebab presentation attributes.
- * Baseline (AV passes) already carries stroke/stroke-width/stroke-linecap/
- * stroke-linejoin/fill-opacity — the previously MISSING ones are asserted:
- * stroke-dasharray, stroke-opacity, marker-end, marker-start (+ fill/opacity/
- * color which are trivially present via the AV passes). */
-const PAINT = ['stroke-dasharray', 'stroke-opacity', 'marker-end', 'marker-start',
-  'fill-opacity', 'opacity', 'stroke-linejoin'];
-const missingPaint = PAINT.filter(p => !pngBody.includes(p));
-assert('BA2-paint-property-list-complete', pngBody !== '' && missingPaint.length === 0,
-  missingPaint.length
-    ? `paint properties missing from the clone paint pass: ${missingPaint.join(', ')}`
-    : `all ${PAINT.length} paint properties (stroke…marker-start) are written`);
+/* BA2' — no computed-style paint inlining (no getComputedStyle in the body:
+ * the flip derives every attribute from the Scene, not from live style). */
+const computedRead = /getComputedStyle/.test(pngBody);
+assert('BA2-no-computed-style-inlining', pngBody !== '' && !computedRead,
+  computedRead
+    ? 'buildPng still reads computed styles — the clone patch is not fully removed'
+    : 'buildPng reads NO computed style — every paint attribute is resolved by buildScene');
 
-/* --- BA3: text/font properties for <text> elements. */
-const FONT = ['font-family', 'font-size', 'font-weight', 'letter-spacing'];
-const missingFont = FONT.filter(p => !pngBody.includes(p));
-assert('BA3-text-font-properties', pngBody !== '' && missingFont.length === 0,
-  missingFont.length
-    ? `text font properties missing: ${missingFont.join(', ')}`
-    : 'text carries font-family/font-size/font-weight/letter-spacing explicitly');
+/* BA3' — the flip: buildSvg + rasterise. */
+const flipped = /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody);
+assert('BA3-buildpng-is-svg-rasterise', pngBody !== '' && flipped,
+  flipped
+    ? 'buildPng = buildSvg(o) + rasterise(svg) — the OPTION B one-painter pipeline'
+    : 'buildPng does not compose buildSvg + rasterise');
 
-/* --- BA4: computed values are sourced per element (path-matched walk over
- * the themed clone's svgs — mountThemed keeps the clone ATTACHED so its
- * computed style carries the resolved EXPORT-theme paint), with the live
- * viewport's svg matched by index as a fallback for none/empty values
- * (`origKids`). Reading ONLY the live original would bake live-theme colours
- * into a cross-theme export; reading only the detached serialisation clone
- * is impossible — html-to-image never decorates svg subtrees. */
-const sourcesComputed = /getComputedStyle\(kid\)/.test(pngBody) && /origKids/.test(pngBody);
-assert('BA4-computed-sourced-per-element', pngBody !== '' && sourcesComputed,
-  sourcesComputed
-    ? 'the paint pass reads getComputedStyle per walked clone element with the path-matched live svg (origKids) as fallback'
-    : 'the paint pass has no per-element computed read with a path-matched fallback (a bare walk writes nothing real — the measured mechanism)');
-
-/* --- BA5: currentColor resolves to the computed color of that element. */
-const resolvesCurrentColor = /currentColor/.test(pngBody) && /color/.test(pngBody);
-assert('BA5-currentcolor-resolved', pngBody !== '' && resolvesCurrentColor,
-  'currentColor is resolved to the element\'s computed color (standalone raster: nothing can resolve it later)');
-
-/* --- BA6: none/empty computed values do NOT clobber existing attributes
- * (preserve contract from the card). */
-const preservesNone = /none|''/.test(pngBody) && /getAttribute|hasAttribute|continue|return/.test(pngBody);
-assert('BA6-preserves-attrs-on-none-empty', pngBody !== '' && preservesNone,
-  'the walk skips (preserves existing attributes on) elements whose computed paint is none/empty');
-
-/* --- BA7: the pass runs BEFORE toPng (ordering contract). */
-const toPngAt = pngBody.indexOf('toPng(');
-const walkAt = pngBody.search(/querySelectorAll(<[^>]+>)?\(\s*['"]svg/);
-assert('BA7-runs-before-toPng', toPngAt > -1 && walkAt > -1 && walkAt < toPngAt,
-  walkAt > -1 && walkAt < toPngAt
-    ? 'the svg paint walk is ordered before the toPng rasterisation call inside buildPng'
-    : 'the paint walk is missing or ordered after toPng (it would never reach the raster)');
-
-/* --- BA8: additive — the AU-1 chrome sanitiser and the AV icon/fill passes
- * stay intact (the card forbids regressions here). */
-const CHROME = ['react-flow__resize-control', 'react-flow__handle', 'react-flow__edgeupdater',
-  'edge-bend-handle', 'edge-sel-core', 'react-flow__nodesselection'];
-const missingChrome = CHROME.filter(c => !pngBody.includes(c));
-assert('BA8-au1-sanitiser-intact', missingChrome.length === 0 && pngBody.includes("'selected'"),
-  missingChrome.length ? `AU-1 chrome sanitiser lost: ${missingChrome.join(', ')}` : 'AU-1 chrome sanitiser intact');
-assert('BA9-av-passes-intact',
-  pngBody.includes('node-ico') && pngBody.includes('fill-opacity') && pngBody.includes('color-mix'),
-  'ROUND AV passes (icon ink + dimensions, color-mix/fill-opacity resolution) untouched');
+/* BA4' — the builder body carries no toPng call (the html-to-image era ends;
+ * the top-of-file annotated import is removed at item 5). */
+const toPngCall = /toPng\(/.test(pngBody);
+assert('BA4-no-topng-in-buildpng', pngBody !== '' && !toPngCall,
+  toPngCall
+    ? 'buildPng still calls toPng — the DOM-clone rasteriser is still wired'
+    : 'no toPng call in buildPng (the import line goes with item 5)');
 
 /* ------------------------------------------------------------------ end -- */
 

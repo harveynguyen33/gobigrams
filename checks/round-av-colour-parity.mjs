@@ -189,17 +189,16 @@ const pngEnd = app.indexOf('\n  // ---- import JSON ----', pngStart);
 const pngBody = pngStart >= 0 && pngEnd > pngStart ? app.slice(pngStart, pngEnd) : '';
 
 assert('AV2-png-resolves-color-mix',
-  pngBody.includes('color-mix'),
-  'buildPng resolves every color-mix(...) paint in the clone to concrete colour + opacity BEFORE rasterising (the detached clone cannot resolve it — measured: all node interiors plain bg)');
+  /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody),
+  'ROUND AY item 4 re-home: buildPng = buildSvg + rasterise — the SCENE resolved every colour (incl. the frame tint fill-opacity) to literals at build time, so no clone-side color-mix resolution pass exists to need; the live tint proof is the pixel-diff (round-ay-png-diff)');
 
 assert('AV2-png-icon-ink-explicit',
-  (pngBody.includes('node-ico') || pngBody.includes('icon')) &&
-    (pngBody.includes('stroke') || pngBody.includes('setAttribute')),
-  'buildPng writes the icon ink (stroke/fill/stroke-width) as explicit attributes on the icon svg children — the raster never depends on inherited CSS for the icon ink');
+  /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody),
+  'ROUND AY item 4 re-home: the icon ink is lifted by buildScene (measurer.icon) and emitted as explicit stroke/fill primitives by the emitter — the PNG inherits exactly the SVG icon ink; asserted in the emitter by AV1 (this file, above)');
 
 assert('AV2-png-icon-svg-dimensions',
-  pngBody.includes('node-ico'),
-  'buildPng gives the icon svg explicit width/height/overflow in the clone (a dimension-less detached svg clips itself — the AU-1 class of failure)');
+  /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody),
+  'ROUND AY item 4 re-home: no detached icon svg is ever rasterised — the emitter writes width/height/viewBox on the icon markup inside the svgString; the clip failure class is structurally gone');
 
 /* ------------------------------------------------------------------ end -- */
 

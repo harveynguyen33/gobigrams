@@ -5,7 +5,8 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {toPng} from 'html-to-image';
+import {toPng} from 'html-to-image'; /* ROUND AY item 5 will delete this import with the dependency */
+import {rasterise} from './exportPng';
 import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
 import {mermaidToGraph} from './mermaid';
 import {
@@ -4318,187 +4319,25 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [rf, theme, pngPad, mountThemed]);
 
+  /* ROUND AY item 4 (OPTION B, spec §4) — buildPng is now TWO LINES: build the
+     SVG (the same string the .svg download gets) and rasterise it. ONE painter
+     per pixel class: the scene/emitter is the single source of the picture and
+     the canvas merely scales it. The old DOM-clone path (themed clone + the
+     AU-1 chrome strip + the AV fill fold + the AV icon inline + the BA paint
+     walk + html-to-image's toPng) is REPLACED, not patched — chrome cannot
+     appear because the scene never contains editor affordances, and every
+     paint value arrives in the svgString as a literal. The pixel-diff gate
+     (checks/fixtures/round-ay-png-before vs the new path) is the proof. */
   const buildPng = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
-    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!el || !rf || !o.nodes.length) return '';
-    const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
-    const pad = pngPad;
-    const imageWidth = Math.ceil((b.width ?? 800) + pad * 2);
-    const imageHeight = Math.ceil((b.height ?? 400) + pad * 2);
-    const transform = `translate(${pad - (b.x ?? 0)}px, ${pad - (b.y ?? 0)}px) scale(1)`;
-    /* AQ21-H — render the offscreen THEMED clone, not the live viewport, so a
-       non-live theme exports with the real Appearance colours (and nothing on
-       the visible board is touched → no flicker behind the modal). */
+    const svg = await buildSvg(o);
+    if (!svg) return '';
     const eff = o.theme || theme;
-    const pre = mountThemed(el, eff);
-    const target = pre.clone;
-    target.style.transform = transform;
-    const keep = new Set(o.nodes.map(n => n.id));
-    target.querySelectorAll('.react-flow__node').forEach(nn => {
-      if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove();
-    });
-    /* ROUND AU, DEFECT-1 (PNG chrome) — strip every EDITOR affordance the
-       clone inherited from the live viewport. The old clone only REMOVED
-       nodes outside `keep`, so a selection was rasterised with the board:
-       measured live at 2x with one node selected (real pointer events,
-       8 chrome elements live) → 4948 px within ±40 of `--sel` #3b82f6 in
-       the PNG vs 0 with nothing selected, plus the 12 grey connection
-       handles. Everything removed here is editor chrome the canvas paints
-       OVER the diagram; the diagram itself (nodes, edges, labels, bend
-       geometry) is untouched. */
-    target.querySelectorAll(
-      '.react-flow__resize-control' // the 4 corner resize handles + 4 edge lines (8 live when selected)
-      + ',.react-flow__handle' // the 12 per-side connection nubs
-      + ',.react-flow__edgeupdater' // the 2 edge reconnect circles
-      + ',.edge-bend-handle' // the smoothstep/step bend dot
-      + ',.edge-sel-core' // the edge selection restroke
-      + ',.react-flow__nodesselection' // the marquee selection rect
-      + ',.react-flow__selection' // the drag-to-box selection pane
-    ).forEach(ch => ch.remove());
-    /* the selection RING paints from the `selected` CLASS (on nodes, edges
-       and labels) — drop the class so no ring/hover/electric mark can
-       rasterise even where its element survives (e.g. an EdgeLabelRenderer
-       portal row kept for label parity). */
-    target.querySelectorAll('.selected').forEach(el2 => el2.classList.remove('selected'));
-    /* ROUND AV, DEFECT-2 (PNG fill) — the shape frames carry
-       fill="transparent" fill-opacity="0.09" (src/shapes.tsx
-       shapeFrameMarkup). The card describes this as a color-mix resolution
-       failure; MEASURED here it is simpler and nastier: html-to-image
-       rasterises `fill="transparent"` as FULLY transparent and drops the
-       separate fill-opacity — an isolated <rect fill="transparent"
-       fill-opacity="0.09"> over #f7f7f8 rasterises bg-plain (247,247,248),
-       while the same rect with fill="rgba(accent, 0.09)" rasterises the
-       correct tint (225,234,238). Fix: fold the pair into ONE concrete paint.
-       The themed clone is IN the document (2 rAF), so its computed style
-       carries the resolved accent — read each frame primitive's computed
-       stroke/fill and, when fill-opacity < 1, rewrite fill as
-       rgba(r,g,b,opacity) inline. Inline beats the attribute in
-       html-to-image's serialisation, so the raster shows exactly the canvas
-       tint. Engine-independent: no transparent-fill + opacity pair survives.
-       (Live canvas truth: computed fill reports rgba(0,0,0,0) because Chrome
-       resolves `transparent` at computed-value time — the ACCENT comes from
-       the sibling stroke, so the tint is derived from stroke when the fill
-       has no chroma.) */
-    target.querySelectorAll<SVGElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon').forEach(elm => {
-      const cs = getComputedStyle(elm);
-      const op = parseFloat(cs.fillOpacity || '1');
-      const stroke = cs.stroke || '';
-      if (!(op > 0 && op < 1)) return;
-      /* derive the accent: the frame paints stroke=<accent> and the fill is
-         achromatic (transparent) — the canvas tint IS accent × opacity */
-      const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(stroke);
-      if (!m) return;
-      elm.style.setProperty('fill', `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${op})`);
-      elm.style.setProperty('fill-opacity', '1');
-    });
-    /* ROUND AV (operator addition) — the ICON ink must not depend on
-       inherited CSS either. The icons are lucide svgs painting
-       stroke="currentColor"; on engines whose detached-clone computed style
-       loses the `.node-ico { color: var(--nc) }` chain (the AU-1 class), the
-       glyph paints nothing. Walk every icon svg: give it explicit
-       width/height/overflow (a dimension-less detached svg clips itself —
-       measured 17px on canvas), resolve its ink ONCE from the live computed
-       style, and write stroke/stroke-width/fill explicitly onto every child
-       primitive. After this pass no icon pixel depends on var(),
-       currentColor, or color-mix. */
-    target.querySelectorAll<SVGSVGElement>('.node-ico svg').forEach(svg => {
-      svg.setAttribute('width', '17');
-      svg.setAttribute('height', '17');
-      svg.style.width = '17px';
-      svg.style.height = '17px';
-      svg.style.overflow = 'visible';
-      const cs = getComputedStyle(svg);
-      const ink = (cs.stroke && cs.stroke !== 'none' && !cs.stroke.includes('var(') && cs.stroke !== 'currentColor')
-        ? cs.stroke
-        : cs.color;
-      const sw = parseFloat(cs.strokeWidth) || 2;
-      const fill = (cs.fill && cs.fill !== 'none' && !cs.fill.includes('var(')) ? cs.fill : 'none';
-      svg.querySelectorAll<SVGElement>('path, circle, ellipse, rect, polyline, line, polygon').forEach(kid => {
-        kid.setAttribute('stroke', ink);
-        kid.setAttribute('stroke-width', String(sw));
-        kid.setAttribute('fill', fill);
-        kid.setAttribute('stroke-linecap', 'round');
-        kid.setAttribute('stroke-linejoin', 'round');
-      });
-    });
-    /* ROUND BA (card t_a272757e) — GENERAL svg paint inlining. html-to-image
-       never styles SVG descendants: lib/clone-node.js `cloneChildren()` returns
-       immediately for an SVG element and `cloneSingleNode` deep-clones SVGs
-       WITHOUT decorate()/cloneCSSStyle() — so any svg subtree whose paint
-       depends on CSS (the edge svgs, the marker defs, frame primitives beyond
-       the AV fill pass) rasterises UNPAINTED in the PNG. The AV passes above
-       fix the icon + the transparent frames; this pass covers EVERY <svg> in
-       the clone: per element, write the COMPUTED paint as explicit
-       presentation attributes (stroke, fill, stroke-width, stroke-dasharray,
-       stroke-linecap, stroke-linejoin, opacity, fill-opacity,
-       stroke-opacity, color, marker-end, marker-start; <text> also gets
-       font-family/font-size/font-weight/letter-spacing). The themed clone is
-       ATTACHED (mountThemed + 2 rAF), so getComputedStyle here carries the
-       EXPORT theme's resolved values — no var(), no currentColor, no
-       color-mix survives into the serialisation. The pre-change RED tree
-       measured edges/icon/frame paint missing (BA1-BA4 fail); live probe
-       numbers are on the card. Runs BEFORE toPng (below). */
-    target.querySelectorAll<SVGSVGElement>('svg').forEach((svg2, si) => {
-      /* the live viewport's same svg — path-matched fallback for none/empty
-         computed values (AV already fixed the icon + frames; this covers
-         edges/markers whose computed paint the themed mount resolves) */
-      const origSvgs = el.querySelectorAll<SVGSVGElement>('svg');
-      const origSvg = origSvgs[si] ?? null;
-      const origKids = origSvg ? Array.from(origSvg.querySelectorAll<SVGElement>('*')) : [];
-      const kids = Array.from(svg2.querySelectorAll<SVGElement>('*'));
-      kids.forEach((kid, ki) => {
-        const cs = getComputedStyle(kid);
-        const oc = origKids[ki] ? getComputedStyle(origKids[ki]) : null;
-        /* computed value, falling back to the live-original's when the
-           themed mount reports none/empty */
-        const pick = (prop: string): string => {
-          const v = cs.getPropertyValue(prop);
-          if (v && v !== 'none' && v !== '') return v;
-          return oc ? (oc.getPropertyValue(prop) || '') : '';
-        };
-        /* currentColor cannot survive serialisation — resolve it NOW to the
-           element's computed color (css colour, e.g. rgb()/rgba()) */
-        const color = pick('color');
-        const resolve = (v: string): string => (v.trim() === 'currentColor' ? color : v);
-        const write = (prop: string, val: string): void => {
-          if (!val || val === 'none') return; /* preserve existing attrs */
-          kid.setAttribute(prop, resolve(val));
-        };
-        write('stroke', pick('stroke'));
-        write('fill', pick('fill'));
-        write('stroke-width', pick('stroke-width'));
-        write('stroke-dasharray', pick('stroke-dasharray'));
-        write('stroke-linecap', pick('stroke-linecap'));
-        write('stroke-linejoin', pick('stroke-linejoin'));
-        write('opacity', pick('opacity'));
-        write('fill-opacity', pick('fill-opacity'));
-        write('stroke-opacity', pick('stroke-opacity'));
-        write('color', color);
-        write('marker-end', pick('marker-end'));
-        write('marker-start', pick('marker-start'));
-        if (kid.tagName.toLowerCase() === 'text') {
-          write('font-family', pick('font-family'));
-          write('font-size', pick('font-size'));
-          write('font-weight', pick('font-weight'));
-          write('letter-spacing', pick('letter-spacing'));
-        }
-      });
-    });
-    try {
-      await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
-      const dataUrl = await Promise.race([
-        toPng(target, {
-          backgroundColor: tokensFor(eff, ['--bg'])['--bg'],
-          width: imageWidth, height: imageHeight, pixelRatio: pngScale,
-        } as any),
-        new Promise<string>((_, rej) => window.setTimeout(() => rej(new Error('PNG render timed out')), 15000)),
-      ]) as string;
-      return dataUrl;
-    } finally {
-      pre.done();
-    }
+    const bg = eff === theme
+      ? readToken('--bg', '#0b0b0d')
+      : tokensFor(eff, ['--bg'])['--bg'];
+    return rasterise(svg, {scale: pngScale, bg});
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [rf, theme, pngPad, pngScale, mountThemed]);
+  }, [theme, pngScale, buildSvg]);
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);

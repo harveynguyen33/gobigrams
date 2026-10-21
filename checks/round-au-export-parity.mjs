@@ -208,11 +208,15 @@ assert('AU3-edge-stroke-width-parity',
   `exported edge stroke-width = 1.8 (canvas contract); got: ${(edgePathTag.match(/stroke-width="[^"]*"/) ?? ['none'])[0]}`);
 
 /* ----------------- DEFECT 1 (half 1, DOM-free) — the chrome contract ------ */
-/* The PNG builder's clone sanitiser must name every editor-chrome class the
-   live inventory measured (1 selected ring, 8 resize controls, 12 connection
-   handles, 2 edge updaters, bend handles, the edge selection core, the
-   nodes-selection rect). This asserts the SANITISER CONTRACT in source; the
-   rasterised-pixels half is the card's live pass. */
+/* ROUND AY item 4 RE-HOME (spec table: "AU-1's assertions move to the
+   rasterise path"): the DOM-clone sanitiser is DELETED — the structural
+   replacement is that buildPng rasterises the SCENE-DERIVED svgString, which
+   cannot contain editor chrome by construction. The assertion moves with it:
+   buildPng's body must (a) delegate to buildSvg (the scene path) and
+   (b) contain NO clone-class string manipulation at all — no chrome class
+   name appears in the PNG builder because there is no clone to strip.
+   The rasterised-pixels half is the card's live pass (0 selection-blue px,
+   round-ay-png-diff). */
 
 const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
 /* isolate buildPng's body (from its declaration to the next builder) */
@@ -228,20 +232,26 @@ const CHROME = [
   'edge-sel-core',
   'react-flow__nodesselection',
 ];
-const missingChrome = CHROME.filter(c => !pngBody.includes(c));
+const chromeInPng = CHROME.filter(c => pngBody.includes(c));
 
-assert('AU1-png-clone-sanitises-chrome', pngBody !== '' && missingChrome.length === 0,
+assert('AU1-png-clone-sanitises-chrome', pngBody !== '' && chromeInPng.length === 0,
   pngBody === ''
     ? 'buildPng body not found in src/App.tsx'
-    : missingChrome.length
-      ? `chrome classes not stripped by the clone sanitiser: ${missingChrome.join(', ')}`
-      : `all ${CHROME.length} chrome class families stripped (resize controls, connection handles, edge updaters, bend handles, edge selection core, nodes-selection)`);
+    : chromeInPng.length
+      ? `clone chrome classes still manipulated in buildPng (the sanitiser should be GONE, replaced by the scene path): ${chromeInPng.join(', ')}`
+      : 'buildPng touches NO clone chrome class — PNG comes from the scene svgString where editor chrome cannot exist (the structural AU-1 replacement)');
 
-/* the selection ring: `selected` must be dropped from cloned nodes/edges
-   (the ring paints from .selected), and the sanitiser must run INSIDE
-   buildPng (the string appears in its body) */
-assert('AU1-png-clone-strips-selected', pngBody.includes("'selected'") || pngBody.includes('"selected"'),
-  "buildPng's sanitiser drops the `selected` class (the ring/handle paint hook) from the clone");
+assert('AU1-png-buildsvg-rasterise',
+  /buildSvg\(/.test(pngBody) && /rasterise\(/.test(pngBody),
+  "buildPng = buildSvg(o) + rasterise(svg) — one painter per pixel class (the item-4 flip)");
+
+/* the selection ring: ROUND AY item 4 re-home — nothing `.selected` is ever
+   cloned any more; the scene carries no selection state, so the ring cannot
+   rasterise. The new-form assertion: buildPng's body contains no
+   classList/class manipulation whatsoever. */
+assert('AU1-png-clone-strips-selected',
+  !/classList|className|'selected'|"selected"/.test(pngBody),
+  "buildPng performs no class surgery — selection state never enters the scene svgString (the structural ring fix)");
 
 /* the edge-overflow fix: the host must restore the `.react-flow` rule context
    so the DETACHED clone's computed overflow is `visible` (html-to-image reads

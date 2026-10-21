@@ -38,3 +38,7 @@ dist/
 
 # research artifacts (deep-dive reports, harnesses)
 research/
+# ROUND AY item 4 scratch: the pixel-diff AFTER captures (regenerated per run
+# by checks/round-ay-png-diff.mjs; only the BEFORE fixtures are committed)
+.ay4-png-after/
+.ay4-diff-report.json
