@@ -24,7 +24,12 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 880354
+ratchet.ceiling: 881164
+# RAISED 2026-10-21 (2nd raise today), Harvey-approved, measured at HEAD 677db01: 881164.
+# Reason: AU-1/2/3 export parity - the PNG clone now sanitises editor chrome (selection ring,
+# resize handles, connection ports) while keeping the connector, the SVG emitter feeds the
+# clone's own edge element so every routed bend survives, and the marker contract matches the
+# canvas (14x14, markerUnits=strokeWidth). +810 bytes over the previous ceiling.
 # RAISED 2026-10-21, Harvey-approved in session, measured not guessed: 831522 -> 880354.
 # Reason: ROUND AR replaced the SVG export's HTML-in-foreignObject clone with a real vector
 # serializer (src/exportSvg.ts + the per-row measured font path + the note-node measurer),
