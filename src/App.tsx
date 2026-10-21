@@ -4245,13 +4245,27 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          reads `e.label` (the one storage), and this push is where the
          model edge becomes the export edge. Asserted live: without the
          field both painted labels vanished from the real export. */
+      /* ROUND AU — the edge's LIVE clone element must ride along: the emitter's
+         measurer (`edgePath`) reads the MEASURED route off
+         `.react-flow__edge-path` inside the clone. `m.el` is always undefined
+         on a model Edge (React Flow never sets it), so before this every edge
+         fell to `stubEdgePath` — a straight centre-to-centre segment (the
+         live smoothstep exported as `M 380,431 L 750,440.5`, all bends
+         discarded). The clone element is looked up by the same data-id the
+         nodes use. */
+      const cloneEdgeById = new Map(
+        [...clone.querySelectorAll<HTMLElement>('.react-flow__edge')]
+          .map(ce => [ce.getAttribute('data-id') ?? '', ce]),
+      );
       const exportEdgeOf = (model: unknown): ExportEdge => {
         const m = model as {id: string; source: string; target: string; label?: unknown; data?: Record<string, unknown> | null; el?: unknown};
         return {
           id: m.id, source: m.source, target: m.target,
           label: typeof m.label === 'string' && m.label ? m.label : undefined,
           data: m.data ?? null,
-          el: m.el,
+          /* the CLONE's edge element (never the model's): its path is drawn in
+             flow coordinates, which is exactly the emitter's edge space. */
+          el: cloneEdgeById.get(m.id) ?? undefined,
         };
       };
       for (const ce of clone.querySelectorAll<HTMLElement>('.react-flow__edge')) {
