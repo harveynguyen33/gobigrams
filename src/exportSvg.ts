@@ -68,6 +68,18 @@ export type TextRect = {
  *  elements (typed `unknown` here so the module stays React/DOM-free); the
  *  harness stub ignores them and returns deterministic values. */
 export type SvgMeasurer = {
+  /** ROUND AV — the node's ICON glyph (`.node-ico svg`): geometry relative
+   *  to the node box, its viewBox, the pre-parsed lucide primitives, and the
+   *  RESOLVED ink (stroke/fill/stroke-width) — the accent the canvas paints.
+   *  The exporter lifts the primitives verbatim into the file so the icon is
+   *  real vector art in the node's own colour. Optional: a harness stub or a
+   *  node without an icon returns null and the exporter emits no icon. */
+  icon?(nodeEl: unknown): {
+    x: number; y: number; w: number; h: number;
+    viewBox: string;
+    primitives: Array<{tag: string; attrs: Record<string, string>}>;
+    stroke: string; strokeWidth: number; fill: string;
+  } | null;
   /** The node's text body box. Coordinates are relative to the node box. */
   text(nodeEl: unknown): TextRect | null;
   /** The edge's route. `d` is the path string; `start`/`end` are the route's
@@ -268,6 +280,38 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
         family: titleEl ? rowFont(titleEl)?.family : undefined,
         kind: isNote && titleEl ? 'note' : undefined, rows};
     },
+    /* ROUND AV — the node's icon glyph: the second svg per node (the lucide
+       glyph inside `.node-ico`). Geometry is read node-relative (the same
+       `rel()` the text box uses); the ink is the icon svg's own computed
+       colour — the accent via `.node-ico { color: var(--nc) }` + lucide's
+       `stroke: currentColor`. Primitives are pre-parsed here so the pure
+       emitter stays DOM-free. */
+    icon(nodeEl) {
+      try {
+        const el = nodeEl as Element | null;
+        if (!el || typeof el.querySelector !== 'function') return null;
+        const svgEl = el.querySelector('.node-ico svg');
+        if (!svgEl) return null;
+        const vb = (svgEl.getAttribute('viewBox') || '0 0 24 24').trim();
+        const kids = [...svgEl.children].filter((c): c is SVGElement =>
+          ['path', 'circle', 'ellipse', 'rect', 'polyline', 'line', 'polygon'].includes(c.tagName.toLowerCase()));
+        if (!kids.length) return null;
+        const cs = getComputedStyle(svgEl);
+        const stroke = cs.stroke && cs.stroke !== 'none' ? cs.stroke : cs.color;
+        const fill = cs.fill === 'none' ? 'none' : (cs.fill || 'none');
+        const strokeWidth = parseFloat(cs.strokeWidth) || 2;
+        const numAttrs = ['x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'd', 'points', 'x1', 'y1', 'x2', 'y2', 'transform'];
+        const primitives = kids.map(c => {
+          const attrs: Record<string, string> = {};
+          numAttrs.forEach(a => { const v = c.getAttribute(a); if (v) attrs[a] = v; });
+          return {tag: c.tagName.toLowerCase(), attrs};
+        });
+        const box = rel(el, svgEl);
+        return {x: box.x, y: box.y, w: box.w, h: box.h, viewBox: vb, primitives, stroke, strokeWidth, fill};
+      } catch {
+        return null;
+      }
+    },
     edgePath(edgeEl) {
       const el = edgeEl as Element | null;
       if (!el || typeof el.querySelector !== 'function') return null;
@@ -356,6 +400,40 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
       measTextEl = null;
     },
   };
+}
+
+/* ------------------------------------------------------------- icon glyph */
+
+/** ROUND AV — one icon primitive's attribute list, with the RESOLVED paint
+ *  overrides. Lucide draws with `stroke="currentColor"`; a standalone SVG has
+ *  no stylesheet, so the emitter writes the measured accent explicitly on
+ *  every primitive and strips the unresolved references. */
+function iconPrimitive(p: {tag: string; attrs: Record<string, string>},
+  ink: {stroke: string; strokeWidth: number; fill: string}): string {
+  const overrides: Record<string, string> = {
+    stroke: ink.stroke,
+    'stroke-width': String(ink.strokeWidth),
+    fill: ink.fill,
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  };
+  const attrs = Object.entries({...p.attrs, ...overrides})
+    .filter(([k, v]) => k !== 'stroke' || v !== 'none')
+    .map(([k, v]) => `${k}="${escAttr(v)}"`)
+    .join(' ');
+  return `<${p.tag} ${attrs}/>`;
+}
+
+/** The node's icon as a nested <svg> at its measured node-relative box. */
+type IconMeasure = {
+  x: number; y: number; w: number; h: number;
+  viewBox: string;
+  primitives: Array<{tag: string; attrs: Record<string, string>}>;
+  stroke: string; strokeWidth: number; fill: string;
+};
+function iconMarkup(m: IconMeasure): string {
+  const kids = m.primitives.map(p => iconPrimitive(p, m)).join('');
+  return `<svg x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}" viewBox="${escAttr(m.viewBox)}" preserveAspectRatio="xMidYMid meet" overflow="visible">${kids}</svg>`;
 }
 
 /* ------------------------------------------------------- text wrapping (D2) */
@@ -855,6 +933,13 @@ export function exportSvg(input: ExportInput): string {
         shapeFrameSvg(asShape(n.data?.shape), {fill: accent, stroke: accent, fillOpacity: '0.09', plain: n.data?.plainCylinder !== false}) +
         `</svg>`,
       );
+      /* ROUND AV — the ICON glyph next to the title: the canvas paints a
+         second svg per node (`.node-ico svg`, lucide primitives in the node's
+         accent). The emitter used to drop it — the coloured glyph vanished
+         from every export. Lift the measured primitives verbatim, with the
+         accent resolved explicitly (never currentColor/var()). */
+      const ico = measurer.icon?.(n.el) ?? null;
+      if (ico) nodeParts.push(iconMarkup(ico));
       const t = input.measurer.text(n.el);
       nodeParts.push(nodeText(n, s, t ?? {x: 13, y: s.h * 0.18, w: s.w * 0.72, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}, ink.fg, ink.dim, accent, widthOf));
     }
