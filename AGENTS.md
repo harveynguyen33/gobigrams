@@ -24,8 +24,13 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 881164
-# RAISED 2026-10-21 (2nd raise today), Harvey-approved, measured at HEAD 677db01: 881164.
+ratchet.ceiling: 883660
+# RAISED 2026-10-21 (3rd raise today), Harvey-approved, measured at HEAD ba3bee0: 883660.
+# Reason: ROUND AV export colour parity - the SVG emitter now lifts every node icon out of the
+# themed clone as real vector primitives (frameMarkup gained an optional icon block instead of a
+# deferred unicode fallback), and the PNG path resolves the frame fill and the icon ink to literal
+# colours before rasterising so html-to-image cannot inherit a transparent/currentColor value.
+# +2496 bytes over the previous ceiling.
 # Reason: AU-1/2/3 export parity - the PNG clone now sanitises editor chrome (selection ring,
 # resize handles, connection ports) while keeping the connector, the SVG emitter feeds the
 # clone's own edge element so every routed bend survives, and the marker contract matches the
