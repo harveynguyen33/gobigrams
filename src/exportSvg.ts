@@ -270,24 +270,36 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
       /* ROUND AX (t_17334591) — the MEASURED text-run x per row. The title
          row is `.node-title` (flex): icon first, then the text span — the
          ROW's box left edge is the icon's, not the text's. A Range over the
-         title's own text node gives the text run's client rect; converted
+         title's own text gives the text run's client rect; converted
          node-relative here so the emitter can start the glyphs PAST the icon
          (iconX + iconW + gap, measured — never assumed). Rows without a
          dedicated text element (kicker/sub/metric) are their own run: their
-         box left edge IS the text's left edge. */
+         box left edge IS the text's left edge.
+         LIVE-FIX: the title text lives in a child `<span>`
+         (DiagramNode renders `<span>{d.title}</span>`), so the text-node
+         probe walks the row's ELEMENT descendants too — the first
+         text-bearing descendant that is not the icon. */
       const runXOf = (rowEl: Element | null): number | undefined => {
         try {
           if (!rowEl) return undefined;
-          const textNode = [...rowEl.childNodes].find(
-            (c): c is Text => c.nodeType === Node.TEXT_NODE && !!(c.textContent ?? '').trim());
-          const r = document.createRange();
-          if (textNode) {
-            r.selectNodeContents(textNode);
+          const nodeLeft = el.getBoundingClientRect().left;
+          const rangeLeft = (target: Text | Element): number | undefined => {
+            const r = document.createRange();
+            r.selectNodeContents(target);
             const rects = r.getClientRects();
             const first = rects.length ? rects[0] : null;
-            if (first && first.width > 0) return first.left - el.getBoundingClientRect().left;
-          }
-          return rowEl.getBoundingClientRect().left - el.getBoundingClientRect().left;
+            if (first && first.width > 0) return first.left - nodeLeft;
+            return undefined;
+          };
+          const direct = [...rowEl.childNodes].find(
+            (c): c is Text => c.nodeType === Node.TEXT_NODE && !!(c.textContent ?? '').trim());
+          if (direct) { const x = rangeLeft(direct); if (x !== undefined) return x; }
+          const desc = [...rowEl.querySelectorAll('*')].find(e =>
+            !e.classList.contains('node-ico') && !e.closest('.node-ico') &&
+            !!(e.textContent ?? '').trim() &&
+            [...e.childNodes].some(c => c.nodeType === Node.TEXT_NODE && !!(c.textContent ?? '').trim()));
+          if (desc) { const x = rangeLeft(desc); if (x !== undefined) return x; }
+          return rowEl.getBoundingClientRect().left - nodeLeft;
         } catch { return undefined; }
       };
       const runs: TextRect['runs'] = {
