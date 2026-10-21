@@ -5,7 +5,6 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {toPng} from 'html-to-image'; /* ROUND AY item 5 will delete this import with the dependency */
 import {rasterise} from './exportPng';
 import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
 import {mermaidToGraph} from './mermaid';
@@ -4149,19 +4148,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      LIVE document theme. So both builders now mount the clone OFFSCREEN under
      `data-theme=<target>` and let the real stylesheet style it — identical
      mechanics to switching Appearance, without touching the visible board. */
-  /* ROUND AU, DEFECT-1 (PNG edge loss) — the host ALSO carries the
-     `react-flow` class. html-to-image reads getComputedStyle of the
-     DETACHED clone; with a bare-div host, the scoped rule
-     `.react-flow .react-flow__edges svg { overflow: visible }` does not
-     match inside the host, so every edge svg computes the svg INITIAL
-     overflow (hidden) — and html-to-image bakes exactly that into the
-     serialization. The rasterised image then clips each edge at its svg's
-     default 300x150 box: the whole route lives outside it, so the PNG lost
-     every connector AND its arrowhead (measured live: 0 edge pixels; with
-     the class restored, computed overflow flips hidden→visible and the
-     edge + marker survive rasterisation, +72 recovered slate pixels on the
-     probe board). `ds-flow-wrap` rides along because the app's own
-     hover/perf-guard scopes hang off it too. */
   /* AR-4 — identity-stable so the export modal's preview effect does not
      re-fire on unrelated App re-renders: the builders used to be plain consts
      re-created every render (and passed inline to <ExportModal>), so ANY App
@@ -4183,37 +4169,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     };
   /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  /* AQ21-F — the cloned viewport's classes (.node shapes, edges, groups…) are
-     styled by the APP stylesheet, which a standalone SVG does not carry — that
-     is why theme-switched previews looked washed out: fills/strokes fell back
-     to defaults. Collect ONLY the rules whose selector matches something in
-     the clone (keeps the SVG small), then the chosen theme's tokens override
-     the :root values. Order = app rules, then token overrides (wins). */
-  const collectCss = useCallback((root: HTMLElement): string => {
-    const classes = new Set<string>();
-    root.querySelectorAll('*').forEach(el => {
-      (el.classList ?? []).forEach(c => classes.add(c));
-    });
-    classes.add('node'); classes.add('react-flow__node'); classes.add('react-flow__edge');
-    classes.add('react-flow__handle'); classes.add('react-flow__edges'); classes.add('react-flow__viewport');
-    const parts: string[] = [];
-    const walk = (list: CSSRuleList): void => {
-      for (const rule of [...list]) {
-        if (rule instanceof CSSStyleRule) {
-          let ok = false;
-          try { ok = [...classes].some(c => rule.selectorText?.includes('.' + c)) ?? false; } catch { ok = false; }
-          if (ok) parts.push(rule.cssText);
-        } else if (rule instanceof CSSMediaRule) {
-          walk(rule.cssRules);
-        }
-      }
-    };
-    for (const sheet of [...document.styleSheets]) {
-      try { walk(sheet.cssRules); } catch { /* cross-origin */ }
-    }
-    return parts.join('\n');
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-
   /* AQ21 — parametrised builders. The modal and the one-click menu buttons
      share THESE; the difference is only defaults (live theme, full board). */
   /* ROUND AR, AR-1 — buildSvg is now a THIN WRAPPER around `src/exportSvg.ts`:
@@ -4222,7 +4177,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      map for the target theme, and hands everything to the pure emitter.
      The emitted file is real SVG primitives — no foreignObject, no HTML —
      so image-context consumers (<img>, Quick Look, Figma, Illustrator)
-     actually paint it. `mountThemed`/`collectCss` stay for `buildPng`. */
+     actually paint it. */
   const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf) return '';
