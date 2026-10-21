@@ -4147,6 +4147,19 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      LIVE document theme. So both builders now mount the clone OFFSCREEN under
      `data-theme=<target>` and let the real stylesheet style it — identical
      mechanics to switching Appearance, without touching the visible board. */
+  /* ROUND AU, DEFECT-1 (PNG edge loss) — the host ALSO carries the
+     `react-flow` class. html-to-image reads getComputedStyle of the
+     DETACHED clone; with a bare-div host, the scoped rule
+     `.react-flow .react-flow__edges svg { overflow: visible }` does not
+     match inside the host, so every edge svg computes the svg INITIAL
+     overflow (hidden) — and html-to-image bakes exactly that into the
+     serialization. The rasterised image then clips each edge at its svg's
+     default 300x150 box: the whole route lives outside it, so the PNG lost
+     every connector AND its arrowhead (measured live: 0 edge pixels; with
+     the class restored, computed overflow flips hidden→visible and the
+     edge + marker survive rasterisation, +72 recovered slate pixels on the
+     probe board). `ds-flow-wrap` rides along because the app's own
+     hover/perf-guard scopes hang off it too. */
   /* AR-4 — identity-stable so the export modal's preview effect does not
      re-fire on unrelated App re-renders: the builders used to be plain consts
      re-created every render (and passed inline to <ExportModal>), so ANY App
@@ -4156,6 +4169,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   const mountThemed = useCallback((source: HTMLElement, themeName: string): {host: HTMLDivElement; clone: HTMLElement; done: () => void} => {
     const host = document.createElement('div');
     host.setAttribute('data-theme', themeName);
+    host.className = 'react-flow ds-flow-wrap';
     host.style.cssText = 'position:fixed;left:-100000px;top:0;width:1600px;height:1200px;overflow:hidden;pointer-events:none;';
     const clone = source.cloneNode(true) as HTMLElement;
     clone.style.transform = 'none';
@@ -4322,6 +4336,29 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     target.querySelectorAll('.react-flow__node').forEach(nn => {
       if (!keep.has(nn.getAttribute('data-id') ?? '')) nn.remove();
     });
+    /* ROUND AU, DEFECT-1 (PNG chrome) — strip every EDITOR affordance the
+       clone inherited from the live viewport. The old clone only REMOVED
+       nodes outside `keep`, so a selection was rasterised with the board:
+       measured live at 2x with one node selected (real pointer events,
+       8 chrome elements live) → 4948 px within ±40 of `--sel` #3b82f6 in
+       the PNG vs 0 with nothing selected, plus the 12 grey connection
+       handles. Everything removed here is editor chrome the canvas paints
+       OVER the diagram; the diagram itself (nodes, edges, labels, bend
+       geometry) is untouched. */
+    target.querySelectorAll(
+      '.react-flow__resize-control' // the 4 corner resize handles + 4 edge lines (8 live when selected)
+      + ',.react-flow__handle' // the 12 per-side connection nubs
+      + ',.react-flow__edgeupdater' // the 2 edge reconnect circles
+      + ',.edge-bend-handle' // the smoothstep/step bend dot
+      + ',.edge-sel-core' // the edge selection restroke
+      + ',.react-flow__nodesselection' // the marquee selection rect
+      + ',.react-flow__selection' // the drag-to-box selection pane
+    ).forEach(ch => ch.remove());
+    /* the selection RING paints from the `selected` CLASS (on nodes, edges
+       and labels) — drop the class so no ring/hover/electric mark can
+       rasterise even where its element survives (e.g. an EdgeLabelRenderer
+       portal row kept for label parity). */
+    target.querySelectorAll('.selected').forEach(el2 => el2.classList.remove('selected'));
     try {
       await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
       const dataUrl = await Promise.race([
