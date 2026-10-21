@@ -35,3 +35,6 @@ dist/
 # declared runtime_data (DS-01 hashes them around every gate run)
 .gob/state.json
 # <<< goblin-stack <<<
+
+# research artifacts (deep-dive reports, harnesses)
+research/
