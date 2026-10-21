@@ -4420,6 +4420,69 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         kid.setAttribute('stroke-linejoin', 'round');
       });
     });
+    /* ROUND BA (card t_a272757e) — GENERAL svg paint inlining. html-to-image
+       never styles SVG descendants: lib/clone-node.js `cloneChildren()` returns
+       immediately for an SVG element and `cloneSingleNode` deep-clones SVGs
+       WITHOUT decorate()/cloneCSSStyle() — so any svg subtree whose paint
+       depends on CSS (the edge svgs, the marker defs, frame primitives beyond
+       the AV fill pass) rasterises UNPAINTED in the PNG. The AV passes above
+       fix the icon + the transparent frames; this pass covers EVERY <svg> in
+       the clone: per element, write the COMPUTED paint as explicit
+       presentation attributes (stroke, fill, stroke-width, stroke-dasharray,
+       stroke-linecap, stroke-linejoin, opacity, fill-opacity,
+       stroke-opacity, color, marker-end, marker-start; <text> also gets
+       font-family/font-size/font-weight/letter-spacing). The themed clone is
+       ATTACHED (mountThemed + 2 rAF), so getComputedStyle here carries the
+       EXPORT theme's resolved values — no var(), no currentColor, no
+       color-mix survives into the serialisation. The pre-change RED tree
+       measured edges/icon/frame paint missing (BA1-BA4 fail); live probe
+       numbers are on the card. Runs BEFORE toPng (below). */
+    target.querySelectorAll<SVGSVGElement>('svg').forEach((svg2, si) => {
+      /* the live viewport's same svg — path-matched fallback for none/empty
+         computed values (AV already fixed the icon + frames; this covers
+         edges/markers whose computed paint the themed mount resolves) */
+      const origSvgs = el.querySelectorAll<SVGSVGElement>('svg');
+      const origSvg = origSvgs[si] ?? null;
+      const origKids = origSvg ? Array.from(origSvg.querySelectorAll<SVGElement>('*')) : [];
+      const kids = Array.from(svg2.querySelectorAll<SVGElement>('*'));
+      kids.forEach((kid, ki) => {
+        const cs = getComputedStyle(kid);
+        const oc = origKids[ki] ? getComputedStyle(origKids[ki]) : null;
+        /* computed value, falling back to the live-original's when the
+           themed mount reports none/empty */
+        const pick = (prop: string): string => {
+          const v = cs.getPropertyValue(prop);
+          if (v && v !== 'none' && v !== '') return v;
+          return oc ? (oc.getPropertyValue(prop) || '') : '';
+        };
+        /* currentColor cannot survive serialisation — resolve it NOW to the
+           element's computed color (css colour, e.g. rgb()/rgba()) */
+        const color = pick('color');
+        const resolve = (v: string): string => (v.trim() === 'currentColor' ? color : v);
+        const write = (prop: string, val: string): void => {
+          if (!val || val === 'none') return; /* preserve existing attrs */
+          kid.setAttribute(prop, resolve(val));
+        };
+        write('stroke', pick('stroke'));
+        write('fill', pick('fill'));
+        write('stroke-width', pick('stroke-width'));
+        write('stroke-dasharray', pick('stroke-dasharray'));
+        write('stroke-linecap', pick('stroke-linecap'));
+        write('stroke-linejoin', pick('stroke-linejoin'));
+        write('opacity', pick('opacity'));
+        write('fill-opacity', pick('fill-opacity'));
+        write('stroke-opacity', pick('stroke-opacity'));
+        write('color', color);
+        write('marker-end', pick('marker-end'));
+        write('marker-start', pick('marker-start'));
+        if (kid.tagName.toLowerCase() === 'text') {
+          write('font-family', pick('font-family'));
+          write('font-size', pick('font-size'));
+          write('font-weight', pick('font-weight'));
+          write('letter-spacing', pick('letter-spacing'));
+        }
+      });
+    });
     try {
       await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
       const dataUrl = await Promise.race([
