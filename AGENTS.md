@@ -24,12 +24,25 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 883721
-# RAISED 2026-10-21 (4th raise today), Harvey-approved, measured at HEAD 6d9459b: 883721.
-# Reason: ROUND AW canvas frame tint - shapeFrameMarkup emits the fill through a style attribute
-# (fill:var(--nc);fill-opacity:0.09) because var() is invalid in an SVG presentation attribute,
-# which is what had forced fill="transparent" and made the canvas the only surface without the
-# node tint. +61 bytes over the previous ceiling.
+ratchet.ceiling: 900000
+# RAISED 2026-10-21 (FINAL raise of the day), Harvey-approved: 883721 -> 900000 (+16279 headroom).
+# Reason: the ceiling was being raised once per feature round (4x today: 878/810/2496/1938/61 bytes),
+# which turned a bloat alarm into a per-commit negotiation. The ceiling now carries ~1.6% headroom and
+# the POLICY below governs raises instead of Harvey being asked each time.
+#
+# RATCHET POLICY (Harvey, 2026-10-21):
+#   1. The orchestrator MAY raise the ceiling without asking when the measured growth is <= +2% of the
+#      current ceiling, the round's gates are green (tsc 0, build 0, all harnesses), and the bytes come
+#      from code Harvey asked for. Record the measured number + reason in this file and in the vault
+#      Change Log. Never raise silently for a jump that is not explained.
+#   2. ASK Harvey for anything above +2%, for ANY new npm dependency, or if bytes DROP by more than 2%
+#      (a large drop usually means code was deleted by accident, not optimised).
+#   3. Re-baseline the ceiling at release milestones only (a release candidate, a major round boundary),
+#      not per round. Between milestones the ceiling is a hard stop that should rarely be approached.
+#   4. A worker that exceeds the ceiling reports the number and BLOCKS; it must never edit this file.
+#
+# History of the raises that led to this policy (kept for the audit trail):
+#   883721 -> ROUND AW canvas frame tint (style attribute fill, var() invalid in a presentation attr)
 # Reason: ROUND AV export colour parity - the SVG emitter now lifts every node icon out of the
 # themed clone as real vector primitives (frameMarkup gained an optional icon block instead of a
 # deferred unicode fallback), and the PNG path resolves the frame fill and the icon ink to literal
