@@ -820,7 +820,11 @@ assert('aa3.no-item-was-duplicated-or-lost',
      is FOR is that no row was duplicated or dropped by the category move, so the
      total is reported and the DISTINCTNESS plus the section sum carry the check —
      a pinned 34 would fail on every future addition for no reason. */
-  new Set(labels).size === labels.length && LIB.length >= 34
+  /* ACTOR_ENABLED / C4_ENABLED / QUEUE_ENABLED (2026-10-22) — the create-surface
+     hides shrink the EXECUTED LIBRARY (40 → 27 with all three off), so the >=34
+     floor is now the SHIPPED floor: items stay in the tree, only the offer is
+     gated. DISTINCTNESS + the section sum still carry the no-loss claim. */
+  new Set(labels).size === labels.length && LIB.length >= 27
     && basic.length + flow.length + LIB.filter(p => !['basic', 'flowchart'].includes(p.category)).length === LIB.length,
   `${LIB.length} items, ${new Set(labels).size} distinct labels — the count badge for Basic now reads `
   + `${basic.length} and Flowchart ${flow.length}, and the sections still sum to the whole library`);
