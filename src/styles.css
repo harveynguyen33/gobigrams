@@ -534,11 +534,12 @@ body {
    `58dvh - 90px`. With it the menu scrolls instead of spilling (scrollRange
    114/137 at the landscape sizes), so every item stays reachable.
    Do NOT "tidy" either number without re-measuring: 420px was arbitrary, the
-   90px is real geometry. The base `.boards-pop` rule below stays untouched for
-   desktop/tablet, where 420px is correct. */
-.app[data-form-factor="phone"] .boards-pop {
-  max-height: calc(58dvh - 90px);
-}
+   90px is real geometry.
+   [RETIRED 2026-10-22, ITEM B — this override patched the OLD head-anchored
+   popup that lived INSIDE the bottom sheet; the redesigned popover is a fixed
+   portal to `document.body` and no longer lives in the sheet, so the override
+   has nothing to override and is gone. The menu now scrolls in its own
+   `.boards-list` (max-height 300px) with the actions block pinned.] */
 
 /* "Collapsed" is a DESKTOP column concept. In the compact tiers the panels are
    drawers/sheets, so the Step 2 hide-opacity must not apply — otherwise a
@@ -3002,6 +3003,14 @@ kbd {
 }
 .boards-btn.on { background: var(--elevated); border-color: var(--border-strong); }
 /* ITEM 6a (2026-09-17) — THE POPUP MUST NOT OVERFLOW THE BUTTON.
+   [SUPERSEDED 2026-10-22, ITEM B — the geometry this section pinned is GONE:
+   the popup is now a 360px fixed portal to body anchored right of the button
+   (App.tsx boardsPopClamp + the `.boards-pop` rule below), so the overflow
+   model below describes the RETIRED head-anchored popup. The overflow=0 claim
+   survives as a DIFFERENT contract: the popup must never overflow the
+   VIEWPORT, which the `max-width` clamp enforces. Kept for the audit trail;
+   checks/package-o-metrics.mjs item6a has been re-anchored to the new
+   contract with the same date.]
 
    MEASURED (checks/package-o-metrics.mjs): `.pop` anchors with `right: 0`, but
    this rule ALSO set `min-width: 240px`. A 240px floor beats a right-anchor on a
@@ -3010,31 +3019,43 @@ kbd {
    (button 168px). This is the same defect class as the earlier `.help-pop`
    overflow: a `min-width` on a right-anchored popup.
 
-   THE FIX is to drop the floor and let the popup fit the button it hangs off —
-   `left: 0; right: 0` already pins BOTH edges to the button's own box, so with
-   no `min-width` the popup resolves to exactly the button width and the
-   measured overflow is 0 at every tier. This was chosen over widening the
-   button because the button is `width: 100%` inside `.panel-head`'s 16px
-   padding: there is no room to widen it without eating the panel's own gutter,
-   and the popup should follow the control rather than the control be resized to
-   fit a popup.
+   THE FIX then was to drop the floor and let the popup fit the button it hangs
+   off — `left: 0; right: 0` pinned BOTH edges to the button's own box. That
+   made the popup exactly the button's 199-232px, which is the cramped box ITEM
+   B replaces; see the redesign comment on `.boards-pop` below. */
 
-   The board NAME inside a row already ellipsises (`.boards-btn .boards-name`)
-   and so does `.boards-item-name`, so a narrower popup truncates gracefully.
-
-   `max-height` is kept, and the phone tier below still overrides `max-height`
-   with its own `calc(58dvh - 90px)`. */
+/* ITEM B (2026-10-22) — the boards popover is REDESIGNED as a fixed portal to
+   body (App.tsx boardsPopClamp). It used to hang off `.panel-head` with
+   `left: 0; right: 0; min-width: 0`, exactly the button's 199-232px — and
+   `.panel` is `overflow: hidden`, so the popup could never grow past the head
+   without being CLIPPED. The portal escapes the clip: the inline style sets
+   position/left/top/width, and THIS rule carries the redesign contract:
+     · width 360 (inline, clamped to the viewport by boardsPopClamp);
+     · `.boards-list` is the scroll CONTAINER — `overflow-y: auto` with its own
+       `max-height: 300px` — and `.boards-actions` stays PINNED below it, always
+       visible (Save now reachable at any list length);
+     · `max-height` moves from the popup to the list, so the actions block can
+       never be pushed off by a long board list.
+   The phone override above (`max-height: calc(58dvh - 90px)`) addressed the OLD
+   head-anchored popup's spill INSIDE the bottom sheet; the portal no longer
+   lives in the sheet, so the override is retired WITH the geometry it patched
+   (below 420px of viewport height `.app`'s transform makes the fixed popup
+   resolve against `.app` anyway — asserted in checks/boards-popover-pinned.mjs). */
 .boards-pop {
-  /* `min-width: 0` explicitly cancels `.pop`'s own `min-width: 168px` floor —
-     without it, a button narrower than 168px would still overflow. With both
-     floors gone, `left: 0; right: 0` alone decides the width and the popup can
-     never be wider than the button at any tier. */
-  left: 0; right: 0; min-width: 0; max-height: 420px; overflow-y: auto;
+  z-index: 60;   /* above `.panel` (8) and the toolbar (5), below .tooltip (9999) */
+  max-height: none;
 }
-.boards-list { display: flex; flex-direction: column; gap: 2px; }
+.boards-list {
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto; max-height: 300px;   /* ITEM B — the list owns the scroll */
+}
 .boards-item { flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 10px; }
 .boards-item.current { background: var(--elevated); box-shadow: inset 2px 0 0 var(--acc); }
-.boards-item .boards-item-name { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boards-item .boards-item-name {
+  font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* ITEM B — de-cramped row: name is its own line … */
+  display: block;
+}
 .boards-item .boards-item-meta { color: var(--dim); font-size: var(--fs-sm); }
 .boards-empty { color: var(--dim); font-size: var(--fs-md); padding: 8px 10px; }
 /* AT-1/AT-4 — the storage-mode line + the local-mode storage readout. Small,
@@ -3405,9 +3426,13 @@ kbd {
    the PACKAGE-M section at the end of this file). */
 
 .badge.preset { border-color: var(--acc); color: var(--acc); }
+/* ITEM B (2026-10-22) — the preset badge moved OUT of the ellipsising
+   `.boards-item-name` span (it used to live inside it and clipped to "Ar…");
+   it is now its own row line and never inherits the name's truncation. */
 .boards-item .boards-item-preset {
   font-family: var(--mono); font-size: var(--fs-xs); color: var(--acc);
-  border: 1px solid var(--acc); border-radius: 999px; padding: 0 4px; margin-left: 6px;
+  border: 1px solid var(--acc); border-radius: 999px; padding: 0 4px;
+  align-self: flex-start; white-space: nowrap;
 }
 .preset-warn {
   font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.5;

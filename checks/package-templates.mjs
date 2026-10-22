@@ -1120,7 +1120,8 @@ assert('16a-REANCHOR.NO-create-row-can-enter-a-radio-walk-because-there-is-none'
   + 'REASON: ROUND 6 ITEM 1 deleted the radio model and the header/kind machinery, so `rows`/`opts`/`StartRow` — the subject the old claim contrasted against — no longer exists.');
 assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
   /setBoardsOpen\(false\); pendingBoardName\.current = ''; setTgOpen\(true\)/.test(APP_RAW)
-    && /Create from Templates/.test(APP_RAW)
+    && /<LayoutTemplate size=\{14\} \/> Templates/.test(APP_RAW)
+    && !/<LayoutTemplate size=\{14\} \/> Create from Templates/.test(APP_RAW)
     && /onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
     && /if \(tgOpen\) return;/.test(APP_RAW)
     && /onBrowse\?: \(name: string\) => void;/.test(DIALOG_RAW)
@@ -1128,11 +1129,11 @@ assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
     && /const carried = pendingBoardName\.current;\s*\n\s*pendingBoardName\.current = '';/.test(APP_RAW),
   'exactly TWO route statements in App.tsx: the boards menu row (the gallery\'s primary entry, D2) and the dialog\'s "Use template" row, which closes the dialog and opens '
   + 'the gallery rather than creating a board from there; and the gallery sits in the SAME global keydown guard as the other overlays (`if (tgOpen) return;`), so app '
-  + 'shortcuts stay inert behind it. The menu row reads "Create from Templates". '
-  + 'RE-ANCHORED (ROUND 6, ITEM 3): both route statements and the dialog prop changed from the old no-argument `onBrowse?: () => void` / `onClick={onBrowse}` / '
-  + '`setBoardDlg(null); setTgOpen(true);` to name-carrying forms, because it is THIS hop the typed name was being dropped on. The NEW CLAIM pins the whole handover: the '
-  + 'dialog hands `trimmed` to `onBrowse`, App.tsx stashes it in `pendingBoardName`, and `useTemplate` consumes AND clears it in the same statement — which is the fix for '
-  + 'Harvey\'s "nó lại ra là untitled X chứ k phải tên đã ghi". The boards-menu row, which has NO typed name, clears the stash instead of carrying one.');
+  + 'shortcuts stay inert behind it. The menu row reads "Templates". '
+  + 'RE-ANCHORED (ITEM B, 2026-10-22) — the literal moved twice, the ROUTES never. OLD CLAIM: the row reads "Create from Templates" (ROUND 4 rename, kept through ROUND 6). '
+  + 'NEW CLAIM: the row reads "Templates" and the "Create from Templates" literal is gone from App.tsx. REASON: ITEM B redesigned the boards popover at a fixed 360px and '
+  + 'HARVEY required the row NOT to wrap; only the label changed — both route statements, the stash-clear and the keydown guard are pinned UNCHANGED in this same predicate. '
+  + 'The dialog route (onBrowse carrying `trimmed`, the carried/clear in useTemplate) is untouched.');
 assert('tg12.an-empty-group-never-renders-a-header',
   galleryFamilies.every(f => f.groups.length > 0 && f.groups.every(g => g.cards.length > 0))
     && /\.filter\(g => g\.entries\.length > 0\)/.test(TG)

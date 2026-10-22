@@ -239,59 +239,76 @@ const guardX = helpPop.decls['overflow-x'];
 console.log(`guard: max-height=${guardHeight}  overflow-y=${guardY}  overflow-x=${guardX}`);
 
 /* ===========================================================================
-   ITEM 6a — .boards-pop overflow past the Boards button
+   ITEM 6a — .boards-pop never overflows the VIEWPORT (ITEM B contract)
+
+   RE-ANCHORED (ITEM B, 2026-10-22) — NOT WEAKENED, the reason is recorded.
+   OLD CLAIM (2026-09-17): the popup hung off `.panel-head` with
+   `left: 0; right: 0; min-width: 0`, so its width EQUALED the button's and the
+   overflow past the button was 0 at every panel tier (232/231/200, including
+   the reported 41px case). That contract pinned the popup to the button's
+   199-232px — which is exactly the cramped box ITEM B replaces.
+   NEW CLAIM: the popup is a 360px fixed PORTAL to body (Tooltip.tsx:205
+   precedent) anchored right of the button (left = btn.right + 6, top =
+   btn.top, inline style from App.tsx `boardsPopClamp`), so it no longer
+   resolves inside `.panel`'s `overflow: hidden` and can never be clipped by
+   it; the width is clamped to the viewport (`max-width = min(360,
+   innerWidth − anchorX − 8)`), so the overflow=0 invariant survives as "never
+   overflows the VIEWPORT" instead of "never overflows the button".
+   REASON: HARVEY redesigned the popover (scrollable list, pinned footer,
+   wider rows); the old geometry made that impossible — the panel clips at
+   232px. SHORT VIEWPORTS (bottom < 420px): the phone tier's transform on
+   `.app` makes `position: fixed` resolve against `.app` instead of the
+   viewport — ACCEPTED, asserted below (`item6a.short-viewport-contract`).
    =========================================================================== */
 const popRule = cssBlock('.pop');
 const boardsPop = cssBlock('.boards-pop');
+const boardsListCss = cssBlock('.boards-list');
 console.log('\n' + '='.repeat(78));
-console.log('ITEM 6a — .boards-pop alignment');
+console.log('ITEM 6a — .boards-pop portal contract (ITEM B)');
 console.log('='.repeat(78));
-console.log(`.pop                   right=${popRule.decls.right} min-width=${popRule.decls['min-width']}   (.pop at styles.css:${popRule.line})`);
-console.log(`.boards-pop            left=${boardsPop.decls.left} right=${boardsPop.decls.right} min-width=${boardsPop.decls['min-width']}   (styles.css:${boardsPop.line})`);
+console.log(`.pop base (shared)     right=${popRule.decls.right} min-width=${popRule.decls['min-width']}   (.pop at styles.css:${popRule.line})`);
+console.log(`.boards-pop            z-index=${boardsPop.decls['z-index']} max-height=${boardsPop.decls['max-height']}   (styles.css:${boardsPop.line})`);
+console.log(`.boards-list           overflow-y=${boardsListCss.decls['overflow-y']} max-height=${boardsListCss.decls['max-height']}   (styles.css:${boardsListCss.line})`);
+/* The App side of the contract, read from the JSX: the portal, the anchor and
+   the clamp are INLINE-STYLE facts, not CSS facts. */
+const APP_RAW = APP.join('\n');
+const portalJsx = /boardsOpen && boardsPopPos && createPortal\(/.test(APP_RAW);
+const anchorJsx = /left: boardsPopPos\.left, top: boardsPopPos\.top/.test(APP_RAW);
+const clampJsx  = /Math\.min\(360, boardsPopPos\.maxW\)/.test(APP_RAW);
+const clampCalc = /window\.innerWidth - left - 8/.test(APP_RAW);
+const bodyPortal = /document\.body,/.test(APP_RAW);
+console.log(`portal=${portalJsx} anchor=${anchorJsx} clamp=${clampJsx} calc=${clampCalc} toBody=${bodyPortal}`);
 
-/* The anchor is the button: `.panel-head` padding is 14px 16px, so the button's
-   containing block is the panel width minus 32px. */
+/* The anchor is the button — but the button is only the ANCHOR now: the
+   popup's WIDTH is fixed (360) and clamped to the viewport, so the old
+   per-tier overflow model (panel 232/231/200) is replaced by a VIEWPORT model.
+   The clamp formula is EXACTLY the one App.tsx `boardsPopClamp` computes:
+     maxW = max(0, innerWidth − (btn.right + 6) − 8), popup width = min(360, maxW),
+   which algebraically NEVER passes the window's right edge: btn.right + 6 +
+   (innerWidth − btn.right − 6 − 8) = innerWidth − 8. The clamp has no floor —
+   measured, not assumed: a 232px floor would overflow a 360px window by 94px,
+   which is exactly the defect class the 2026-09-17 pass existed to kill.
+   The model reads the real panel width from the sheet (`--left-w`, 232px, and
+   200px on the desktop compact tier) and holds the WINDOW width per tier. */
 const panelHead = cssBlock('.panel-head');
 const [phPadY, phPadX] = shorthands(panelHead.decls.padding);
-/* `.panel-head` is `position: relative`, which is what makes it the containing
-   block for the absolutely-positioned popup; `.panel` is `overflow: hidden`, so
-   anything wider than the head is CLIPPED, not just misaligned. Both are read
-   from the sheet rather than assumed. */
-const panelRule = cssBlock('.panel');
-function boardsGeom(panelWidth) {
-  const btnW = panelWidth - phPadX * 2;
-  /* Model the real box resolution. `.boards-pop` sets `left: 0; right: 0` so both
-     edges are pinned to the button's box, and its `min-width: 0` cancels
-     `.pop`'s `min-width: 168px` floor. The effective floor is therefore this
-     rule's own value when it is a positive length, else nothing:
-       - floor absent/0 -> the popup resolves to the button width, overflow 0
-       - floor positive -> the floor wins and the box overflows by (floor - button)
-     The regression this guards: removing `min-width: 0` silently reinstates
-     `.pop`'s 168px floor, which must FAIL this assertion on a narrow tier. */
-  const ownMinW = pxOf(boardsPop.decls['min-width']);         // 0 when "0"
-  const popFloor = (ownMinW && ownMinW > 0) ? ownMinW : 0;
-  /* The INHERITED floor: if this rule does not cancel it, `.pop`'s own
-     `min-width` applies and becomes the effective floor. Modelled explicitly so a
-     deleted `min-width: 0` shows up as the 168px it really is, not as 0. */
-  const inherited = ownMinW == null ? (pxOf(popRule.decls['min-width']) ?? 0) : 0;
-  const floor = Math.max(popFloor, inherited);
-  const popW = Math.max(btnW, floor);
-  /* Clipping: the popup hangs off `.panel-head` (its containing block) and the
-     panel clips. Horizontal spill past the HEAD's own box is what the panel's
-     `overflow: hidden` would eat. */
-  const headRight = panelWidth - phPadX;   // head's padding box right edge
-  const clipRight = Math.max(0, popW - btnW);
-  return {panelWidth, btnW, ownMinW, inherited, floor, popW, overflow: popW - btnW, clipRight, headRight};
+const appLeftW = cssBlock('.app').decls['grid-template-columns'] ?? '';
+const PANEL_W = pxOf(appLeftW.split(/\s+/)[0] ?? '') ?? 232;
+function boardsGeom(windowWidth) {
+  const btnRight = PANEL_W - phPadX;                    // btn.right (panel is at the left edge)
+  const anchorX = btnRight + 6;                         // boardsPopClamp: left = btn.right + 6
+  const maxW = Math.max(0, windowWidth - anchorX - 8);  // boardsPopClamp's formula, verbatim
+  const popW = Math.min(360, maxW);                     // inline width 360, clamped
+  const overflowVp = Math.max(0, anchorX + popW - windowWidth);
+  return {windowWidth, btnRight, anchorX, maxW, popW, overflowVp};
 }
-/* 231 is the REPORTED case, made exact: Harvey's panel laid the button out at
-   199px, so the panel was 199 + 2×16 = 231px. The old 240px floor overflowed it
-   by 41px. 232/200 are the canonical tiers from the previous pass. */
-const BOARD_TIERS = [232, 231, 200];
+/* The invariant tiers: at each, the popup must end at or before the window's
+   right edge. 360 (the phone breakpoint floor), 500, 800, 1280, 1920. */
+const BOARD_TIERS = [360, 500, 800, 1280, 1920];
 for (const pw of BOARD_TIERS) {
   const g = boardsGeom(pw);
-  console.log(`panel ${pw}px -> button ${g.btnW}px, popup ${g.popW}px, overflow right = ${g.overflow}px, clipped by panel = ${g.clipRight}px`);
+  console.log(`window ${pw}px -> button right ${g.btnRight}px, clamp ${g.maxW}px, popup ${g.popW}px, overflow past viewport = ${g.overflowVp}px`);
 }
-ok('item6a.overflow-before-recorded', true, `${boardsGeom(232).overflow}px @ 232 panel`);
 
 /* The SECOND `.pop` user (the Export/Import dropdown in the canvas toolbar) must
    keep the shared base untouched: it is NOT overridden, so it still anchors right
@@ -299,8 +316,7 @@ ok('item6a.overflow-before-recorded', true, `${boardsGeom(232).overflow}px @ 232
 const otherPopUsers = APP.filter(l => /className="pop"/.test(l)).length;
 console.log(`\n.pop base (shared by the Export dropdown): right=${popRule.decls.right} min-width=${popRule.decls['min-width']}   (.pop at styles.css:${popRule.line})`);
 console.log(`elements using the BARE .pop class (no boards-pop): ${otherPopUsers}`);
-console.log(`.boards-pop cancels it ? left=${boardsPop.decls.left} right=${boardsPop.decls.right} min-width=${boardsPop.decls['min-width']}`);
-console.log(`.panel overflow = ${panelRule.decls.overflow ?? panelRule.decls['overflow-y'] ?? '(none)'} — the clip that makes overflow matter`);
+console.log(`.boards-pop overrides ? position=fixed(inline) z-index=${boardsPop.decls['z-index']} max-height=${boardsPop.decls['max-height']}`);
 
 /* ===========================================================================
    ITEM 4 — shape hint lengths + uniqueness
@@ -482,33 +498,51 @@ assert('item3.phone-tier-still-overrides',
   phoneHelp ? `width=${phoneHelp.decls.width} left=${phoneHelp.decls.left} right=${phoneHelp.decls.right}` : 'no phone rule');
 
 // --- ITEM 6a ----------------------------------------------------------------
-// Overflow must be 0: the popup can never be wider than the button it hangs off.
-const overflows = BOARD_TIERS.map(pw => boardsGeom(pw).overflow);
+// The portal contract (ITEM B). The old per-tier overflow==0 model is
+// re-anchored: overflow is now measured past the VIEWPORT, and the popup must
+// never be clippable by the panel (it is portal'd OUT of .panel entirely).
+const overflows = BOARD_TIERS.map(pw => boardsGeom(pw).overflowVp);
 const maxOverflow = Math.max(...overflows);
-assert('item6a.overflow-0', maxOverflow <= 0,
-  `overflow ${JSON.stringify(overflows)} at panel widths ${JSON.stringify(BOARD_TIERS)}`);
-// The exact reported case: a 199px button (panel 231px). The old 240px floor
-// gave 41px here — this assertion is the regression, stated as the number Harvey
-// saw, so a re-introduced floor fails with the same 41 it was reported with.
-assert('item6a.reported-41px-case-is-0', boardsGeom(231).overflow === 0,
-  `panel 231px -> button ${boardsGeom(231).btnW}px, overflow ${boardsGeom(231).overflow}px (was 240-199 = 41px)`);
-// Nothing may be clipped by the panel either — a popup that fits the button but
-// is painted past the panel's own clip would be invisible, not merely offset.
-assert('item6a.not-clipped-by-panel', BOARD_TIERS.every(pw => boardsGeom(pw).clipRight === 0),
-  BOARD_TIERS.map(pw => `${pw}:${boardsGeom(pw).clipRight}px`).join(' '));
-// The popup's own floor must be an EXPLICIT cancellation of the base, not a
-// coincidence: if `.boards-pop` ever drops `min-width`, this fails with the
-// inherited 168 it would really resolve to.
-assert('item6a.boards-pop-explicitly-cancels-the-shared-floor',
-  boardsPop.decls['min-width'] === '0' && boardsGeom(200).inherited === 0,
-  `min-width=${boardsPop.decls['min-width']} declared, inherited=${boardsGeom(200).inherited}px`);
-// The SECOND .pop user must be untouched: the shared base keeps `right: 0` and
-// its own floor. AQ21-F — the Export dropdown (the last BARE .pop) was replaced
-// by the export modal, so the bare-user clause is retired; the base itself and
-// the compound boards-pop consumer remain pinned.
+assert('item6a.viewport-overflow-0', maxOverflow <= 0,
+  `overflow ${JSON.stringify(overflows)} at viewport widths ${JSON.stringify(BOARD_TIERS)} — RE-ANCHORED (ITEM B, 2026-10-22): the OLD claim measured overflow past the ` +
+  `BUTTON at panel tiers 232/231/200 for the head-anchored popup; the NEW claim measures overflow past the VIEWPORT for the 360px fixed portal, clamped by ` +
+  `max-width = min(360, innerWidth − anchorX − 8). The old contract pinned the popup to the button's 199-232px, which is the cramped box this round replaces.`);
+// The clamp-floor regression this re-anchor CAUGHT: an intermediate state of
+// the redesign shipped `max(232, …)` as the clamp's floor, which overflowed a
+// 360px window by 94px — the same defect class the 2026-09-17 pass killed.
+// The floor is banned by name: the clamp is max(0, …).
+assert('item6a.clamp-has-no-floor',
+  /Math\.max\(0, window\.innerWidth - left - 8\)/.test(APP_RAW) && !/Math\.max\(232, window\.innerWidth/.test(APP_RAW),
+  `RE-ANCHORED (ITEM B, 2026-10-22): the OLD claim was "overflow past the button = 0" for the head-anchored popup (the reported 41px case, 240−199). ` +
+  `The NEW claim: the 360px portal's only width guarantee is the viewport clamp max(0, 100vw − anchorX − 8) with NO floor — a floor re-creates the ` +
+  `overflow defect on narrow windows (measured: 232px floor ⇒ +94px at a 360px window).`);
+// The popup is portal'd to document.body and positioned inline: it is OUTSIDE
+// .panel, so the panel's overflow:hidden can never clip it again.
+assert('item6a.portal-escapes-the-panel-clip',
+  portalJsx && bodyPortal && anchorJsx && clampJsx && clampCalc,
+  `createPortal(..., document.body) with inline position/left/top/maxWidth — RE-ANCHORED (ITEM B, 2026-10-22): the OLD claim ` +
+  `"not-clipped-by-panel" modelled the clip INSIDE the head (left:0;right:0); the NEW claim is that the popup no longer lives in the head at all. ` +
+  `portal=${portalJsx} body=${bodyPortal} anchor=${anchorJsx} clamp=${clampJsx} calc=${clampCalc}`);
+// The shared .pop base keeps the bare users working; the boards popup keeps an
+// EXPLICIT override block (z-index + max-height) so the redesign is a decision,
+// not an inheritance accident.
 assert('item6a.shared-.pop-base-unchanged',
   popRule.decls.right === '0' && pxOf(popRule.decls['min-width']) === 168,
   `.pop right=${popRule.decls.right} min-width=${popRule.decls['min-width']}`);
+assert('item6a.boards-pop-declares-its-own-override',
+  boardsPop.decls['z-index'] === '60' && boardsPop.decls['max-height'] === 'none',
+  `.boards-pop z-index=${boardsPop.decls['z-index']} max-height=${boardsPop.decls['max-height']} — RE-ANCHORED (ITEM B, 2026-10-22): the OLD claim ` +
+  `pinned min-width:0 (the floor cancellation for the head-anchored box); the NEW claim pins the portal-era override: the popup rises above the panels ` +
+  `(z-index 60 vs .panel's 8) and carries NO max-height of its own — the scroll budget moved to .boards-list so the actions block stays pinned.`);
+// SHORT VIEWPORTS — the accepted fixed-vs-transform caveat, asserted as a fact
+// of the sheet: the phone tier's transform rule is the only transform on .app.
+const shortViewportTransform = /\.app\[data-form-factor="phone"\] \.panel \{[\s\S]{0,600}?transform: translateY\(101%\)/.test(CSS.join('\n'))
+  || /transform: translateY\(101%\)/.test(CSS.join('\n'));
+assert('item6a.short-viewport-contract',
+  shortViewportTransform && boardsListCss.decls['overflow-y'] === 'auto' && pxOf(boardsListCss.decls['max-height']) === 300,
+  `RE-ANCHORED (ITEM B, 2026-10-22): below 420px of viewport height the compact tiers' transforms make position:fixed resolve against .app — ACCEPTED, not fought; ` +
+  `the anchor is measured from the post-transform rect (getBoundingClientRect), so the popup lands beside the sheet. The list owns the scroll ` +
+  `(overflow-y=${boardsListCss.decls['overflow-y']}, max-height=${boardsListCss.decls['max-height']}) and .boards-actions stays pinned below it.`);
 
 // --- ITEM 4 -----------------------------------------------------------------
 assert('item4.no-duplicate-hints (SHAPES)', dupes.length === 0,

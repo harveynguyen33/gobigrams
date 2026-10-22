@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
+import {createPortal} from 'react-dom';
 import {
   ReactFlow, Background, Controls, MiniMap, Panel, addEdge, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
@@ -1543,7 +1544,9 @@ export default function App() {
    *  again at every point where it would otherwise go stale.
    *
    *  THE STALE-NAME RULE (each clear site, and why it is there):
-   *    - opening the gallery from the BOARDS MENU row (`Create from Templates`)
+   *    - opening the gallery from the BOARDS MENU row (`Templates`; it read
+   *      `Create from Templates` until ITEM B, 2026-10-22, shortened so the
+   *      row never wraps at the popover's 360px)
    *      starts an EMPTY stash, because that route has no typed name and the
    *      board must auto-number — without this clear, a name abandoned in an
    *      earlier dialog would silently name a later, unrelated board;
@@ -1657,6 +1660,44 @@ export default function App() {
    *  is chosen. Focusing a null ref is a no-op, so a menu row ref would silently
    *  drop focus on `<body>` and the next Tab would start from the top of the page. */
   const boardsMenuBtnRef = useRef<HTMLButtonElement>(null);
+
+  /* ITEM B (2026-10-22) — the boards popover is a FIXED PORTAL, anchored to
+   * the live button rect. Measured defect it replaces: the popup hung off
+   * `.panel-head` with `left: 0; right: 0`, and `.panel` is `overflow: hidden`
+   * at 232px — a wider redesign is CLIPPED, not scrolled, so the width could
+   * never grow inside the head. Portal'd to `document.body` (the
+   * `Tooltip.tsx` precedent) it escapes that clip; the anchor is the button's
+   * own rect (`left: btn.right + 6`, top pinned to the button top) so the
+   * popup opens to the RIGHT of the control and the `max-width` clamp keeps
+   * it inside the viewport on narrow hosts. Recomputed while open so a
+   * viewport resize re-anchors instead of leaving the popup floating.
+   * SHORT VIEWPORTS: below 420px of viewport height the phone tier puts a
+   * `transform` on `.app`'s subtree — a `position: fixed` descendant then
+   * resolves against `.app` (the transformed ancestor), not the viewport,
+   * which is ACCEPTED here, not fought: the clamp loop below measures the
+   * button rect AFTER that resolution (getBoundingClientRect already reports
+   * post-transform geometry), so the popup lands beside the sheet either way;
+   * `boardsPopClamp` asserts it. */
+  const [boardsPopPos, setBoardsPopPos] = useState<{left: number; top: number; maxW: number} | null>(null);
+  const boardsPopClamp = useCallback(() => {
+    if (!boardsOpen) { setBoardsPopPos(null); return; }
+    const r = boardsMenuBtnRef.current?.getBoundingClientRect();
+    if (!r) { setBoardsPopPos(null); return; }
+    const left = r.right + 6;
+    const top = r.top;
+    /* ITEM B — the clamp has NO floor, by design: a floor would push the popup
+       past a narrow window's right edge (measured in the harness model: a 232px
+       floor overflows a 360px window by 94px). max-width = 100vw − anchorX − 8;
+       a degenerate sliver of a window squeezes the popup instead of overflowing. */
+    const maxW = Math.max(0, window.innerWidth - left - 8);
+    setBoardsPopPos({left, top, maxW});
+  }, [boardsOpen]);
+  useEffect(() => {
+    if (!boardsOpen) { setBoardsPopPos(null); return; }
+    boardsPopClamp();
+    window.addEventListener('resize', boardsPopClamp);
+    return () => window.removeEventListener('resize', boardsPopClamp);
+  }, [boardsOpen, boardsPopClamp]);
 
   /** L2 — applies a preset to the CURRENT board. NO UI CALLS THIS any more:
    *  the user-facing picker was removed on 2026-09-17, so this is now the
@@ -5651,8 +5692,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 <ChevronDown size={12} style={{verticalAlign: -2}} />
               </button>
             </Tooltip>
-            {boardsOpen && (
-              <div className="pop boards-pop">
+            {/* ITEM B (2026-10-22) — the popover is PORTAL'D TO BODY and
+                position:fixed (Tooltip.tsx:205 precedent): `.panel` clips at
+                232px (overflow:hidden), so the redesigned 360px popup could
+                never render inside the head. The inline style carries the
+                anchor computed in `boardsPopClamp` (left = button right + 6,
+                top = button top, max-width = viewport − anchor − 8). */}
+            {boardsOpen && boardsPopPos && createPortal(
+              <div
+                className="pop boards-pop"
+                style={{position: 'fixed', left: boardsPopPos.left, top: boardsPopPos.top, maxWidth: Math.min(360, boardsPopPos.maxW), width: 360}}
+              >
                 {/* AT-1 — mode is VISIBLE, not guessed: one small line above the
                     list. server → "Saved to server files"; local → "Saved in
                     this browser". No dead buttons, no modal, no override (the
@@ -5667,18 +5717,25 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     {storageEstimate}
                   </div>
                 )}
+                {/* ITEM B — the LIST owns the scroll (`overflow-y: auto`,
+                    `max-height: 300px`); the actions block below is PINNED and
+                    always visible (Save now reachable at any list length). */}
                 <div className="boards-list">
                   {boardList.map(b => (
                     <button
                       key={b.id}
                       type="button"
                       className={`pop-item boards-item${b.id === curBoard?.id ? ' current' : ''}`}
+                      title={b.name}
                       onClick={() => void openBoard(b.id)}
                     >
-                      <span className="boards-item-name">
-                        {b.name}
-                        <span className="boards-item-preset">{getPreset(b.preset).label}</span>
-                      </span>
+                      {/* ITEM B — de-cramped row: the NAME is its own
+                          ellipsising line and the preset badge sits OUTSIDE
+                          it (it used to live INSIDE the ellipsising span and
+                          clipped to "Ar…" on any narrow popup). `title` on
+                          the row carries the full name through truncation. */}
+                      <span className="boards-item-name">{b.name}</span>
+                      <span className="boards-item-preset">{getPreset(b.preset).label}</span>
                       <span className="boards-item-meta">
                         {b.nodeCount}n · {b.edgeCount}e · {fmtDate(b.updatedAt)}
                       </span>
@@ -5700,16 +5757,20 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                       deferral, not an omission to fix here). It sits beside
                       "New board" because it is the same intent — start a board —
                       with a catalog in front of it.
-                      ROUND 4, ITEM 2 — the row reads "Create from Templates"
+                      ROUND 4, ITEM 2 — the row read "Create from Templates"
                       (Harvey, verbatim: "Còn cái Templates... bên ngoài thì đổi
-                      thành Create from Templates"). Only the MENU ROW is
-                      renamed: the gallery's own heading is still "Templates".
+                      thành Create from Templates"). Only the MENU ROW was
+                      renamed; the gallery's own heading is still "Templates".
+                      ITEM B (2026-10-22) — HARVEY: the label must NOT wrap, so
+                      the row is shortened to "Templates" (the handler, the
+                      stash-clear and the route are untouched). checks tg11 and
+                      round-4 i2 are RE-ANCHORED to the new literal, dated.
                       ROUND 6, ITEM 3 — this route has NO typed name, so it is
                       the one place that MUST empty the dialog's name stash: a
                       name abandoned in an earlier dialog would otherwise name
                       this unrelated board. The gallery then auto-numbers. */}
                   <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}>
-                    <LayoutTemplate size={14} /> Create from Templates
+                    <LayoutTemplate size={14} /> Templates
                   </button>
                   <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
                     <Pencil size={14} /> Rename
@@ -5724,7 +5785,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     <Save size={14} /> Save now
                   </button>
                 </div>
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
           <div className={`save-ind${saveState === 'saving' ? ' busy' : ''}${saveState === 'error' ? ' err' : ''}`} aria-live="polite">

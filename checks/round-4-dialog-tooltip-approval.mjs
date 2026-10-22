@@ -138,17 +138,22 @@ console.log('='.repeat(78));
 const menuRowMatch = /<LayoutTemplate size=\{14\} \/> ([^<\n]+)/.exec(APP_RAW);
 const menuRow = menuRowMatch ? {1: menuRowMatch[1]} : null;
 console.log(`  boards-menu template row label: ${JSON.stringify(menuRow ? menuRow[1] : 'ABSENT')}`);
-assert('i2.the-menu-row-reads-Create-from-Templates',
-  !!menuRow && menuRow[1].trim() === 'Create from Templates'
+assert('i2.the-menu-row-opens-the-gallery-and-does-not-wrap',
+  !!menuRow && menuRow[1].trim() === 'Templates'
+    && !/<LayoutTemplate size=\{14\} \/> Create from Templates/.test(APP)
     && !/Templates…/.test(APP)
     && /setBoardsOpen\(false\); pendingBoardName\.current = ''; setTgOpen\(true\); \}\};?/.test(APP)
     && /<Plus size=\{14\} \/> New board/.test(APP)
     && /id="tg-title">Templates</.test(GALLERY_RAW),
-  'Harvey: "Còn cái Templates... bên ngoài thì đổi thành Create from Templates". The row sits directly beside "New board" and keeps the same handler; the '
+  'The row sits directly beside "New board" and keeps the same handler; the '
   + 'gallery\'s own heading stays "Templates" (it is the destination, not the verb). '
-  + 'RE-ANCHORED (ROUND 6, ITEM 3): the handler predicate gained `pendingBoardName.current = \'\'` — this route has NO typed name, so it must CLEAR the dialog\'s stash rather '
-  + 'than carry a stale one into the gallery. The old predicate `setBoardsOpen(false); setTgOpen(true)` is one clause short of the shipped statement, which is why this '
-  + 'assertion was red; the stale-name leak it now guards is the case worth pinning (a name typed once must not attach to a board created later from this menu route).');
+  + 'RE-ANCHORED (ITEM B, 2026-10-22) — NOT WEAKENED, the reason is recorded. OLD CLAIM: '
+  + 'the row reads "Create from Templates" (ROUND 4, Harvey: "Còn cái Templates... bên ngoài thì đổi thành Create from Templates"). '
+  + 'NEW CLAIM: the row reads "Templates" and no longer carries the "Create from" prefix anywhere in App.tsx. '
+  + 'REASON: ITEM B redesigned the boards popover at a fixed 360px, and HARVEY required the row NOT to wrap — the long literal '
+  + 'was the one row that did. The handler, the pendingBoardName stash-clear and the route are UNCHANGED (all still pinned here), '
+  + 'so only the literal moved. The gallery\'s heading assertion (`id="tg-title">Templates`) is untouched. '
+  + 'The stale-name guard from ROUND 6 ITEM 3 (`pendingBoardName.current = \'\'`) is still pinned in the predicate above — a name typed once must not attach to a board created later from this menu route.');
 
 /* ===========================================================================
    ITEM 3 — the stuck tooltip. The modality decision is EXECUTED.
