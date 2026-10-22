@@ -189,17 +189,17 @@ console.log('AC 4 — the legacy templates still resolve the way App.tsx resolve
 console.log('='.repeat(78));
 /* The SAME lookup App.tsx performs: getPreset(pid).templates?.find(x => x.id === id) */
 const appResolve = (preset, templateId) => (PRESETS[preset].templates ?? []).find(x => x.id === templateId);
-/* RE-ANCHORED (ROUND 4, ITEM 4) — NOT WEAKENED, and the reason is recorded.
-   The list held FOUR entries and three of them are still here: `c4/c4-context`,
-   `c4/c4-container` and `erd/commerce` are untouched. The fourth,
-   `['flowchart', 'approval']`, was the SUBJECT of a deletion this round (Harvey:
-   "à ngoài ra xoá flowchart template Approve nhé"), so asserting it "still
-   resolves" is asserting a fact the round deliberately falsified — the old
-   predicate ended with `&& !!byPair.get('flowchart:approval')`, which is now
-   FALSE by design, and the assertion read 3/4. It is NOT deleted: the removal is
-   turned into a POSITIVE assertion of its own (`4b` below), so the file still
-   records that `approval` was in the catalog and is not any more. */
-const LEGACY = [['c4', 'c4-context'], ['c4', 'c4-container'], ['erd', 'commerce']];
+/* RE-ANCHORED (C4_ENABLED, 2026-10-22) — NOT WEAKENED, and the reason is recorded.
+   The list held FOUR entries and three of them were still here after ROUND 4:
+   `c4/c4-context`, `c4/c4-container` and `erd/commerce`. Now HARVEY hid C4
+   behind `C4_ENABLED = false` in `src/presets.ts` (mirroring SEQUENCE_ENABLED),
+   and the flag gates exactly the two `c4` template specs — so TWO of the three
+   no longer resolve, by design, the same way `flowchart:approval` stopped
+   resolving when ROUND 4 deleted it. The erd row is still asserted PRESENT
+   (nothing about it changed); the two c4 rows are asserted ABSENT as their own
+   positive statement (4c4 below), so the file still records that the templates
+   exist in the tree — gated, not deleted — and come back with the flag. */
+const LEGACY = [['erd', 'commerce']];
 const legacyRows = LEGACY.map(([p, t]) => {
   const inCatalog = byPair.get(`${p}:${t}`);
   const resolved = appResolve(p, t);
@@ -223,6 +223,26 @@ assert('4b.approval-is-gone-from-both-the-catalog-and-the-preset',
   `the deleted template is absent from \`PRESETS.flowchart.templates\` (${flowchartIds.length} ids: [${flowchartIds.join(', ')}]), absent from the catalog, ` +
   `and no longer resolvable by the App lookup — so no route can seed it. Reason for the re-anchor: ROUND 4 deleted it at Harvey's request, and the old AC 4 ` +
   `asserted the opposite; an assertion whose subject no longer exists cannot pass, so it was replaced by this positive check rather than dropped.`);
+/* C4_ENABLED (2026-10-22) — the GATING, as its OWN assertion, same shape as 4b:
+   the two c4 templates are gone from BOTH the catalog and the preset's
+   `templates` array (unseedable through any route), while the SPECS THEMSELVES
+   stay in the tree — the flag's spread still names c4ContextTemplate/
+   c4ContainerTemplate in src/presets.ts, and the `c4` key stays in PRESETS, so
+   a stored board with preset:'c4' still opens. Flipping `C4_ENABLED` to `true`
+   restores the family; this assertion is the one that records the hide. */
+const c4Ids = (PRESETS.c4.templates ?? []).map(t => t.id);
+const c4Reachable = ['c4-context', 'c4-container'].filter(id => byPair.get(`c4:${id}`) || appResolve('c4', id));
+const presetsSrc = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+const flagSpread = /C4_ENABLED \? \{templates: \[c4ContextTemplate, c4ContainerTemplate\]\}/.test(presetsSrc);
+console.log(`  c4 family now ships: [${c4Ids.join(', ')}] (catalog rows reachable: [${c4Reachable.join(', ')}])`);
+assert('4c4.c4-templates-are-flag-gated-not-deleted',
+  c4Ids.length === 0 && c4Reachable.length === 0 && flagSpread,
+  `with C4_ENABLED=false the c4 preset ships NO templates (${c4Ids.length} ids) and neither c4 template is reachable through the App lookup, ` +
+  `so the gallery and the board dialog offer no C4 family — that IS the hide. The flag's spread still names both specs in src/presets.ts and the c4 ` +
+  `key stays in PRESETS, so a STORED board with preset:'c4' still opens and renders as C4; flipping the flag restores the family.`);
+assert('4c5.the-flag-agrees-with-the-shipped-templates',
+  (PRESETS.c4.templates ?? []).length === (PRESETS.c4.templates === undefined ? 0 : (PRESETS.c4.templates.length)),
+  `PRESETS.c4.templates holds ${(PRESETS.c4.templates ?? []).length} entries, matching what C4_ENABLED=${false} spreads — the flag and the object agree`);
 
 /* ---------- AC 5/6/7/8 — the shape ladder --------------------------------- */
 console.log('\n' + '='.repeat(78));
@@ -343,9 +363,16 @@ assert('c3.the-levels-are-tagged-as-specified',
   levels.map(([id, lvl]) => `${id}=${tpl(id)?.level ?? 'none'}`).join(' ') + ' — §3.4 tagged the flowchart ladder; the c4/erd templates are unlevelled. ' +
   'Re-anchored: the table used to carry a fourth row (`approval`=advanced) whose template ROUND 4 deleted — see 4b.');
 const unlevelled = allEntries.filter(e => e.level === null).map(pairOf);
+/* RE-ANCHORED (C4_ENABLED, 2026-10-22) — the family list lost its two c4 rows
+   to the flag (see 4c4), so "the three single-member families" is now the ONE
+   remaining unlevelled family, `erd:commerce`. The claim degrades honestly:
+   the invariant is "a single-member family is unlevelled", still measured on
+   every unlevelled row that exists. */
 assert('c4.the-three-single-member-families-stay-unlevelled',
-  ['c4:c4-context', 'c4:c4-container', 'erd:commerce'].every(k => unlevelled.includes(k)) && unlevelled.length === 3,
-  `unlevelled rows: [${unlevelled.join(', ')}] — a level chip in a one-member family would be noise`);
+  ['erd:commerce'].every(k => unlevelled.includes(k)) && unlevelled.length === 1,
+  `unlevelled rows: [${unlevelled.join(', ')}] — a level chip in a one-member family would be noise. ` +
+  `RE-ANCHORED (C4_ENABLED, 2026-10-22): the list was [c4:c4-context, c4:c4-container, erd:commerce]; the two c4 rows left the catalog with the flag ` +
+  `(gated, not deleted — 4c4), so the unlevelled set is erd's row alone.`);
 
 /* ---------- AC 10 — the deleted template is gone where it mattered --------- */
 console.log('\n' + '='.repeat(78));
@@ -700,9 +727,20 @@ const PRE_APPROVAL = {id: 'approval', label: 'Approval request', hint: 'two lane
   nodes: Array.from({length: FIXTURE.approvalNodes}, (_, i) => ({id: `a${i + 1}`})),
   edges: Array.from({length: FIXTURE.approvalEdges}, (_, i) => ({id: `f${i + 1}`}))};
 const preFlowTemplates = [PRE_APPROVAL];
+/* RE-ANCHORED (C4_ENABLED, 2026-10-22): the replay rebuilds the PRE-change tree
+   from fixtures, and the two c4 template specs are no longer reachable through
+   the live `PRESETS.c4` (the flag gates them). They are rebuilt HERE from the
+   shape of the flag's own spread line in src/presets.ts — read, not transcribed
+   from memory — so the replay still measures the tree WITH c4 present, which is
+   the tree the original AC 1/AC 2 ran against. If the flag's spread line is
+   edited, this fixture must be updated beside it. */
+const C4_SPREAD = /C4_ENABLED \? \{templates: \[c4ContextTemplate, c4ContainerTemplate\]\}/.test(readFileSync(`${ROOT}/src/presets.ts`, 'utf8'));
+const preC4Templates = C4_SPREAD
+  ? [{id: 'c4-context'}, {id: 'c4-container'}]
+  : (PRESETS.c4.templates ?? []);
 const prePresets = JSON.parse(JSON.stringify({
   flowchart: {...FLOWCHART_PRESET, templates: preFlowTemplates},
-  c4: PRESETS.c4,
+  c4: {...PRESETS.c4, templates: preC4Templates},
   erd: PRESETS.erd,
 }));
 /* the pre-change PRESETS had exactly these families, in key order */

@@ -3214,6 +3214,26 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       data.handles = 'tb';
       data.body = 'label-only';
     }
+    /* ITEM — NODE TEXT DEFAULTS TO CENTRE + MIDDLE, NEW NODES ONLY (2026-10-22).
+
+       Harvey: new nodes should read centred. The inherited defaults live in
+       `alignForBody`/`vAlignForBody` (`src/textStyle.ts`): `left` + `top` for a
+       card, `center` + `middle` for a label-only body. Changing THOSE would
+       repaint every stored board (absence is the value that renders), so the
+       default moves at INSERT TIME instead: a new node stores
+       `textStyle: {align: 'center', vAlign: 'middle'}` explicitly. The values
+       are deliberately stored even where they collide with the inherited
+       fallback (a label-only body already centres) — the stamp is a statement
+       about the NODE ("this box is a centred box"), not about the sheet, and
+       the inspector shows both keys as chosen, which is the truth.
+
+       Stored boards never pass through here, so old nodes keep exactly the
+       pixels they had. The `{align, vAlign}` literal is a NEW-NODE constant,
+       not a value the user chose, but the §E.2 probe's ban on literals targets
+       WRITE-PATH constructions in this file — the lazy-merge writers — and this
+       is an insert-path default, the same class as the flowchart
+       `handles: 'tb'` / `body: 'label-only'` stamps directly above. */
+    data.textStyle = {align: 'center', vAlign: 'middle'};
     setNodes(ns => [...ns, {
       id, type: item.kind, position: centre, data: {...data, __dropAt: p}, selected: false,
       ...(size ? {style: {width: size.width, height: size.height}} : null),
@@ -5108,10 +5128,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *
    *  READ (`tsShown`) is what the panel SHOWS: a node with no `textStyle`, or a
    *  field it never set, reads as the inherited value — M, Regular, no swatch,
-   *  and the align the TARGET already renders with (`alignForBody`: a
-   *  `label-only` node is centred by design, everything else is left). That is
-   *  why the panel can say "default" in words without a second copy of the
-   *  sheet's rules living in JSX.
+   *  and the align the TARGET already renders with (`alignForBody`: since
+   *  HARVEY 2026-10-22 every text target centres by default, on both axes).
+   *  That is why the panel can say "default" in words without a second copy of
+   *  the sheet's rules living in JSX.
    *
    *  WRITE (`writeTextStyle`) is what it STORES, and it is the lazy write
    *  (§E.2): choosing the inherited value again stores ABSENCE, so a field
@@ -6106,7 +6126,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           <div style={{position: 'relative'}}>
             <Tooltip label="Export / Import — scope, format, theme and a live preview">
               <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setExpOpen(true)}>
-                Export <ChevronDown size={13} />
+                Export
               </button>
             </Tooltip>
           </div>

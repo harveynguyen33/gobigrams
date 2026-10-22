@@ -29,6 +29,22 @@ export type PresetId = 'architecture' | 'flowchart' | 'c4' | 'erd' | 'sequence' 
    HIDDEN behind this flag until the row-order/column-constraint design is
    redone. One switch flips it back on — every piece stays in the tree. */
 export const SEQUENCE_ENABLED = false;
+
+/* HARVEY 2026-10-22 — C4 hidden the SAME way (deck item 2, mirroring
+   SEQUENCE_ENABLED): one flag keeps every C4 piece in the tree but drops it
+   from the CREATE surfaces. GATED HERE, and gated NARROWLY on purpose:
+     · the `c4` key STAYS in `PRESETS` unconditionally — a stored board whose
+     `preset` field is `'c4'` must still open, render and save as C4
+     (`asPreset`/`getPreset` are untouched), and the palette a C4 board renders
+     with keeps its C4 items (`C4_PALETTE_ITEMS` stays in `LIBRARY`, because
+     `MIXED_LABELS` and `libraryFor('c4')` both reach through it).
+     · what the flag removes is only the OFFER: `C4_PRESET.templates` is the
+     sole source of the catalog's C4 family, so gating the two template specs
+     out drops the family from the template catalog + gallery, and with no
+     templates a fresh C4 board is unreachable from every create path (the
+     board dialog offers templates only through the gallery model).
+   Flip to `true` to put C4 back — the flag is the entire switch. */
+export const C4_ENABLED = false;
 export type LayoutId = 'layered-lr' | 'layered-tb' | 'grid' | 'free';
 
 export type PathId = 'bezier' | 'smoothstep' | 'step' | 'straight';
@@ -1020,7 +1036,14 @@ export const C4_PRESET: DiagramPreset = {
     requireTechnology: true,
   },
   caps: {subflow: true, cyclePrevention: true, oneInput: false, resizable: true},
-  templates: [c4ContextTemplate, c4ContainerTemplate],
+  /* C4_ENABLED (2026-10-22) — the templates ARE the C4 create offer, so they
+     are the piece the flag gates: `templates: undefined` drops the whole C4
+     family from `templateCatalog()` (a preset with no templates contributes no
+     family), hence from the gallery and the board dialog. `templates?:` is
+     already optional on `DiagramPreset` — the ERD-less presets ship without it. */
+  ...(C4_ENABLED ? {templates: [c4ContextTemplate, c4ContainerTemplate]} : {}),
+  /* A note pinned outside the flag on purpose: a STORED C4 board still opens,
+     still renders, and its inspector still prints this. */
   note: 'Relationships are unidirectional and dashed (the C4 convention), with an intent label plus a technology suffix.',
   legend: [
     {colorKey: 'green', label: '[Person]'},
