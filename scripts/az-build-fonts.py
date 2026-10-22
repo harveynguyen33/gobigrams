@@ -35,8 +35,22 @@ TMP = '/tmp/az2-build'      # scratch: instanced statics + pre-rename work
 # Latin Ext-A, Latin Ext-B (cheap, avoids silent gaps), combining marks (NFD
 # fallback), Latin Extended Additional U+1EA0-1EF9 (the card's named range),
 # general punctuation, the dong sign, the arrows the app draws, script-l.
+#
+# ORCHESTRATOR ADDITION (2026-10-22, Harvey: "làm 1"): the original latin range
+# stopped at general punctuation, so the euro sign had NO glyph — measured: '€'
+# missing from both shipped variable faces, while U+20AB (₫) was covered only
+# because the vietnamese range names it. A diagram label containing € fell back
+# to another typeface mid-word, and the same character was unrenderable from the
+# embedded subset in an exported SVG. Added: the Currency Symbols block, letterlike
+# symbols (™ ℃ №), the full arrows block, math operators (≈ ≤ ≥ ≠ ∞ ∑ √),
+# box drawing (ASCII-diagram arrows), geometric shapes (■ ▲ ● ◆) and dingbats
+# (✓ ✔ ✗ ★ ⚠). All of it lands in the EXISTING 'latin' group on purpose: the file
+# names must stay stable, because the @font-face declarations and the embed look
+# them up by name.
 SUBSETS = {
-    'latin': 'U+0020-007E,U+00A0-00FF,U+2000-206F,U+2190-2193,U+2212,U+2113',
+    'latin': ('U+0020-007E,U+00A0-00FF,U+2000-206F,U+20A0-20CF,U+2100-214F,'
+              'U+2190-21FF,U+2200-22FF,U+2500-257F,U+25A0-25FF,U+2600-26FF,'
+              'U+2700-27BF,U+2113'),
     'latin-ext': 'U+0100-017F,U+0180-024F,U+0259,U+1E00-1EFF',
     'vietnamese': ('U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,'
                    'U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,'
