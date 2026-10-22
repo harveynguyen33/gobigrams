@@ -251,10 +251,21 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
               so the file paints identically everywhere, but the text is no
               longer selectable (the source stays in data-text). */}
           {(format === 'svg' || format === 'pdf') && (
-            <label className="em-note" style={{display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer'}}>
-              <input type="checkbox" checked={outline} onChange={e => setOutline(e.target.checked)} />
-              Outline text (glyph paths — exact everywhere, not selectable)
-            </label>
+            <>
+              <label className="em-note" style={{display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer'}}>
+                <input type="checkbox" checked={outline} onChange={e => setOutline(e.target.checked)} />
+                Outline text (glyph paths — exact everywhere, not selectable)
+              </label>
+              {/* HARVEY 2026-10-22: a one-line explanation of what the option is FOR, next to it.
+                  The full text also lives in the README ("When to outline"); this is the in-place note
+                  so nobody has to leave the dialog to understand the trade. */}
+              <div className="em-note" style={{paddingLeft: 22, marginTop: -2}}>
+                Turns each text row into shapes: the file opens identically on any machine, even with no font
+                installed, and gets smaller than an embedded font. Use it for a file you send to a client, print,
+                or import into Figma/Illustrator. You cannot select or copy the text afterwards (the strings are
+                still kept in the SVG for search and tooling).
+              </div>
+            </>
           )}
 
           <div className="em-label">Theme</div>
