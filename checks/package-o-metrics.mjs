@@ -588,6 +588,16 @@ assert('itemA.queue-is-flag-gated-from-the-create-surfaces',
   `executed LIBRARY holds ${executedPresets.LIBRARY.length} items and NO Queue (the hide), the flag's filter still names 'Queue' in src/presets.ts, ` +
   `the item itself stays in src/palette.ts, and PRESETS.architecture.palette keeps its 10 entries with 'Queue' at [2] — the seed's ` +
   `External → Queue → Service pipeline is untouched, so checks/boot-no-flash.mjs stays green without a re-anchor.`);
+/* ACTOR_ENABLED (2026-10-22) — same hide, same positive assertion shape:
+   Actor is OUT of the executed LIBRARY (create surfaces cannot offer it),
+   the flag's filter still names 'Actor' in src/presets.ts, the item stays in
+   src/palette.ts, and PALETTE keeps it — stored boards keep rendering. */
+const actorFilterSpread = /ACTOR_ENABLED \|\| p\.label !== 'Actor'/.test(presetsSrcQ);
+const actorInPalette = /label: 'Actor',/.test(readFileSync(`${ROOT}/src/palette.ts`, 'utf8'));
+assert('actor.is-flag-gated-from-the-create-surfaces',
+  !executedPresets.LIBRARY.some(p => p.label === 'Actor') && actorFilterSpread && actorInPalette,
+  `executed LIBRARY holds NO Actor (the hide), the flag's filter still names 'Actor' in src/presets.ts, ` +
+  `and the item itself stays in src/palette.ts so a stored board that placed an Actor keeps rendering it.`);
 const stillLong = libItems.filter(e => e.hint.length > 32);
 assert('item4.no-library-hint-over-32ch', stillLong.length === 0,
   stillLong.map(e => `${e.label}(${e.hint.length})`).join(',') || `longest ${Math.max(...libItems.map(e => e.hint.length))}ch`);

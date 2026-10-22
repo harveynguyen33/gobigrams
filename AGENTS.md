@@ -24,7 +24,14 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 921096
+ratchet.ceiling: 921108
+# RAISED 2026-10-22 (config round fixes), measured: 921108 (+12, +0.0013%).
+# Reason: the ACTOR_ENABLED hide (Harvey corrected "Action" -> "Actor") added a
+# second filter chain in LIBRARY + MIXED_LABELS in src/presets.ts, and the
+# positive gating assertion in checks/package-o-metrics.mjs (not in the shipped
+# bundle). Harvey approved in chat ("approve sao"). Gates green at the
+# measurement: tsc 0, vite build 0, boot-no-flash / package-templates /
+# boards-popover-pinned / package-o-metrics all exit 0.
 # RAISED 2026-10-22 (config round: items 1/2/4 + A Queue-hide + B boards-popover redesign), measured at HEAD 7786a53: 921096 (+25, +0.003%).
 # Previous: 921071 (0 headroom). Reason: the Queue hide added the QUEUE_ENABLED
 # flag + filter + seed-facing LIBRARY_FULL assembly in src/presets.ts; the boards

@@ -46,6 +46,21 @@ export const SEQUENCE_ENABLED = false;
    Flip to `true` to put C4 back — the flag is the entire switch. */
 export const C4_ENABLED = false;
 
+/* HARVEY 2026-10-22 — Actor hidden the SAME way (the corrected item A:
+   "Action" was a misreading of ACTOR — Harvey confirmed "yes ý tôi là actor").
+   One flag drops it from every CREATE surface — the left panel's library
+   sections, the omnibox search and the insert modal, which all read
+   `LIBRARY` (`App.tsx` builds its groups from `LIBRARY` alone;
+   `addNodeByLabel` resolves through `LIBRARY.find`).
+   GATED HERE, and gated NARROWLY on purpose:
+     · `PALETTE` (the architecture list) stays UNFILTERED — the seed-facing
+       assemblies read it, and a stored board that placed an Actor keeps
+       rendering it (shape rendering never consults this flag).
+     · what the flag removes is only the OFFER: `LIBRARY` — the one array the
+       create surfaces enumerate — filters `label === 'Actor'` out.
+   Flip to `true` to put Actor back — the flag is the entire switch. */
+export const ACTOR_ENABLED = false;
+
 /* HARVEY 2026-10-22 — Queue hidden the SAME way (deck item A, mirroring
    C4_ENABLED / SEQUENCE_ENABLED): one flag drops it from every CREATE surface —
    the left panel's library sections, the omnibox search and the insert modal,
@@ -913,7 +928,8 @@ export const LIBRARY: PaletteItem[] = [
   //     QUEUE_ENABLED (2026-10-22) — Queue drops out of the CREATE-SURFACE
   //     library HERE; the seed-facing preset palette keeps it (see
   //     `libraryFor`'s architecture branch and the flag's comment above).
-  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue'),
+  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue')
+            .filter(p => ACTOR_ENABLED || p.label !== 'Actor'),
   // 2 — the flowchart's own elements (10): Terminal … On-page connector.
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note'),
   // 3 — `Lane` (groups).
@@ -941,7 +957,8 @@ export const LIBRARY: PaletteItem[] = [
    QUEUE_ENABLED (2026-10-22) — the hidden Queue drops out of this set too: the
    `custom` preset's palette is a CREATE surface. */
 const MIXED_LABELS = new Set<string>([
-  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue').map(p => p.label),
+  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue')
+            .filter(p => ACTOR_ENABLED || p.label !== 'Actor').map(p => p.label),
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note').map(p => p.label),
   // C4_ENABLED (2026-10-22) — gated with the LIBRARY spread above: the Mixed
   // set is a CREATE surface, so hidden C4 items must not re-enter through it.
