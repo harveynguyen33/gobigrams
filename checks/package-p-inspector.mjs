@@ -2281,9 +2281,12 @@ console.log(`  @font-face blocks in src/styles.css: ${FACES.length}  `
 console.log(`  distinct unicode-ranges: ${ranges.size}  files referenced: ${FACES.length}  `
   + `files missing on disk: ${noFile.length}`);
 assert('p.every-font-face-declares-a-unicode-range',
-  FACES.length === 36 && noRange.length === 0,
-  `${FACES.length} @font-face blocks, ${noRange.length} without a unicode-range — 6 families × `
-  + '2 weights × 3 subsets, so a page fetches only the subset it renders');
+  noRange.length === 0 && FACES.length === 47,
+  `${FACES.length} @font-face blocks, ${noRange.length} without a unicode-range — ROUND AZ re-provenance:
+  Inter + JetBrains Mono carry their painted weights (sans 400/500/600/700, mono 400/600/700)
+  × 3 subsets, PLUS one VARIABLE face per family (the 650 note-title weight a static set
+  lacks); the other four families stay 2 weights × 3 subsets, so a page still fetches only
+  the subset it renders`);
 assert('p.every-referenced-font-file-EXISTS-under-public-fonts',
   noFile.length === 0 && FACES.every(f => faceFile(f) !== null),
   noFile.length === 0
@@ -2291,9 +2294,10 @@ assert('p.every-referenced-font-file-EXISTS-under-public-fonts',
       + 'the fallback stack and throws nothing, which is why this is checked on disk)'
     : `MISSING: [${noFile.join(', ')}]`);
 assert('p.the-three-ranges-are-the-three-subset-ranges',
-  ranges.size === 3,
-  `the three ranges are latin / latin-ext / vietnamese, identical across all six families because `
-  + 'Google defines the subsets once — copied verbatim, none invented');
+  ranges.size === 4,
+  `the subset ranges are latin / latin-ext / vietnamese (identical across all six families —
+  copied verbatim, none invented) PLUS the one VARIABLE-face union range the AZ faces add
+  (the three subset ranges joined — same codepoints, one descriptor)`);
 assert('p.the-six-families-in-the-model-are-the-six-declared',
   [...declared].sort().join('|') === 'Be Vietnam Pro|IBM Plex Sans|Inter|JetBrains Mono|Lexend|Shantell Sans'
     && M.TEXT_FONT_OPTS.every(o => {

@@ -1,0 +1,30 @@
+# AZ2 (t_96100cb2) — pinned provenance. Regenerate with scripts/az-build-fonts.py
+# Upstream sources:
+#   Inter 4.1 InterVariable.ttf          4989b125924991b90d05b2d16e0e388c48f7d5bb8b30539bbf9c755278d0ccaf
+#   JetBrainsMono 2.304 variable ttf     662a196d58f1183bf2d77428b6d5283fe3f45161ab021bea4036bc98e5cac016
+# Shipped files (name  sha256):
+inter-400-latin.woff2  c93e7226327d1f3f186edfd51a1bf0dfbb7298bb9b8a4eac43ea12495c32a6e7  # inter w400 latin
+inter-400-latin-ext.woff2  10773d45ad65150ffb7480cc2975f93fd661d8145f79661eb97dfaf0a0324c84  # inter w400 latin-ext
+inter-400-vietnamese.woff2  734dc7e71fc05eeedcbd8a7234cab0c46a270f2492da502ffd3818bad75194cb  # inter w400 vietnamese
+inter-500-latin.woff2  1e04e9dec8a63e27b09271c91a58e699394158f6befbd4abb9148818fd45439e  # inter w500 latin
+inter-500-latin-ext.woff2  839036c2f523cfd2b6c7cd745851c42c48ec7ed41c72efeca21649365b06fc85  # inter w500 latin-ext
+inter-500-vietnamese.woff2  2ba2cf8ab74981bcfbec464b5accb4da49bbcf281e81711d7ac6cd9ebed9fa70  # inter w500 vietnamese
+inter-600-latin.woff2  578142fd9281374fd8225f43913d3b02c6c32068c161cb4d08cde1f382562461  # inter w600 latin
+inter-600-latin-ext.woff2  8fe4650bac65ec3f474d6c72b5a40383114c05649ea69284161f70fef9b0b8f1  # inter w600 latin-ext
+inter-600-vietnamese.woff2  69aa874d36debadeb9d4335d6fd7d68fb53d1922b5afa9179b058d7aa4bf108d  # inter w600 vietnamese
+inter-700-latin.woff2  318681816b7578f9b17a17cca63b596506c3c145f20c8deac0e161baed78a331  # inter w700 latin
+inter-700-latin-ext.woff2  9665d6a89a92ebef9c02fbf8d791df0510c0479caa52f00c82e7cbbfaa03c32c  # inter w700 latin-ext
+inter-700-vietnamese.woff2  8545e31b359a91297dfe1eeb0d3513c2185f01f5da2143d203d22422432b3f8d  # inter w700 vietnamese
+jetbrains-mono-400-latin.woff2  a0f88302e870ccb53f19a593dd37acf105eeefc4bc7b10f3f3e41318d0eaa852  # jetbrains-mono w400 latin
+jetbrains-mono-400-latin-ext.woff2  bff785d17ec4a26955bf95800041f5d49fa73751659f475121f308e652133a20  # jetbrains-mono w400 latin-ext
+jetbrains-mono-400-vietnamese.woff2  fe5224ffd7e13ccf9594f1d4d1c5b383c3afbafeb2dacee1af38c2a1a6125df0  # jetbrains-mono w400 vietnamese
+jetbrains-mono-600-latin.woff2  3c75852be9976e15d5b1178c849d6bb740ad8154b60d3270e98de914b63b1be8  # jetbrains-mono w600 latin
+jetbrains-mono-600-latin-ext.woff2  8515dabe9b5f0eaad1d510f971363e779cafd5e20036846e4cb010d3a03e5755  # jetbrains-mono w600 latin-ext
+jetbrains-mono-600-vietnamese.woff2  c159d69e5766cf2d257c8ba57b7a51b9c649c9762870cdd6d07d3f05db0952b9  # jetbrains-mono w600 vietnamese
+jetbrains-mono-700-latin.woff2  ca2ecb5b985ed757b8f7cc38a996f39351f58456442c7fb6f276ffac7623d184  # jetbrains-mono w700 latin
+jetbrains-mono-700-latin-ext.woff2  8a79af1f66bc95d3b2ca615c75df916f5845b9a6798fd8b68cdac10fb3fee501  # jetbrains-mono w700 latin-ext
+jetbrains-mono-700-vietnamese.woff2  0a2294d07c89d4e29ef0976e9d276e34daa57485e5dfda6d5441fc47c6543249  # jetbrains-mono w700 vietnamese
+inter-variable.woff2  a2dc0fd3976a956f151d99dc89f526b8a5aef6f7aa33bc96163a02bcc972ca76  # inter variable merged (650 face)
+jetbrains-mono-variable.woff2  e5b6b39d9a377e60cdb59f9c70d61690ff16463de588369e0f8aee6b80ec0562  # jetbrains-mono variable merged (650 face)
+inter-variable.ttf  6c5ba383d360026254420780ca0ca67246a1cf0242c983e9ba78fa79c7f76f69  # inter variable merged (shaper bytes)
+jetbrains-mono-variable.ttf  1c84471febee08e0b34a6a800bfa2c8daaabc8cf3ff06989d9053f8956e3c8ff  # jetbrains-mono variable merged (shaper bytes)
