@@ -166,6 +166,9 @@ export type ExportInput = {
   /** ROUND C — outline mode: the pre-built shapers ride the input so the
    *  legacy compose (buildScene + emitSvg) can thread them into EmitCtx. */
   outline?: EmitCtx['outline'];
+  /** ROUND AZ — the embedded-font CSS (base64 woff2 @font-face), threaded
+   *  into EmitCtx so emitSvg inlines it in <defs><style>. */
+  fontEmbedCss?: string;
 };
 
 /* ------------------------------------------------------------------ utils */
@@ -826,7 +829,7 @@ function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; 
  *  buildScene + the bounds pass + emitSvg directly (item 2). */
 export function exportSvg(input: ExportInput): string {
   const scene = exportSceneOf(input);
-  return emitSvg(scene, {tokens: input.tokens, inheritFamily: input.measurer.defaultFamily?.() ?? '', outline: input.outline});
+  return emitSvg(scene, {tokens: input.tokens, inheritFamily: input.measurer.defaultFamily?.() ?? '', outline: input.outline, fontEmbedCss: input.fontEmbedCss});
 }
 
 /** Alias kept for the App.tsx import name used mid-migration. */

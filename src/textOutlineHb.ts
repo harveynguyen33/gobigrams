@@ -49,6 +49,10 @@ type HbModule = {
     hb_face_get_upem(facePtr: number): number;
     hb_font_create(facePtr: number): number;
     hb_font_set_scale(fontPtr: number, x: number, y: number): void;
+    /* ROUND AZ — variable-font instantiation: set the wght axis so ONE
+     * committed variable subset covers every painted weight (400..700, 650). */
+    hb_font_set_variations(fontPtr: number, coordsPtr: number, coordsLength: number): void;
+    hb_ot_var_get_axis_infos(facePtr: number, startOffset: number, countPtr: number, axesPtr: number): number;
     hb_font_draw_glyph(fontPtr: number, gid: number, dfuncs: number, drawData: number): void;
     hb_buffer_create(): number;
     hb_buffer_add_codepoints(bufPtr: number, cpsPtr: number, len: number, itemOffset: number, itemLength: number): void;
@@ -131,7 +135,42 @@ const shaperCache = new Map<string, Promise<{
   upem: number;
 } | null>>();
 
-async function shaperFor(bytes: Uint8Array, key: string) {
+/** ROUND AZ — the wght axis index within the face's fvar (needed because
+ *  hb_font_set_variations takes coordinates in AXIS ORDER, not by tag).
+ *  Cached per face pointer. Returns -1 when the face has no wght axis
+ *  (a static instance): the caller then skips set_variations entirely. */
+const wghtAxisCache = new Map<number, number>();
+function wghtAxisIndex(mod: HbModule, facePtr: number): number {
+  const hit = wghtAxisCache.get(facePtr);
+  if (hit !== undefined) return hit;
+  let idx = -1;
+  try {
+    const x = mod.wasmExports;
+    const countPtr = x.malloc(4);
+    mod.HEAPU32[countPtr / 4] = 0;
+    /* query the count first (countPtr=0 writes) then read the axis records */
+    x.hb_ot_var_get_axis_infos(facePtr, 0, countPtr, 0);
+    const n = mod.HEAPU32[countPtr / 4];
+    const axesPtr = x.malloc(n * 20); /* hb_ot_var_axis_info_t = 20 bytes */
+    mod.HEAPU32[countPtr / 4] = n;
+    x.hb_ot_var_get_axis_infos(facePtr, 0, countPtr, axesPtr);
+    for (let i = 0; i < n; i++) {
+      /* struct layout (hb_ot_var_axis_info_t): tag u32 at +0 */
+      const tag = mod.HEAPU32[axesPtr / 4 + i * 5];
+      /* 'wght' = 0x77676874 */
+      if (tag === 0x77676874) { idx = i; break; }
+    }
+    x.free(countPtr);
+    x.free(axesPtr);
+  } catch (e) {
+    console.error('[textOutline] axis query failed:', e);
+    idx = -1;
+  }
+  wghtAxisCache.set(facePtr, idx);
+  return idx;
+}
+
+async function shaperFor(bytes: Uint8Array, key: string, weight?: number) {
   let p = shaperCache.get(key);
   if (!p) {
     p = (async () => {
@@ -149,6 +188,28 @@ async function shaperFor(bytes: Uint8Array, key: string) {
         const upem = x.hb_face_get_upem(facePtr);
         const fontPtr = x.hb_font_create(facePtr);
         x.hb_font_set_scale(fontPtr, 64, 64); /* px-per-em at shape time — layoutRun's SCALE */
+        /* ROUND AZ — instantiate the wght axis when the face is variable and
+         * the row's weight is known. Coordinates are in AXIS ORDER: build the
+         * full vector with the default value everywhere except wght. */
+        if (weight !== undefined) {
+          const axisIdx = wghtAxisIndex(mod, facePtr);
+          if (axisIdx >= 0) {
+            const nAxes = (() => {
+              const countPtr = x.malloc(4);
+              mod.HEAPU32[countPtr / 4] = 0;
+              x.hb_ot_var_get_axis_infos(facePtr, 0, countPtr, 0);
+              const n = mod.HEAPU32[countPtr / 4];
+              x.free(countPtr);
+              return n;
+            })();
+            const coordsPtr = x.malloc(nAxes * 4);
+            const coords = new Float32Array(mod.HEAPU8.buffer, coordsPtr, nAxes);
+            for (let i = 0; i < nAxes; i++) coords[i] = 400; /* the sheets' default; only wght matters here and is set next */
+            coords[axisIdx] = weight;
+            x.hb_font_set_variations(fontPtr, coordsPtr, nAxes);
+            x.free(coordsPtr);
+          }
+        }
         return {fontPtr, upem};
       } catch (e) {
         console.error('[textOutline] shaper init failed:', e);
@@ -162,12 +223,15 @@ async function shaperFor(bytes: Uint8Array, key: string) {
 
 /** The app's OutlineShaper for one face: shapes with HarfBuzz, extracts
  *  outlines with hb_font_draw_glyph into SVG path data (the package's
- *  Font#glyphToPath output format). */
+ *  Font#glyphToPath output format). `weight` instantiates the variable
+ *  wght axis when the face is variable (ROUND AZ); omit it for a static
+ *  instance. */
 export async function makeShaper(
   bytes: Uint8Array,
   cacheKey: string,
+  weight?: number,
 ): Promise<OutlineShaper | null> {
-  const s = await shaperFor(bytes, cacheKey);
+  const s = await shaperFor(bytes, cacheKey, weight);
   if (!s) return null;
   const mod = await moduleFor();
   if (!mod) return null;

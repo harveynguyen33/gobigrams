@@ -57,6 +57,9 @@ import {exportSvgOf, domMeasurer, type ExportNode, type ExportEdge, type ExportI
 /* ROUND C — outline text (harfbuzzjs shaper) + the print PDF route. */
 import {localFontBytes, type OutlineShaper} from './textOutline';
 import {makeShaper} from './textOutlineHb';
+/* ROUND AZ — file-first font bytes (the committed subsets) + the embed
+   builder + the OS/2 fsType licence guard. */
+import {committedFontBytes, embeddingRefusal} from './fontFiles';
 import {printSvgAsPdf} from './printView';
 
 import {
@@ -4187,10 +4190,16 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    * resolved family, keyed by the EXACT family string the rows carry, so
    * the emitter's rowMarkup lookup is the row's own family. Rows whose
    * family has no resolvable bytes (no permission, non-matching stack)
-   * keep <text> per row — the emitter's per-row fallback. */
+   * keep <text> per row — the emitter's per-row fallback.
+   * ROUND AZ — FILE-FIRST: bytes come from the committed subsets
+   * (src/fontFiles.ts -> public/fonts/<slug>-variable.ttf), the variable
+   * wght axis is instantiated per weight, and queryLocalFonts drops to a
+   * LAST-RESORT for families the tree does not ship. The unresolved
+   * families are RETURNED so the caller can surface a visible note (never
+   * a silent no-op). */
   const buildOutlineShaper = useCallback(async (
     nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
-  ): Promise<NonNullable<ExportInput['outline']> | null> => {
+  ): Promise<{ctx: NonNullable<ExportInput['outline']> | null; unresolved: string[]}> => {
     void edges;
     /* edge LABEL rows too: collect pairs off the nodes AND the measured
      * edge label fonts (ROUND-AR-DEFECT-1's portalled rows). */
@@ -4217,43 +4226,124 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const lf = measure.edgeLabelFont?.(e.id);
       collect(lf?.family, lf?.weight);
     }
-    if (!pairs.size) return null;
+    if (!pairs.size) return {ctx: null, unresolved: []};
     const shapers = new Map<string, OutlineShaper>();
-    const cacheKeyOf = new Map<string, string>();
+    const unresolved = new Set<string>();
+    /* one resolved face per (family, weight): the committed variable twins
+     * cover every weight (instantiated per weight via set_variations), so
+     * the cache key carries the weight. */
+    const resolvedAt = new Map<string, OutlineShaper>(); // family|weight -> shaper
+    const register = (k: string, shaper: OutlineShaper) => {
+      if (k && !shapers.has(k)) shapers.set(k, shaper);
+      const squeezed = k.replace(/\s+/g, ' ').trim();
+      if (squeezed && !shapers.has(squeezed)) shapers.set(squeezed, shaper);
+      const squeezedQuotes = squeezed.replace(/"/g, '');
+      if (squeezedQuotes && !shapers.has(squeezedQuotes)) shapers.set(squeezedQuotes, shaper);
+    };
     for (const {family, weight} of pairs.values()) {
-      if (cacheKeyOf.has(family)) continue;
-      const hit = await localFontBytes(family, weight);
-      if (!hit) continue;
-      const key = `${hit.name}@${weight}`;
-      cacheKeyOf.set(family, key);
-      const shaper = await makeShaper(hit.bytes, key);
+      const pairKey = `${family}|${weight}`;
+      const already = resolvedAt.get(pairKey);
+      if (already) { register(family, already); continue; }
+      /* FILE-FIRST: the committed variable subset */
+      const committed = await committedFontBytes(family);
+      let shaper: OutlineShaper | null = null;
+      if (committed) {
+        const key = `${committed.name}@${weight}`;
+        shaper = await makeShaper(committed.bytes, key, weight);
+      }
+      /* LAST-RESORT: the queryLocalFonts API for a family the tree does
+       * not ship (an opt-in ROUND W face at an unshipped weight) */
+      if (!shaper) {
+        const hit = await localFontBytes(family, weight);
+        if (hit) shaper = await makeShaper(hit.bytes, `${hit.name}@${weight}`);
+      }
       if (shaper) {
-        /* rows carry the family STACK ('ui-sans-serif, system-ui, …');
-         * register the resolved shaper under EVERY prefix of the stack
-         * AND under every WHITESPACE VARIANT (the emitter's lookup is
-         * exact-string; a row's measured family can differ in spacing
-         * around the quotes). */
-        const register = (k: string) => {
-          if (k && !shapers.has(k)) shapers.set(k, shaper);
-          const squeezed = k.replace(/\s+/g, ' ').trim();
-          if (squeezed && !shapers.has(squeezed)) shapers.set(squeezed, shaper);
-          const squeezedQuotes = squeezed.replace(/"/g, '');
-          if (squeezedQuotes && !shapers.has(squeezedQuotes)) shapers.set(squeezedQuotes, shaper);
-        };
-        register(family);
+        resolvedAt.set(pairKey, shaper);
+        register(family, shaper);
         const parts = family.split(',');
         for (let i = 2; i <= parts.length; i++) {
-          register(parts.slice(0, i).join(',').trimEnd().replace(/,\s*$/, ''));
+          register(parts.slice(0, i).join(',').trimEnd().replace(/,\s*$/, ''), shaper);
         }
-        /* register the resolved family name itself too (a row measured
+        /* register the concrete family name itself too (a row measured
          * AFTER the font resolved can carry the concrete name) */
-        register(hit.name);
+        register(committed?.name ?? '', shaper);
+      } else {
+        unresolved.add(family);
       }
     }
-    if (!shapers.size) return null;
+    if (!shapers.size) return {ctx: null, unresolved: [...unresolved]};
     /* the default face: the measurer's defaultFamily when IT resolved */
     const defaultShaper = defaultFamily ? shapers.get(defaultFamily) : undefined;
-    return {shapers, defaultShaper};
+    return {ctx: {shapers, defaultShaper}, unresolved: [...unresolved]};
+  }, []);
+
+  /* ROUND AZ — the font-embed builder (§4): base64 woff2 @font-face inside
+   * the exported SVG's <defs><style>, ONLY the families/weights the exported
+   * scene paints, ONLY faces whose OS/2 fsType permits embedding (the guard
+   * in fontFiles.ts — implemented, not assumed). The embedded faces are the
+   * committed VARIABLE woff2 twins (one per family — a variable face with a
+   * `font-weight: 100 900` descriptor covers every painted weight, so the
+   * browser instantiates rather than us shipping per-weight base64 blobs).
+   * The rows already carry their font-family/font-weight attributes, so the
+   * SVG's own paint code needs NO change to consume the embed. */
+  const buildFontEmbedCss = useCallback(async (
+    nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
+  ): Promise<{css?: string; bytes: number; refusals: string[]}> => {
+    void edges; void nodes;
+    /* the same pair-collection the outline shaper does (defaultFamily covers
+     * both stacks once the AZ swap landed) — but here only the FAMILY set
+     * matters: the variable face embeds once per family. */
+    const families = new Set<string>();
+    const defaultFamily = measure.defaultFamily?.() ?? '';
+    const collectFam = (fam: string | undefined) => {
+      const f = fam ?? defaultFamily;
+      if (f) families.add(f);
+    };
+    for (const n of nodes) {
+      const t = measure.text(n.el);
+      collectFam(t?.family);
+      if (t?.rows) for (const rf of Object.values(t.rows)) collectFam(rf?.family);
+    }
+    collectFam(undefined); /* the document default paints the unmeasured rows */
+    const blocks: string[] = [];
+    const refusals: string[] = [];
+    let bytes = 0;
+    /* de-duplicate families down to the SHIPPED faces (one embed per face) */
+    const embedded = new Set<string>();
+    for (const stack of families) {
+      const committed = await committedFontBytes(stack);
+      if (!committed || embedded.has(committed.name)) continue;
+      embedded.add(committed.name);
+      const refusal = embeddingRefusal(committed.fsType);
+      if (refusal) { refusals.push(`${committed.name}: ${refusal}`); continue; }
+      /* the WOFF2 twin (same subset, smaller): fetch + base64 */
+      const woff2Url = stack.includes('JetBrains') && !stack.includes('Inter')
+        ? '/fonts/jetbrains-mono-variable.woff2'
+        : '/fonts/inter-variable.woff2';
+      const face = committed.name.includes('JetBrains') ? 'JetBrains Mono' : 'Inter';
+      if (embedded.has(`css:${face}`)) continue;
+      embedded.add(`css:${face}`);
+      try {
+        const r = await fetch(woff2Url);
+        if (!r.ok) { refusals.push(`${face}: woff2 fetch failed (${r.status})`); continue; }
+        const buf = new Uint8Array(await r.arrayBuffer());
+        bytes += buf.byteLength;
+        let bin = '';
+        const CHUNK = 0x8000;
+        for (let i = 0; i < buf.length; i += CHUNK) {
+          bin += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+        }
+        const b64 = btoa(bin);
+        blocks.push(
+          `@font-face { font-family: '${face}'; font-style: normal; font-weight: 100 900; ` +
+          `src: url(data:font/woff2;base64,${b64}) format('woff2-variations'); }`);
+      } catch (e) {
+        console.error('[fontEmbed] fetch failed:', woff2Url, e);
+        refusals.push(`${face}: woff2 fetch threw`);
+      }
+    }
+    if (!blocks.length) return {css: undefined, bytes, refusals};
+    return {css: blocks.join('\n'), bytes, refusals};
   }, []);
 
   /* Dev note (measured under automation): the ROW families are stacks
@@ -4343,21 +4433,38 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const measure = domMeasurer(() => clone);
       try {
         /* ROUND C — outline mode: when requested, build the outline shaper
-         * ONCE per export from the rows' own families (local-font bytes,
-         * user-permissioned) and hand it to the emitter through ctx. A
-         * shaper that cannot be built (no permission, no matching face,
-         * wasm fetch failure) falls back to <text> VISIBLY: the note is
-         * surfaced via window event so the modal can show it. */
+         * ONCE per export from the rows' own families and hand it to the
+         * emitter through ctx. ROUND AZ — FILE-FIRST (committed subsets,
+         * no permission): an unresolvable family is surfaced VISIBLY via
+         * the gobi:export-note event + __ds_outline_note — never a silent
+         * no-op preview. */
         let outlineCtx: NonNullable<ExportInput['outline']> | undefined;
         if (o.outline) {
-          outlineCtx = (await buildOutlineShaper(exportNodes, exportEdges, measure)) ?? undefined;
+          const built = await buildOutlineShaper(exportNodes, exportEdges, measure);
+          outlineCtx = built.ctx ?? undefined;
           (window as unknown as Record<string, unknown>).__ds_outline_map = outlineCtx?.shapers ?? null;
           (window as unknown as Record<string, unknown>).__ds_outline_note = outlineCtx
-            ? undefined
-            : 'no local font bytes available (permission denied or unsupported browser)';
-          if (!outlineCtx) {
+            ? (built.unresolved.length
+              ? `outlined every family except: ${built.unresolved.join('; ')} (no committed bytes, no local-font match)`
+              : undefined)
+            : 'no font bytes available for any text family (no committed subset matched, no local-font match)';
+          if (built.unresolved.length || !outlineCtx) {
             window.dispatchEvent(new CustomEvent('gobi:export-note', {
-              detail: 'Outline text: no local font bytes available (permission denied or unsupported browser) — text stayed selectable.',
+              detail: outlineCtx
+                ? `Outline text: some families kept selectable text — ${built.unresolved.join('; ')}`
+                : 'Outline text: no font bytes available for any text family — text stayed selectable.',
+            }));
+          }
+          /* ROUND AZ — embed the committed subsets so the exported file
+           * paints its OWN families outside the app (only the families the
+           * scene paints, only faces whose fsType permits embedding). */
+          const embed = await buildFontEmbedCss(exportNodes, exportEdges, measure);
+          (window as unknown as Record<string, unknown>).__ds_embed_bytes = embed.bytes;
+          (window as unknown as Record<string, unknown>).__ds_embed_css = embed.css;
+          if (embed.refusals.length) {
+            (window as unknown as Record<string, unknown>).__ds_embed_refusals = embed.refusals;
+            window.dispatchEvent(new CustomEvent('gobi:export-note', {
+              detail: `Font embed: skipped — ${embed.refusals.join('; ')}`,
             }));
           }
         }
@@ -4369,6 +4476,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           measurer: measure,
           pad: pngPad,
           outline: outlineCtx,
+          fontEmbedCss: o.outline ? (window as unknown as Record<string, unknown>).__ds_embed_css as string | undefined : undefined,
         });
       } finally {
         measure.dispose?.();
