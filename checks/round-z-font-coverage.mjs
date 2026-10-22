@@ -209,12 +209,13 @@ console.log(`  distinct family×subset cmaps: ${byKey.size} (the two weights sha
 
 assert('Z1 every declared family has its three subset files on disk, and every one parses',
   missing.length === 0 && unreadable.length === 0
-    && FACES.length === 36 && parsed.length === 36 && byKey.size === 18,
+    && FACES.length === 47 && parsed.length === 47 && byKey.size === 20,
   missing.length || unreadable.length
     ? `missing [${missing.join(', ')}] unreadable [${unreadable.join('; ')}]`
-    : `${FACES.length} blocks — 6 families x 2 weights x 3 subsets — all ${parsed.length} files read back as `
-      + 'well-formed woff2 with a parseable cmap (no glyf reconstruction needed: this asks which CHARACTERS '
-      + 'a font describes, and that is cmap alone)');
+    : `${FACES.length} blocks — ROUND AZ: Inter + JetBrains Mono re-sourced at their painted weights `
+      + `(sans 400/500/600/700, mono 400/600/700) × 3 subsets + one VARIABLE face per family; the other `
+      + `four families stay 2×3 — all ${parsed.length} files read back as well-formed woff2 with a parseable `
+      + 'cmap (no glyf reconstruction needed: this asks which CHARACTERS a font describes, and that is cmap alone)');
 
 /* --- Z2: the Vietnamese letters, per family, in its own vietnamese file ---- */
 const LETTER_POINTS = Object.values(VIET_LETTERS);
@@ -282,8 +283,14 @@ for (const {family} of MODEL_FAMILIES) {
   if (!v || !l || !x) { violations.push({family, why: 'a subset file is missing'}); continue; }
   const e = c => ({v: describes(v.ranges, c), l: describes(l.ranges, c), x: describes(x.ranges, c)});
   const E = e(0x1ec1), A = e(0xc2);
-  if (!E.v || E.l || E.x) violations.push({family, why: `ế: vietnamese=${E.v} latin=${E.l} latin-ext=${E.x} (want true/false/false)`});
-  if (!(A.v === false) || !A.l) violations.push({family, why: `Â: vietnamese=${A.v} latin=${A.l} (want false/true)`});
+  /* ROUND AZ — the AZ latin-ext subsets carry the WHOLE U+1E00-1EFF block
+   * (scripts/az-build-fonts.py), so ế now reads present in latin-ext too.
+   * The identity invariant that matters is unchanged — ế ABSENT from latin,
+   * Â present ONLY in latin — plus latin-ext remaining its own set (below).
+   * The old `want true/false/false` was Google's subset split, not a property
+   * of Vietnamese coverage. */
+  if (!E.v || E.l) violations.push({family, why: `ế: vietnamese=${E.v} latin=${E.l} (want true/false)`});
+  if (!(A.v === false) || !A.l || A.x) violations.push({family, why: `Â: vietnamese=${A.v} latin=${A.l} latin-ext=${A.x} (want false/true/false)`});
   /* latin-ext is its own set, not a copy of its latin sibling. It legitimately
      carries SOME of the Vietnamese letters (five of them, measured — latin-ext
      and vietnamese overlap), so that is not the claim; the claim is that it is
@@ -298,11 +305,11 @@ console.log(`\n  subset identity per family (ế only in vietnamese; Â only in 
   + `${MODEL_FAMILIES.length - violations.length}/${MODEL_FAMILIES.length} ok`);
 for (const v of violations) console.log(`    ! ${v.family} — ${v.why}`);
 assert('Z3 each declared file really IS the subset its unicode-range claims',
-  violations.length === 0 && byKey.size === 18,
-  `${MODEL_FAMILIES.length}/${MODEL_FAMILIES.length} families: ế (U+1EC1) is described ONLY by their vietnamese `
-  + 'file and Â (U+00C2) ONLY by their latin file, and each latin-ext file describes codepoints its latin '
-  + 'sibling does not — so no `unicode-range` can have been pasted onto the wrong file, and the three subsets '
-  + 'are three distinct sets rather than copies of one');
+  violations.length === 0 && byKey.size === 20,
+  `${MODEL_FAMILIES.length}/${MODEL_FAMILIES.length} families: ế (U+1EC1) is described by vietnamese `
+  + '(and, since ROUND AZ, by the widened latin-ext — the whole U+1E00-1EFF block) but NEVER by latin; '
+  + 'Â (U+00C2) ONLY by latin — so no `unicode-range` can have been pasted onto the wrong file, and the '
+  + 'subsets are distinct sets rather than copies of one');
 
 /* --- Z4: NEGATIVE CONTROL -------------------------------------------------- */
 const anyViet = byKey.get(`${MODEL_FAMILIES[0].family}|vietnamese`);
