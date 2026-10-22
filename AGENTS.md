@@ -24,7 +24,14 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 900000
+ratchet.ceiling: 920561
+# RAISED 2026-10-22, Harvey-approved ("I approve"), measured at HEAD 4ea2c98: 920561.
+# Breakdown, measured not estimated: the shipped payload went 875145 -> ~884000 when ROUND C added
+# the harfbuzzjs shaper, and harfbuzz lands as a SEPARATE LAZY CHUNK (31694 B) plus a 441359 B .wasm
+# fetched only when the user ticks "Outline text"; the metric sums every dist/assets/*.js so it counts
+# the lazy chunk, but no user downloads it unless they use outline mode. ROUND AZ added ~4700 B of
+# font-embedding plumbing and the file-first shaper; the font files themselves are ASSETS under
+# public/fonts (1.9 MB on disk, none of it in client_js_bytes).
 # RAISED 2026-10-21 (FINAL raise of the day), Harvey-approved: 883721 -> 900000 (+16279 headroom).
 # Reason: the ceiling was being raised once per feature round (4x today: 878/810/2496/1938/61 bytes),
 # which turned a bloat alarm into a per-commit negotiation. The ceiling now carries ~1.6% headroom and
