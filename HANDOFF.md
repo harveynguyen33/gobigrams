@@ -1,5 +1,60 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-22 12:xx — ROUND C — "Outline text" (off by default) + PDF print route COMPLETE (card t_a5c17861), LOCAL ONLY
+
+**Tree:** `main`, HEAD `479e71a`. NOT pushed (card rule). Boards clean: Harvey's `Untitled`
+(mvaf8pkt162b2aed) + library only — all probe boards removed by exact-name file delete
+(no DELETE HTTP).
+
+**Commits (5, in order):**
+- `38acbe5` RED harness `checks/round-c-outline.mjs` (fails on the pre-change tree: no src/textOutline.ts)
+- `55dc05b` harfbuzzjs@1.6.3 dependency (Harvey-approved in-card, 2026-10-21 "ok 1")
+- `c3e5283` outline-text mode + PDF print route (run 186's main landing)
+- `e84b0df` fix 1 — minimal harfbuzzjs WRAPPER replacing the package's helper layer (measured:
+  the helpers breached the ceiling at 924,849 B and carried top-level await that hard-failed
+  the es2020 build target; the wrapper over the raw factory exports is the surface the
+  STEP-0 document priced)
+- `479e71a` fix 2 — the 64-per-em scale contract + edge-label coverage + generic-font resolution
+
+**MEASURED ACCEPTANCE (checks/round-c-live.mjs, probe board, both themes):**
+- outlined vs `<text>` pixel diff: **light 0.997% / dark 0.988%** (floor 2.57%; a 0.000%
+  would be the red flag — the diff is real, concentrated in AA rings)
+- ink-top: **56 vs 56 px in both themes** (floor 1px)
+- outlined export: **0 `<text>`, 71 paths, data-text per run**; default export keeps
+  `<text>` (selectable — OFF by default in the modal, `useState(false)`)
+- probe-board file sizes: SVG text **5.5 KB**, SVG outlined **40.2 KB** (both themes);
+  PDF = print view (route i): same SVG inlined in a print document, `window.print()`,
+  honest modal label "opens the print dialog — choose Save as PDF"
+- RED proof: the re-anchored geometry assertions fail on parent c3e5283 (measured 17/20
+  there: C-advance-placement, C-spacing-in-advance, C-anchor-middle)
+
+**KEY MEASURED CONTRACT (future rounds, do not re-derive):** with
+`hb_font_set_scale(64,64)` harfbuzzjs returns advances AND glyphToPath coordinates in
+**64-per-em units** (one em = 64, whatever the face's upem) — scale BOTH to row px by
+k = size/64; the run group carries `scale(k,-k)`. The old font-units reading double-
+corrected (glyphs ~7x too big, placements ~32x too small, 4.09% diff).
+
+**client_js_bytes: 915,768 vs ceiling 900,000 — 15,768 OVER. POLICY ANSWER NEEDED.**
+Composition: 875,145 (pre-C) + ~40,623 (the ROUND C feature set as built: outline module,
+emitter seam, modal, print view, wiring + the wrapper). The STEP-0 estimate priced the
+shaper at +16,332 B but the accepted feature also carries the pure-layout module, the
+emitter mode branch, the modal, the print view and the probe seam — the whole ROUND C
+feature. Per ratchet policy this is a worker-reported overrun, not a self-approved raise:
+the ceiling line in AGENTS.md is UNCHANGED. Options for Harvey: (a) approve the raise to
+~920,000 with the ROUND C numbers above, (b) trim the probe seam (__ds_export, ~1 KB) or
+the print route, (c) revert outline mode. Note the +5.2% is code Harvey asked for in this
+card; the wrapper itself saved ~26 KB vs the helper-layer route.
+
+**Gates at HEAD:** tsc 0 · vite build 0 · goblin-verify 22/22 · full sweep 62 green
+(+4 skipped RED/capture drivers per the AY convention) · round-c-outline 20/20 ·
+round-c-live 10/10 · print smoke: emitted SVG parses as SVG root, carries width/height,
+text selectable (route-i contract verified in-page).
+
+**NOT done / follow-ups:** `client_js_bytes` decision above. The outlined export's
+`queryLocalFonts` prompt fires once per origin on first outlined export (browser policy);
+before that grant the export stays `<text>` with a visible note. AZ (fonts) is the child
+card and starts after this one closes.
+
 ## ▶ 2026-10-21 23:xx — ROUND AY — SVG-first export pipeline, items 1-6 COMPLETE (card t_822ff5a3), LOCAL ONLY
 
 **Tree:** `main`, HEAD `1678994`. NOT pushed (card rule). Boards clean: Harvey's `Untitled`
