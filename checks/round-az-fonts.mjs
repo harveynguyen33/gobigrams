@@ -55,7 +55,7 @@ let manifestEntries = [];
 if (manifestOk) {
   manifestEntries = readFileSync(manifestPath, 'utf8').split('\n')
     .map(l => l.trim()).filter(l => l && !l.startsWith('#'))
-    .map(l => { const [h, ...n] = l.split(/\s+/); return {hash: h, name: n.join(' ')}; });
+    .map(l => { const parts = l.split(/\s+/); return {name: parts[0], hash: parts[1]}; });
 }
 let manifestVerified = 0;
 for (const e of manifestEntries) {
