@@ -1851,6 +1851,13 @@ export default function App() {
   useEffect(() => {
     if (!boardsOpen) return;
     const onDown = (e: MouseEvent) => {
+      /* CONFIG-FIX (2026-10-22) — the popover is PORTAL'D to document.body, so
+         it is NOT inside boardsBtnRef any more: a click inside it landed here,
+         read as "outside", and closed the menu BEFORE the row's onClick ran —
+         every row (open board, New board, Templates, Rename…) appeared dead.
+         Exclude the portal'd popup itself from the outside test. */
+      const t = e.target as Element | null;
+      if (t?.closest?.('.boards-pop')) return;
       if (boardsBtnRef.current && !boardsBtnRef.current.contains(e.target as any)) setBoardsOpen(false);
     };
     window.addEventListener('mousedown', onDown);
@@ -5678,20 +5685,21 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             <span className="dot" />Diagram Studio<span className="path">diagrams</span>
           </div>
           <div ref={boardsBtnRef} style={{position: 'relative', marginTop: 10}}>
-            <Tooltip label="Boards — open, create, rename, duplicate or delete drawings">
-              <button
-                type="button"
-                ref={boardsMenuBtnRef}
-                className={`tbtn-dd boards-btn${boardsOpen ? ' on' : ''}`}
-                aria-label="Boards menu"
-                aria-expanded={boardsOpen}
-                onClick={() => { setBoardsOpen(o => !o); void refreshBoards(); }}
-              >
-                <LayoutGrid size={13} style={{verticalAlign: -2}} />
-                <span className="boards-name">{curBoard ? curBoard.name : 'Boards'}</span>
-                <ChevronDown size={12} style={{verticalAlign: -2}} />
-              </button>
-            </Tooltip>
+            {/* CONFIG-FIX (2026-10-22) — HARVEY: the hover tooltip covered the
+                freshly-portal'd popover (it opens right beside this button), so
+                the Tooltip wrapper is GONE; the button keeps its aria-label. */}
+            <button
+              type="button"
+              ref={boardsMenuBtnRef}
+              className={`tbtn-dd boards-btn${boardsOpen ? ' on' : ''}`}
+              aria-label="Boards menu"
+              aria-expanded={boardsOpen}
+              onClick={() => { setBoardsOpen(o => !o); void refreshBoards(); }}
+            >
+              <LayoutGrid size={13} style={{verticalAlign: -2}} />
+              <span className="boards-name">{curBoard ? curBoard.name : 'Boards'}</span>
+              <ChevronDown size={12} style={{verticalAlign: -2}} />
+            </button>
             {/* ITEM B (2026-10-22) — the popover is PORTAL'D TO BODY and
                 position:fixed (Tooltip.tsx:205 precedent): `.panel` clips at
                 232px (overflow:hidden), so the redesigned 360px popup could
