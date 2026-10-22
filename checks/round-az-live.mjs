@@ -154,8 +154,16 @@ try {
     const hasEmbed = outl.svg.includes('base64');
     assert(`az-${theme}-outlined-no-text-NO-PERMISSION`, noText && hasPaths,
       `outlined export without any localFonts grant: ${noText ? '0 <text>' : '<text> SURVIVED'}, ${(outl.svg.match(/<path\b/g) || []).length} paths${hasData ? ', data-text present' : ''}`);
-    assert(`az-${theme}-embed-present`, hasEmbed,
-      `the outlined export embeds the committed subsets (base64 @font-face in defs)`);
+    /* ROUND AZ fix (orchestrator) — the embed belongs to the TEXT export, not the outlined one:
+       outlined glyphs are paths and need no font, so embedding there was pure bloat (measured
+       318,713 B before the fix, 84.9 KB after). The assertion now checks the contract in the
+       direction that matters: the DEFAULT export (text, the one a client opens) must carry the
+       committed subsets, and the outlined export must NOT carry them. */
+    const textEmbeds = text.svg.includes('@font-face') && text.svg.includes('base64');
+    assert(`az-${theme}-embed-present-text`, textEmbeds,
+      `the TEXT export embeds the committed subsets (base64 @font-face in defs) — text mode is the one that needs a font`);
+    assert(`az-${theme}-embed-absent-outlined`, !hasEmbed,
+      `the OUTLINED export carries no @font-face (paths need no font) — found ${hasEmbed ? 'an embed' : 'none'}`);
     /* the Vietnamese rows survived: data-text carries the diacritics */
     const vn = outl.svg.includes('Đơn hàng') || outl.svg.includes('Ghi ch') || outl.svg.includes('đọc ghi');
     assert(`az-${theme}-vietnamese-data`, hasData && vn,

@@ -4455,18 +4455,24 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 : 'Outline text: no font bytes available for any text family — text stayed selectable.',
             }));
           }
-          /* ROUND AZ — embed the committed subsets so the exported file
-           * paints its OWN families outside the app (only the families the
-           * scene paints, only faces whose fsType permits embedding). */
-          const embed = await buildFontEmbedCss(exportNodes, exportEdges, measure);
-          (window as unknown as Record<string, unknown>).__ds_embed_bytes = embed.bytes;
-          (window as unknown as Record<string, unknown>).__ds_embed_css = embed.css;
-          if (embed.refusals.length) {
-            (window as unknown as Record<string, unknown>).__ds_embed_refusals = embed.refusals;
-            window.dispatchEvent(new CustomEvent('gobi:export-note', {
-              detail: `Font embed: skipped — ${embed.refusals.join('; ')}`,
-            }));
-          }
+        }
+        /* ROUND AZ fix (orchestrator, measured live) — the embed belongs to the TEXT path, not the
+         * outline path. Outlined glyphs ARE paths: they need no font at all, so embedding there only
+         * bloated the file (measured: 318,713 B outlined with an embed against ~78 KB it needs).
+         * Meanwhile the default export — the one Harvey sends to clients — carried NO @font-face, so a
+         * viewer without Inter saw substitution, which is the exact problem ROUTE 1 exists to solve.
+         * Embed only when text stays text, only the families the scene paints, only faces whose fsType
+         * permits it. */
+        const embed = o.outline
+          ? {css: undefined as string | undefined, bytes: 0, refusals: [] as string[]}
+          : await buildFontEmbedCss(exportNodes, exportEdges, measure);
+        (window as unknown as Record<string, unknown>).__ds_embed_bytes = embed.bytes;
+        (window as unknown as Record<string, unknown>).__ds_embed_css = embed.css;
+        if (embed.refusals.length) {
+          (window as unknown as Record<string, unknown>).__ds_embed_refusals = embed.refusals;
+          window.dispatchEvent(new CustomEvent('gobi:export-note', {
+            detail: `Font embed: skipped — ${embed.refusals.join('; ')}`,
+          }));
         }
         return exportSvgOf({
           nodes: exportNodes,
@@ -4476,7 +4482,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           measurer: measure,
           pad: pngPad,
           outline: outlineCtx,
-          fontEmbedCss: o.outline ? (window as unknown as Record<string, unknown>).__ds_embed_css as string | undefined : undefined,
+          fontEmbedCss: embed.css,
         });
       } finally {
         measure.dispose?.();
