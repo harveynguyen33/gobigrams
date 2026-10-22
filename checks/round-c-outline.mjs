@@ -127,22 +127,15 @@ if (!run || typeof mod.shapeLineToSvg !== 'function') {
   assert('C-no-text-element', !/<text[\s>]/.test(svg), 'outlined run emits no <text>');
   assert('C-run-fill', /fill="#ff0000"/.test(svg), `run fill on the group: ${svg.slice(0, 160)}`);
 
-  /* B2: advance placement — the stub shaper reports advances in units
-   * where the row size maps 1:1 (size 10 = the stub's full em), so with
-   * the measured 64-per-em contract the run group carries
-   * scale(size/64) and glyph placements are pre-scaled to row px:
-   * advance 7 * (10/10 em-ratio) → the stub's upem 10 means one em =
-   * its 10-unit glyph box; size 10 → 1 em → k = 10/64; advance 7 units
-   * = 0.7 em = 7 * (10/10) px... the stub's shapes ARE its em: the
-   * placements the harness can pin are the ADVANCE RATIOS. Glyph 2 sits
-   * at advance7 * k where k = size/SCALE; with the stub's upem 10 the
-   * advance 7 means 7 * 10/10 em-units → 7 * size/10 = 7 px, and k-px
-   * placement inside a k-scaled group must present as translate(7/1...).
-   * Measured contract: placement x = advance * k = 7 * (10/64) = 1.09,
-   * rendered width 1.09 * 64/10 = 7px. Assert the rendered geometry: */
+  /* B2: advance placement — CORRECTED CONTRACT (orchestrator, 2026-10-22).
+   * The shaper returns offsets/advances in 64-per-em UNITS and the run group's
+   * scale(k,-k) applies the size ONCE. The old harness pinned placements
+   * pre-multiplied by k, which is exactly the double-scale bug that made Harvey's
+   * outlined text "gom co lại" (measured: an 11px mono row advanced 1.32px per glyph
+   * instead of ~7.7px). Glyph 2 now sits at the raw advance, 7 units. */
   const k = 10 / 64;
-  const second = svg.indexOf(`translate(${(7 * k).toFixed(2)},0)`);
-  assert('C-advance-placement', second >= 0, `second glyph at advance 7 * k(size/64) = ${(7 * k).toFixed(2)} run-relative (renders 7px under the group scale): ${svg.slice(0, 220)}`);
+  const second = svg.indexOf('translate(7,0)');
+  assert('C-advance-placement', second >= 0, `second glyph at the raw advance 7 units (the group scale turns it into 7 * k = ${(7 * k).toFixed(2)} px): ${svg.slice(0, 220)}`);
 
   /* B3: y flip — the group's scale carries NEGATIVE y (font y-up ->
    * SVG y-down): scale(k,-k) with k = size/64 = 0.16 for the stub. */
@@ -150,21 +143,23 @@ if (!run || typeof mod.shapeLineToSvg !== 'function') {
     `the glyph outline must be y-flipped (font y-up -> SVG y-down): ${svg.slice(0, 200)}`);
 
   /* B4: letter-spacing folded into the ADVANCE (shape first, spacing
-   * second): with spacing 3, glyph 2 lands at run-relative 7k+3. */
+   * second). Spacing is authored in px, so it converts into shaper units
+   * (spacing / k); with spacing 3 at size 10 that is 19.2 units, so glyph 2
+   * lands at 7 + 19.2 = 26.2 units. */
   const svgSp = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 3, shaper: stubShaper,
   });
-  assert('C-spacing-in-advance', svgSp.indexOf(`translate(${(7 * k + 3).toFixed(2)},0)`) >= 0,
-    `letter-spacing 3 folded into the advance: glyph 2 at run-relative ${(7 * k + 3).toFixed(2)}`);
+  assert('C-spacing-in-advance', svgSp.indexOf(`translate(${Math.round((7 + 3 / k) * 100) / 100},0)`) >= 0,
+    `letter-spacing 3px folded into the advance as ${(3 / k).toFixed(2)} units: glyph 2 at run-relative 26.2 units`);
 
   /* B5: anchor middle — the run is centred on x by its shaped width. */
   const svgMid = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 0, anchor: 'middle', shaper: stubShaper,
   });
-  /* width = 2 glyphs * 7k = 2.19 => run-relative start = -1.09 */
-  assert('C-anchor-middle', new RegExp(`translate\\(-${(7 * k).toFixed(2)},0\\)`).test(svgMid), `middle-anchored run starts at -${(7 * k).toFixed(2)} (100 - shapedWidth/2): ${svgMid.slice(0, 140)}`);
+  /* width = 2 glyphs * 7 units = 14 units => run-relative start = -7 units */
+  assert('C-anchor-middle', new RegExp(`translate\\(-7,0\\)`).test(svgMid), `middle-anchored run starts at -7 units (half of the 14-unit shaped width): ${svgMid.slice(0, 140)}`);
 
   /* E: the source string rides a data attribute (a11y / round-trip). */
   assert('C-data-text', /data-text="ab"/.test(svg), `source text kept in data-text`);

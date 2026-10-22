@@ -4518,8 +4518,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    * the caller; outline rides `outline: true` — the modal's checkbox
    * reaches the print view through this flag), inline it in a print
    * window with a print stylesheet, and open the browser's dialog. */
-  const printPdf = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<void> => {
-    const svg = await buildSvg({...o, outline: true});
+  const printPdf = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}): Promise<void> => {
+    /* ORCHESTRATOR FIX (2026-10-22, Harvey: "dù không chọn Outline, PDF vẫn ra như khi chọn outline") —
+     * this call hardcoded `outline: true`, so the print route ALWAYS outlined: the PDF carried glyph
+     * paths and the text was never selectable, regardless of the checkbox. The checkbox is the only
+     * thing that decides; the print view inherits whatever the modal shows. */
+    const svg = await buildSvg({nodes: o.nodes, edges: o.edges, theme: o.theme, outline: !!o.outline});
     if (!svg) return;
     printSvgAsPdf(svg, curBoard?.name || 'Diagram Studio');
   /* eslint-disable-next-line react-hooks/exhaustive-deps */

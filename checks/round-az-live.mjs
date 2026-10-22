@@ -169,6 +169,26 @@ try {
     assert(`az-${theme}-vietnamese-data`, hasData && vn,
       `the outlined export's data-text carries the Vietnamese strings`);
 
+    /* AZ fix regression guard (orchestrator, 2026-10-22): the double-scale bug multiplied the
+       glyph offsets by size/64 in layoutRun AND again in the group transform, so an 11px mono row
+       advanced 1.32px per glyph instead of ~7.7px — Harvey saw the text "gom co lại". A real advance
+       is 0.35–0.7em; the broken one was 0.12em. Assert the ratio, not a font-specific number. */
+    {
+      const groups = [...outl.svg.matchAll(/scale\(([\d.]+),-[\d.]+\)"[^>]*data-size="([\d.]+)"[^>]*>([\s\S]*?)<\/g>/g)];
+      const ratios = [];
+      for (const g of groups) {
+        const k = parseFloat(g[1]); const size = parseFloat(g[2]);
+        const xs = [...g[3].matchAll(/translate\(([-\d.]+),/g)].map(m => parseFloat(m[1]));
+        if (xs.length < 3 || !size) continue;
+        const ds = xs.slice(1).map((v, i) => v - xs[i]).filter(v => v > 0).sort((a, b) => a - b);
+        if (!ds.length) continue;
+        ratios.push((ds[Math.floor(ds.length / 2)] * k) / size);
+      }
+      const worst = ratios.length ? Math.min(...ratios) : Infinity;
+      assert(`az-${theme}-outline-advance-not-collapsed`, ratios.length > 0 && worst >= 0.35,
+        `median glyph advance is ${(worst * 100).toFixed(1)}% of the font size across ${ratios.length} outlined rows (the double-scale bug measured 12%); anything under 35% means glyphs are being compressed`);
+    }
+
     if (noText && hasPaths) {
       const pngText = await rasteriseViaBrowser(page, text.svg);
       const pngOutl = await rasteriseViaBrowser(page, outl.svg);

@@ -84,27 +84,37 @@ export function layoutRun(
    * pixel diff of the pre-fix probe.) */
   void upem;
   const k = o.size / SCALE;
+  /* ORCHESTRATOR FIX (2026-10-22, Harvey: outlined text "bị gom co lại") — the DOUBLE SCALE.
+   * The shaper returns offsets, advances and path coordinates all in 64-per-em units, and
+   * `shapeLineToSvg` already scales the whole run group by k = size/64. Multiplying the glyph
+   * OFFSETS by k here as well applied k twice: at 14px that is 0.219×, so every glyph was pulled
+   * toward the run origin — the compressed/clumped text Harvey saw. Offsets now stay in shaper
+   * units and are scaled exactly once, by the group transform. Letter-spacing is authored in px,
+   * so it converts into the same unit space (and only `width`/`x0` are reported in px). */
+  const spUnits = k ? o.spacing / k : 0;
   /* shape first, spacing second: fold letter-spacing into the ADVANCE */
   let x = 0;
   const placed: PlacedGlyph[] = [];
   for (const g of glyphs) {
     placed.push({
       gid: g.gid,
-      x: x + g.xOffset * k,
-      y: g.yOffset * k,
+      x: x + g.xOffset,
+      y: g.yOffset,
     });
-    x += g.xAdvance * k + o.spacing;
+    x += g.xAdvance + spUnits;
   }
   /* the trailing spacing of the last glyph is not ink */
-  const width = x - (glyphs.length ? o.spacing : 0);
+  const widthUnits = x - (glyphs.length ? spUnits : 0);
+  const width = widthUnits * k;
   /* anchor: middle/centre the run on the requested x (the emitter passes
    * the row's own x; start leaves it). end would right-align — unused by
-   * the scene today but symmetric. */
-  let x0 = 0;
-  if (o.anchor === 'middle' || o.anchor === 'central') x0 = -width / 2;
-  else if (o.anchor === 'end') x0 = -width;
-  if (x0 !== 0) for (const g of placed) g.x += x0;
-  return {glyphs: placed, width, x0};
+   * the scene today but symmetric. Applied in shaper units (the space the
+   * glyph offsets live in); reported in px for callers that want a length. */
+  let x0u = 0;
+  if (o.anchor === 'middle' || o.anchor === 'central') x0u = -widthUnits / 2;
+  else if (o.anchor === 'end') x0u = -widthUnits;
+  if (x0u !== 0) for (const g of placed) g.x += x0u;
+  return {glyphs: placed, width, x0: x0u * k};
 }
 
 /** Per-glyph paths + the run group, in final SVG user space.

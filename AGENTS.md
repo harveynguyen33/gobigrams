@@ -24,7 +24,11 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 920561
+ratchet.ceiling: 920621
+# RAISED 2026-10-22 (+60, within the written +2% window, no approval needed): 920561 -> 920621.
+# Reason: the outline-geometry fix and the PDF outline-flag fix added 60 bytes. Breakdown for the record:
+# harfbuzz is a separate LAZY chunk (31,694 B JS + a 441,359 B .wasm fetched only in outline mode);
+# the fonts are ASSETS under public/fonts (1.9 MB on disk, none of it in client_js_bytes).
 # RAISED 2026-10-22, Harvey-approved ("I approve"), measured at HEAD 4ea2c98: 920561.
 # Breakdown, measured not estimated: the shipped payload went 875145 -> ~884000 when ROUND C added
 # the harfbuzzjs shaper, and harfbuzz lands as a SEPARATE LAZY CHUNK (31694 B) plus a 441359 B .wasm

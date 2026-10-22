@@ -1318,7 +1318,14 @@ assert('r3f.initialPick-and-boardPick-are-BOTH-removed',
  *  writes go out over the app's own HTTP API, at the user's request. */
 const boardsDirName = 'boa' + 'rds';
 const boardsDir = join(ROOT, boardsDirName);
-const boardNames = readdirSync(boardsDir).filter(f => f.endsWith('.json') && f !== 'library.json' && f !== 'library.json.bak').sort();
+/* AS-7 (2026-10-22): DELETE now ARCHIVES a board as `<id>.deleted-<UTC>.json` instead of unlinking it,
+   so archives are expected artifacts, not live boards. Exclude them from the listing (their names carry
+   dots and an uppercase UTC stamp, which the live-board name rule rightly rejects) and keep asserting the
+   live set. Measured when this was re-anchored: Harvey's board had been deleted and archived, and three
+   of his own new boards were live — the listing legitimately changes with his device testing. */
+const boardNames = readdirSync(boardsDir)
+  .filter(f => f.endsWith('.json') && f !== 'library.json' && f !== 'library.json.bak' && !/\.deleted-[0-9]{8}T[0-9]{6}Z\.json$/.test(f))
+  .sort();
 console.log(`  ${boardsDirName} dir holds ${boardNames.length} board files: [${boardNames.join(', ')}]`);
 /* HARVEY 2026-10-13 re-anchor: the runtime data directory is the USER'S live
    data (gitignored). His device-test session legitimately deleted the demo board

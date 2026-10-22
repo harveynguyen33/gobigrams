@@ -31,7 +31,7 @@ type Props = {
   buildPng: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<string>;
   /** ROUND C — the print route: App owns window/printView (the modal is
    *  DOM-only). Receives the SAME svg string the .svg download gets. */
-  printPdf: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<void>;
+  printPdf: (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}) => Promise<void>;
   /** AQ21-G — Import gets its own tab; JSON file picking stays in App (fileRef). */
   onImportJson: () => void;
 };
@@ -157,7 +157,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
         /* Harvey-approved route (i): the print dialog, not a download.
            printPdf builds the same svg string (theme/scope/outline baked
            in) inside App and hands it to the print view. */
-        await printPdf({nodes: scoped.nodes, edges: scoped.edges, theme: effTheme});
+        await printPdf({nodes: scoped.nodes, edges: scoped.edges, theme: effTheme, outline});
         return;
       } else if (format === 'png') {
         const url = await buildPng({...scoped, theme: effTheme});
