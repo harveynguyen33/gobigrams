@@ -42,3 +42,6 @@ research/
 # by checks/round-ay-png-diff.mjs; only the BEFORE fixtures are committed)
 .ay4-png-after/
 .ay4-diff-report.json
+# ROUND C scratch: the live-probe artefacts (probe board SVG/PNG rasters,
+# regenerated per run by checks/round-c-live.mjs)
+.rc-live/

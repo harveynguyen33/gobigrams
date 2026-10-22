@@ -732,9 +732,17 @@ function noteMarkup(s: {w: number; h: number}, surface: string, dim: string): st
 /** ERD table: header band + colour strip + one row per visible column.
  *  ROUND-AR-DEFECT-1 — `t` (when the measurer found the table's DOM) carries
  *  the `.tnode-cname` row font in `rows.tcol`, so each column line is painted
- *  in the measured family/size/weight instead of the legacy sans defaults. */
+ *  in the measured family/size/weight instead of the legacy sans defaults.
+ *  ROUND C — `emitRow` (when the caller passes it) replaces the direct
+ *  textLine calls so outline mode covers the table rows; default keeps
+ *  the plain <text> behaviour byte-identical. */
 function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, fg: string, dim: string,
-  t?: TextRect | null): string {
+  t?: TextRect | null,
+  emitRow?: (x: number, y: number, content: string, o: {size: number; weight: number; fill: string; family?: string; anchor?: string; spacingNum?: number}) => string): string {
+  const row = emitRow ?? ((x, y, content, o) => textLine(x, y, content, {
+    size: o.size, weight: o.weight, fill: o.fill, family: o.family, anchor: o.anchor,
+    spacing: o.spacingNum !== undefined ? String(o.spacingNum) : undefined,
+  }));
   const d = (n.data ?? {}) as Record<string, unknown>;
   const cols: Array<Record<string, unknown> | string> = Array.isArray(d.columns) ? d.columns : [];
   const headerH = 24;
@@ -743,7 +751,7 @@ function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, f
     `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(accent)}" stroke-width="1.5"/>`,
     `<rect x="1" y="1" width="${s.w - 2}" height="${headerH}" rx="6" fill="${escAttr(accent)}" fill-opacity="0.16"/>`,
     `<rect x="1" y="${headerH}" width="4" height="${Math.max(s.h - headerH - 2, 0)}" fill="${escAttr(accent)}"/>`,
-    textLine(12, 17, String(d.name ?? d.title ?? n.id), {size: 12, weight: 650, fill: fg, family: t?.family}),
+    row(12, 17, String(d.name ?? d.title ?? n.id), {size: 12, weight: 650, fill: fg, family: t?.family}),
   ];
   const rowH = cols.length ? Math.min(18, (s.h - headerH - 4) / cols.length) : 0;
   cols.forEach((c, i) => {
@@ -753,7 +761,7 @@ function tableMarkup(n: ExportNode, s: {w: number; h: number}, accent: string, f
     if (typeof c !== 'string' && (c.pk || c.isPrimary || c.primaryKey)) {
       parts.push(`<circle cx="8" cy="${y - 4}" r="2.4" fill="${escAttr(accent)}"/>`);
     }
-    parts.push(textLine(16, y, name, {
+    parts.push(row(16, y, name, {
       size: colFont?.size ?? 10.5, weight: colFont?.weight ?? 450, fill: dim,
       family: colFont?.family,
     }));
@@ -951,11 +959,11 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
       const mid = {x: e.label.x + off.x, y: e.label.y + off.y};
       parts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(scene.surface)}" stroke="${escAttr(scene.dim)}" stroke-width="0.8"/>`,
-        textLine(mid.x - lw / 2 + 6, mid.y + 4, e.label.row.content, {
-          size: e.label.row.size, weight: e.label.row.weight, fill: e.label.row.fill,
-          family: e.label.row.family,
-          spacing: e.label.row.spacing !== undefined ? String(e.label.row.spacing) : undefined,
-        }));
+        /* ROUND C — the label row goes through rowMarkup like every other
+         * row, so outline mode covers it too (was a direct textLine, which
+         * left the edge label as the ONE <text> survivor in outlined
+         * exports — measured live on the RC probe board). */
+        rowMarkup({...e.label.row, x: mid.x - lw / 2 + 6, baselineY: mid.y + 4}, outline));
     }
   }
   parts.push('</g>');
@@ -989,7 +997,10 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
       parts.push(noteMarkup(s, scene.surface, scene.dim));
       for (const r of n.rows) parts.push(rowEl(r));
     } else if (n.kind === 'table') {
-      parts.push(tableMarkup(n as never, s, n.accent, scene.fg, scene.dim, n.textRect));
+      /* ROUND C — the table's own textLine calls become rowMarkup calls
+       * so outline mode covers the header + column rows too. */
+      parts.push(tableMarkup(n as never, s, n.accent, scene.fg, scene.dim, n.textRect,
+        (x, y, content, o) => rowMarkup({x, baselineY: y, content, size: o.size, weight: o.weight, fill: o.fill, family: o.family, spacing: o.spacingNum, anchor: o.anchor}, outline)));
     } else {
       parts.push(
         `<svg x="0" y="0" width="${s.w}" height="${s.h}" viewBox="0 0 200 100" preserveAspectRatio="none">` +

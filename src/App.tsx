@@ -4192,15 +4192,30 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
   ): Promise<NonNullable<ExportInput['outline']> | null> => {
     void edges;
+    /* edge LABEL rows too: collect pairs off the nodes AND the measured
+     * edge label fonts (ROUND-AR-DEFECT-1's portalled rows). */
     const pairs = new Map<string, {family: string; weight: number}>();
     let defaultFamily = measure.defaultFamily?.() ?? '';
+    const collect = (fam: string | undefined, weight: number | undefined) => {
+      const f = fam ?? defaultFamily;
+      if (!f) return;
+      const key = `${f}|${weight ?? 500}`;
+      if (!pairs.has(key)) pairs.set(key, {family: f, weight: weight ?? 500});
+    };
     for (const n of nodes) {
       const t = measure.text(n.el);
-      const fam = t?.family ?? defaultFamily;
-      if (!fam) continue;
-      const key = `${fam}|${t?.weight ?? 650}`;
-      if (!pairs.has(key)) pairs.set(key, {family: fam, weight: t?.weight ?? 650});
-      if (!t?.family && !defaultFamily) defaultFamily = fam;
+      collect(t?.family, t?.weight ?? 650);
+      /* table column rows (t.rows.tcol) and the other measured rows carry
+       * their own families — collect every distinct one */
+      if (t?.rows) {
+        for (const rf of Object.values(t.rows)) {
+          if (rf?.family) collect(rf.family, rf.weight);
+        }
+      }
+    }
+    for (const e of edges) {
+      const lf = measure.edgeLabelFont?.(e.id);
+      collect(lf?.family, lf?.weight);
     }
     if (!pairs.size) return null;
     const shapers = new Map<string, OutlineShaper>();
@@ -4212,13 +4227,41 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const key = `${hit.name}@${weight}`;
       cacheKeyOf.set(family, key);
       const shaper = await makeShaper(hit.bytes, key);
-      if (shaper) shapers.set(family, shaper);
+      if (shaper) {
+        /* rows carry the family STACK ('ui-sans-serif, system-ui, …');
+         * register the resolved shaper under EVERY prefix of the stack
+         * AND under every WHITESPACE VARIANT (the emitter's lookup is
+         * exact-string; a row's measured family can differ in spacing
+         * around the quotes). */
+        const register = (k: string) => {
+          if (k && !shapers.has(k)) shapers.set(k, shaper);
+          const squeezed = k.replace(/\s+/g, ' ').trim();
+          if (squeezed && !shapers.has(squeezed)) shapers.set(squeezed, shaper);
+          const squeezedQuotes = squeezed.replace(/"/g, '');
+          if (squeezedQuotes && !shapers.has(squeezedQuotes)) shapers.set(squeezedQuotes, shaper);
+        };
+        register(family);
+        const parts = family.split(',');
+        for (let i = 2; i <= parts.length; i++) {
+          register(parts.slice(0, i).join(',').trimEnd().replace(/,\s*$/, ''));
+        }
+        /* register the resolved family name itself too (a row measured
+         * AFTER the font resolved can carry the concrete name) */
+        register(hit.name);
+      }
     }
     if (!shapers.size) return null;
     /* the default face: the measurer's defaultFamily when IT resolved */
     const defaultShaper = defaultFamily ? shapers.get(defaultFamily) : undefined;
     return {shapers, defaultShaper};
   }, []);
+
+  /* Dev note (measured under automation): the ROW families are stacks
+   * ('ui-monospace, SFMono-Regular, …'). localFontBytes matches stack
+   * parts against queryLocalFonts' response; on this Linux box the sans
+   * stack's 'Roboto' part resolves (Roboto-Black etc.) while generic
+   * keywords (ui-*, system-ui, monospace, sans-serif) correctly never
+   * name a face. A stack that matches nothing keeps <text> per row. */
 
   const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
@@ -4308,6 +4351,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         let outlineCtx: NonNullable<ExportInput['outline']> | undefined;
         if (o.outline) {
           outlineCtx = (await buildOutlineShaper(exportNodes, exportEdges, measure)) ?? undefined;
+          (window as unknown as Record<string, unknown>).__ds_outline_map = outlineCtx?.shapers ?? null;
+          (window as unknown as Record<string, unknown>).__ds_outline_note = outlineCtx
+            ? undefined
+            : 'no local font bytes available (permission denied or unsupported browser)';
           if (!outlineCtx) {
             window.dispatchEvent(new CustomEvent('gobi:export-note', {
               detail: 'Outline text: no local font bytes available (permission denied or unsupported browser) — text stayed selectable.',
@@ -4363,6 +4410,22 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     printSvgAsPdf(svg, curBoard?.name || 'Diagram Studio');
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [buildSvg, curBoard]);
+
+  /* ROUND C — the probe seam: the harness drives the app's OWN build
+   * path (not a re-implementation) to measure the outlined vs text
+   * exports. Dev/test only; it reads nothing beyond the builders. */
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__ds_export =
+      async (o: {board?: string; theme: string; outline: boolean}) => {
+        try {
+          const svg = await buildSvg({nodes, edges, theme: o.theme, outline: o.outline});
+          return {svg, note: o.outline ? (window as unknown as {__ds_outline_note?: string}).__ds_outline_note : undefined};
+        } catch (e) {
+          return {error: String(e)};
+        }
+      };
+    return () => { delete (window as unknown as Record<string, unknown>).__ds_export; };
+  }, [buildSvg, nodes, edges]);
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);

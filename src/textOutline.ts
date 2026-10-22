@@ -74,19 +74,26 @@ export function layoutRun(
 ): ShapedRun {
   const {glyphs, upem} = shaper.shapeRun(text);
   const SCALE = 64; /* shaper px-per-em at shape time */
-  /* font units -> shaper px, then shaper px -> row px */
+  /* Measured contract (run 187, live DejaVu Sans probe): with
+   * hb_font_set_scale(64,64) the shaper returns ADVANCES and glyphToPath
+   * coordinates in 64-per-em units — NOT raw font units, despite the type
+   * comment. One em is always 64 of them, whatever the face's upem, so
+   * EVERYTHING scales to row px by k = size/64 and upem only rides along.
+   * (The old unitK*size/upem chain double-corrected: advances came out
+   * ~32x too small while the raw paths emitted ~7x too big — the 4.09%
+   * pixel diff of the pre-fix probe.) */
+  void upem;
   const k = o.size / SCALE;
-  const unitK = SCALE / upem;
   /* shape first, spacing second: fold letter-spacing into the ADVANCE */
   let x = 0;
   const placed: PlacedGlyph[] = [];
   for (const g of glyphs) {
     placed.push({
       gid: g.gid,
-      x: x + g.xOffset * unitK * k,
-      y: g.yOffset * unitK * k,
+      x: x + g.xOffset * k,
+      y: g.yOffset * k,
     });
-    x += g.xAdvance * unitK * k + o.spacing;
+    x += g.xAdvance * k + o.spacing;
   }
   /* the trailing spacing of the last glyph is not ink */
   const width = x - (glyphs.length ? o.spacing : 0);
@@ -128,7 +135,9 @@ export function shapeLineToSvg(
     })
     .join('');
   const attrs = [
-    `transform="translate(${o.x},${o.baselineY}) scale(1,-1)"`,
+    /* the group scales the 64-per-em shaper units to row px (measured
+     * contract, see layoutRun) AND flips font y-up to SVG y-down */
+    `transform="translate(${o.x},${o.baselineY}) scale(${round2(o.size / 64)},-${round2(o.size / 64)})"`,
     `fill="${o.fill}"`,
     o.opacity ? `opacity="${o.opacity}"` : '',
     `data-text="${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}"`,
@@ -169,20 +178,56 @@ export async function localFontBytes(
     if (!fonts.length) return null;
     /* the row's family may be a stack: try each comma part */
     const parts = family.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    const nameHit = (f: {family: string; fullName: string; postscriptName: string}, p: string): boolean =>
+      f.family.toLowerCase() === p || f.fullName.toLowerCase() === p ||
+      f.postscriptName.toLowerCase().replace(/-/g, ' ') === p;
     const scored = fonts.map(f => {
       let score = -1;
       for (let i = 0; i < parts.length; i++) {
-        const p = parts[i].toLowerCase();
-        if (f.family.toLowerCase() === p || f.fullName.toLowerCase() === p ||
-            f.postscriptName.toLowerCase().replace(/-/g, ' ') === p) {
+        if (nameHit(f, parts[i].toLowerCase())) {
           score = 100 - i; /* earlier stack parts win */
           break;
         }
-        /* generic keywords (monospace/sans-serif) and ui- prefixes cannot
-         * name a face — skip them for direct matches */
       }
       return {f, score};
     }).filter(s => s.score >= 0);
+    /* GENERIC KEYWORDS: 'monospace' / 'sans-serif' (and ui-* aliases)
+     * never name a face in queryLocalFonts' response — resolve them by
+     * RENDERED WIDTH (canvas): the face whose advance widths match the
+     * generic's exactly IS the face the browser renders (measured live:
+     * monospace -> DejaVu Sans Mono, sans-serif -> Liberation Sans).
+     * Ties/near-misses are rejected (the match must be < 0.01px). */
+    const GENERIC = new Set(['monospace', 'sans-serif', 'serif', 'cursive', 'fantasy', 'ui-monospace', 'ui-sans-serif', 'ui-serif', 'ui-rounded', 'system-ui']);
+    const widthMatched = (generic: string): {f: (typeof fonts)[number]; score: number} | null => {
+      try {
+        const c = document.createElement('canvas').getContext('2d');
+        if (!c) return null;
+        const SAMPLE = 'Diagram Studio reads 123 — widths 0123456789';
+        const widthOf = (fam: string): number => {
+          c.font = `14.5px ${fam}`;
+          return c.measureText(SAMPLE).width;
+        };
+        const target = widthOf(generic);
+        let best: {f: (typeof fonts)[number]; d: number} | null = null;
+        const seen = new Set<string>();
+        for (const f of fonts) {
+          if (seen.has(f.family)) continue;
+          seen.add(f.family);
+          const d = Math.abs(widthOf(f.family) - target);
+          if (!best || d < best.d) best = {f, d};
+        }
+        /* the widths must agree EXACTLY (same face, same rasteriser) */
+        return best && best.d < 0.01 ? {f: best.f, score: 1} : null;
+      } catch {
+        return null;
+      }
+    };
+    for (let i = 0; i < parts.length && !scored.length; i++) {
+      const p = parts[i].toLowerCase();
+      if (!GENERIC.has(p)) continue;
+      const m = widthMatched(p);
+      if (m) scored.push(m);
+    }
     if (!scored.length) return null;
     /* closest weight among the matched family's faces */
     scored.sort((a, b) =>

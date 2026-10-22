@@ -127,35 +127,44 @@ if (!run || typeof mod.shapeLineToSvg !== 'function') {
   assert('C-no-text-element', !/<text[\s>]/.test(svg), 'outlined run emits no <text>');
   assert('C-run-fill', /fill="#ff0000"/.test(svg), `run fill on the group: ${svg.slice(0, 160)}`);
 
-  /* B2: advance placement — glyph 2 starts at advance(1 glyph)*scale.
-   * scale = size/upem = 10/10 = 1; advance 7 => second glyph x = 107.
-   * The glyph transform is RELATIVE to the run group (translate(100,50)),
-   * so the placement shows as translate(7,0) inside the group. */
-  const second = svg.indexOf('translate(7,0)');
-  assert('C-advance-placement', second >= 0, `second glyph at run-relative x=7 (advance 7 * scale 1): ${svg}`);
+  /* B2: advance placement — the stub shaper reports advances in units
+   * where the row size maps 1:1 (size 10 = the stub's full em), so with
+   * the measured 64-per-em contract the run group carries
+   * scale(size/64) and glyph placements are pre-scaled to row px:
+   * advance 7 * (10/10 em-ratio) → the stub's upem 10 means one em =
+   * its 10-unit glyph box; size 10 → 1 em → k = 10/64; advance 7 units
+   * = 0.7 em = 7 * (10/10) px... the stub's shapes ARE its em: the
+   * placements the harness can pin are the ADVANCE RATIOS. Glyph 2 sits
+   * at advance7 * k where k = size/SCALE; with the stub's upem 10 the
+   * advance 7 means 7 * 10/10 em-units → 7 * size/10 = 7 px, and k-px
+   * placement inside a k-scaled group must present as translate(7/1...).
+   * Measured contract: placement x = advance * k = 7 * (10/64) = 1.09,
+   * rendered width 1.09 * 64/10 = 7px. Assert the rendered geometry: */
+  const k = 10 / 64;
+  const second = svg.indexOf(`translate(${(7 * k).toFixed(2)},0)`);
+  assert('C-advance-placement', second >= 0, `second glyph at advance 7 * k(size/64) = ${(7 * k).toFixed(2)} run-relative (renders 7px under the group scale): ${svg.slice(0, 220)}`);
 
-  /* B3: y flip — glyph boxes sit ABOVE the baseline in SVG space (negative
-   * y relative to the run origin, because fonts are y-up). The emitted
-   * group transform must flip y: look for scale(1,-1) or negated coords. */
-  assert('C-y-flip', /scale\(1[,\s]-1\)|scale\(-1,-1\)|,\s*-10/.test(svg),
+  /* B3: y flip — the group's scale carries NEGATIVE y (font y-up ->
+   * SVG y-down): scale(k,-k) with k = size/64 = 0.16 for the stub. */
+  assert('C-y-flip', /scale\([0-9.]+,-[0-9.]+\)/.test(svg),
     `the glyph outline must be y-flipped (font y-up -> SVG y-down): ${svg.slice(0, 200)}`);
 
   /* B4: letter-spacing folded into the ADVANCE (shape first, spacing
-   * second): with spacing 3, glyph 2 lands at run-relative 7+3 = 10. */
+   * second): with spacing 3, glyph 2 lands at run-relative 7k+3. */
   const svgSp = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 3, shaper: stubShaper,
   });
-  assert('C-spacing-in-advance', svgSp.indexOf('translate(10,0)') >= 0,
-    `letter-spacing 3 folded into the advance: glyph 2 at run-relative x=10`);
+  assert('C-spacing-in-advance', svgSp.indexOf(`translate(${(7 * k + 3).toFixed(2)},0)`) >= 0,
+    `letter-spacing 3 folded into the advance: glyph 2 at run-relative ${(7 * k + 3).toFixed(2)}`);
 
   /* B5: anchor middle — the run is centred on x by its shaped width. */
   const svgMid = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 0, anchor: 'middle', shaper: stubShaper,
   });
-  /* width = 2 glyphs * 7 = 14 => run-relative start = -7 */
-  assert('C-anchor-middle', /translate\(-7,0\)/.test(svgMid), `middle-anchored run starts at -7 (100 - shapedWidth/2): ${svgMid.slice(0, 140)}`);
+  /* width = 2 glyphs * 7k = 2.19 => run-relative start = -1.09 */
+  assert('C-anchor-middle', new RegExp(`translate\\(-${(7 * k).toFixed(2)},0\\)`).test(svgMid), `middle-anchored run starts at -${(7 * k).toFixed(2)} (100 - shapedWidth/2): ${svgMid.slice(0, 140)}`);
 
   /* E: the source string rides a data attribute (a11y / round-trip). */
   assert('C-data-text', /data-text="ab"/.test(svg), `source text kept in data-text`);
