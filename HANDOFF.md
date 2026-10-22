@@ -1,5 +1,116 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-22 14:xx — ROUND AZ — SHIPPED FONTS + OUTLINE-FROM-COMMITTED-BYTES + EMBED COMPLETE (card t_96100cb2), LOCAL ONLY
+
+**Tree:** `main`, HEAD `790af3f` (+ this handoff commit). NOT pushed (card rule).
+`boards/` back to Harvey's files only (`mvaf8pkt162b2aed` + library) — all AZ
+probe boards removed by exact-name file delete (no DELETE HTTP).
+
+**Commits (9, in order):**
+- `c3c8316` RED source-contract harness `checks/round-az-fonts.mjs` (13/19 FAIL on parent b0e4583)
+- `b1d7b38` fonts 1/3 — Inter 4.1 + JetBrains Mono 2.304 re-sourced from PINNED upstream
+  (no CDN): `public/fonts/SHA256S.txt` pins every shipped file + both upstream
+  sources; `OFL-Inter.txt` / `OFL-JetBrainsMono.txt` committed; every subset
+  regenerated with pyftsubset (latin / latin-ext / **vietnamese U+1EA0-1EF9** /
+  combining marks / arrows / punct); static instances at the sheet's PAINTED
+  weights (sans 400/500/600/700, mono 400/600/700) + **one VARIABLE face per
+  family** (font-weight range descriptor) covering **650**; the variable
+  subset's **.ttf twin** ships beside each woff2 — the OUTLINE SHAPER's bytes
+  (harfbuzzjs takes raw sfnt; runtime woff2 inflation was rejected: the twin
+  costs 0 JS bytes and 0 runtime work)
+- `ea31621` harness manifest-parser fix (name-first rows)
+- `a0fc677` fonts 2/3 — `--sans`/`--mono` LEAD with `'Inter'`/`'JetBrains Mono'`
+  (styles.css:98-99, the ONLY stack edit; system stacks kept as fallback tail)
+  + preload the two first-paint variable woff2 faces (index.html)
+- `5160580` **core** — the outline pipeline is FILE-FIRST:
+  `src/fontManifest.ts` (family stack → committed `/fonts/<slug>-variable.ttf`)
+  + `src/fontFiles.ts` (fetch + sfnt parse + **OS/2 fsType licence guard**:
+  refuses fsType 0x0002 restricted and the card-named 0x0100 bit, implemented
+  in `embeddingRefusal()`) + `textOutlineHb.ts` declares and calls
+  **hb_font_set_variations** (wght axis found via hb_ot_var_get_axis_infos,
+  coordinates in axis order) so ONE variable file shapes EVERY painted weight
+  including 650; `queryLocalFonts` drops to a LAST-RESORT for faces the tree
+  does not ship (the four opt-in ROUND W families); unresolved families are
+  RETURNED and surfaced via `gobi:export-note` + `__ds_outline_note` — never a
+  silent no-op. `buildFontEmbedCss` embeds the committed variable **woff2**
+  twins as base64 `@font-face` (`font-weight: 100 900` descriptor) through the
+  `fontEmbedCss` seam into the export's `<defs><style>`; the embed runs on the
+  outlined route and carries `__ds_embed_bytes` for measurement
+- `cec0b6d` live acceptance probe `checks/round-az-live.mjs`
+- `6b9e839` probe env fix (see the honest-BEFORE note below)
+- `790af3f` round-z-font-coverage re-anchor (47 faces / 20 cmaps)
+
+**MEASURED ACCEPTANCE (checks/round-az-live.mjs — fresh browser, NO
+localFonts grant, probe board with Vietnamese rows "Đơn hàng", "Xử lý — API",
+"khách hàng", "Ghi chú", "đọc ghi"):**
+- outlined export: **0 `<text>`**, 78 paths, data-text carries the Vietnamese
+  strings — in BOTH themes, with **no permission and no local font access**
+  (on parent b0e4583 the same probe stays `<text>`: the honest BEFORE run
+  measured `<text>` SURVIVED / no embed, 6 FAILs)
+- outlined vs `<text>` rasterised diff: **light 1.029% / dark 1.022%**
+  (floor 2.57%; identical would be the red flag) — ink-top **56 vs 56 px
+  both themes** (floor 1px); PDF route inherits it (same svg string)
+- embed: the outlined file carries the base64 `@font-face` blocks;
+  `__ds_embed_bytes` measured **179,700 raw / ~239,600 base64 per export**
+  (2 variable faces) — the annex estimated +45,920 B for 4 static pairs;
+  the variable route is bigger per file but ONE face covers all weights
+- file sizes (probe board): svg text 6.1 KB · outlined 321.2 KB (both themes)
+- webfonts: `document.fonts` reports Inter + JetBrains Mono faces LOADED on
+  the board page; the exported `<text>` rows now carry
+  `font-family="JetBrains Mono, ui-monospace, …"` / `"Inter, ui-sans-serif, …"`
+
+**§3 VISUAL PAIRS (attached):** `.az-live/canvas-{light,dark}-{before,after}.png`
+(same probe board, 1600×1000; before = b0e4583 system stacks, after = AZ tree).
+Canvas pixel diff before→after: **light 5.005% / dark 4.835%** — the swap is
+VISIBLE, as required. Geometry held: export viewBox identical before/after
+(`0 0 716 476`), `<text>` row count identical (12), no layout break. SVG+PNG
+export pairs also captured (svg-text / png-text / png-outlined per theme).
+
+**Gates at HEAD:** tsc 0 · vite build 0 · goblin-verify **22 PASS / 0 FAIL**
+(GT-02: client_js_bytes 920,550, ceiling 900,000) · full sweep **all green**
+(capture/RED drivers skipped per the AY convention) · round-az-fonts **19/19** ·
+round-az-live **11/11 after / honest-RED before** · round-c-outline 20/20 ·
+round-c-live 10/10 (diff 1.019%/1.011%, same floors).
+
+**client_js_bytes 920,550 vs ceiling 900,000 — 20,550 OVER; AZ added +4,782
+over ROUND C's 915,768.** Composition of the AZ delta: the file-first
+provider, the variations plumbing, the embed builder, the App wiring. Fonts
+are ASSETS under `public/fonts/` (1,793,539 B on disk, 0 B inlined into JS —
+the single `base64` string in the bundle is the embed builder's template
+literal). Per the card: reported, NOT raised, AGENTS.md untouched. The
+pre-existing ROUND C overage (915,768) still awaits Harvey's policy answer.
+
+**KEY MEASURED CONTRACTS for future rounds:**
+- `hb_font_set_variations` needs the wght AXIS INDEX (axis order), found via
+  `hb_ot_var_get_axis_infos` (struct tag u32 at +0, stride 20 B). With
+  `hb_font_set_scale(64,64)` the ROUND C 64-per-em contract is unchanged —
+  variable instantiation does not disturb it (probe diffs stayed in the floor).
+- The shaper takes **sfnt only**: ship every embed/shape face as a `.ttf`
+  twin beside its woff2. The embed base64s the woff2; the shaper fetches the
+  ttf. One fetch per family per export (HTTP-cached after the first).
+- The variable `@font-face` needs `format('woff2-variations')` and a
+  `font-weight: 100 900` RANGE descriptor; the browser then instantiates any
+  painted weight (650 included) with no extra files.
+
+**Re-anchored harnesses (each named, per the card's re-anchor rule):**
+- `package-p-inspector` — @font-face pins 36→47 faces, 3→4 unicode-ranges
+- `round-z-font-coverage` — Z1 36/18→47/20; Z3 identity now "ế never in
+  latin, Â only in latin" (the AZ latin-ext carries the whole U+1E00-1EFF
+  block by build design, so the old true/false/false split is gone)
+- Nothing else moved: full sweep green without further edits — the stack swap
+  changed glyph shapes but no geometry assertion (ink-top, row boxes, scale
+  probes) proved sensitive beyond the existing floors.
+
+**NOT done / follow-ups:**
+- `client_js_bytes` ceiling decision (Harvey; noted above).
+- The four opt-in ROUND W families (Plex/Shantell/Lexend/Be Vietnam) still
+  resolve outline bytes via queryLocalFonts or fall back to `<text>` with a
+  visible note — shipping their variable twins would be a small follow-up.
+- The embed currently fires only on the OUTLINED route (it rides
+  `o.outline`); Harvey may want a separate "embed fonts" checkbox.
+- `AZ_APP_URL` env name added to the live probe (AY_APP_URL still wins); the
+  before-capture trap this fixes is documented in commit 6b9e839.
+
 ## ▶ 2026-10-22 12:xx — ROUND C — "Outline text" (off by default) + PDF print route COMPLETE (card t_a5c17861), LOCAL ONLY
 
 **Tree:** `main`, HEAD `479e71a`. NOT pushed (card rule). Boards clean: Harvey's `Untitled`
