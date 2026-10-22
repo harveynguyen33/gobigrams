@@ -25,6 +25,7 @@ import {asShape, shapeFrameSvg} from './shapes';
 import {EXPORT_TOKENS} from './theme';
 import {labelAnchor, type LabelPos} from './edgeLabel';
 import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
+import {shapeLineToSvg, type OutlineShaper} from './textOutline';
 
 /** One measured text ROW's font — read off that row's own live element.
  *  AR-11: the canvas sets a DIFFERENT family per row (`.node-title` →
@@ -162,6 +163,9 @@ export type ExportInput = {
   measurer: SvgMeasurer;
   /** Padding around the content bounds (the export modal's pngPad). */
   pad?: number;
+  /** ROUND C — outline mode: the pre-built shapers ride the input so the
+   *  legacy compose (buildScene + emitSvg) can thread them into EmitCtx. */
+  outline?: EmitCtx['outline'];
 };
 
 /* ------------------------------------------------------------------ utils */
@@ -814,7 +818,7 @@ function absPosition(n: ExportNode, byId: Map<string, ExportNode>): {x: number; 
  *  buildScene + the bounds pass + emitSvg directly (item 2). */
 export function exportSvg(input: ExportInput): string {
   const scene = exportSceneOf(input);
-  return emitSvg(scene, {tokens: input.tokens, inheritFamily: input.measurer.defaultFamily?.() ?? ''});
+  return emitSvg(scene, {tokens: input.tokens, inheritFamily: input.measurer.defaultFamily?.() ?? '', outline: input.outline});
 }
 
 /** Alias kept for the App.tsx import name used mid-migration. */
@@ -854,7 +858,48 @@ export type EmitCtx = {
   /** AR-11 — the family unmeasured rows inherit (from the measurer's
    *  defaultFamily; the emitter itself never invents one). */
   inheritFamily?: string;
+  /** ROUND C — "Outline text" (OFF by default): when present, every
+   *  scene text row is emitted as positioned glyph outline paths (the
+   *  shaper is harfbuzzjs — shape parity with the canvas by construction)
+   *  and NO <text> element survives. Rows whose family the map has no
+   *  shaper for (missing font bytes/permission) keep <text> per row —
+   *  a visible, honest fallback. */
+  outline?: {
+    /** ONE shaper per resolved family (harfbuzzjs face bytes). */
+    shapers: Map<string, OutlineShaper>;
+    /** Rows with no family fall back to this face (the measurer's
+     *  defaultFamily — the canvas's own default). */
+    defaultShaper?: OutlineShaper;
+  };
 };
+
+/** One text row: a <text> line (the default) or an outlined glyph run
+ *  (ctx.outline) — the ONE place the mode branches (D4: the emitter stays
+ *  a pure function of (Scene, ctx); the shapers are injected). A row whose
+ *  family has no shaper, or whose shaping throws, falls back to <text>. */
+function rowMarkup(r: SceneTextRow, outline?: EmitCtx['outline']): string {
+  if (outline) {
+    const shaper = (r.family ? outline.shapers.get(r.family) : undefined) ?? outline.defaultShaper;
+    if (shaper) {
+      try {
+        return shapeLineToSvg(r.content, {
+          x: r.x, baselineY: r.baselineY,
+          size: r.size, weight: r.weight, fill: r.fill,
+          spacing: r.spacing ?? 0, anchor: r.anchor,
+          shaper,
+        });
+      } catch (e) {
+        /* a shaper failure must not lose the row: fall back visibly */
+        console.error('[exportSvg] outline run failed; falling back to <text>:', e);
+      }
+    }
+  }
+  return textLine(r.x, r.baselineY, r.content, {
+    size: r.size, weight: r.weight, fill: r.fill,
+    family: r.family, anchor: r.anchor,
+    spacing: r.spacing !== undefined ? String(r.spacing) : undefined,
+  });
+}
 
 /** The content group: groups (behind), edges, nodes — the canvas z-order —
  *  WITHOUT the root svg / bg rect / token style. The bounds pass (spec §3)
@@ -862,24 +907,20 @@ export type EmitCtx = {
  *  the painted group are THE SAME bytes. Returns the group markup plus the
  *  collected marker defs (the AU-3 contract — the caller places <defs>
  *  before the content in the root svg). */
-export function emitContent(scene: Scene): {content: string; markerDefs: string[]} {
+export function emitContent(scene: Scene, outline?: EmitCtx['outline']): {content: string; markerDefs: string[]} {
   const parts: string[] = [];
   const defs: string[] = [];
-  emitContentInto(scene, parts, defs);
+  emitContentInto(scene, parts, defs, outline);
   return {content: parts.join(''), markerDefs: defs};
 }
 
 /** The bounds-pass variant: emits with a KNOWN offset (the final viewBox
  *  arithmetic), collecting marker defs into `defs`. */
-export function emitContentInto(scene: Scene, parts: string[], defs: string[]): void {
+export function emitContentInto(scene: Scene, parts: string[], defs: string[], outline?: EmitCtx['outline']): void {
   const pad = scene.pad;
   const b: Bounds = scene.bounds;
   const off = {x: pad - b.minX, y: pad - b.minY};
-  const rowEl = (r: SceneTextRow): string => textLine(r.x, r.baselineY, r.content, {
-    size: r.size, weight: r.weight, fill: r.fill,
-    family: r.family, anchor: r.anchor,
-    spacing: r.spacing !== undefined ? String(r.spacing) : undefined,
-  });
+  const rowEl = (r: SceneTextRow): string => rowMarkup(r, outline);
   /* groups first (behind everything) */
   for (const g of scene.groups) {
     const cb = (g as SceneNode & {childBounds?: Bounds}).childBounds
@@ -974,7 +1015,7 @@ export function emitSvg(scene: Scene, ctx: EmitCtx = {}): string {
    * agree — the spec §3 mount measures what the file paints. */
   const parts: string[] = [];
   const defs: string[] = [];
-  emitContentInto(scene, parts, defs);
+  emitContentInto(scene, parts, defs, ctx.outline);
   const content = parts.join('');
   /* the token <style> block stays in the file (other tooling reads it) but
    * nothing painted depends on it (D3) */

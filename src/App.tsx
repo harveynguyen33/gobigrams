@@ -53,7 +53,11 @@ import BoardDialog, {type BoardDialogResult} from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
-import {exportSvgOf, domMeasurer, type ExportNode, type ExportEdge} from './exportSvg';
+import {exportSvgOf, domMeasurer, type ExportNode, type ExportEdge, type ExportInput, type SvgMeasurer} from './exportSvg';
+/* ROUND C — outline text (harfbuzzjs shaper) + the print PDF route. */
+import {localFontBytes, type OutlineShaper} from './textOutline';
+import {makeShaper} from './textOutlineHb';
+import {printSvgAsPdf} from './printView';
 
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
@@ -4178,7 +4182,45 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      The emitted file is real SVG primitives — no foreignObject, no HTML —
      so image-context consumers (<img>, Quick Look, Figma, Illustrator)
      actually paint it. */
-  const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
+  /* ROUND C — the outline shapers for one export. The canvas paints rows in
+   * TWO families (mono rows + sans rows); ONE harfbuzzjs face per distinct
+   * resolved family, keyed by the EXACT family string the rows carry, so
+   * the emitter's rowMarkup lookup is the row's own family. Rows whose
+   * family has no resolvable bytes (no permission, non-matching stack)
+   * keep <text> per row — the emitter's per-row fallback. */
+  const buildOutlineShaper = useCallback(async (
+    nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
+  ): Promise<NonNullable<ExportInput['outline']> | null> => {
+    void edges;
+    const pairs = new Map<string, {family: string; weight: number}>();
+    let defaultFamily = measure.defaultFamily?.() ?? '';
+    for (const n of nodes) {
+      const t = measure.text(n.el);
+      const fam = t?.family ?? defaultFamily;
+      if (!fam) continue;
+      const key = `${fam}|${t?.weight ?? 650}`;
+      if (!pairs.has(key)) pairs.set(key, {family: fam, weight: t?.weight ?? 650});
+      if (!t?.family && !defaultFamily) defaultFamily = fam;
+    }
+    if (!pairs.size) return null;
+    const shapers = new Map<string, OutlineShaper>();
+    const cacheKeyOf = new Map<string, string>();
+    for (const {family, weight} of pairs.values()) {
+      if (cacheKeyOf.has(family)) continue;
+      const hit = await localFontBytes(family, weight);
+      if (!hit) continue;
+      const key = `${hit.name}@${weight}`;
+      cacheKeyOf.set(family, key);
+      const shaper = await makeShaper(hit.bytes, key);
+      if (shaper) shapers.set(family, shaper);
+    }
+    if (!shapers.size) return null;
+    /* the default face: the measurer's defaultFamily when IT resolved */
+    const defaultShaper = defaultFamily ? shapers.get(defaultFamily) : undefined;
+    return {shapers, defaultShaper};
+  }, []);
+
+  const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}): Promise<string> => {
     const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!el || !rf) return '';
     const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
@@ -4257,6 +4299,21 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          paints outside each edge's own element. */
       const measure = domMeasurer(() => clone);
       try {
+        /* ROUND C — outline mode: when requested, build the outline shaper
+         * ONCE per export from the rows' own families (local-font bytes,
+         * user-permissioned) and hand it to the emitter through ctx. A
+         * shaper that cannot be built (no permission, no matching face,
+         * wasm fetch failure) falls back to <text> VISIBLY: the note is
+         * surfaced via window event so the modal can show it. */
+        let outlineCtx: NonNullable<ExportInput['outline']> | undefined;
+        if (o.outline) {
+          outlineCtx = (await buildOutlineShaper(exportNodes, exportEdges, measure)) ?? undefined;
+          if (!outlineCtx) {
+            window.dispatchEvent(new CustomEvent('gobi:export-note', {
+              detail: 'Outline text: no local font bytes available (permission denied or unsupported browser) — text stayed selectable.',
+            }));
+          }
+        }
         return exportSvgOf({
           nodes: exportNodes,
           edges: exportEdges,
@@ -4264,6 +4321,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           tokens,
           measurer: measure,
           pad: pngPad,
+          outline: outlineCtx,
         });
       } finally {
         measure.dispose?.();
@@ -4293,6 +4351,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     return rasterise(svg, {scale: pngScale, bg});
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [theme, pngScale, buildSvg]);
+
+  /* ROUND C — the print PDF route (Harvey-approved route (i)): build the
+   * SAME svg string the .svg download gets (theme/scope already baked by
+   * the caller; outline rides `outline: true` — the modal's checkbox
+   * reaches the print view through this flag), inline it in a print
+   * window with a print stylesheet, and open the browser's dialog. */
+  const printPdf = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<void> => {
+    const svg = await buildSvg({...o, outline: true});
+    if (!svg) return;
+    printSvgAsPdf(svg, curBoard?.name || 'Diagram Studio');
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [buildSvg, curBoard]);
 
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);
@@ -6083,6 +6153,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           selCount={selCount}
           buildSvg={buildSvg}
           buildPng={buildPng}
+          printPdf={printPdf}
           onImportJson={() => fileRef.current?.click()}
         />
 

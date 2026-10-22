@@ -69,9 +69,28 @@ export {buildSceneSync} from '${join(ROOT, 'src/exportScene.ts')}';
 const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
   ? join(ROOT, 'node_modules/.bin/esbuild')
   : join(REAL_ROOT, 'node_modules/.bin/esbuild');
-writeFileSync(OUT, execFileSync(esbuild,
-  [ENTRY, '--bundle', '--platform=node', '--format=esm', '--log-level=error'],
-  {encoding: 'utf8', env: {...process.env, NODE_PATH: join(REAL_ROOT, 'node_modules')}}));
+/* `?url` is a vite convention — plain esbuild has no loader for it. Use
+ * esbuild's JS API (same binary, same version) with a tiny resolve
+ * plugin that does what vite does at build time: the import becomes a
+ * URL string constant. */
+const esbuildMod = await import(esbuild.replace(/\.bin.*/, '/esbuild/lib/main.js'));
+const result = await esbuildMod.build({
+  entryPoints: [ENTRY],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  logLevel: 'error',
+  outfile: OUT,
+  plugins: [{
+    name: 'wasm-url-alias',
+    setup(build) {
+      build.onResolve({filter: /harfbuzz\.wasm\?url$/}, () => ({path: 'hb-wasm-url-stub', namespace: 'stub'}));
+      build.onLoad({filter: /.*/, namespace: 'stub'}, () => ({contents: 'export default "harfbuzz.wasm"', loader: 'js'}));
+    },
+  }],
+});
+void result;
+writeFileSync(OUT, readFileSync(OUT, 'utf8'));
 const mod = await import(`${OUT}?t=${Date.now()}`);
 
 /* ---- B. shapeLine contract: a STUB shaper (deterministic, no wasm) ---- */
@@ -109,9 +128,11 @@ if (!run || typeof mod.shapeLineToSvg !== 'function') {
   assert('C-run-fill', /fill="#ff0000"/.test(svg), `run fill on the group: ${svg.slice(0, 160)}`);
 
   /* B2: advance placement — glyph 2 starts at advance(1 glyph)*scale.
-   * scale = size/upem = 10/10 = 1; advance 7 => second glyph x = 107. */
-  const second = svg.indexOf('translate(107');
-  assert('C-advance-placement', second >= 0, `second glyph translated to x=107 (100 + advance 7 * scale 1)`);
+   * scale = size/upem = 10/10 = 1; advance 7 => second glyph x = 107.
+   * The glyph transform is RELATIVE to the run group (translate(100,50)),
+   * so the placement shows as translate(7,0) inside the group. */
+  const second = svg.indexOf('translate(7,0)');
+  assert('C-advance-placement', second >= 0, `second glyph at run-relative x=7 (advance 7 * scale 1): ${svg}`);
 
   /* B3: y flip — glyph boxes sit ABOVE the baseline in SVG space (negative
    * y relative to the run origin, because fonts are y-up). The emitted
@@ -120,21 +141,21 @@ if (!run || typeof mod.shapeLineToSvg !== 'function') {
     `the glyph outline must be y-flipped (font y-up -> SVG y-down): ${svg.slice(0, 200)}`);
 
   /* B4: letter-spacing folded into the ADVANCE (shape first, spacing
-   * second): with spacing 3, glyph 2 lands at 100 + (7+3) = 110. */
+   * second): with spacing 3, glyph 2 lands at run-relative 7+3 = 10. */
   const svgSp = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 3, shaper: stubShaper,
   });
-  assert('C-spacing-in-advance', svgSp.indexOf('translate(110') >= 0,
-    `letter-spacing 3 folded into the advance: glyph 2 at x=110`);
+  assert('C-spacing-in-advance', svgSp.indexOf('translate(10,0)') >= 0,
+    `letter-spacing 3 folded into the advance: glyph 2 at run-relative x=10`);
 
   /* B5: anchor middle — the run is centred on x by its shaped width. */
   const svgMid = mod.shapeLineToSvg('ab', {
     x: 100, baselineY: 50, size: 10, weight: 400, fill: '#00ff00',
     spacing: 0, anchor: 'middle', shaper: stubShaper,
   });
-  /* width = 2 glyphs * 7 = 14 => start x = 100 - 7 = 93 */
-  assert('C-anchor-middle', /translate\(9[23]/.test(svgMid), `middle-anchored run starts at 93 (100 - shapedWidth/2): ${svgMid.slice(0, 140)}`);
+  /* width = 2 glyphs * 7 = 14 => run-relative start = -7 */
+  assert('C-anchor-middle', /translate\(-7,0\)/.test(svgMid), `middle-anchored run starts at -7 (100 - shapedWidth/2): ${svgMid.slice(0, 140)}`);
 
   /* E: the source string rides a data attribute (a11y / round-trip). */
   assert('C-data-text', /data-text="ab"/.test(svg), `source text kept in data-text`);
@@ -164,9 +185,11 @@ if (typeof mod.emitSvg === 'function' && typeof mod.buildSceneSync === 'function
     const plain = mod.emitSvg(scene, {tokens: mkInput().tokens});
     const plainText = plain.includes('<text');
     assert('C-default-text-mode', plainText, 'without the outline flag the file keeps <text> (selectable by default)');
-    /* with outline ON and a shaper injected, no <text> survives */
+    /* with outline ON and shapers injected, no <text> survives. The row's
+     * family is the measurer's defaultFamily ('Test, sans-serif') — the
+     * map key; a family-less row uses defaultShaper. BOTH are injected. */
     if (typeof mod.shapeLineToSvg === 'function') {
-      const outlined = mod.emitSvg(scene, {tokens: mkInput().tokens, outline: {shaper: stubShaper}});
+      const outlined = mod.emitSvg(scene, {tokens: mkInput().tokens, outline: {shapers: new Map([['Test, sans-serif', stubShaper]]), defaultShaper: stubShaper}});
       assert('C-outlined-no-text', !/<text[\s>]/.test(outlined), 'outline ctx flag -> zero <text> elements');
       assert('C-outlined-has-paths', (outlined.match(/<path\b/g) || []).length > 0, 'outlined file carries glyph paths');
       assert('C-outlined-data-text', outlined.includes('data-text='), 'outlined file keeps data-text per run');
@@ -190,8 +213,8 @@ if (!existsSync(join(ROOT, 'src', 'printView.ts'))) {
 } else {
   const printSrc = readFileSync(join(ROOT, 'src', 'printView.ts'), 'utf8');
   assert('C-print-module', true, 'src/printView.ts exists');
-  assert('C-print-inline-svg', /svg/.test(printSrc) && !/iframe/i.test(printSrc),
-    'print view inlines the SVG (no iframe)');
+  assert('C-print-inline-svg', /svg/.test(printSrc) && !/<iframe/i.test(printSrc),
+    'print view inlines the SVG (no iframe element)');
   assert('C-print-calls-print', /window\.print\(\)/.test(printSrc), 'print view triggers window.print()');
 }
 const modalHasPdf = /PDF/.test(modalSrc) && /print/i.test(modalSrc);

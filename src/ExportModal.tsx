@@ -4,7 +4,7 @@ import {EXPORT_TOKENS, tokensFor} from './theme';
 import {toMermaid, toMermaidSequence, fromMermaid} from './mermaid';
 
 export type ExportScope = 'full' | 'selection';
-export type ExportFormat = 'svg' | 'png' | 'json' | 'mermaid';
+export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';
 /* AR-9 — one pluraliser for every count string ("1 node · 0 edges"), so no
    branch hand-writes its own. */
 const count = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'}`;
@@ -27,8 +27,11 @@ type Props = {
   boardName?: string;
   selCount: number;
   /** Serialisers owned by App (they need the wrap ref + rf instance). */
-  buildSvg: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<string>;
+  buildSvg: (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}) => Promise<string>;
   buildPng: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<string>;
+  /** ROUND C — the print route: App owns window/printView (the modal is
+   *  DOM-only). Receives the SAME svg string the .svg download gets. */
+  printPdf: (o: {nodes: Node[]; edges: Edge[]; theme: string}) => Promise<void>;
   /** AQ21-G — Import gets its own tab; JSON file picking stays in App (fileRef). */
   onImportJson: () => void;
 };
@@ -65,11 +68,16 @@ function Seg<T extends string>({value, set, options, aria, selCount, tabRef}: {
   );
 }
 
-export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, onImportJson}: Props) {
+export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson}: Props) {
   const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
   const [format, setFormat] = useState<ExportFormat>('svg');
   const [theme, setTheme] = useState('live');
+  /* ROUND C — "Outline text" (OFF by default: selectable text unless asked
+   * otherwise — Harvey's requirement; Figma defaults the other way because
+   * it optimises for print). Present for SVG; the PDF print route renders
+   * the SAME svg string, so it inherits whatever this is set to. */
+  const [outline, setOutline] = useState<boolean>(false);
   const [preview, setPreview] = useState<{kind: 'img' | 'text'; data: string; sub?: string} | null>(null);
   /* AR-3 — ONE `busy` state used to serve two meanings ("a preview is
    * rebuilding" and "a download is in flight"), so the primary button's label
@@ -99,11 +107,15 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       try {
         const effTheme = theme === 'live' ? liveTheme : theme;
         if (format === 'svg') {
-          const svg = await buildSvg({...scoped, theme: effTheme});
+          const svg = await buildSvg({...scoped, theme: effTheme, outline});
           setPreview({kind: 'img', data: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, sub: `${count(scoped.nodes.length, 'node')} · ${count(scoped.edges.length, 'edge')}`});
         } else if (format === 'png') {
           const url = await buildPng({...scoped, theme: effTheme});
           setPreview({kind: 'img', data: url, sub: '2× PNG'});
+        } else if (format === 'pdf') {
+          /* the print view previews the same SVG it will print */
+          const svg = await buildSvg({...scoped, theme: effTheme, outline});
+          setPreview({kind: 'img', data: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, sub: 'Print view — opens the print dialog'});
         } else if (format === 'json') {
           setPreview({kind: 'text', data: JSON.stringify({name: boardName, nodes: scoped.nodes, edges: scoped.edges}, null, 2).slice(0, 4000), sub: `${count(scoped.nodes.length, 'node')} · ${count(scoped.edges.length, 'edge')}`});
         } else {
@@ -121,7 +133,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       setPreviewBusy(false);
     }, 250);
     return () => window.clearTimeout(t);
-  }, [open, scope, format, theme, nodes, edges, liveTheme, boardName, buildSvg, buildPng, scoped]);
+  }, [open, scope, format, theme, nodes, edges, liveTheme, boardName, buildSvg, buildPng, scoped, outline]);
 
   useEffect(() => {
     if (open) window.setTimeout(() => tabRef.current?.focus(), 30);
@@ -139,8 +151,14 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       const base = (boardName?.replace(/[^\w.-]+/g, '_') || 'diagram');
       let blob: Blob; let name: string;
       if (format === 'svg') {
-        blob = new Blob([await buildSvg({...scoped, theme: effTheme})], {type: 'image/svg+xml'});
+        blob = new Blob([await buildSvg({...scoped, theme: effTheme, outline})], {type: 'image/svg+xml'});
         name = `${base}.svg`;
+      } else if (format === 'pdf') {
+        /* Harvey-approved route (i): the print dialog, not a download.
+           printPdf builds the same svg string (theme/scope/outline baked
+           in) inside App and hands it to the print view. */
+        await printPdf({nodes: scoped.nodes, edges: scoped.edges, theme: effTheme});
+        return;
       } else if (format === 'png') {
         const url = await buildPng({...scoped, theme: effTheme});
         const bin = atob(url.split(',')[1] ?? '');
@@ -220,9 +238,24 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           <Seg<ExportFormat> value={format} set={setFormat} aria="Format" selCount={selCount} tabRef={tabRef} options={[
             {id: 'svg', label: 'SVG'},
             {id: 'png', label: 'PNG'},
+            {id: 'pdf', label: 'PDF'},
             {id: 'json', label: 'JSON'},
             {id: 'mermaid', label: 'Mermaid'},
           ]} />
+          {format === 'pdf' && <div className="em-note">PDF (opens the print dialog — choose Save as PDF). The browser embeds the fonts; text stays selectable.</div>}
+
+          {/* ROUND C — "Outline text": exact-typography mode for SVG (and the
+              PDF print view, which renders the same string). OFF by default:
+              selectable text unless asked otherwise. Outlining turns every
+              text row into glyph paths (HarfBuzz — the canvas's own shaper),
+              so the file paints identically everywhere, but the text is no
+              longer selectable (the source stays in data-text). */}
+          {(format === 'svg' || format === 'pdf') && (
+            <label className="em-note" style={{display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer'}}>
+              <input type="checkbox" checked={outline} onChange={e => setOutline(e.target.checked)} />
+              Outline text (glyph paths — exact everywhere, not selectable)
+            </label>
+          )}
 
           <div className="em-label">Theme</div>
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />
