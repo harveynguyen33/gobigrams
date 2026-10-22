@@ -45,6 +45,24 @@ export const SEQUENCE_ENABLED = false;
      board dialog offers templates only through the gallery model).
    Flip to `true` to put C4 back — the flag is the entire switch. */
 export const C4_ENABLED = false;
+
+/* HARVEY 2026-10-22 — Queue hidden the SAME way (deck item A, mirroring
+   C4_ENABLED / SEQUENCE_ENABLED): one flag drops it from every CREATE surface —
+   the left panel's library sections, the omnibox search and the insert modal,
+   which all read `LIBRARY` (`App.tsx` builds its groups from `LIBRARY` alone;
+   `addNodeByLabel` resolves through `LIBRARY.find`).
+   GATED HERE, and gated NARROWLY on purpose:
+     · `QUEUE_PALETTE_ITEM` STAYS in the tree and `PALETTE` (the architecture
+       list) is assembled UNFILTERED — the first-run seed reads
+       `PRESETS.architecture.palette[2]` (`App.tsx` `initialNodes`, the
+       External → Queue → Service pipeline) and `checks/boot-no-flash.mjs`
+       pins that seed byte-identical, so the seed-facing preset palette keeps
+       every entry. A stored board that placed a Queue also keeps rendering it
+       (`insertNodeData`/shape rendering never consult this flag).
+     · what the flag removes is only the OFFER: `LIBRARY` — the one array the
+       create surfaces enumerate — filters `label === 'Queue'` out.
+   Flip to `true` to put Queue back — the flag is the entire switch. */
+export const QUEUE_ENABLED = false;
 export type LayoutId = 'layered-lr' | 'layered-tb' | 'grid' | 'free';
 
 export type PathId = 'bezier' | 'smoothstep' | 'step' | 'straight';
@@ -892,7 +910,10 @@ const SEQUENCE_PALETTE: PaletteItem[] = [
 
 export const LIBRARY: PaletteItem[] = [
   // 1 — architecture, PALETTE's own order (its `Note` is the ONE shared Note).
-  ...PALETTE,
+  //     QUEUE_ENABLED (2026-10-22) — Queue drops out of the CREATE-SURFACE
+  //     library HERE; the seed-facing preset palette keeps it (see
+  //     `libraryFor`'s architecture branch and the flag's comment above).
+  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue'),
   // 2 — the flowchart's own elements (10): Terminal … On-page connector.
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note'),
   // 3 — `Lane` (groups).
@@ -909,9 +930,11 @@ export const LIBRARY: PaletteItem[] = [
 /* §2.7 — the Mixed (`custom`) set is its OWN selector, NOT a `types[]` filter
    (a filter over `types[]` would yield all 34). Membership is keyed on the
    `label`, unique inside LIBRARY, and the ORDER is rebuilt to match the old
-   `custom` palette exactly: ARCH ++ FLOW(−Lane,−Note) ++ C4[0..6] ++ Table. */
+   `custom` palette exactly: ARCH ++ FLOW(−Lane,−Note) ++ C4[0..6] ++ Table.
+   QUEUE_ENABLED (2026-10-22) — the hidden Queue drops out of this set too: the
+   `custom` preset's palette is a CREATE surface. */
 const MIXED_LABELS = new Set<string>([
-  ...PALETTE.map(p => p.label),
+  ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue').map(p => p.label),
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note').map(p => p.label),
   ...C4_PALETTE_ITEMS.slice(0, 6).map(p => p.label),
   TABLE_PALETTE_ITEM.label,
@@ -919,6 +942,23 @@ const MIXED_LABELS = new Set<string>([
 
 const byLabel = new Map(LIBRARY.map(p => [p.label, p] as const));
 const pick = (labels: Iterable<string>): PaletteItem[] => [...labels].map(l => byLabel.get(l)!);
+
+/** The seed-facing FULL assembly — every piece the library is built from, in
+ *  library order, with NOTHING hidden. `libraryFor`'s architecture branch and
+ *  `PRESETS.architecture.palette` read THIS, because the first-run seed builds
+ *  its External → Queue → Service pipeline through `palette[3]/[2]/[0]`
+ *  (`App.tsx` `initialNodes`) and `checks/boot-no-flash.mjs` pins that seed
+ *  byte-identical. The create-surface `LIBRARY` above applies the
+ *  `QUEUE_ENABLED` hide to its architecture slice; this array never does. */
+const LIBRARY_FULL: PaletteItem[] = [
+  ...PALETTE,
+  ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note'),
+  ...FLOWCHART_PALETTE.filter(p => p.label === 'Lane'),
+  ...C4_PALETTE_ITEMS,
+  ...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : []),
+  TABLE_PALETTE_ITEM,
+  ERD_ENUM_NOTE_ITEM,
+];
 
 /** The ONE shared `Note` moved to the tail — the position the old flowchart and
  *  C4 lists both gave it (they appended it last; the architecture list has it
@@ -946,8 +986,13 @@ export function libraryFor(id: PresetId): PaletteItem[] {
       return LIBRARY.filter(p => p.types.includes('erd'));
     case 'sequence':
       return withNoteLast(LIBRARY.filter(p => p.types.includes('sequence')));
+    /* Architecture reads LIBRARY_FULL, NOT the create-surface LIBRARY: the
+       first-run seed reads `PRESETS.architecture.palette[3]/[2]/[0]` and
+       checks/boot-no-flash.mjs pins the seed byte-identical (QUEUE_ENABLED,
+       2026-10-22 — see LIBRARY_FULL above). Stored boards' presets resolve the
+       same way, so a stored Queue keeps its palette. */
     default:
-      return LIBRARY.filter(p => p.types.includes('architecture'));
+      return LIBRARY_FULL.filter(p => p.types.includes('architecture'));
   }
 }
 

@@ -13,7 +13,7 @@
  * this popup overflow its anchor. Every modelled rule is quoted with its CSS
  * line so a reader can check the model against the sheet.
  */
-import {readFileSync} from 'node:fs';
+import {readFileSync, writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
@@ -415,9 +415,24 @@ console.log(`hints that repeat their own label: ${libRepeats.length}${libRepeats
 /* SEARCH COVERAGE. Every word below was REMOVED from a hint in this pass, and
    each must still resolve through the surviving haystack. The pairs are real
    `label -> query` pairs taken from the LIBRARY, so a wrong label shows up as a
-   gap rather than passing silently. */
+   gap rather than passing silently.
+   RE-ANCHORED (QUEUE_ENABLED, 2026-10-22) — NOT WEAKENED, the reason is
+   recorded. OLD CLAIM: the `['Queue', 'topic']` pair proved Queue's retired
+   search word `topic` (now in its `aliases`) still resolves through the
+   haystack, so dropping `topic` from a hint could never strand the shape.
+   NEW CLAIM: the same alias-protection machinery holds for every shape that is
+   still OFFERED. REASON: HARVEY hid Queue behind `QUEUE_ENABLED = false` in
+   `src/presets.ts` (mirroring C4_ENABLED/SEQUENCE_ENABLED), so Queue left the
+   CREATE surfaces — the panel sections, the omnibox and the insert modal all
+   read `LIBRARY`, which now filters it out. An assertion that the hidden row
+   is still findable by search asserts a fact the round deliberately falsified
+   (it would only pass again if the flag were flipped, which is the restore
+   path, not a regression). The row is therefore REPLACED by a positive gating
+   assertion below (`itemA.queue-is-flag-gated-from-the-create-surfaces`) that
+   records the hide itself; flipping the flag makes THIS list's old pair
+   green again and the gating assertion red, which is the correct pairing. */
 const SEARCH_REGRESSION = [
-  ['Queue', 'topic'], ['External', 'third'], ['Storage', 'object'],
+  ['External', 'third'], ['Storage', 'object'],
   ['Group', 'vpc'], ['Group', 'cluster'], ['Note', 'annotation'],
   ['Terminal', 'terminator'], ['Terminal', 'start'], ['Terminal', 'end'],
   ['Predefined process', 'subprocess'], ['Predefined process', 'defined'],
@@ -507,6 +522,38 @@ assert('item4.library-hints-do-not-repeat-their-label', libRepeats.length === 0,
   libRepeats.map(e => e.label).join(',') || 'none');
 assert('item4.search-coverage-preserved', coverageGaps.length === 0,
   coverageGaps.length ? coverageGaps.map(([l, w]) => `${l}:"${w}"`).join(', ') : `${SEARCH_REGRESSION.length} retired words still findable`);
+/* ITEM A (QUEUE_ENABLED, 2026-10-22) — the HIDE itself, as its own positive
+   assertion (the re-anchor above explains why the old pair left the list):
+   Queue is OUT of `LIBRARY` (so the panel sections, the omnibox and the insert
+   modal cannot offer it) while the flag's filter still names 'Queue' in
+   src/presets.ts and `PALETTE` still CONTAINS the item — so the first-run seed
+   (`PRESETS.architecture.palette[2]`, pinned byte-identical by
+   checks/boot-no-flash.mjs) and every stored board keep their Queue. */
+const presetsSrcQ = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+const queueFilterSpread = /QUEUE_ENABLED \|\| p\.label !== 'Queue'/.test(presetsSrcQ);
+const queueInPalette = /label: 'Queue',/.test(readFileSync(`${ROOT}/src/palette.ts`, 'utf8'));
+/** The EXECUTED module, not the text: esbuild-bundle src/presets.ts the way
+ *  checks/round-ad-flowchart.mjs does, so the flag's spread really evaluates
+ *  and `LIBRARY` / the seed-facing palette are read as the app builds them. */
+const bundlePresets = () => {
+  const entry = `${ROOT}/.aoq-entry.ts`;
+  const out = `${ROOT}/.aoq-out.mjs`;
+  writeFileSync(entry, `export {LIBRARY, PRESETS} from './src/presets';\n`);
+  const bundled = execFileSync(`${ROOT}/node_modules/.bin/esbuild`,
+    [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
+      '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],
+    {encoding: 'utf8'});
+  writeFileSync(out, bundled);
+  return import(`${out}?t=${Date.now()}`);
+};
+const executedPresets = await bundlePresets();
+const archPalette = executedPresets.PRESETS.architecture.palette;
+assert('itemA.queue-is-flag-gated-from-the-create-surfaces',
+  !executedPresets.LIBRARY.some(p => p.label === 'Queue') && queueFilterSpread && queueInPalette
+    && archPalette[2]?.label === 'Queue' && archPalette.length === 10,
+  `executed LIBRARY holds ${executedPresets.LIBRARY.length} items and NO Queue (the hide), the flag's filter still names 'Queue' in src/presets.ts, ` +
+  `the item itself stays in src/palette.ts, and PRESETS.architecture.palette keeps its 10 entries with 'Queue' at [2] — the seed's ` +
+  `External → Queue → Service pipeline is untouched, so checks/boot-no-flash.mjs stays green without a re-anchor.`);
 const stillLong = libItems.filter(e => e.hint.length > 32);
 assert('item4.no-library-hint-over-32ch', stillLong.length === 0,
   stillLong.map(e => `${e.label}(${e.hint.length})`).join(',') || `longest ${Math.max(...libItems.map(e => e.hint.length))}ch`);
