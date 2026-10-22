@@ -919,7 +919,14 @@ export const LIBRARY: PaletteItem[] = [
   // 3 — `Lane` (groups).
   ...FLOWCHART_PALETTE.filter(p => p.label === 'Lane'),
   // 4 — the C4 elements (11), in C4_TYPES order.
-  ...C4_PALETTE_ITEMS,
+  //     C4_ENABLED (2026-10-22, HARVEY follow-up: "C4 shapes/group vẫn còn
+  //     hiện") — the first cut kept the items in LIBRARY so `libraryFor('c4')`
+  //     and MIXED_LABELS stayed intact, but LIBRARY is the create-surface
+  //     enumeration, so the C4 section still rendered in the panel, search and
+  //     the insert modal. Mirror SEQUENCE_ENABLED exactly: gate the SPREAD.
+  //     MIXED_LABELS below is gated the same way; `libraryFor('c4')` still
+  //     reads C4_PALETTE_ITEMS directly, so a STORED c4 board keeps its palette.
+  ...(C4_ENABLED ? C4_PALETTE_ITEMS : []),
   // 4b — PACKAGE-SEQ: the UML sequence pieces (HIDDEN — see SEQUENCE_ENABLED).
   ...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : []),
   // 5 — the ERD entities.
@@ -936,7 +943,9 @@ export const LIBRARY: PaletteItem[] = [
 const MIXED_LABELS = new Set<string>([
   ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue').map(p => p.label),
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note').map(p => p.label),
-  ...C4_PALETTE_ITEMS.slice(0, 6).map(p => p.label),
+  // C4_ENABLED (2026-10-22) — gated with the LIBRARY spread above: the Mixed
+  // set is a CREATE surface, so hidden C4 items must not re-enter through it.
+  ...(C4_ENABLED ? C4_PALETTE_ITEMS.slice(0, 6).map(p => p.label) : []),
   TABLE_PALETTE_ITEM.label,
 ]);
 
