@@ -46,6 +46,12 @@
         } catch (e) { /* storage blocked — leave the :root dark default in place */ }
       })();
     </script>
+    <!-- ROUND AZ — preload the two faces that paint FIRST paint (the title
+         rows are sans 650, the chrome is mono 400; both files carry the
+         Vietnamese + latin ranges the boot board renders). crossorigin is
+         REQUIRED even for same-origin font preloads (the fetch is CORS-mode). -->
+    <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-variable.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
