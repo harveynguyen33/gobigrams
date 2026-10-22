@@ -28,7 +28,7 @@ const require_ = createRequire(join('/home/harvey/projects/tech-goblin/package.j
 const {chromium} = require_('playwright-core');
 const {PNG} = require_('/home/harvey/.hermes/hermes-agent/node_modules/pngjs/lib/png.js');
 
-const APP = process.env.AY_APP_URL || 'http://localhost:5200/';
+const APP = process.env.AY_APP_URL || process.env.AZ_APP_URL || 'http://localhost:5200/';
 const TAG = process.env.AZ_TAG || 'after'; /* 'before' captures land in the same dir, tagged */
 const OUT = join(REPO, '.az-live');
 mkdirSync(OUT, {recursive: true});
