@@ -1,5 +1,55 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-22 (end of session) — SESSION CLOSED. Review happens in NEW sessions.
+
+**State:** `main` @ **`d7244cc`**, pushed to BOTH remotes (`origin` Forgejo + `github-mirror`), **0 ahead**.
+Gates: `tsc 0` · `vite build 0` · **65/65 harnesses** · `client_js_bytes` **921,071** (ceiling 921,071) ·
+`goblin-verify` 22 passed / 0 failed / 5 skipped.
+
+**Dev server:** still up on `:5200` (`http://192.168.33.200:5200/`), started long before this session. Leave it
+running for review; kill by PID if a restart is needed (never start a second one).
+
+### What this session shipped (in order)
+- **BA** — PNG stopgap: inline SVG presentation attributes on the html-to-image clone; `html-to-image` pinned 1.11.11.
+- **AY** — the architecture: `buildScene` (resolved scene) → pure `emitSvg` → **PNG = rasterise(the SVG string)**;
+  `html-to-image`, `toPng`, `collectCss` and the clone-patch passes **deleted**; persisted text metrics with a
+  fonts-epoch guard; bounds from `getBBox` + stroke/2 + marker extents.
+- **C** — outline text (harfbuzzjs, Harvey-approved) + **PDF via the print dialog** (zero dependency, honest label).
+- **AZ/AZ2** — **Inter 4.1 + JetBrains Mono 2.304** shipped (OFL, pinned, SHA256 manifest), subsets cover
+  Vietnamese + currency/arrows/math/geometry/dingbats, stacks lead with the shipped families, **text exports embed
+  the subsets** (`fsType` guarded), outlined exports carry paths and no embed.
+- **Two orchestrator-found defects fixed after the workers "finished"**:
+  1. the font embed was **inverted** (default export had none, outlined wasted 240 KB) — `4ea2c98`;
+  2. **outlined text was double-scaled** (glyph advance 1.32px instead of 7.66px at 11px mono) and **PDF ignored
+     the outline checkbox** (hardcoded `outline: true`) — `61abd16`.
+- **In-modal note** explaining when to use Outline text — `d7244cc`.
+
+### Verified numbers worth remembering
+- PNG: 0 selection-chrome pixels, connector + arrowhead present, ink/tint intact; pixel gate vs the old clone path
+  5.09% (light) / 6.87% (dark) with every cluster explained, and a **0.000% control** re-captured on the unflipped tree.
+- Outline vs `<text>`: **1.00–1.02%** of pixels, ink-top exact, 0 `<text>` in the outlined file, no font permission needed.
+- Text SVG ≈ **284 KB** (embedded subsets) · outlined SVG ≈ **84.9 KB** (paths only) — outline is the smaller file.
+
+### PENDING — needs Harvey (nothing blocks the code)
+1. **LICENSE** (none yet) → then `private: true` → `false`, `version` 0.1.0, `description`/`homepage`.
+2. **GitHub repo** is still **PRIVATE** with an empty description/homepage.
+3. **Host** for the public build (Cloudflare Pages fits the existing stack).
+4. README: add the "When to outline / Known differences" section (the in-modal note is the short version).
+5. Optional: `€` is now covered; the 284 KB text export can shrink with a per-export glyph subset if size ever matters.
+
+### Harness lessons from this session (do not re-learn them)
+- **An assertion can pin the bug.** Three `round-c` assertions pinned the wrong placements (`advance*k`, `7k+3`,
+  `-7k`) and stayed green through the double-scale defect. Assert the *result* (advance ≥ 35% of font size,
+  0 `<text>`, pixel diff inside the floor), not the formula.
+- A **capture driver** inside `checks/` will be run by any sweep and overwrite committed baselines — it must no-op
+  unless its env flag is set (`round-ay-png-capture.mjs`, `AY_CAPTURE=1`).
+- `boards/<id>.deleted-<UTC>.json` are AS-7 archives, not live boards — any listing check must skip them.
+- System-level: Hermes **checkpoints are disabled fleet-wide** after a 39 GB checkpoint store filled the single
+  99 GB root disk and killed two workers (`hermes-operations/references/disk-and-checkpoints.md`).
+- Mnemosyne writes can fail with `database is locked` after long uptime — the fix is recycling the session
+  process, not touching the DB (`hermes-operations/references/mnemosyne-lock.md`).
+
+
 ## ▶ 2026-10-22 14:xx — ROUND AZ — SHIPPED FONTS + OUTLINE-FROM-COMMITTED-BYTES + EMBED COMPLETE (card t_96100cb2), LOCAL ONLY
 
 **Tree:** `main`, HEAD `790af3f` (+ this handoff commit). NOT pushed (card rule).
