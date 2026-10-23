@@ -113,19 +113,43 @@ assert('af1.every-flowchart-entry-declares-a-size',
     : `all ${SIZES.length} carry an explicit size, so none can fall back to the 190px CSS floor and render as a sliver. ` +
       'Before this round THIRTEEN had none.');
 
-assert('af1.every-declared-size-is-exactly-ratio-2.0',
-  WRONG_RATIO.length === 0,
-  WRONG_RATIO.length
-    ? `${WRONG_RATIO.length} entry/entries are off ratio 2.0, i.e. their silhouette is STRETCHED by the frame: ` +
-      WRONG_RATIO.map(s => `${s.label} ${s.size.width}x${s.size.height}=${(s.size.width / s.size.height).toFixed(3)}`).join('; ')
-    : `all ${SIZED.length} sizes are exactly 2.0. The frame's viewBox is 200x100 with a stretch fit, so 2.0 is the ` +
-      'one ratio at which every silhouette paints as drawn — the palette held 1.50, 1.56 and 1.00 before this round.');
+/* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — every flowchart entry's
+   size sat at exactly ratio 2.0 because every silhouette shared the 200x100
+   frame. NEW claim — the On-page connector is the one DELIBERATE exception:
+   its silhouette is a circle, drawn in its own SQUARE frame (0 0 100 100) so
+   a 2:1 node would paint it as a squashed ellipse, and its default size is
+   square (CONNECTOR_NODE_SIZE 152x152) so the resizer grips sit ON the circle
+   (Harvey: the corner grips floated far from it). A ratio-2.0 connector is now
+   the DEFECT (ellipse + off-circle grips); every OTHER entry must still be
+   exactly 2.0. The connector's squareness is asserted per-shape below. */
+const OFF_RATIO = SIZED.filter(s => s.shape === 'connector'
+  ? s.size.width !== s.size.height
+  : Math.abs(s.size.width / s.size.height - 2) >= 1e-6);
 
-assert('af1.the-flowchart-entries-all-agree-on-ONE-size',
-  new Set(SIZED.map(s => `${s.size.width}x${s.size.height}`)).size === 1,
-  `${new Set(SIZED.map(s => `${s.size.width}x${s.size.height}`)).size} distinct size(s) across the set: ` +
-  `[${[...new Set(SIZED.map(s => `${s.size.width}x${s.size.height}`))].join(', ')}]. Uniform is the point — Harvey's report was that ONE shape ` +
-  'reads as bigger than the others.');
+assert('af1.every-declared-size-is-exactly-ratio-2.0-EXCEPT-the-square-connector',
+  OFF_RATIO.length === 0 && SIZED.some(s => s.shape === 'connector' && s.size.width === s.size.height),
+  OFF_RATIO.length
+    ? `${OFF_RATIO.length} entry/entries off their frame's own ratio: ` +
+      OFF_RATIO.map(s => `${s.label} ${s.size.width}x${s.size.height}=${(s.size.width / s.size.height).toFixed(3)}`).join('; ')
+    : `all ${SIZED.length - 1} rect-frame sizes are exactly 2.0 and the On-page connector is square (the circle's own frame is ` +
+      'square since ROUND BE — a 2:1 connector painted a stretched ellipse and put the grips in dead corners).');
+
+
+/* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — all flowchart entries shared
+   ONE size (290x145), because one silhouette frame served all. NEW claim — the
+   set holds TWO deliberate sizes now: the shared 2:0 constant for every
+   rect-frame silhouette, and the square CONNECTOR_NODE_SIZE for the circle.
+   Uniformity across the rect set is still the point; a SECOND rect size, or a
+   non-square connector, is the regression. */
+const RECT_SIZED = SIZED.filter(s => s.shape !== 'connector');
+const CONNECTOR_SIZED = SIZED.filter(s => s.shape === 'connector');
+const rectSizes = new Set(RECT_SIZED.map(s => `${s.size.width}x${s.size.height}`));
+assert('af1.the-RECT-flowchart-entries-all-agree-on-ONE-size-and-the-connector-on-ITS-own',
+  rectSizes.size === 1 && rectSizes.has('290x145')
+    && CONNECTOR_SIZED.length === 1 && CONNECTOR_SIZED[0].size.width === CONNECTOR_SIZED[0].size.height,
+  `rect-frame entries: ${[...rectSizes].join(', ')} (${RECT_SIZED.length} entries) — uniform is the point, Harvey's report was that ONE ` +
+  `shape reads as bigger than the others. Connector: ${CONNECTOR_SIZED.map(s => `${s.size.width}x${s.size.height}`).join(', ') || 'NONE'} — ` +
+  'square since ROUND BE, so the grips sit on the circle. A second rect size or an off-square connector fails here.');
 
 /* ===========================================================================
    1 — THE SIX ROUND-AD ADDITIONS ARE INCLUDED.
@@ -210,11 +234,23 @@ assert('af3.addNodeByLabel-sizes-from-item-size-and-writes-it-to-node-style',
   'the sizing line is `item.size ?? (group / note / null)` and the resolved box is written to `style: {width, height}`, so a ' +
   'flowchart item no longer reaches the `null` branch. The slice is length-checked so it cannot pass on an empty body.');
 
-assert('af3.every-flowchart-item-resolves-to-the-one-size-at-the-INSERT-path',
+/* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — every flowchart item resolved
+   to the ONE size (290x145). NEW claim — every item still resolves through the
+   same `item.size ?? …` chain (no NULL branch), but the resolved values are
+   now the TWO deliberate sizes: 290x145 for rect frames, CONNECTOR_NODE_SIZE
+   for the circle. The invariant is "resolves, and to its frame's ratio", not
+   "resolves to one number". */
+assert('af3.every-flowchart-item-resolves-to-ITS-frame-ratio-at-the-INSERT-path',
   unresolved.length === 0
-    && resolved.every(r => `${r.size.width}x${r.size.height}` === `${SIZED[0].size.width}x${SIZED[0].size.height}`),
-  `re-running the SHIPPED chain over the SHIPPED items: all ${resolved.length} resolve to ` +
-  `${SIZED[0].size.width}x${SIZED[0].size.height}. The palette data alone would not prove this — a null here is the sliver bug.`);
+    && resolved.every(r => {
+      const item = FLOW_ITEMS.find(p => p.label === r.label);
+      return item?.shape === 'connector'
+        ? r.size.width === r.size.height
+        : `${r.size.width}x${r.size.height}` === `${SIZED[0].size.width}x${SIZED[0].size.height}`;
+    }),
+  `re-running the SHIPPED chain over the SHIPPED items: all ${resolved.length} resolve (no null — the sliver bug), every rect frame at ` +
+  `${SIZED[0].size.width}x${SIZED[0].size.height} and the connector square. ROUND BE split the one number into the two frame ratios.`);
+
 
 /* ===========================================================================
    3 — THE TEMPLATE SEEDS AGREE WITH THE PALETTE.
@@ -239,21 +275,41 @@ const SEED_NODES = TEMPLATE_BLOCKS.flatMap(block =>
   [...block.matchAll(/flowNode\('([^']+)',\s*'([^']+)'[^\n]*/g)].map(m => ({id: m[1], line: m[0].replace(/\s+/g, ' ')})));
 console.log(`  flowchart template blocks: ${TEMPLATE_BLOCKS.length}; flowNode seeds across them: ${SEED_NODES.length}`);
 const seedSizes = SEED_NODES.map(n => {
-  if (/FLOWCHART_NODE_SIZE/.test(n.line)) return {id: n.id, via: 'constant'};
+  /* ROUND BE (2026-10-23) — a seed "via a constant" is either shared constant
+     now; CONNECTOR_NODE_SIZE is a deliberate route, not a literal. */
+  if (/FLOWCHART_NODE_SIZE|CONNECTOR_NODE_SIZE/.test(n.line)) return {id: n.id, via: 'constant'};
   const m = /\{width:\s*(\d+),\s*height:\s*(\d+)\}/.exec(n.line);
   return {id: n.id, via: m ? `${m[1]}x${m[2]}` : 'NO SIZE'};
 });
+/* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — every seed routed through
+   FLOWCHART_NODE_SIZE (one constant for the family). NEW claim — every seed
+   still routes through a NAMED constant, but the connector seeds route through
+   CONNECTOR_NODE_SIZE (square) while the rest route through
+   FLOWCHART_NODE_SIZE. A seed via a literal, or a connector seed via the 2:1
+   constant, is the regression. The liveness floor is unchanged (48 seeds). */
 const offConstant = seedSizes.filter(s => s.via !== 'constant');
-console.log(`  seeds NOT routed through the constant: ${offConstant.length}${offConstant.length ? ` [${offConstant.map(s => `${s.id}=${s.via}`).join(', ')}]` : ''}`);
-
+const connectorSeeds = SEED_NODES.filter(n => n.line.includes("'connector'"));
+const connectorViaSquare = connectorSeeds.every(n => /CONNECTOR_NODE_SIZE/.test(n.line));
+const rectSeedsViaShared = seedSizes.filter(s => !connectorSeeds.some(c => c.id === s.id))
+  .every(s => s.via === 'constant');
+console.log(`  seeds NOT routed through a constant: ${offConstant.length}${offConstant.length ? ` [${offConstant.map(s => `${s.id}=${s.via}`).join(', ')}]` : ''}`);
+console.log(`  connector seeds: ${connectorSeeds.length}, all via CONNECTOR_NODE_SIZE: ${connectorViaSquare}`);
 const seededTerminators = SEED_NODES.filter(n => n.line.includes("'terminator'"));
 console.log(`  terminator seeds: ${seededTerminators.length} across ${TEMPLATE_BLOCKS.length} templates`);
+assert('af4.every-flowchart-seed-in-the-template-carries-a-NAMED-constant',
+  TEMPLATE_BLOCKS.length === 3 && seedSizes.length >= 48
+    && offConstant.length === 0 && connectorViaSquare && rectSeedsViaShared,
+  `all ${seedSizes.length} flowchart seeds across the ${TEMPLATE_BLOCKS.length} shipped templates route through a named constant — ` +
+  `FLOWCHART_NODE_SIZE for the rect frames, CONNECTOR_NODE_SIZE (square, ROUND BE 2026-10-23) for the ${connectorSeeds.length} connector seeds. ` +
+  'OLD claim was "all through FLOWCHART_NODE_SIZE"; the connector left it so its grips sit on the circle. A literal in any seed fails here.');
 
-assert('af4.every-flowchart-seed-in-the-template-carries-the-shared-constant',
-  TEMPLATE_BLOCKS.length === 3 && seedSizes.length >= 48 && seedSizes.every(s => s.via === 'constant'),
-  `all ${seedSizes.length} flowchart seeds across the ${TEMPLATE_BLOCKS.length} shipped templates route through FLOWCHART_NODE_SIZE rather than a literal, ` +
-  'so a seeded chart cannot drift from a dragged one — the two terminators used to carry 270x180 and the two connectors 84x84 while the palette said the same. ' +
-  'Re-anchored this round: the probe used to read the deleted `approval` block alone, where it passed over an empty list.');
+console.log(`  terminator seeds: ${seededTerminators.length} across ${TEMPLATE_BLOCKS.length} templates`);
+
+/* SUPERSEDED (ROUND BE, 2026-10-23) — the old
+   `af4.every-flowchart-seed-in-the-template-carries-the-shared-constant` (every
+   seed via FLOWCHART_NODE_SIZE) is REPLACED by the per-constant assertion
+   above: the connector seeds now route through CONNECTOR_NODE_SIZE, so the old
+   single-constant claim would fail a CORRECT tree. */
 
 assert('af4.the-template-s-terminators-agree-with-the-palette-default',
   seededTerminators.length >= 6
@@ -263,14 +319,39 @@ assert('af4.the-template-s-terminators-agree-with-the-palette-default',
 
 /* The constant must be DECLARED ONCE and be the palette's value, or the two
    sides can be "in agreement" by both being wrong. */
-const CONST_DECLS = [...(PRESETS.match(/FLOWCHART_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
-const CONST_USE = [...PRESETS.matchAll(/FLOWCHART_NODE_SIZE/g)].length;
-console.log(`  FLOWCHART_NODE_SIZE: ${CONST_DECLS.length} declaration(s), ${CONST_USE} references total (16 palette rows + ${SEED_NODES.length} template seeds + the declaration)`);
-assert('af4.the-shared-size-is-declared-once-and-used-by-every-row',
-  CONST_DECLS.length === 1 && CONST_USE === 16 + SEED_NODES.length + 1,
-  `one declaration (\`${CONST_DECLS[0]?.replace(/\s+/g, ' ')}\`) and ${CONST_USE} references — the 16 palette rows, the ${SEED_NODES.length} template seeds and ` +
-  'the declaration itself. Pinned to the measured number with its parts named (it read 27 when only the deleted 10-seed template was counted), so a template ' +
-  'that stops using the constant has to change this deliberately. One number, so the palette, the templates and a future addition cannot disagree.');
+/* The constants must each be DECLARED ONCE and be the palette's values, or the
+   two sides can be "in agreement" by both being wrong.
+   RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — FLOWCHART_NODE_SIZE: exactly
+   1 declaration and 16+48+1 = 65 references. NEW claim — TWO declared sizes:
+   FLOWCHART_NODE_SIZE keeps 1 declaration with 15+44+1 = 60 references, and
+   CONNECTOR_NODE_SIZE adds 1 declaration with 1+4+1 = 6 references (1 palette
+   row + 4 connector seeds + the declaration). A reference that drifts off
+   either count is a row or seed leaving its constant, asserted per-side. */
+const FC_ROWS_TOTAL = FC_ROWS.length;
+/* ROUND BE — the row counts are read from the fc() SOURCE rows (the bundled
+   LIBRARY dedupes/merges one row, so it is the wrong denominator here); what
+   matters is how many fc() rows route through each constant. */
+const FC_SOURCE_ROWS = [...PRESETS.matchAll(/fc\('([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)'([^\n]*)/g)]
+  .map(m => ({label: m[1], tail: m[5]}));
+const FC_RECT_ROWS = FC_SOURCE_ROWS.filter(r => r.tail.includes('FLOWCHART_NODE_SIZE')).length;
+const FC_CX_ROWS = FC_SOURCE_ROWS.filter(r => r.tail.includes('CONNECTOR_NODE_SIZE')).length;
+const FC_SEEDS_TOTAL = SEED_NODES.length;
+const FC_RECT_SEEDS = FC_SEEDS_TOTAL - connectorSeeds.length;
+const FC_CONST_DECLS = [...(PRESETS.match(/FLOWCHART_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
+const FC_CONST_USE = [...PRESETS.matchAll(/FLOWCHART_NODE_SIZE/g)].length;
+const CX_CONST_DECLS = [...(PRESETS.match(/CONNECTOR_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
+const CX_CONST_USE = [...PRESETS.matchAll(/CONNECTOR_NODE_SIZE/g)].length;
+console.log(`  FLOWCHART_NODE_SIZE: ${FC_CONST_DECLS.length} declaration(s), ${FC_CONST_USE} references (expect ${FC_RECT_ROWS} rect rows + ${FC_RECT_SEEDS} rect seeds + 1)`);
+console.log(`  CONNECTOR_NODE_SIZE: ${CX_CONST_DECLS.length} declaration(s), ${CX_CONST_USE} references (expect 1 row + ${connectorSeeds.length} seeds + 1)`);
+assert('af4.each-shared-size-is-declared-once-and-used-by-its-own-rows',
+  FC_CONST_DECLS.length === 1 && FC_CONST_USE === FC_RECT_ROWS + FC_RECT_SEEDS + 1
+    && CX_CONST_DECLS.length === 1 && CX_CONST_USE === FC_CX_ROWS + connectorSeeds.length + 1
+    && FC_CX_ROWS === 1,
+  `FLOWCHART_NODE_SIZE: one declaration, ${FC_CONST_USE} references (the ${FC_RECT_ROWS} rect palette rows, the ${FC_RECT_SEEDS} rect seeds and the ` +
+  `declaration). CONNECTOR_NODE_SIZE: one declaration, ${CX_CONST_USE} references (the ${FC_CX_ROWS} connector palette row, its ${connectorSeeds.length} template seeds ` +
+  'and the declaration). ROUND BE re-anchored the old single-constant 16+48+1 count into these two per-constant counts — a row or seed that ' +
+  'changes constant shows up as a wrong number here.');
+
 
 /* ===========================================================================
    4 — THE FLOOR IS UNCHANGED, AND THE CHOSEN SIZE CLEARS IT.
@@ -430,17 +511,30 @@ console.log('='.repeat(78));
 
 /* SCOPED TO `ShapeFrame`, the silhouette painter — `ShapePreview` renders the
    palette row's small art in its OWN 26x18 frame and legitimately has a second
-   viewBox, so a file-wide count would read a correct tree as a defect. */
-const VIEWBOX = /viewBox="0 0 200 100"/.test(SHAPES);
-const STRETCH = /preserveAspectRatio="none"/.test(SHAPES);
-const FRAME_FN = SHAPES.slice(SHAPES.indexOf('export function ShapeFrame'), SHAPES.indexOf('export function ShapePreview'));
-const frameViewBoxes = [...FRAME_FN.matchAll(/viewBox="([^"]+)"/g)].map(m => m[1]);
-const frameBoices = frameViewBoxes.length;
-console.log(`  ShapeFrame viewBox: [${[...new Set(frameViewBoxes)].join(', ')}]  (${frameBoices} in the painter)  stretch=${STRETCH}`);
-assert('af6.the-frame-is-unchanged-200x100-and-still-stretched',
-  VIEWBOX && STRETCH && frameBoices === 1 && frameViewBoxes[0] === '0 0 200 100',
-  `${frameBoices} viewBox in the silhouette painter and it is still 0 0 200 100 with preserveAspectRatio="none". This round changed ` +
-  'NO path and NO frame number — rescaling a path to compensate would hide the distortion instead of removing it.');
+   viewBox, so a file-wide count would read a correct tree as a defect.
+   RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — ShapeFrame carried exactly
+   ONE viewBox, `0 0 200 100`, and this round changed no frame number. NEW
+   claim — TWO viewBoxes: `0 0 200 100` for the rect-frame silhouettes (every
+   non-connector shape, still stretched, still the ratio-2.0 contract above)
+   and a SQUARE `0 0 100 100` for the connector only — the one shape a 2:1
+   frame would paint as an ellipse. The stretch fit stays on for BOTH: the
+   square frame only works because the node is square too (the palette's
+   CONNECTOR_NODE_SIZE), which the size assertions above pin. */
+const FRAME_FN_ANCHORED = SHAPES_RAW.slice(
+  SHAPES_RAW.indexOf('export function ShapeFrame'),
+  SHAPES_RAW.indexOf('export function ShapePreview'));
+/* The frame is a RUNTIME pick now (`viewBox={vb}` off a per-shape ternary), so
+   the assertion reads the decision site itself instead of counting literals. */
+const VB_SITE = (FRAME_FN_ANCHORED.match(/viewBox=/g) ?? []).length === 1
+  && /viewBox=\{vb\}/.test(FRAME_FN_ANCHORED);
+const VB_TERNARY = /shape === 'connector' \? '0 0 100 100' : '0 0 200 100'/.test(FRAME_FN_ANCHORED);
+const STRETCH = /preserveAspectRatio="none"/.test(FRAME_FN_ANCHORED);
+console.log(`  ShapeFrame frame pick: viewBox={vb} site=${VB_SITE}, ternary(connector->square)=${VB_TERNARY}, stretch=${STRETCH}`);
+assert('af6.the-frame-is-200x100-plus-the-connectors-SQUARE-frame-still-stretched',
+  VB_SITE && VB_TERNARY && STRETCH,
+  `one viewBox= site bound to the per-shape ternary: connector -> square 0 0 100 100, every other silhouette -> 0 0 200 100 ` +
+  `(ROUND BE 2026-10-23: a circle drawn in the 2:1 frame and stretched into the old 290x145 box painted as an ellipse with the grips ` +
+  'in dead paintless corners). preserveAspectRatio="none" is retained for both branches.');
 
 const capRoundness = (w, h) => (49 * w / 200) / (49 * h / 100);
 const atChosen = capRoundness(CHOSEN.width, CHOSEN.height), at270x180 = capRoundness(270, 180), at150x96 = capRoundness(150, 96);

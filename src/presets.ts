@@ -563,6 +563,16 @@ const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteI
    rather than inflating the other fifteen shapes. */
 export const FLOWCHART_NODE_SIZE = {width: 290, height: 145} as const;
 
+/* ROUND BE (2026-10-23) — the connector is SQUARE. Its silhouette is a circle
+   (shapes.tsx now draws it in a square frame, where it reaches every edge), so
+   its default node must be square or NodeResizer's grips sit in the dead
+   corners the 2:1 box added (Harvey: "4 góc mũi tên xa so với hình tròn").
+   152x152 is the ratio-2.0 default's own SHORT edge (145) raised to the next
+   grid-16 multiple, so the circle is the same visual height as every sibling
+   on the palette while being genuinely round. Every other flowchart shape
+   stays on FLOWCHART_NODE_SIZE. */
+export const CONNECTOR_NODE_SIZE = {width: 152, height: 152} as const;
+
 const FLOWCHART_PALETTE: PaletteItem[] = [
   fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium', FLOWCHART_NODE_SIZE),
   fc('Process', 'rect · action step', 'process', 'cyan', 'Process step', 'flowchart', FLOW, ['rect', 'step', 'action', 'action step', 'task'], 'rect', FLOWCHART_NODE_SIZE),
@@ -573,7 +583,7 @@ const FLOWCHART_PALETTE: PaletteItem[] = [
   fc('Preparation', 'hexagon · setup', 'preparation', 'cyan', 'Initialise', 'flowchart', FLOW, ['initialization', 'initialisation', 'setup', 'init', 'hex'], 'hexagon', FLOWCHART_NODE_SIZE),
   fc('Manual operation', 'trapezoid · by hand', 'manual', 'green', 'Manual step', 'flowchart', FLOW, ['manual step', 'manual', 'person'], 'trapezoid', FLOWCHART_NODE_SIZE),
   fc('Delay', 'D-shape · wait', 'delay', 'amber', 'Wait', 'flowchart', FLOW, ['wait', 'pause'], 'D-shape', FLOWCHART_NODE_SIZE),
-  fc('On-page connector', 'circle · jump', 'connector', 'slate', 'A', 'flowchart', FLOW, ['connector', 'circle', 'reference', 'jump', 'on-page'], 'circle', FLOWCHART_NODE_SIZE),
+  fc('On-page connector', 'circle · jump', 'connector', 'slate', 'A', 'flowchart', FLOW, ['connector', 'circle', 'reference', 'jump', 'on-page'], 'circle', CONNECTOR_NODE_SIZE),
   /* ROUND AD, ITEM 2 — the six additions. Colour keys follow the SAME semantic
      grouping as the ten above (Option B), so the key stays one idea:
        offpage          slate  — a routing marker, like On-page connector
@@ -722,8 +732,8 @@ const flowchartAdvancedTemplate: TemplateSpec = {
     flowNode('c8', 'process', 'Seal and label the parcel', 'cyan', 380, 1350, FLOWCHART_NODE_SIZE),
     flowNode('c9', 'document', 'Packing slip', 'violet', 380, 1565, FLOWCHART_NODE_SIZE),
     flowNode('c10', 'decision', 'Parcel matches the packing slip?', 'amber', 380, 1780, FLOWCHART_NODE_SIZE),
-    flowNode('c11', 'connector', 'A', 'slate', 760, 1780, FLOWCHART_NODE_SIZE),
-    flowNode('c12', 'connector', 'A', 'slate', 760, 1995, FLOWCHART_NODE_SIZE),
+    flowNode('c11', 'connector', 'A', 'slate', 760, 1780, CONNECTOR_NODE_SIZE),
+    flowNode('c12', 'connector', 'A', 'slate', 760, 1995, CONNECTOR_NODE_SIZE),
     flowNode('c13', 'process', 'Hand the parcel to the courier', 'cyan', 380, 1995, FLOWCHART_NODE_SIZE),
     flowNode('c14', 'terminator', 'Packing done', 'green', 380, 2210, FLOWCHART_NODE_SIZE),
     flowNote('cNote', 'Packing runs on its own sheet: it is a sub-assembly of the order, not a step of it.', 760, 60),
@@ -776,8 +786,8 @@ const flowchartComplexTemplate: TemplateSpec = {
     flowNode('d14', 'delay', 'Waiting for the courier pickup', 'amber', 380, 2650, FLOWCHART_NODE_SIZE),
     flowNode('d15', 'process', 'Seal and label the parcel', 'cyan', 380, 2865, FLOWCHART_NODE_SIZE),
     flowNode('d16', 'decision', 'Parcel matches the packing slip?', 'amber', 380, 3080, FLOWCHART_NODE_SIZE),
-    flowNode('d17', 'connector', 'A', 'slate', 760, 3080, FLOWCHART_NODE_SIZE),
-    flowNode('d18', 'connector', 'A', 'slate', 1140, 3080, FLOWCHART_NODE_SIZE),
+    flowNode('d17', 'connector', 'A', 'slate', 760, 3080, CONNECTOR_NODE_SIZE),
+    flowNode('d18', 'connector', 'A', 'slate', 1140, 3080, CONNECTOR_NODE_SIZE),
     flowNode('d19', 'storeddata', 'Order history log', 'violet', 380, 3295, FLOWCHART_NODE_SIZE),
     flowNode('d20', 'offpage', 'To page 2: deliver the parcel', 'slate', 380, 3510, FLOWCHART_NODE_SIZE),
     flowNode('d21', 'offpage', 'From page 1: order packed', 'slate', 380, 3725, FLOWCHART_NODE_SIZE),

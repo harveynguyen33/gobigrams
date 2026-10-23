@@ -189,8 +189,15 @@ function frameMarkup(shape: Shape, p: FramePaint): string {
       return `<path d="M2 2 H198 L164 98 H36 Z" ${a}/>`;
     case 'delay':
       return `<path d="M2 2 H122 A 78 48 0 0 1 122 98 H2 Z" ${a}/>`;
+    /* ROUND BE (2026-10-23) — the paint must FILL the frame (skill:
+       shape-geometry-and-render-sites law 1) so the NodeResizer grips sit ON
+       the circle. The frame below is SQUARE for this one shape, so cx/cy=50
+       r=49.5 reaches every edge: r is the frame half minus the 0.5-unit
+       stroke inset every rect-based shape uses (service: x=1 of 200). The
+       old `cx=100 cy=50 r=48` in the 200x100 frame filled only 96/200 of the
+       width — the dead strips the grips floated in. */
     case 'connector':
-      return `<circle cx="100" cy="50" r="48" ${a}/>`;
+      return `<circle cx="50" cy="50" r="49.5" ${a}/>`;
     case 'offpage':
       return `<path d="M2 2 H198 V66 L100 98 L2 66 Z" ${a}/>`;
     case 'manualinput':
@@ -252,8 +259,17 @@ export function shapeFrameMarkup(shape: Shape, nc: string, plain: boolean): stri
  *  `dangerouslySetInnerHTML` is safe here. */
 export function ShapeFrame({shape, plain}: {shape: Shape; plain?: boolean}) {
   const inner = shapeFrameMarkup(shape, 'var(--nc, var(--border-strong))', plain !== false);
+  /* ROUND BE (2026-10-23) — the connector is the ONE shape whose silhouette is
+     round, so its frame is square: a circle drawn in the 2:1 frame and
+     stretched into a 145-tall node paints as a tall ellipse, which is worse
+     than the margins it replaces. SQUARE FRAME + SQUARE NODE (the palette's
+     CONNECTOR_NODE_SIZE) keeps it a true circle and lets the paint reach the
+     frame — grips on the circle (Harvey: the corner grips floated far from
+     it). The <svg> is width/height 100% of the node either way; only the
+     internal coordinate system differs. */
+  const vb = shape === 'connector' ? '0 0 100 100' : '0 0 200 100';
   return (
-    <svg className={`shape-frame ${shape}`} viewBox="0 0 200 100" preserveAspectRatio="none"
+    <svg className={`shape-frame ${shape}`} viewBox={vb} preserveAspectRatio="none"
       dangerouslySetInnerHTML={{__html: inner}} />
   );
 }
@@ -330,7 +346,12 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
          ShapeFrame `delay` case for the measurement). */
       return wrap(<path d="M1 3 H18 A 6 6 0 0 1 18 15 H1 Z" {...s} />, 'delay');
     case 'connector':
-      return wrap(<circle cx="13" cy="9" r="5.6" {...s} />, 'connector');
+      /* ROUND BE (2026-10-23) — a true circle filling the 26x18 preview frame
+         (was r=5.6 in a 26x18 box: visible side margins). The preview frame
+         is 2:1 so a frame-filling circle is an ellipse here — matching the
+         canvas node, whose silhouette is also wider than tall relative to
+         the glyph cell. Both sites now paint to their frame (skill law 2). */
+      return wrap(<ellipse cx="13" cy="9" rx="12.5" ry="8.5" {...s} />, 'connector');
 
     /* ---------------- ROUND AD previews (26x18) ---------------- */
     case 'offpage':

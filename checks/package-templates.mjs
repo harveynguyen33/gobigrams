@@ -74,11 +74,11 @@ const dir = mkdtempSync(join(tmpdir(), 'ds-pt-'));
 const entry = join(dir, 'entry.ts');
 writeFileSync(entry,
   `export {templateCatalog, TEMPLATE_LEVEL_ORDER} from ${JSON.stringify(join(ROOT, 'src/templateCatalog.ts'))};\n` +
-  `export {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`);
+  `export {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`);
 const out = join(dir, 'out.mjs');
 writeFileSync(out, execFileSync(ESBUILD, [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'}));
 const M = await import(pathToFileURL(out).href);
-const {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS, templateCatalog, TEMPLATE_LEVEL_ORDER} = M;
+const {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS, templateCatalog, TEMPLATE_LEVEL_ORDER} = M;
 
 const sha = s => createHash('sha256').update(s).digest('hex');
 const catalog = templateCatalog();
@@ -336,13 +336,31 @@ const EXPECT = {
   'flow-advanced': {nodes: 15, edges: 15, shapes: 10},
   'flow-complex': {nodes: 25, edges: 27, shapes: 16},
 };
+/* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — every flow node seeds at the
+   ONE shared 290x145. NEW claim — every flow node seeds at a NAMED constant
+   size and carries tb handles, where the On-page connector's size is the
+   SQUARE CONNECTOR_NODE_SIZE (its silhouette is a circle; a 2:1 box put the
+   resizer grips in dead corners) and every other shape is 290x145. A literal
+   size, or the connector at the 2:1 constant, fails here. */
+const seedSizeOk = n => {
+  const s = n.style ?? {};
+  if (n.data?.shape === 'connector') return `${s.width}x${s.height}` === `${CONNECTOR_NODE_SIZE.width}x${CONNECTOR_NODE_SIZE.height}`;
+  return `${s.width}x${s.height}` === `${FLOWCHART_NODE_SIZE.width}x${FLOWCHART_NODE_SIZE.height}`;
+};
+const badSize = (t) => (t.nodes ?? []).filter(n => n.data?.shape !== 'note')
+  .filter(n => !(seedSizeOk(n) && n.data.handles === 'tb'))
+  .map(n => `${n.data?.shape}:${n.style?.width}x${n.style?.height}/${n.data?.handles}`);
 const countRows = Object.entries(EXPECT).map(([id, want]) => {
   const t = tpl(id);
   const sizes = t ? t.nodes.filter(n => n.data?.shape !== 'note').map(n => `${n.style?.width}x${n.style?.height}/${n.data.handles}`) : [];
-  const badSize = sizes.filter(s => s !== `${FLOWCHART_NODE_SIZE.width}x${FLOWCHART_NODE_SIZE.height}/tb`);
-  return {id, want, got: t ? {nodes: t.nodes.length, edges: t.edges.length, shapes: shapeSet(t).size} : null, badSize};
+  return {id, want, got: t ? {nodes: t.nodes.length, edges: t.edges.length, shapes: shapeSet(t).size} : null, badSize: badSize(t ?? {nodes: []})};
 });
 for (const r of countRows) console.log(`  ${r.id.padEnd(14)} nodes ${r.got ? r.got.nodes : '-'}/${r.want.nodes}  edges ${r.got ? r.got.edges : '-'}/${r.want.edges}  shapes ${r.got ? r.got.shapes : '-'}/${r.want.shapes}`);
+assert('c2.every-flow-node-carries-its-NAMED-constant-size-and-tb-handles',
+  countRows.every(r => r.badSize.length === 0),
+  countRows.map(r => `${r.id}: ${r.badSize.length} off-size${r.badSize.length ? ` [${r.badSize.join(', ')}]` : ''}`).join('; ') +
+  ` — seed-from-template and drag-from-panel agree: ${FLOWCHART_NODE_SIZE.width}x${FLOWCHART_NODE_SIZE.height} for the rect frames, ` +
+  `${CONNECTOR_NODE_SIZE.width}x${CONNECTOR_NODE_SIZE.height} (square) for the On-page connector`);
 /* RE-ANCHORED (ROUND 4, ITEM 4) — `['approval', 'advanced']` was a row of this
    table and its SUBJECT is deleted, so the row went with it; the table is now the
    three templates the family actually ships. `tpl('approval')` would be

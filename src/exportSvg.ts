@@ -1005,8 +1005,13 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
       parts.push(tableMarkup(n as never, s, n.accent, scene.fg, scene.dim, n.textRect,
         (x, y, content, o) => rowMarkup({x, baselineY: y, content, size: o.size, weight: o.weight, fill: o.fill, family: o.family, spacing: o.spacingNum, anchor: o.anchor}, outline)));
     } else {
+      /* ROUND BE (2026-10-23) — the connector's frame is SQUARE (ShapeFrame's
+         own choice; the circle cannot stretch to 2:1 and stay a circle), so
+         the export wrapper must agree with it or the same geometry paints as
+         a squashed ellipse in the exported file. */
+      const vb = asShape(n.data?.shape) === 'connector' ? '0 0 100 100' : '0 0 200 100';
       parts.push(
-        `<svg x="0" y="0" width="${s.w}" height="${s.h}" viewBox="0 0 200 100" preserveAspectRatio="none">` +
+        `<svg x="0" y="0" width="${s.w}" height="${s.h}" viewBox="${vb}" preserveAspectRatio="none">` +
         shapeFrameSvg(asShape(n.data?.shape), {fill: n.accent, stroke: n.accent, fillOpacity: '0.09', plain: (n as SceneNode & {plain?: boolean}).plain !== false}) +
         `</svg>`);
       if (n.icon) parts.push(iconMarkup(n.icon));
