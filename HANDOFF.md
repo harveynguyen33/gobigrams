@@ -1,5 +1,40 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-24 01:3x — ROUND BF — custom-shape ring + per-shape resize floors COMPLETE (reviewed, pushed)
+
+**State:** `main` @ **`dc6fdb6`**, pushed to BOTH remotes, 0 ahead. Tree clean except this
+handoff + ROUND-BF-SPEC.md (kept untracked by convention).
+Gates: `tsc 0` · `vite build 0` · `client_js_bytes` **924,748** (ceiling 942,000) ·
+`goblin-verify` 22/0/5 · sweep 71/71 + the 2 new harnesses (round-bf-visibility 12/12,
+round-bf-floors 21/21), hand-rerun by the orchestrator after the review fix.
+
+**The round (Harvey's device-test issues, option B chosen 2026-10-23):**
+- **BF-1 `eb088cb`** — custom-shape imports are visible at rest: 1.5px dashed
+  token-coloured `outline` ring on `:not(.selected)`, layout-neutral (img rect identical,
+  negative control via border-inject shifts 200→198), NOT painted in export (grep-verified).
+- **BF-2 slice A `5035035`** — `resizeFloorsFor(shape, naturalW, naturalH)`: connector floors
+  at a flat 64px (`SYMBOL_FLOOR_PX = 2 × SHAPE_MIN_PX`); text-card shapes keep
+  `max(190, min(200, natural))`; round-r S1/S3 re-anchored per-class (STRICTER, proven by
+  mutant + RED on base worktree).
+- **BF-2 slice B `876d32b`** — the natural WIDTH floor is re-measured at `onResizeStart`, so
+  a reloaded 152px connector no longer snaps to 200 on first drag (the felt jerk). Deviation
+  (adjudicated OK by review): the HEIGHT re-measure was dropped — a one-line label measures
+  ~22px intrinsic, min(141, 22) would break AC8's stop-at-141; height keeps AQ19c class floors.
+- **BF-2 slice C `0bbf807`** — note floors 130/44 flat, derived from `.note-node` CSS 120 +
+  slack; the 120/200 CSS-vs-JS argument ends (both sides derive from one number).
+- **Review `dc6fdb6`** — reviewer verdict 7/7 invariants HOLDS, 2 MINOR dead-code defects,
+  both removed in this commit; both coder deviations upheld with measured evidence.
+
+**Research artifact:** `/home/harvey/diagram-studio-research/RESIZE-TEXT-SCALE-REPORT.md`
+(260 lines, sourced: draw.io/Excalidraw/tldraw/Figma/Miro/Lucidchart — consensus: fixed label
+fonts, per-shape floors; text scaling is C-lite, a LATER card, not this round).
+
+**PENDING — Harvey's Mac test:** (1) a custom-shape import shows a dashed ring at rest and no
+ring when selected; (2) resize an On-page connector — no snap on first grab, shrinks smoothly
+to 64px; (3) a note resizes down to 130px wide (not 200); (4) reload a board, grab any small
+shape — no jerk. Vault capture for the 10-22→10-24 rounds still owed (Change Log stops at
+10-22; ADR-031 stops at the 10-22 addendum) — route through pkm.
+
 ## ▶ 2026-10-22 (end of session) — SESSION CLOSED. Review happens in NEW sessions.
 
 **State:** `main` @ **`d7244cc`**, pushed to BOTH remotes (`origin` Forgejo + `github-mirror`), **0 ahead**.
