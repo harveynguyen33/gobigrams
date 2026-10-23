@@ -1183,6 +1183,22 @@ body {
 .custom-shape-node.selected {
   outline: none;
 }
+/* ROUND BF-1 (2026-10-23) — the AT-REST ring. A transparent-region import
+   painted nothing until selection showed the grips, so the node read as
+   invisible until clicked. A 1.5px dashed ring in the node's OWN colour
+   (via --nc, wired in CustomShapeNode.tsx this round) delineates the exact
+   box NodeResizer will grip. It must be an OUTLINE, never a border or a
+   box-shadow: `* { box-sizing: border-box }` (line 343) makes a border
+   subtract from the content box — the art would shift and shrink by the
+   ring width, exactly the ROUND BE class of defect this round closes.
+   An outline is layout-neutral, and outline-offset: 0 keeps it on the box
+   so it coincides with the grip geometry. Scoped :not(.selected) — once
+   selected, the grips delineate the box (the .selected rule above keeps
+   its outline: none). */
+.custom-shape-node:not(.selected) {
+  outline: 1.5px dashed var(--nc, var(--border-strong));
+  outline-offset: 0;
+}
 
 /* react-flow handles — quiet at rest, appear on node hover / selection.
    F: ONE size for all eight sites. The midpoints were 14px and the corners 9px

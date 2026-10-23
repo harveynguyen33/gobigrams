@@ -32,6 +32,7 @@
 import {memo} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
+import {resolveColor} from './colors';
 import type {ColorKey} from './colors';
 
 export type CustomShapeKind = {
@@ -43,8 +44,16 @@ export type CustomShapeKind = {
 
 const CustomShapeNode = memo(({data, selected}: NodeProps) => {
   const d = data as unknown as CustomShapeKind;
+  /* ROUND BF (2026-10-23) — `--nc` finally reaches this node kind: the ring
+     rule in styles.css reads it, so the at-rest affordance (BF-1) themes with
+     the node's own colourKey. Same wiring every other node kind already had. */
+  const nc = resolveColor(d);
   return (
-    <div className={`custom-shape-node${selected ? ' selected' : ''}`} data-shape-title={d.title}>
+    <div
+      className={`custom-shape-node${selected ? ' selected' : ''}`}
+      data-shape-title={d.title}
+      style={{'--nc': nc} as React.CSSProperties}
+    >
       {selected && (
         /* §8.3 — the live resize carries the same 32px floor the import path
            enforces, and NO ceiling: ROUND BE (2026-10-23, Harvey: resize
