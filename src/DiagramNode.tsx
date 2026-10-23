@@ -99,26 +99,41 @@ export const NODE_MIN_H = CONTENT_MIN_H + FLOOR_SLACK_PX;
 /* ROUND BF (2026-10-23) — PER-SHAPE-CLASS FLOORS. The uniform 200x141 floor
    was applied to every class while the CSS exempts exactly one shape, so a
    152px connector took a 48px folded clamp on the FIRST drag event (the
-   resize jerk). Two classes land in slice A:
+   resize jerk), and `note` could never shrink below 200 despite its own
+   120px CSS floor. Three classes:
 
-   - text-card (every RESIZABLE shape except connector; `note` joins in
-     slice C): the ROUND S AQ19c/e semantics, upgraded with the max() so the
-     effective floor can never drop below the CSS content floor even when a
-     measured natural is smaller.
+   - text-card (every RESIZABLE shape except connector/note): the ROUND S
+     AQ19c/e semantics, upgraded with the max() so the effective floor can
+     never drop below the CSS content floor even when a measured natural is
+     smaller.
    - connector: FLAT 64 = 2 × SHAPE_MIN_PX (the import path's own minimum
      box; the same derivation discipline as NODE_MIN_W from
      CSS_CONTENT_MIN_W). The label wraps and AQ15 auto-grow handle overflow —
      the floor is the silhouette, not the label.
+   - note (slice C): FLAT 130/44. W derives from `.note-node`'s own CSS
+     min-width the same way NODE_MIN_W derives from `.node`'s, so JS and CSS
+     agree BY CONSTRUCTION (the 120/200 argument ends: both sides derive from
+     one number). H is 44, the LabelNode one-line precedent floor
+     (round-r R5); measured on a real one-line note at default text style the
+     stacked height is 43px (21 text + 10+12 padding), so 44 covers it.
 
    `resizeFloorsFor` is PURE (no React, no DOM): the harnesses bundle and
    EXECUTE it, and App-level callers can reuse it unchanged. */
 /** Silhouette minimum for the exempted symbol class: 2 × SHAPE_MIN_PX. */
 export const SYMBOL_FLOOR_PX = 2 * SHAPE_MIN_PX;
+/** Mirrors `.note-node { min-width }` (styles.css) so the note floor derives
+ *  from the CSS number instead of inventing a second one beside it. */
+export const NOTE_CSS_MIN_W = 120;
+export const NOTE_MIN_W = NOTE_CSS_MIN_W + FLOOR_SLACK_PX;
+/** The LabelNode resizer's one-line precedent floor (round-r R5); a measured
+ *  one-line note is 43px, so 44 covers it (§2.3 probe, in the harness log). */
+export const NOTE_MIN_H = 44;
 
 /** Effective resizer floors for one node. See the ROUND BF header above. */
 export type Floors = {w: number; h: number};
 export function resizeFloorsFor(shape: NodeShape, naturalW: number, naturalH: number): Floors {
   if (shape === 'connector') return {w: SYMBOL_FLOOR_PX, h: SYMBOL_FLOOR_PX};
+  if (shape === 'note') return {w: NOTE_MIN_W, h: NOTE_MIN_H};
   return {
     w: Math.max(CSS_CONTENT_MIN_W, Math.min(NODE_MIN_W, naturalW || NODE_MIN_W)),
     h: Math.min(NODE_MIN_H, naturalH || NODE_MIN_H),
