@@ -715,13 +715,25 @@ const MULTI = APP.slice(MULTI_START, MULTI_END > MULTI_START ? MULTI_END : undef
 console.log(`multi-select branch: App.tsx:${at(APP_RAW, ') : selCount >= 2 ? (')} → :${at(APP_RAW, ") : selected?.type === 'table' ? (")}  (${MULTI.split('\n').length} lines)`);
 const MULTI_KEEP = ['duplicate', 'deleteSelection', "align('left')", "align('hcenter')", "align('right')",
   "align('top')", "align('vcenter')", "align('bottom')", "distribute('h')", "distribute('v')",
-  'swatchRow(null', 'delete selected'];
+  'swatchRow('];
 for (const k of MULTI_KEEP) {
   console.log(`  ${MULTI.includes(k) ? ' ' : '!'} ${k}  ×${countOf(MULTI, k)}`);
 }
+/* ROUND BD RE-ANCHOR (old claim + new claim + reason):
+   OLD: the multi branch kept `swatchRow(null` and a standalone `delete
+   selected` pill — 12 controls under a merged 'Color · Delete' header.
+   NEW: ROUND BD redesigned the block (Harvey: "ugly"). The bulk swatch call
+   now passes the batch's SHARED key (so `swatchRow(` stays, the `null`
+   literal is gone), and the delete pill moved into a bottom Actions row as
+   the ONE destructive button (title-cased `Delete`, class `multi-danger`).
+   The controls' PRESENCE claim survives: every action pass 1 inventoried is
+   still in the branch, plus the new Arrange row. The full inventory contract
+   (counts, geometry, danger styling, live rects) is checks/round-bd-multi-panel.mjs. */
 assert('e.multi-select-branch-still-has-its-controls',
-  MULTI_KEEP.every(k => MULTI.includes(k)),
-  `${MULTI_KEEP.length}/${MULTI_KEEP.length} controls present: duplicate, delete, 6 align, 2 distribute, swatches, delete selected`);
+  MULTI_KEEP.every(k => MULTI.includes(k))
+    && countOf(MULTI, "reorderSelection('front')") === 1 && countOf(MULTI, "reorderSelection('back')") === 1,
+  `${MULTI_KEEP.length}/${MULTI_KEEP.length} controls present: duplicate, delete, 6 align, 2 distribute, ` +
+  'swatches (shared-key current) + ROUND BD\'s 2 Arrange calls');
 assert('e.multi-select-branch-was-not-restructured',
   MULTI_START > 0 && MULTI_END > MULTI_START
     && countOf(MULTI, 'data-section') === 0
@@ -1146,11 +1158,12 @@ assert('j.no-duplicate-or-delete-in-any-single-target-branch',
   'node / table / label branches carry no duplicate and no delete — §H.6 is a no-op here');
 assert('j.no-editing-gate-was-invented-for-it',
   !/isEditing/.test(APP) && !/data-editing/.test(APP) && countOf(APP, 'holdCommit') === 0
-    && countOf(APP, 'duplicateSelection') === 6 && countOf(APP, 'deleteSelection') === 4,
+    && countOf(APP, 'duplicateSelection') === 6 && countOf(APP, 'deleteSelection') === 3,
   'no `isEditing`/`data-editing` flag was added to App.tsx to hide controls that do not exist, and no '
-  + 'part of the hold leaked into the panel. The two handler names still appear exactly as often as '
-  + 'they did at the end of pass 1 (6 / 4 — their definitions and the multi-select call sites); the '
-  + 'assertion that matters is (j) above: ZERO of them inside any single-target branch');
+  + 'part of the hold leaked into the panel. ROUND BD re-anchor: deleteSelection 4 -> 3 because the '
+  + 'multi block carried the handler TWICE (a top delete pill + a bottom delete-selected pill); the '
+  + 'redesign leaves exactly ONE destructive button, so one call site died. duplicateSelection stays 6. '
+  + 'The assertion that matters is (j) above: ZERO of them inside any single-target branch');
 assert('j.control-the-multi-select-branch-is-untouched',
   MULTI.includes('duplicateSelection()') && MULTI.includes('deleteSelection')
     && countOf(MULTI, '<Section') === 0 && countOf(MULTI, 'renderSections()') === 0,

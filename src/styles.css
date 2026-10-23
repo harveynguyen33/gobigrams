@@ -2886,6 +2886,51 @@ kbd {
   color: var(--fg); padding: 2px 0 6px;
 }
 .multi-actions { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; }
+/* ===========================================================================
+   ROUND BD — THE MULTI BLOCK'S CONTROL KIT (Harvey: the block was "ugly";
+   defects were measured off his screenshot, item numbers below are his).
+
+   ONE ROW LANGUAGE, THREE COUNTS. Every control row in the block is
+   `.multi-actions` flex with `flex: 1 1 0` cells (the AA equal-width rule), so
+   a row of N buttons divides the field N ways with no per-count arithmetic —
+   the same zero-basis share `.insp-seg` uses. Two modifiers state only the
+   WRAP POINT, each with the same `calc((100% - <gaps>) / <cols>)` basis
+   `.insp-seg.grid3` / `.half` use:
+     · `multi-grid3`  — the align row: SIX icon buttons as a clean 3x2 grid
+       (defect 1: the old row wrapped 4+2 with mixed axes on one line). Icons
+       are the SAME lucide set at 15px the sel-bar uses for the same actions,
+       so the two surfaces speak one language (the sel-bar block in App.tsx is
+       the mapping's source of truth).
+     · `multi-grid2`  — distribute (defect 6: two small text buttons floating
+       in dead space) and the new Arrange row: two equal-width icon buttons.
+   DEFECT 5 — THE DANGER BUTTON NOW READS AT REST. `.mbtn.danger` only
+   recoloured on hover, so 'duplicate' and 'delete' were two identical neutral
+   pills until the pointer arrived. Destructive is a STATE, not a hover: the
+   block's Delete carries `multi-danger` — border + label in `--acc` at rest
+   (the danger token every theme defines), no recolour on hover to restate it.
+   `.mbtn.danger` keeps its weaker hover-only role for the table column's ×,
+   which sits inside a crowded row where a standing accent border would shout.
+   DEFECT 7 — LABELS: the icon rows are icon-only with `title` tooltips; the
+   word rows (Duplicate / Delete) are title-cased. One convention per shape,
+   asserted in checks/round-bd-multi-panel.mjs.
+   ONE GAP RHYTHM: sections separate by `.sec-label`'s own margins — the block
+   adds no second spacing value of its own. */
+.multi-grid3 { gap: 5px; } /* AQ: 5px stays - the AA segmented-row gap, coupled to the calc((100% - 10px)/3) basis below */
+.multi-grid3 .mbtn {
+  flex: 1 1 calc((100% - 10px) / 3); min-width: 0;
+  display: grid; place-items: center; padding: 6px 4px;
+}
+.multi-grid2 { gap: 5px; }
+.multi-grid2 .mbtn {
+  flex: 1 1 calc((100% - 5px) / 2); min-width: 0;
+  display: grid; place-items: center; padding: 6px 4px;
+}
+/* the icon rows' buttons carry an svg, not a word — one icon size, the
+   sel-bar's (AQ13's 15px), so the two surfaces' glyphs match */
+.multi-actions .mbtn svg { width: 15px; height: 15px; flex: none; }
+/* destructive at REST: standing accent border + label (see the ROUND BD note).
+   Declared AFTER `.mbtn`/`.mbtn:hover` (below) so the two-class selector wins
+   the cascade the same way `.swatches.insp-seg` beats `.swatches` (AA). */
 .mbtn {
   font-family: var(--mono); font-size: var(--fs-sm);
   background: var(--elevated); color: var(--fg);
@@ -2901,6 +2946,12 @@ kbd {
 .mbtn:disabled { opacity: .45; cursor: not-allowed; }
 .mbtn:disabled:hover { border-color: var(--border-strong); color: var(--fg); }
 .mbtn.danger:hover { border-color: var(--acc); color: var(--acc); }
+/* destructive at REST for the multi block's Delete — the hover-only `.danger`
+   above read as a neutral pill until the pointer arrived (ROUND BD defect 5).
+   Two classes beat `.mbtn` and `.mbtn:hover`, so the accent holds in both
+   states and the button never impersonates a neutral action. */
+.mbtn.multi-danger { border-color: var(--acc); color: var(--acc); }
+.mbtn.multi-danger:hover { border-color: var(--acc); color: var(--acc); }
 /* ---------- floating selection action bar ---------- */
 .sel-bar {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);

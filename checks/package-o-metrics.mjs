@@ -13,8 +13,10 @@
  * this popup overflow its anchor. Every modelled rule is quoted with its CSS
  * line so a reader can check the model against the sheet.
  */
-import {readFileSync, writeFileSync} from 'node:fs';
+import {readFileSync, writeFileSync, mkdtempSync, rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8').split('\n');
@@ -568,17 +570,33 @@ const queueFilterSpread = /QUEUE_ENABLED \|\| p\.label !== 'Queue'/.test(presets
 const queueInPalette = /label: 'Queue',/.test(readFileSync(`${ROOT}/src/palette.ts`, 'utf8'));
 /** The EXECUTED module, not the text: esbuild-bundle src/presets.ts the way
  *  checks/round-ad-flowchart.mjs does, so the flag's spread really evaluates
- *  and `LIBRARY` / the seed-facing palette are read as the app builds them. */
-const bundlePresets = () => {
-  const entry = `${ROOT}/.aoq-entry.ts`;
-  const out = `${ROOT}/.aoq-out.mjs`;
-  writeFileSync(entry, `export {LIBRARY, PRESETS} from './src/presets';\n`);
+ *  and `LIBRARY` / the seed-facing palette are read as the app builds them.
+ *  ROUND BD FIX — the scratch entry/bundle moved OUT of the repo root into a
+ *  tmpdir: the old `.aoq-entry.ts` / `.aoq-out.mjs` litter sat untracked in
+ *  the tree and goblin-verify's FM-02 resolved `src/colors.ts`'s feature-map
+ *  token against the untracked bundle, going RED on every run after a sweep
+ *  regenerated it. Same probe, same esbuild flags — only the write location
+ *  moved (the house style every other bundling harness uses). */
+const bundlePresets = async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'aoq-'));
+  const entry = join(tmp, 'entry.ts');
+  const out = join(tmp, 'out.mjs');
+  writeFileSync(entry, `export {LIBRARY, PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`);
   const bundled = execFileSync(`${ROOT}/node_modules/.bin/esbuild`,
     [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
       '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],
-    {encoding: 'utf8'});
+    {encoding: 'utf8', cwd: ROOT});
   writeFileSync(out, bundled);
-  return import(`${out}?t=${Date.now()}`);
+  /* Import through a path INSIDE the repo: node resolves the externals
+     (@xyflow/react etc.) against node_modules relative to the importing file,
+     and a bare-tmpdir out.mjs has no node_modules ancestor. (2026-10-23.) */
+  const inRepoOut = join(ROOT, '.aoq-out.mjs');
+  writeFileSync(inRepoOut, bundled);
+  try {
+    return await import(`${inRepoOut}?t=${Date.now()}`);
+  } finally {
+    rmSync(inRepoOut, {force: true});
+  }
 };
 const executedPresets = await bundlePresets();
 const archPalette = executedPresets.PRESETS.architecture.palette;

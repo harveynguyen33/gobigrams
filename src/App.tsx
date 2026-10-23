@@ -16,6 +16,7 @@ import {
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
+  BringToFront, SendToBack,
   PanelLeftClose, PanelRightClose, Eye,
   LayoutTemplate,
   Settings as SettingsIcon,
@@ -3882,6 +3883,46 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     onEdgesChange(changes);
   }, [onEdgesChange, noteRemove]);
 
+/* ROUND BD, ITEM 1 — THE Z-ORDER PRIMITIVES. The app had NONE: a grep for
+   zIndex / bringToFront / sendToBack across src/ found only React Flow's own
+   internals, and draw order is simply the array order of `nodes`. So ordering
+   is now written the only way the controlled `nodes` array offers — a `zIndex`
+   field on each node, written through `setNodes` behind ONE `pushHistory()`,
+   the same discipline as `align`/`distribute` above (undo restores the exact
+   pre-click array; a second undo changes nothing).
+
+   WHY MAX, NOT MAX+1. Nudging past the live maximum leaves every future
+   re-order to keep climbing; normalising onto [max-N+1 .. max] keeps the
+   numbers bounded forever. Equal values keep the relative array order, so a
+   group brought forward stays internally ordered — Figma semantics.
+
+   THE READBACK ALSO REORDERS THE ARRAY. A `zIndex` alone repaints correctly
+   (React Flow sorts by zIndex internally), but `snapshot()` history and any
+   future array-order reader would disagree with what is on screen. Sorting the
+   written array by the new zIndex makes the array the truth, once.
+
+   HONEST SCOPE NOTE (flagged, not hidden): only top-level siblings race here —
+   a parent group always paints above a node outside it in React Flow, and
+   these writes do not change that. Matches `align`/`distribute`, which also
+   treat the selection as one plane. */
+const reorderSelection = useCallback((to: 'front' | 'back') => {
+  const selNodes = nodesRef.current.filter(n => n.selected);
+  if (selNodes.length < 2) return;
+  pushHistory();
+  setNodes(ns => {
+    const zs = ns.map(n => n.zIndex ?? 0);
+    const bound = to === 'front' ? Math.max(...zs) : Math.min(...zs);
+    // top of the selection lands ON the current extreme; the rest stack below/
+    // above it in one contiguous band, so two clicks can never drift unbounded
+    const band = new Map<string, number>();
+    selNodes.forEach((n, i) => band.set(n.id, to === 'front' ? bound - (selNodes.length - 1 - i) : bound + i));
+    return ns
+      .map(n => band.has(n.id) ? {...n, zIndex: band.get(n.id)} : n)
+      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+  });
+}, [pushHistory, setNodes]);
+
+
   // ---- align / distribute ----
   /* AQ11 — BOTH functions now work in ABSOLUTE coordinates. The old versions
      read `n.position` directly, which is PARENT-RELATIVE for a group child: one
@@ -5103,6 +5144,16 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *  and `.insp-seg` are the same element there, so sharing the name would move
    *  the font row's gap. Measured in the `.swatches.swatch6` block in
    *  `src/styles.css`.
+   *
+   *  ROUND BD — THE BULK ROW'S CURRENT IS THE SHARED KEY, NOT A CONSTANT NULL.
+   *  The old call passed a literal `null`, so all eleven cells always painted
+   *  ringless — an all-off state on a control the user has demonstrably used
+   *  (measured defect 8 of the old block). The single-node Style section lights
+   *  the cell whose key is in force (`swatchRow(resolveColorKey(...), ...)`),
+   *  and the bulk row now asks the SAME question of the batch: when every
+   *  selected node resolves to the SAME key, that key lights — exactly the
+   *  single-node contract. A mixed batch resolves to `null` (all off), which is
+   *  honest: no ring may claim one colour for eleven nodes that disagree.
    *
    *  ROUND AO, AO-1a — SIX COLUMNS, NOT THREE. AG2 shipped `swatch3` and the
    *  three columns made every colour cell 80 x 26: a slab ("các ô nên nhỏ lại
@@ -7114,47 +7165,95 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             </>
           ) : selCount >= 2 ? (
             <>
-              {/* C2: multi-select summary — never a single node's fields */}
+              {/* C2: multi-select summary — never a single node's fields.
+
+                  ROUND BD — THE BLOCK REDESIGNED (Harvey: "ugly"; defects were
+                  measured off his screenshot). What changed and why:
+
+                  (2) 'Color · Delete' SPLIT. Two unrelated concepts under one
+                  header made the delete pill under the swatches read as
+                  colour-related. Delete is now its own block at the BOTTOM —
+                  destructive actions live apart from constructive ones, one
+                  button only (the swatches' own duplicate pill up top is gone).
+
+                  (B/DUPLICATE) Duplicate STAYS in the panel rather than moving
+                  to the sel-bar. The sel-bar already carries it, but the bar is
+                  the quick-gesture set while the panel is the inventory of
+                  bulk actions — dropping the panel's copy would leave the
+                  inventory destroy-only and hide a legitimate bulk action. The
+                  pairing is now deliberate: exactly ONE neutral button and ONE
+                  destructive button, side by side, the destructive one styled
+                  apart (below).
+
+                  (5) DESTRUCTIVE DIFFERENTIATED. `.mbtn.danger` only recoloured
+                  on HOVER — at rest it was identical to `.mbtn` (measured
+                  defect). The block-level `.multi-danger` now paints the
+                  danger at REST (border + text in the accent), matching the
+                  destructive styling Figma/draw.io use, and stays hover-recolour
+                  free. `.mbtn.danger` keeps its hover role elsewhere.
+
+                  (7) LABELS TITLE-CASED (one convention for this block; the
+                  icon buttons are icon-only with `title` tooltips — the pick
+                  is recorded in the harness).
+
+                  (3)+(4) BOTH 'Move with arrow keys' hints DELETED — the same
+                  keyboard fact appeared twice in one block; the shortcut lives
+                  on the `?` sheet, which is where hints belong (the sidebar
+                  hint block was deleted for the same reason, see the note at
+                  the sidebar's tail).
+
+                  (A) ALIGN AS A 3x2 ICON GRID. Same lucide icons, same
+                  icon→action mapping as the sel-bar (App.tsx `sel-bar` block):
+                  the two surfaces must agree — one gesture vocabulary, two
+                  places. `flex: 1 1 0` equal widths (the AA rule). Distribute
+                  is TWO equal icon buttons in one row. Arrange (new) gets the
+                  same row shape.
+
+                  (8) SWATCH GRID EQUAL COLUMNS via the shared `.swatches
+                  .swatch6` control — cells equalise for free, and the ring
+                  semantics now match the single-node Style section (see the
+                  ROUND BD note at `swatchRow`). */}
               <div className="multi-head">{selCount} nodes selected</div>
-              <div className="multi-actions">
-                <button className="mbtn" onClick={() => duplicateSelection()}>duplicate</button>
-                <button className="mbtn danger" onClick={deleteSelection}>delete</button>
-              </div>
-              <div className="hint" style={{paddingTop: 2}}>
-                Move with arrow keys — 1px, <kbd>Shift</kbd>+arrow 10px.
-              </div>
               <div className="sec-label">Align</div>
-              <div className="multi-actions">
-                <button className="mbtn" title="Align left" onClick={() => align('left')}>left</button>
-                <button className="mbtn" title="Align horizontal centers" onClick={() => align('hcenter')}>center</button>
-                <button className="mbtn" title="Align right" onClick={() => align('right')}>right</button>
-                <button className="mbtn" title="Align top" onClick={() => align('top')}>top</button>
-                <button className="mbtn" title="Align vertical middles" onClick={() => align('vcenter')}>middle</button>
-                <button className="mbtn" title="Align bottom" onClick={() => align('bottom')}>bottom</button>
+              <div className="multi-actions multi-grid3">
+                <button className="mbtn" title="Align left edges" aria-label="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button>
+                <button className="mbtn" title="Align horizontal centers" aria-label="Align horizontal centers" onClick={() => align('hcenter')}><AlignCenterVertical size={15} /></button>
+                <button className="mbtn" title="Align right edges" aria-label="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button>
+                <button className="mbtn" title="Align top edges" aria-label="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button>
+                <button className="mbtn" title="Align vertical middles" aria-label="Align vertical middles" onClick={() => align('vcenter')}><AlignCenterHorizontal size={15} /></button>
+                <button className="mbtn" title="Align bottom edges" aria-label="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button>
               </div>
               <div className="sec-label">Distribute</div>
-              <div className="multi-actions">
-                <button className="mbtn" title="Distribute horizontally" onClick={() => distribute('h')}>horizontal</button>
-                <button className="mbtn" title="Distribute vertically" onClick={() => distribute('v')}>vertical</button>
+              <div className="multi-actions multi-grid2">
+                <button className="mbtn" title="Distribute horizontally" aria-label="Distribute horizontally" onClick={() => distribute('h')}><AlignHorizontalSpaceAround size={15} /></button>
+                <button className="mbtn" title="Distribute vertically" aria-label="Distribute vertically" onClick={() => distribute('v')}><AlignVerticalSpaceAround size={15} /></button>
               </div>
-              <div className="sec-label">Color · Delete</div>
+              <div className="sec-label">Arrange</div>
+              <div className="multi-actions multi-grid2">
+                <button className="mbtn" title="Bring to front" aria-label="Bring to front" onClick={() => reorderSelection('front')}><BringToFront size={15} /></button>
+                <button className="mbtn" title="Send to back" aria-label="Send to back" onClick={() => reorderSelection('back')}><SendToBack size={15} /></button>
+              </div>
+              <div className="sec-label">Color</div>
               <div className="field">
-                {swatchRow(null, k => {
-                  pushHistory();
-                  const ids = new Set(nodes.filter(n => n.selected).map(n => n.id));
-                  setNodes(ns => ns.map(n => ids.has(n.id)
-                    ? {...n, data: {...(n.data as any), colorKey: k, color: undefined}}
-                    : n));
-                })}
+                {(() => {
+                  /* the batch's SHARED key, or null when the batch disagrees —
+                     see the ROUND BD note at `swatchRow` above */
+                  const keys = nodes.filter(n => n.selected).map(n => resolveColorKey(n.data as any));
+                  const shared = keys.length && keys.every(k => k === keys[0]) ? keys[0] : null;
+                  return swatchRow(shared, k => {
+                    pushHistory();
+                    const ids = new Set(nodes.filter(n => n.selected).map(n => n.id));
+                    setNodes(ns => ns.map(n => ids.has(n.id)
+                      ? {...n, data: {...(n.data as any), colorKey: k, color: undefined}}
+                      : n));
+                  });
+                })()}
               </div>
-              <button
-                className="mbtn danger"
-                title="Delete selected nodes"
-                onClick={deleteSelection}
-              >
-                delete selected
-              </button>
-              <div className="hint">Bulk actions apply to all {selCount} selected nodes. Move with arrow keys — 1px, Shift+arrow 10px.</div>
+              <div className="sec-label">Actions</div>
+              <div className="multi-actions">
+                <button className="mbtn" onClick={() => duplicateSelection()}>Duplicate</button>
+                <button className="mbtn multi-danger" title="Delete selected nodes" onClick={deleteSelection}>Delete</button>
+              </div>
             </>
           ) : selected?.type === 'table' ? (
             <>
