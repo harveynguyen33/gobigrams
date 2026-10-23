@@ -168,8 +168,6 @@ if (HAS_F) {
     MOD.SYMBOL_FLOOR_PX === 2 * MOD.SHAPE_MIN_PX && MOD.SHAPE_MIN_PX === 32,
     `SYMBOL_FLOOR_PX ${MOD.SYMBOL_FLOOR_PX} === 2 * SHAPE_MIN_PX (${MOD.SHAPE_MIN_PX}) — anchored to the real import, can never drift`);
 
-  const qSrc = /export function resizeFloorsFor\([\s\S]{0,600}?^}/m.exec(NODE)?.[0] ?? '';
-  void qSrc;
   assert('bf2.ac5.single-call-site-in-component',
     /const floors = resizeFloorsFor\(/.test(NODE)
       && /minWidth=\{floors\.w\}/.test(NODE) && /minHeight=\{floors\.h\}/.test(NODE),

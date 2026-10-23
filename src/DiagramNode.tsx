@@ -352,8 +352,6 @@ const Node = memo(({id, data, selected}: NodeProps) => {
        (naturalWRef.current === 0 → floor 200); the height axis keeps the
        AQ19c semantics (measured only while the wrapper has no explicit
        height, so a reloaded node floors at the class 141). */
-    const kids = [...body.children].filter(c => (c as HTMLElement).offsetParent !== null);
-    void kids;
     /* width: the content's natural single-line width + horizontal insets,
        exactly the AQ16 probe — set, read, restore, never leave it behind. */
     const prevW = body.style.width;
