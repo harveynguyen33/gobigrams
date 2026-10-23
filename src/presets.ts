@@ -61,6 +61,31 @@ export const C4_ENABLED = false;
    Flip to `true` to put Actor back — the flag is the entire switch. */
 export const ACTOR_ENABLED = false;
 
+/* HARVEY 2026-10-22 — four more create-surface hides, SAME pattern
+   (ACTOR/QUEUE/C4/SEQUENCE). One flag each; items stay in the tree, only the
+   OFFER is gated:
+     · STORAGE_ENABLED — the bucket shape in Data & storage (Harvey: "xoá
+       Storage trong Data & Storage").
+     · ERD_ENABLED — BOTH entities items (Table + Note (enum)); with both off
+       the `entities` category section renders empty and disappears
+       (groupByCategory drops empty groups), and the ERD preset loses its
+       palette offer. `libraryFor('erd')` reads LIBRARY, so it returns [] —
+       acceptable: the ERD preset is template-seeded, and a stored erd board
+       keeps its nodes (shape rendering never consults this flag).
+       HARVEY 2026-10-23 — the ERD preset itself stays in PRESETS (a stored
+       erd board must still open as ERD); only its palette offer is gated.
+     · LANE_ENABLED — the swimlane; Harvey: Group and Lane are near-duplicates
+       (both shape 'group', both a dashed boundary; Lane only adds a 420×200
+       default size + swimlane aliases), so Lane goes, Group stays.
+     · NOTE_ENABLED — the shared plain-text Note (annotations category).
+       `withNoteLast` and the flowchart/c4 tail-hoist no-op when the item is
+       not in LIBRARY (the filter finds nothing, nothing is appended).
+   Flip any to `true` to put the shape back — the flag is the entire switch. */
+export const STORAGE_ENABLED = false;
+export const ERD_ENABLED = false;
+export const LANE_ENABLED = false;
+export const NOTE_ENABLED = false;
+
 /* HARVEY 2026-10-22 — Queue hidden the SAME way (deck item A, mirroring
    C4_ENABLED / SEQUENCE_ENABLED): one flag drops it from every CREATE surface —
    the left panel's library sections, the omnibox search and the insert modal,
@@ -928,12 +953,18 @@ export const LIBRARY: PaletteItem[] = [
   //     QUEUE_ENABLED (2026-10-22) — Queue drops out of the CREATE-SURFACE
   //     library HERE; the seed-facing preset palette keeps it (see
   //     `libraryFor`'s architecture branch and the flag's comment above).
+  //     STORAGE / NOTE (2026-10-22) — same hide, same reasoning.
   ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue')
-            .filter(p => ACTOR_ENABLED || p.label !== 'Actor'),
+            .filter(p => ACTOR_ENABLED || p.label !== 'Actor')
+            .filter(p => STORAGE_ENABLED || p.label !== 'Storage')
+            .filter(p => NOTE_ENABLED || p.label !== 'Note'),
   // 2 — the flowchart's own elements (10): Terminal … On-page connector.
+  //     LANE_ENABLED (2026-10-22) — the Lane piece is its own filter below.
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note'),
   // 3 — `Lane` (groups).
-  ...FLOWCHART_PALETTE.filter(p => p.label === 'Lane'),
+  //     LANE_ENABLED (2026-10-22) — Harvey: Lane duplicates Group (same shape,
+  //     same dashed boundary); gated out of the create surface.
+  ...(LANE_ENABLED ? FLOWCHART_PALETTE.filter(p => p.label === 'Lane') : []),
   // 4 — the C4 elements (11), in C4_TYPES order.
   //     C4_ENABLED (2026-10-22, HARVEY follow-up: "C4 shapes/group vẫn còn
   //     hiện") — the first cut kept the items in LIBRARY so `libraryFor('c4')`
@@ -946,8 +977,9 @@ export const LIBRARY: PaletteItem[] = [
   // 4b — PACKAGE-SEQ: the UML sequence pieces (HIDDEN — see SEQUENCE_ENABLED).
   ...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : []),
   // 5 — the ERD entities.
-  TABLE_PALETTE_ITEM,
-  ERD_ENUM_NOTE_ITEM,
+  //     ERD_ENABLED (2026-10-22) — both items gated; `entities` section
+  //     disappears when empty (groupByCategory drops empty groups).
+  ...(ERD_ENABLED ? [TABLE_PALETTE_ITEM, ERD_ENUM_NOTE_ITEM] : []),
 ];
 
 /* §2.7 — the Mixed (`custom`) set is its OWN selector, NOT a `types[]` filter
@@ -958,8 +990,14 @@ export const LIBRARY: PaletteItem[] = [
    `custom` preset's palette is a CREATE surface. */
 const MIXED_LABELS = new Set<string>([
   ...PALETTE.filter(p => QUEUE_ENABLED || p.label !== 'Queue')
-            .filter(p => ACTOR_ENABLED || p.label !== 'Actor').map(p => p.label),
+            .filter(p => ACTOR_ENABLED || p.label !== 'Actor')
+            .filter(p => STORAGE_ENABLED || p.label !== 'Storage')
+            .filter(p => NOTE_ENABLED || p.label !== 'Note').map(p => p.label),
+  // LANE_ENABLED / NOTE_ENABLED (2026-10-22) — the flowchart slice already
+  // excludes Lane and Note textually; the Lane piece is the ONLY Lane source,
+  // so gate it here (Mixed is a CREATE surface).
   ...FLOWCHART_PALETTE.filter(p => p.label !== 'Lane' && p.label !== 'Note').map(p => p.label),
+  ...(LANE_ENABLED ? FLOWCHART_PALETTE.filter(p => p.label === 'Lane').map(p => p.label) : []),
   // C4_ENABLED (2026-10-22) — gated with the LIBRARY spread above: the Mixed
   // set is a CREATE surface, so hidden C4 items must not re-enter through it.
   ...(C4_ENABLED ? C4_PALETTE_ITEMS.slice(0, 6).map(p => p.label) : []),
@@ -988,9 +1026,12 @@ const LIBRARY_FULL: PaletteItem[] = [
 
 /** The ONE shared `Note` moved to the tail — the position the old flowchart and
  *  C4 lists both gave it (they appended it last; the architecture list has it
- *  second-to-last, which is why ONE flat library order cannot serve all five). */
+ *  second-to-last, which is why ONE flat library order cannot serve all five).
+ *  NOTE_ENABLED (2026-10-22) — when the Note is hidden from the create surface,
+ *  the hoist no-ops: the filter drops every row, and the append is gated so
+ *  the hidden item cannot re-enter through the tail. */
 const withNoteLast = (items: PaletteItem[]): PaletteItem[] =>
-  [...items.filter(p => p.label !== 'Note'), NOTE_ITEM];
+  [...items.filter(p => p.label !== 'Note'), ...(NOTE_ENABLED ? [NOTE_ITEM] : [])];
 
 /** The ONE selector. The four real types are `types[]` FILTERS over LIBRARY
  *  (§2.6); `custom` is the curated Mixed set (§2.7). `flowchart` and `c4`

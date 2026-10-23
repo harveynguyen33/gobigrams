@@ -24,7 +24,14 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 921108
+ratchet.ceiling: 921183
+# RAISED 2026-10-23 (four create-surface hides), measured: 921183 (+75, +0.008%).
+# Reason: STORAGE_ENABLED / ERD_ENABLED / LANE_ENABLED / NOTE_ENABLED — the four
+# Harvey hides (Storage; Table+Note(enum); Lane; Note) added filter chains in
+# LIBRARY + MIXED_LABELS + the gated withNoteLast hoist in src/presets.ts, and
+# the round-aa library floor re-anchor (34→27→22) is a harness, not shipped.
+# Harvey approved raises in chat for this round's pattern. Gates green at the
+# measurement: tsc 0, vite build 0, goblin-verify 22/0/5, sweep 67/0.
 # RAISED 2026-10-22 (config round fixes), measured: 921108 (+12, +0.0013%).
 # Reason: the ACTOR_ENABLED hide (Harvey corrected "Action" -> "Actor") added a
 # second filter chain in LIBRARY + MIXED_LABELS in src/presets.ts, and the
