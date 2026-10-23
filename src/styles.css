@@ -1059,6 +1059,14 @@ body {
   position: absolute; inset: 0; width: 100%; height: 100%;
   overflow: visible; pointer-events: none;
 }
+/* ROUND BE (2026-10-23) — the connector's frame is SQUARE (its own 0 0 100 100
+   viewBox; a 2:1 stretch would paint the circle as an ellipse), so the square
+   node box must stay square: the goblin card's shared geometry (`.node`'s
+   190px content floor and `.node-body`'s horizontal inset) is for TEXT and
+   must not size this shape. The label-only body keeps its OWN inset for the
+   text — only the frame geometry is squared. */
+.node.shape-connector { min-width: 0; }
+.node.shape-connector > .node-body { padding: 14px 0; }
 /* selection = crisp blue ring, visible on any node colour (incl. orange).
    F: `outline` is gone. `outline-radius` is not supported here, so the ring was
    ALWAYS a sharp rectangle and this rule's `border-radius` never applied to it.
