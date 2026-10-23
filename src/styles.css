@@ -1159,7 +1159,11 @@ body {
 /* ---------- custom-shape node (PACKAGE-N §8, imported SVG artwork) ----------
    The user's SVG IS the artwork: no app frame is painted behind it, and the
    <img> fills the node on both axes so `object-fit: contain` letterboxes a
-   non-matching aspect ratio instead of distorting it. Tokens only. */
+   non-matching aspect ratio instead of distorting it. Tokens only.
+   ROUND BE (2026-10-23) — PADDING DROPPED (was 4px). The padding shrank the
+   <img> inside the node box, so the artwork pulled in from the very edges
+   NodeResizer measures: the grips sat off the art by exactly that 4px per
+   side PLUS the import quantise drift. The box is now the art's box. */
 .custom-shape-node {
   position: relative;
   width: 100%;
@@ -1167,7 +1171,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
 }
 .custom-shape-node.selected {
   outline: none;

@@ -31,7 +31,7 @@
  */
 import {memo} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
-import {svgDataUri, SHAPE_MIN_PX, SHAPE_MAX_PX} from './customShape';
+import {svgDataUri, SHAPE_MIN_PX} from './customShape';
 import type {ColorKey} from './colors';
 
 export type CustomShapeKind = {
@@ -46,18 +46,21 @@ const CustomShapeNode = memo(({data, selected}: NodeProps) => {
   return (
     <div className={`custom-shape-node${selected ? ' selected' : ''}`} data-shape-title={d.title}>
       {selected && (
-        /* §8.3 — the same clamps the import path enforces, applied again to
-           the live resize: a 32 px floor and a 512 px ceiling on BOTH axes.
-           AUDIT-15 correction: the resizer carries NO aspect lock — the node box
-           can take any ratio. The artwork itself cannot distort (the <img>
-           below is object-fit: contain, so it letterboxes inside the box), but
-           a reader trusting the old "aspect:'fixed'" comment would not have
-           re-verified that. */
+        /* §8.3 — the live resize carries the same 32px floor the import path
+           enforces, and NO ceiling: ROUND BE (2026-10-23, Harvey: resize
+           should behave like normal shapes) removed maxWidth/maxHeight so the
+           custom kind matches DiagramNode / LabelNode, whose NodeResizer
+           mounts without a cap. The 512 import window stays only in the
+           IMPORT path's clampShapeSize (customShape.ts) as a sanity default
+           for the freshly dropped box — it is not a live bound any more, and
+           this file must not reference it (asserted by round-5 7d). AUDIT-15
+           correction still holds: the resizer carries NO aspect lock — the
+           node box can take any ratio. The artwork itself cannot distort
+           (the <img> below is object-fit: contain, so it letterboxes inside
+           the box). */
         <NodeResizer
           minWidth={SHAPE_MIN_PX}
           minHeight={SHAPE_MIN_PX}
-          maxWidth={SHAPE_MAX_PX}
-          maxHeight={SHAPE_MAX_PX}
           lineClassName="resize-line"
           handleClassName="resize-handle"
         />

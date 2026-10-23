@@ -29,10 +29,17 @@ import {type ColorKey, isColorKey} from './colors';
    against an explicit `gridSize`, never against a hard-coded 16.
 --------------------------------------------------------------------------- */
 export const SHAPE_MIN_PX = 32;      // smallest legible box; ≈2 grid units at pitch 16
-export const SHAPE_MAX_PX = 512;     // ≈4× the largest default container (group 320×200)
+export const SHAPE_MAX_PX = 512;     // IMPORT window only — see ROUND BE note below
 export const SHAPE_MIN_UNITS = 2;    // grid units, so it stays ≥32 at pitch 8
 export const SHAPE_MAX_UNITS = 32;   // grid units, so it stays ≤512 at pitch 64
-export const SHAPE_DEFAULT_PX = 64;  // the default box's long edge, before quantising
+/* ROUND BE (2026-10-23, Harvey: "rất nhỏ khó nhìn so với default") — the
+   default box's long edge, raised 64 → 200. 200 is the flowchart palette's
+   long edge (290) minus a step, so an import lands at a legible size next to
+   the built-ins instead of a 64px speck. This is the IMPORT DEFAULT only: the
+   live NodeResizer has NO ceiling since this round (parity with every goblin
+   node — DiagramNode mounts its resizer without maxWidth/maxHeight), so a
+   drag can take a custom shape well past 512 exactly like any other shape. */
+export const SHAPE_DEFAULT_PX = 200; // the default box's long edge, before quantising
 export const SHAPE_MAX_INPUT_BYTES = 512 * 1024;  // 512 KiB, checked BEFORE parsing
 
 /** The default grid pitch when a caller cannot supply one (Settings.tsx default). */

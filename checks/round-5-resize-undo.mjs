@@ -517,10 +517,22 @@ check('7c. the label node still resizes with its own floors (it shares this path
   assert.match(LABEL, /minHeight=\{48\}/, 'the label floor moved');
 });
 
-check('7d. the custom-shape resizer still carries all four clamps', () => {
-  for (const prop of ['minWidth={SHAPE_MIN_PX}', 'minHeight={SHAPE_MIN_PX}', 'maxWidth={SHAPE_MAX_PX}', 'maxHeight={SHAPE_MAX_PX}']) {
+check('7d. the custom-shape resizer floors, and carries NO ceiling', () => {
+  /* RE-ANCHORED (ROUND BE, 2026-10-23): OLD claim — the custom resizer carried
+     all four clamps (min AND maxWidth/maxHeight = SHAPE_MAX_PX 512). NEW claim
+     — only the 32px floors: DiagramNode's resizer has no ceiling either, and
+     Harvey asked for resize parity ("resize should behave like normal
+     shapes"), so the 512 cap left the live resizer. SHAPE_MAX_PX survives
+     ONLY inside the import path's clampShapeSize window (customShape.ts) —
+     it must NOT be imported by CustomShapeNode.tsx any more, or a cap can
+     creep back in through the side door. */
+  for (const prop of ['minWidth={SHAPE_MIN_PX}', 'minHeight={SHAPE_MIN_PX}']) {
     assert.ok(CUSTOM.includes(prop), `the custom-shape resizer lost ${prop}`);
   }
+  for (const gone of ['maxWidth={SHAPE_MAX_PX}', 'maxHeight={SHAPE_MAX_PX}']) {
+    assert.ok(!CUSTOM.includes(gone), `the custom-shape resizer still carries ${gone} — the live cap was removed in ROUND BE`);
+  }
+  assert.ok(!/SHAPE_MAX_PX/.test(CUSTOM), 'CustomShapeNode.tsx still references SHAPE_MAX_PX — the import-window clamp must stay in customShape.ts only');
 });
 
 check('7e. the removal guard is untouched', () => {

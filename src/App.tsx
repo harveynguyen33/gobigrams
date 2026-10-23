@@ -3676,7 +3676,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       position: p,
       selected: false,
       // §8.3 — the size came from `clampShapeSize` at import, so it is already
-      // quantised and inside 32–512; the resizer holds the same window live.
+      // quantised and inside 32–512; since ROUND BE (2026-10-23) the live
+      // resizer carries only the 32px floor — no ceiling, like every goblin node.
       style: {width: shape.w, height: shape.h},
       data: {svg: shape.data, viewBox: shape.viewBox, title: shape.title, colorKey: shape.colorKey},
     } as Node]);
@@ -6065,8 +6066,15 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
                   // exact string back to the entry it already holds.
                   onDragStart={e => e.dataTransfer.setData('customshape', s.data)}
                   onDoubleClick={() => insertCustomShape(s)}
-                  title={`Add “${s.title}” to the canvas — click, double-click or drag`}
-                  onClick={() => insertCustomShape(s)}
+                  /* ROUND BE (2026-10-23, Harvey: a single click must NOT
+                     insert — parity with the palette). The onClick here used to
+                     insert immediately, which the palette rows
+                     (`renderPaletteRow`: drag or double-click, no onClick) and
+                     the canvas both punish — one stray click littered the
+                     board. This tile now follows the PALETTE convention, not
+                     the favourites' (which are click-to-insert by design, and
+                     stay so). Double-click and drag still work unchanged. */
+                  title={`Drag onto the canvas or double-click to add “${s.title}”`}
                 >
                   <span className="fav-glyph" aria-hidden="true">
                     <img src={svgDataUri(s.data)} alt="" className="cust-art" />
