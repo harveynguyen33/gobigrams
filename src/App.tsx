@@ -3910,25 +3910,32 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
   if (selNodes.length < 2) return;
   pushHistory();
   setNodes(ns => {
-    /* BUGFIX (2026-10-23, HARVEY: "bring to front/back không thấy work") —
-       RF12 'basic' zIndexMode paints EVERY selected node at rawZ + 1000, so a
-       band written onto the selected nodes moved as ONE GROUP: the relative
-       order inside the selection never changed (front was invisible) and the
-       'back' band (0,1,2) painted ABOVE unselected z=0 nodes — inverted.
-       FIX: clear `selected` in the same write that paints. The array sort is
-       the durable order; with selection cleared (the panel close follows), the
-       raw zIndex bands alone decide paint, exactly as the bands intend. */
+    /* BUGFIX 2 (2026-10-23, HARVEY: "vẫn không thay đổi") — the first cut
+       banded the selection in ARRAY order, but the array order is the
+       document's INSERT order: within the selection, who paints on top never
+       changed, so two overlapping marquee-selected nodes could never flip.
+       Design-tool semantics (Figma/draw.io): the reorder pivots on the node
+       the user clicked LAST. `sel` holds exactly that id (onSelectionChange
+       stores s[0], and RF puts the last-clicked node first). That node gets
+       the extreme of the band; the rest of the selection stacks beneath it in
+       array order, so a click on the under-node + Send to back really does
+       drop it to the bottom, and Bring to front really does lift it. */
     const zs = ns.map(n => n.zIndex ?? 0);
     const bound = to === 'front' ? Math.max(...zs) : Math.min(...zs);
-    // top of the selection lands ON the current extreme; the rest stack below/
-    // above it in one contiguous band, so two clicks can never drift unbounded
+    const pivot = sel ? selNodes.findIndex(n => n.id === sel) : -1;
+    // pivot first (it takes the extreme), then the remaining selection in order
+    const ordered = pivot >= 0
+      ? [selNodes[pivot], ...selNodes.filter((_, i) => i !== pivot)]
+      : selNodes;
     const band = new Map<string, number>();
-    selNodes.forEach((n, i) => band.set(n.id, to === 'front' ? bound - (selNodes.length - 1 - i) : bound + i));
+    ordered.forEach((n, i) => band.set(n.id, to === 'front'
+      ? bound - i                          // pivot lands ON the extreme (top)
+      : bound + i));                        // pivot lands ON the extreme (bottom)
     return ns
       .map(n => band.has(n.id) ? {...n, zIndex: band.get(n.id), selected: false} : n)
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
   });
-}, [pushHistory, setNodes]);
+}, [pushHistory, setNodes, sel]);
 
 
   // ---- align / distribute ----

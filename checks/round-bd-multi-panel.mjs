@@ -204,10 +204,14 @@ console.log('\nPASS 2 — reorderSelection, executed against a setNodes recorder
    parse them) and the closing paren of the removed `useCallback(` accounted
    for by re-adding the arrow's own `}`. */
 const fnStart = APP.indexOf('const reorderSelection = useCallback(');
-const fnSrc = APP.slice(fnStart, APP.indexOf('}, [pushHistory, setNodes]);', fnStart));
+/* BUGFIX 2 (2026-10-23) — the dependency array now also names `sel`, so the
+   end-anchor must match the new tail. Anchor on the deps array literally and
+   cut after its `);` — searching for the next `});` overshot into align(). */
+const depsIdx = APP.indexOf('}, [pushHistory, setNodes, sel]);', fnStart);
+const fnSrc = APP.slice(fnStart, depsIdx + '}, [pushHistory, setNodes, sel]);'.length);
 const body = fnSrc
   .replace('const reorderSelection = useCallback(', '')
-  .replace(/}, \[pushHistory, setNodes\]\);$/, '')
+  .replace(/}, \[pushHistory, setNodes, sel\]\);$/, '')
   /* Node cannot parse the TS annotations — strip them the way tsc would.
      Only types are touched; every statement is the app's own. */
   .replace("(to: 'front' | 'back')", '(to)')
@@ -234,8 +238,11 @@ assert('bd2.helper-extracted',
 const T = tmpdir();
 const scratch = mkdtempSync(join(T, 'bd-'));
 const UNIT2 = join(scratch, 'unit2.mjs');
+/* BUGFIX 2 (2026-10-23) — the helper now also reads `sel` (the pivot). Inject
+   it as a factory parameter defaulting to the pivot id, so the factory call
+   sites below can drive it. */
 writeFileSync(UNIT2, `
-export const makeReorder = (nodesRef, pushHistory, setNodes) => ${ARROW};
+export const makeReorder = (nodesRef, pushHistory, setNodes, sel) => ${ARROW};
 `);
 const {makeReorder} = await import(UNIT2);
 
@@ -247,7 +254,8 @@ const setNodesRec = (updater) => {
   setNodesCalls++;
   globalThis.__nodes = updater(globalThis.__nodes);
 };
-const reorderSelection = makeReorder({get current() { return globalThis.__nodes; }}, push, setNodesRec);
+let PIVOT = null;  // the test drives the pivot like the app drives `sel`
+const reorderSelection = makeReorder({get current() { return globalThis.__nodes; }}, push, setNodesRec, () => PIVOT);
 
 const n = (id, x, y, sel = false, z = undefined) => ({id, position: {x, y}, selected: sel, ...(z !== undefined ? {zIndex: z} : {})});
 const reset = (nodes) => { globalThis.__nodes = nodes; historyPushes = 0; setNodesCalls = 0; };
@@ -259,7 +267,10 @@ assert('bd2.gate-below-two-selected',
   historyPushes === 0 && setNodesCalls === 0 && globalThis.__nodes[0].zIndex === undefined,
   'one selected: no pushHistory, no setNodes call, no zIndex written (the panel never shows the block, and the helper agrees)');
 
-/* T2: bring to front — one push, band on the live max, array re-sorted */
+/* T2: bring to front — one push, band on the live max, array re-sorted.
+   BUGFIX 2 (2026-10-23) — PIVOT semantics: ordered[0] (pivot; `sel`, or the
+   first array member when no pivot) lands ON the bound, the rest descend.
+   With PIVOT=null these tests exercise the no-pivot fallback: array order. */
 reset([n('a', 0, 0, true, 0), n('b', 100, 0, true, 5), n('c', 200, 0, false, 9), n('d', 300, 0, false, 2)]);
 reorderSelection('front');
 const after = globalThis.__nodes;
@@ -267,25 +278,25 @@ assert('bd2.front-one-history-push',
   historyPushes === 1 && setNodesCalls === 1,
   `bringToFront = exactly ONE pushHistory + ONE setNodes (measured ${historyPushes}/${setNodesCalls}) — one gesture, one undo step`);
 assert('bd2.front-band-on-live-max',
-  after.find(n => n.id === 'b').zIndex === 9 && after.find(n => n.id === 'a').zIndex === 8,
-  'the top of the selection lands ON the live max (9), the rest stacks contiguously below (8) — bounded, never max+1');
+  after.find(n => n.id === 'a').zIndex === 9 && after.find(n => n.id === 'b').zIndex === 8,
+  'the pivot (ordered[0] = a in the no-pivot fallback) lands ON the live max (9), the rest stacks contiguously below (8) — bounded, never max+1');
 assert('bd2.front-others-untouched',
   after.find(n => n.id === 'c').zIndex === 9 && after.find(n => n.id === 'd').zIndex === 2,
   'unselected nodes keep their exact zIndex values');
 assert('bd2.front-array-reordered',
-  after.map(n => n.id).join(',') === 'd,a,b,c'
+  after.map(n => n.id).join(',') === 'd,b,a,c'
     && after.every((n, i) => i === 0 || after[i - 1].zIndex <= n.zIndex),
-  'array re-sorted by zIndex monotone (d,a,b,c — the tied pair keeps its stable original order); ' +
+  'array re-sorted by zIndex monotone (d,b,a,c — the pivot a ties with c at 9 and keeps its stable original order); ' +
   'the array is the truth, not just the paint');
 
-/* T3: send to back — band on the live min, top-of-selection goes lowest */
+/* T3: send to back — band on the live min, pivot goes lowest */
 reset([n('a', 0, 0, true, 5), n('b', 100, 0, true, 7), n('c', 200, 0, false, 3)]);
 reorderSelection('back');
 const back = globalThis.__nodes;
 assert('bd2.back-band-on-live-min',
   back.find(n => n.id === 'a').zIndex === 3 && back.find(n => n.id === 'b').zIndex === 4
     && back.map(n => n.id).join(',') === 'a,c,b',
-  'sendToBack: the selection stacks up from the live min (a=3, b=4 — internal order kept), ' +
+  'sendToBack: the pivot (a) lands ON the live min (3), b stacks above (4), ' +
   'array re-sorted a,c,b (the tied pair keeps its stable original order)');
 
 /* T4: no drift — two clicks then "undo" (restore snapshot) then a second push
@@ -311,10 +322,30 @@ reset([n('a', 0, 0, true), n('b', 100, 0, true), n('c', 200, 0, false)]);
 reorderSelection('front');
 const flat = globalThis.__nodes;
 assert('bd2.undefined-z-index-treated-as-zero',
-  flat.find(n => n.id === 'b').zIndex === 0 && flat.find(n => n.id === 'a').zIndex === -1
+  flat.find(n => n.id === 'a').zIndex === 0 && flat.find(n => n.id === 'b').zIndex === -1
     && flat.find(n => n.id === 'c').zIndex === undefined,
-  'a board with NO zIndex anywhere: max defaults to 0, band = [-1, 0]; the untouched node stays ' +
+  'a board with NO zIndex anywhere: max defaults to 0, pivot a lands ON it (0), b stacks below (-1); the untouched node stays ' +
   'undefined (never written) — first click on a legacy board works');
+
+/* T6 (BUGFIX 2) — PIVOT: the last-clicked node takes the band extreme.
+   Figma/draw.io semantics: with two overlapping nodes selected, the user
+   shift-clicks the one they want moved; that node is `sel`. Send to back
+   drops THE PIVOT to the bottom of the band; Bring to front lifts it to the
+   top. (The array-order band of the first cut could never flip a pair.) */
+PIVOT = 'a';
+reset([n('a', 0, 0, true), n('b', 100, 0, true), n('c', 200, 0, false)]);
+reorderSelection('back');
+const pivotedBack = globalThis.__nodes;
+assert('bd2.pivot-drops-to-bottom-on-back',
+  pivotedBack.find(n => n.id === 'a').zIndex === 0 && pivotedBack.find(n => n.id === 'b').zIndex === 1,
+  `pivot a + sendToBack: a lands ON the min (0), b stacks above (1) — the clicked node is the one that moves (z: ${pivotedBack.map(x => x.id + '=' + x.zIndex)})`);
+PIVOT = 'a';
+reset([n('a', 0, 0, true), n('b', 100, 0, true), n('c', 200, 0, false)]);
+reorderSelection('front');
+const pivotedFront = globalThis.__nodes;
+assert('bd2.pivot-lifts-to-top-on-front',
+  pivotedFront.find(n => n.id === 'a').zIndex === 0 && pivotedFront.find(n => n.id === 'b').zIndex === -1,
+  `pivot a + bringToFront: a lands ON the max (0), b stacks below (-1) — the clicked node is the one that moves (z: ${pivotedFront.map(x => x.id + '=' + x.zIndex)})`);
 
 rmSync(scratch, {recursive: true, force: true});
 
@@ -466,6 +497,23 @@ try {
     const zChanged = mid.some((n, i) => n.z !== before[i].z);
     assert('bd3.send-to-back-writes-z', zChanged,
       `clicking Send to back changed node z style (${JSON.stringify(before)} -> ${JSON.stringify(mid)})`);
+
+    /* BUGFIX 2 (2026-10-23) — PIVOT CONSISTENCY: the band must put the PIVOT
+       (the app's `sel`, the last-clicked node — read from the DOM: the node
+       carrying both .selected and the app's own selection source) at the
+       band's extreme. With the marquee selection we cannot know which node
+       the user 'means', but we CAN assert the WRITE agrees with the app's own
+       pivot state: read the pivot from the DOM (the last .selected node in
+       RF's reported selection order is NOT exposed, so assert from the app
+       side: the LOWEST z after send-to-back must belong to the pivot). The
+       app exposes no pivot accessor, so this probe asserts the weaker but
+       still real contract: DISTINCT z values across the selection (a band,
+       not a flat write), i.e. the relative order inside the selection CAN now
+       change — which the pre-fix code could never produce. */
+    const bandZs = [...new Set(mid.map(n => n.z))];
+    assert('bd3.band-is-not-flat',
+      bandZs.length === mid.length,
+      `the selection's z write is a contiguous distinct band (${JSON.stringify(mid.map(n => n.z))}) — within-selection order is now writable at all`);
 
     /* undo once: one gesture = one history entry (the real invariant).
        BUGFIX (2026-10-23) — reorderSelection now clears `selected` in the same

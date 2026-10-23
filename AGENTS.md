@@ -24,7 +24,15 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 923054
+ratchet.ceiling: 923102
+# RAISED 2026-10-23 (Arrange pivot fix), measured: 923102 (+48, +0.005%).
+# Reason: BUGFIX 2 — reorderSelection now pivots on `sel` (the last-clicked
+# node): the pivot lands ON the band extreme, the rest of the selection stacks
+# contiguously beneath/above. Fixes Harvey's "bring to front/back vẫn không
+# thay đổi": the array-order band of the first cut could never flip two
+# overlapping selected nodes. Harvey approved in chat ("show approve"). Gates
+# green at the measurement: tsc 0, build 0, round-bd 47/47, goblin-verify
+# 0 FAIL, sweep 68/0.
 # RAISED 2026-10-23 (ROUND BD multi-select inspector redesign), measured: 923054
 # (+1871, +0.20%). Reason: the multi panel gained reorderSelection (z-order
 # bands through setNodes behind one pushHistory), the 3x2 lucide align grid +
