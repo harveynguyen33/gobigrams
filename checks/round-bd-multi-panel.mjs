@@ -166,8 +166,16 @@ assert('bd1.arrange-uses-z-order-helper',
     && countOf(APP, 'BringToFront size') === 1 && countOf(APP, 'SendToBack size') === 1,
   "reorderSelection('front'|'back') is the ONE z-order primitive; BringToFront/SendToBack icons render once");
 assert('bd1.no-stray-z-order-writes',
-  countOf(APP, 'zIndex') === countOf(APP, 'zIndex ?? 0') + countOf(APP, 'zIndex: band.get(n.id)'),
-  'every zIndex token in the app is a read-default (x2) or the single write in reorderSelection — no second writer');
+  // CONFIG ROUND (2026-10-23) — counting raw tokens counts comments and the
+  // new zIndexMode prop/hook plumbing too. Strip comment text, then assert
+  // the WRITE budget: exactly ONE zIndex write (the band), three
+  // read-defaults, and the mode plumbing (hook destructure + live prop +
+  // reorderSelection's mode read).
+  ((strip) => countOf(strip, 'zIndex:') === 1
+    && countOf(strip, 'zIndex ?? 0') === 3
+    && countOf(strip, 'zIndexMode') === 3)(
+    APP.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')),
+  'exactly ONE zIndex write (the band), three read-defaults, and only the zOrderMode plumbing — no second writer');
 
 /* --- (h) NEGATIVE CONTROL: single-node branches untouched ---------------- */
 const SINGLE = APP.slice(MULTI_END);
@@ -207,11 +215,14 @@ const fnStart = APP.indexOf('const reorderSelection = useCallback(');
 /* BUGFIX 2 (2026-10-23) — the dependency array now also names `sel`, so the
    end-anchor must match the new tail. Anchor on the deps array literally and
    cut after its `);` — searching for the next `});` overshot into align(). */
-const depsIdx = APP.indexOf('}, [pushHistory, setNodes, sel]);', fnStart);
-const fnSrc = APP.slice(fnStart, depsIdx + '}, [pushHistory, setNodes, sel]);'.length);
+/* CONFIG ROUND (2026-10-23) — the deps array grew `zOrderMode`; anchor and
+   strip follow the REAL tail, whatever it names. */
+const depsIdx = APP.indexOf('}, [pushHistory, setNodes, sel, zOrderMode]);', fnStart);
+const DEPS_TAIL = '}, [pushHistory, setNodes, sel, zOrderMode]);';
+const fnSrc = APP.slice(fnStart, depsIdx + DEPS_TAIL.length);
 const body = fnSrc
   .replace('const reorderSelection = useCallback(', '')
-  .replace(/}, \[pushHistory, setNodes, sel\]\);$/, '')
+  .replace(/}, \[pushHistory, setNodes, sel, zOrderMode\]\);\s*$/, '')
   /* Node cannot parse the TS annotations — strip them the way tsc would.
      Only types are touched; every statement is the app's own. */
   .replace("(to: 'front' | 'back')", '(to)')
@@ -242,7 +253,7 @@ const UNIT2 = join(scratch, 'unit2.mjs');
    it as a factory parameter defaulting to the pivot id, so the factory call
    sites below can drive it. */
 writeFileSync(UNIT2, `
-export const makeReorder = (nodesRef, pushHistory, setNodes, sel) => ${ARROW};
+export const makeReorder = (nodesRef, pushHistory, setNodes, sel, zOrderMode) => ${ARROW};
 `);
 const {makeReorder} = await import(UNIT2);
 
@@ -255,7 +266,8 @@ const setNodesRec = (updater) => {
   globalThis.__nodes = updater(globalThis.__nodes);
 };
 let PIVOT = null;  // the test drives the pivot like the app drives `sel`
-const reorderSelection = makeReorder({get current() { return globalThis.__nodes; }}, push, setNodesRec, () => PIVOT);
+let MODE = 'wysiwyg';  // the test drives the display mode like the app drives `zOrderMode`
+const reorderSelection = makeReorder({get current() { return globalThis.__nodes; }}, push, setNodesRec, () => PIVOT, () => MODE);
 
 const n = (id, x, y, sel = false, z = undefined) => ({id, position: {x, y}, selected: sel, ...(z !== undefined ? {zIndex: z} : {})});
 const reset = (nodes) => { globalThis.__nodes = nodes; historyPushes = 0; setNodesCalls = 0; };

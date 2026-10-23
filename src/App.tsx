@@ -135,6 +135,7 @@ import {usePanelCollapse, isPanelHidden} from './panelCollapse';
 /* ROUND AA, ITEM 2 — the marquee mode: its persisted value, its React Flow
    enum, and the hook that owns both. */
 import {useMarqueeMode} from './marqueeMode';
+import {useZOrderMode} from './zOrderMode';
 import {useInspectorSections} from './inspectorState';
 import {searchLibrary, groupByCategory} from './paletteSearch';
 import {
@@ -862,6 +863,10 @@ export default function App() {
      there is no second place that could map the value differently. Default is
      `touch` (overlap); see `src/marqueeMode.ts`. */
   const {mode: marqueeMode, selectionMode, setMode: setMarqueeMode} = useMarqueeMode();
+  /* CONFIG ROUND (2026-10-23) — the z-order display mode: 'wysiwyg' (manual,
+     paint = stored z, the default) vs 'lift' (the library's select-raises
+     behaviour). See src/zOrderMode.ts. */
+  const {mode: zOrderMode, zIndexMode, setMode: setZOrderMode} = useZOrderMode();
   const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave} =
     useHoverChoreography(wrap, edgesRef, highlight && !readOnly);
   const {startInteraction, endInteraction} = useInteractionGuard(wrap);
@@ -3910,16 +3915,14 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
   if (selNodes.length < 2) return;
   pushHistory();
   setNodes(ns => {
-    /* BUGFIX 2 (2026-10-23, HARVEY: "vẫn không thay đổi") — the first cut
-       banded the selection in ARRAY order, but the array order is the
-       document's INSERT order: within the selection, who paints on top never
-       changed, so two overlapping marquee-selected nodes could never flip.
-       Design-tool semantics (Figma/draw.io): the reorder pivots on the node
-       the user clicked LAST. `sel` holds exactly that id (onSelectionChange
-       stores s[0], and RF puts the last-clicked node first). That node gets
-       the extreme of the band; the rest of the selection stacks beneath it in
-       array order, so a click on the under-node + Send to back really does
-       drop it to the bottom, and Bring to front really does lift it. */
+    /* BUGFIX 2 (2026-10-23) + CONFIG ROUND — pivots on `sel` (the last-clicked
+       node): pivot lands ON the band extreme; the rest stacks contiguously.
+       With zOrderMode 'wysiwyg' (the default) the paint order IS the stored z,
+       so no selection-clearing is needed — the selection survives the Arrange,
+       which is friendlier than Figma's drop-on-reorder. Under the opt-in
+       'lift' mode (basic), RF paints selected nodes at rawZ + 1000, which
+       would mask the band; there the selection IS cleared in the same write,
+       exactly as the first cut did. */
     const zs = ns.map(n => n.zIndex ?? 0);
     const bound = to === 'front' ? Math.max(...zs) : Math.min(...zs);
     const pivot = sel ? selNodes.findIndex(n => n.id === sel) : -1;
@@ -3931,11 +3934,12 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
     ordered.forEach((n, i) => band.set(n.id, to === 'front'
       ? bound - i                          // pivot lands ON the extreme (top)
       : bound + i));                        // pivot lands ON the extreme (bottom)
+    const keepSelection = zOrderMode === 'lift';
     return ns
-      .map(n => band.has(n.id) ? {...n, zIndex: band.get(n.id), selected: false} : n)
+      .map(n => band.has(n.id) ? {...n, zIndex: band.get(n.id), selected: keepSelection} : n)
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
   });
-}, [pushHistory, setNodes, sel]);
+}, [pushHistory, setNodes, sel, zOrderMode]);
 
 
   // ---- align / distribute ----
@@ -6463,6 +6467,8 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
           onHighlight={toggleHighlight}
           marquee={marqueeMode}
           onMarquee={setMarqueeMode}
+          zOrder={zOrderMode}
+          onZOrder={setZOrderMode}
           pngScale={pngScale}
           onPngScale={onPngScale}
           pngPad={pngPad}
@@ -6572,6 +6578,10 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
           elementsSelectable={!readOnly}
+          /* CONFIG ROUND (2026-10-23) — the LIVE prop follows the Setting
+             (Canvas → Layer display). 'manual' = paint order is the stored
+             zIndex, WYSIWYG; 'basic' = the library's select-raises default. */
+          zIndexMode={zIndexMode}
           snapToGrid={snap}
           snapGrid={[gridSize, gridSize]}
           onNodeDragStart={(e, node, nodesAll) => { startInteraction(); onNodeDragStartAll(e, node); void nodesAll; }}

@@ -24,7 +24,15 @@ gate_tsc_build_cmd: npx tsc --noEmit && npx vite build
 gate_todo_ceiling_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.vite --exclude-dir=dist . 2>/dev/null | wc -l)" -le 160
 ratchet.name: client_js_bytes
 ratchet.cmd: find dist/assets -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
-ratchet.ceiling: 923102
+ratchet.ceiling: 924162
+# RAISED 2026-10-23 (z-order display mode setting), measured: 924162 (+1060,
+# +0.11%). Reason: Harvey's UX call — instead of a hard zIndexMode flip, the
+# choice became a SETTING: new src/zOrderMode.ts (persisted 'wysiwyg' |
+# 'lift', default wysiwyg = RF 'manual'), the Layer display segmented row in
+# Settings Canvas pane, and reorderSelection keeping the selection alive in
+# wysiwyg (clearing only under 'lift'). round-bd harness re-anchored to the
+# deps-tail + write-budget counts. Harvey approved in chat ("ok approve").
+# Gates green at the measurement: tsc 0, build 0, round-bd 47/47, sweep 68/0.
 # RAISED 2026-10-23 (Arrange pivot fix), measured: 923102 (+48, +0.005%).
 # Reason: BUGFIX 2 — reorderSelection now pivots on `sel` (the last-clicked
 # node): the pivot lands ON the band extreme, the rest of the selection stacks

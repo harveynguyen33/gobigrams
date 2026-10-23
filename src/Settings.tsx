@@ -6,6 +6,9 @@ import {type Mode, type ThemeName} from './theme';
    labels. Imported rather than re-declared: the control, the persisted value
    and the React Flow prop must resolve through ONE definition. */
 import {MARQUEE_OPTS, type MarqueeMode} from './marqueeMode';
+/* CONFIG ROUND (2026-10-23) — the z-order display mode's values and labels.
+   Same one-definition rule as the marquee's. */
+import {ZORDER_OPTS, type ZOrderMode} from './zOrderMode';
 /* PACKAGE-R — the roadmap surface's data. A pure, React-free module: the block
    further down this file is its only reader in the app. */
 import {ROADMAP, SHIPPED, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from './roadmap';
@@ -93,6 +96,11 @@ type Props = {
    *  `SHORTCUTS_MOUSE` comment below for why that list stays as it is. */
   marquee: MarqueeMode;
   onMarquee: (m: MarqueeMode) => void;
+  /** CONFIG ROUND (2026-10-23) — the z-order display mode (Canvas pane). App
+   *  owns the persisted value through `useZOrderMode`, which also owns the
+   *  React Flow prop; this row is the discoverable surface. */
+  zOrder: ZOrderMode;
+  onZOrder: (m: ZOrderMode) => void;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 };
@@ -298,8 +306,8 @@ function AppearancePane(props: Pick<Props, 'mode' | 'onMode' | 'resolved'>) {
 
 function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
-  marquee, onMarquee, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
+  marquee, onMarquee, zOrder, onZOrder, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -355,6 +363,20 @@ function CanvasPane({
             value={marquee}
             onPick={onMarquee}
             labelOf={v => MARQUEE_OPTS.find(o => o.v === v)?.label ?? String(v)}
+          />
+        </Row>
+        {/* CONFIG ROUND (2026-10-23) — the z-order display mode. Default is
+            'wysiwyg' (True layers): the canvas paints the STORED stack order and
+            selecting never reorders, so Bring to front / Send to back are always
+            exactly what they say. 'Lift on select' restores the library's
+            select-raises behaviour for anyone who prefers the pop. */}
+        <Row label="Layer display" hint="whether selecting a node raises it above its neighbours">
+          <Segmented
+            label="Layer display"
+            options={ZORDER_OPTS.map(o => o.v)}
+            value={zOrder}
+            onPick={onZOrder}
+            labelOf={v => ZORDER_OPTS.find(o => o.v === v)?.label ?? String(v)}
           />
         </Row>
         <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">
@@ -544,6 +566,7 @@ export default function Settings({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate,
   highlight, onHighlight,
   marquee, onMarquee,
+  zOrder, onZOrder,
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
   returnFocusTo,
@@ -641,6 +664,8 @@ export default function Settings({
           onHighlight={onHighlight}
           marquee={marquee}
           onMarquee={onMarquee}
+          zOrder={zOrder}
+          onZOrder={onZOrder}
           pngScale={pngScale}
           onPngScale={onPngScale}
           pngPad={pngPad}
