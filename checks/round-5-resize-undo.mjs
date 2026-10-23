@@ -485,13 +485,26 @@ check('6d. WHY there can be no difference: the resize path reads no edge state',
 console.log('');
 console.log('7. this round did not move the resize geometry, the floors or the feel');
 
-check('7a. no resizer gained a gesture callback prop (the feel is unchanged)', () => {
-  for (const [name, src] of [['DiagramNode', DIAGRAM], ['LabelNode', LABEL], ['CustomShapeNode', CUSTOM]]) {
+check('7a. no resizer gained a gesture callback prop beyond the BF drag-start re-measure', () => {
+  /* RE-ANCHORED (ROUND BF, 2026-10-23): this round's spec §2.4 EXPLICITLY
+     adds `onResizeStart` to DiagramNode's resizer (the drag-start re-measure
+     that kills the reload jerk) — the 2026-10-12 ban predates it and is
+     lifted for THAT prop only. onResize / onResizeEnd stay banned (nothing
+     this round hooks per-frame callbacks), and LabelNode / CustomShapeNode
+     keep the full ban — their floors are constants, nothing to re-measure. */
+  const gestureProps = ['onResize=', 'onResizeEnd'];
+  const kinds = [['DiagramNode', DIAGRAM, true], ['LabelNode', LABEL, false], ['CustomShapeNode', CUSTOM, false]];
+  for (const [name, src, allowStart] of kinds) {
     const blocks = src.match(/<NodeResizer[\s\S]*?\/>/g) ?? [];
     assert.ok(blocks.length > 0, `${name}: no <NodeResizer> found`);
     for (const block of blocks) {
-      for (const prop of ['onResizeStart', 'onResize=', 'onResizeEnd']) {
-        assert.equal(block.includes(prop), false, `${name}'s resizer gained ${prop} — this round must not change the gesture`);
+      for (const prop of gestureProps) {
+        assert.equal(block.includes(prop), false, `${name}'s resizer gained ${prop} — per-frame gesture callbacks stay banned`);
+      }
+      if (!allowStart) {
+        assert.equal(block.includes('onResizeStart'), false, `${name}'s resizer gained onResizeStart — only DiagramNode re-measures at drag start (ROUND BF §2.4)`);
+      } else {
+        assert.equal(block.includes('onResizeStart={() => measureNatural()}'), true, "DiagramNode's onResizeStart must be the BF re-measure hook and nothing else");
       }
     }
   }

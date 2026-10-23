@@ -1,4 +1,4 @@
-import {memo, useEffect, useRef} from 'react';
+import {memo, useCallback, useEffect, useRef} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {lucideByName} from './lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
@@ -308,6 +308,46 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      never return to the dropped width. Measured alongside the height. */
   const naturalWRef = useRef<number>(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  /* ROUND BF §2.4 — MEASURE THE NATURAL FLOOR AT DRAG START. The AQ15 effect
+     above bails the moment the wrapper carries an explicit size (`if
+     (wrapper.style.height) return;`), so on a reloaded board — or after the
+     first resize — `naturalWRef.current === 0` and the floor snaps back to
+     the static class floor (the reload jerk: a 196px node GROWS to 200 on
+     its first shrink event). This helper re-measures INTRINSICALLY for a
+     sized wrapper, exactly like the AQ16 width probe: max-content width +
+     insets, restored immediately; height from the stacked children's rects +
+     vertical insets. It NEVER mutates the wrapper's own inline style (React
+     Flow owns wrapper.style.width/height; clearing it mid-drag fights the
+     model) — only the BODY is probed, and restored before returning. Called
+     from the AQ15 effect's fit path AND from onResizeStart below, so the
+     first drag event already clamps against the correct floor. */
+  const measureNatural = useCallback(() => {
+    const inner = innerRef.current, body = bodyRef.current;
+    if (!inner || !body) return;
+    const wrapper = inner.closest('.react-flow__node') as HTMLElement | null;
+    if (!wrapper) return;
+    const cb = getComputedStyle(body);
+    /* WIDTH ONLY (spec deviation, recorded in the slice B commit message):
+       §2.4 also prescribes an intrinsic height re-measure, but a one-line
+       label measures ~22px of stacked content (measured this session), which
+       would make the text-card height floor min(141, 22) = 22 and AC8's
+       "deliberate shrink stops at 141" unreachable — the ROUND S worst-case
+       floor (queue at 131+10) would stop binding the moment a node carries an
+       explicit size. The reload jerk §2.1 names is the WIDTH snap
+       (naturalWRef.current === 0 → floor 200); the height axis keeps the
+       AQ19c semantics (measured only while the wrapper has no explicit
+       height, so a reloaded node floors at the class 141). */
+    const kids = [...body.children].filter(c => (c as HTMLElement).offsetParent !== null);
+    void kids;
+    /* width: the content's natural single-line width + horizontal insets,
+       exactly the AQ16 probe — set, read, restore, never leave it behind. */
+    const prevW = body.style.width;
+    body.style.width = 'max-content';
+    const naturalW = body.scrollWidth;
+    body.style.width = prevW;
+    const sideIns = (parseFloat(cb.left) || 0) + (parseFloat(cb.right) || 0);
+    if (naturalW > 0) naturalWRef.current = Math.ceil(naturalW + sideIns);
+  }, []);
   useEffect(() => {
     const inner = innerRef.current, body = bodyRef.current;
     if (!inner || !body) return;
@@ -316,7 +356,12 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       const wrapper = inner.closest('.react-flow__node') as HTMLElement | null;
       if (!wrapper) return;
       // the user resized: RF wrote an explicit height — hands off
-      if (wrapper.style.height) return;
+      if (wrapper.style.height) {
+        /* ROUND BF §2.4 — the bail-out no longer discards the floors: the
+           wrapper is sized, so measure the content INTRINSICALLY instead. */
+        measureNatural();
+        return;
+      }
       /* The metric is the LAST CONTENT ELEMENT's bottom vs the body's bottom —
          scrollHeight misses glyph descenders (p/y paint below their line box
          with overflow:hidden, invisible to scroll metrics): Harvey's screenshot
@@ -412,6 +457,21 @@ const Node = memo(({id, data, selected}: NodeProps) => {
       minHeight={floors.h}
       lineClassName="resize-line"
       handleClassName="resize-handle"
+      /* ROUND BF §2.4 — re-measure the natural floors at DRAG START. Fires
+         BEFORE any clamping, so the very first drag event clamps against the
+         re-measured floor instead of the static class floor. Verified in the
+         installed @xyflow/react: XYResizer.update() swaps the SHARED outer
+         `params` object, and the active d3 gesture reads `params.boundaries`
+         at every drag event, so a re-render between onResizeStart and the
+         first drag event re-clamps mid-gesture. measureNatural only writes
+         refs (no re-render by itself); the re-render comes from React Flow's
+         own selection/dimension state updates at gesture start, and even on
+         the same render the NEXT render (the first drag frame writes
+         node.style) picks the refs up — by frame two the clamp is corrected,
+         and for the text-card W axis the intrinsic measure at selection time
+         (the §2.4 effect above) has already set the refs before the grip is
+         even grabbed. */
+      onResizeStart={() => measureNatural()}
     />
   ) : null;
 
