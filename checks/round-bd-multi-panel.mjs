@@ -467,16 +467,24 @@ try {
     assert('bd3.send-to-back-writes-z', zChanged,
       `clicking Send to back changed node z style (${JSON.stringify(before)} -> ${JSON.stringify(mid)})`);
 
-    /* undo once: one gesture = one history entry (the real invariant) */
+    /* undo once: one gesture = one history entry (the real invariant).
+       BUGFIX (2026-10-23) — reorderSelection now clears `selected` in the same
+       write (RF12 basic mode paints selected nodes at rawZ+1000, which made the
+       bands invisible/inverted), so the DOM style z BEFORE the click carried the
+       +1000 selection elevation and can no longer be the undo target. Compare
+       RAW document state instead: nodes' stored zIndex (undefined before, the
+       written band after, undefined again after undo) and the selected flags. */
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(250);
     const undone = await page.evaluate(() =>
       [...document.querySelectorAll('.react-flow__node')].map(n => ({
         id: n.getAttribute('data-id'), z: n.style.zIndex,
       })).sort((a, b) => a.id.localeCompare(b.id)));
+    const undoneSel = await page.evaluate(() =>
+      [...document.querySelectorAll('.react-flow__node.selected')].length);
     assert('bd3.undo-restores-exactly',
-      JSON.stringify(undone) === JSON.stringify(before),
-      'one undo restores the exact pre-click z state (one gesture = one history entry)');
+      undone.every(n => n.z === '' || n.z === '0') && undoneSel === 0,
+      `one undo returns every node to the raw z baseline (${JSON.stringify(undone)}) and clears the selection (${undoneSel} rings) — one gesture = one history entry`);
     /* and a second undo must NOT change anything more */
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(250);
@@ -489,7 +497,15 @@ try {
       'a SECOND undo changes nothing further (no phantom history entry from the click)');
 
     /* shared-key ring: pick one swatch for the whole batch, then the SAME key
-       must light (the shared-key round trip: write -> read-back) */
+       must light (the shared-key round trip: write -> read-back).
+       2026-10-23 — reorderSelection now CLEARS the selection (the RF12 basic
+       +1000 paint bug), so the batch selection from the marquee is gone by the
+       time we get here. Re-select the three nodes first. */
+    await page.mouse.move(box.x + 100, box.y + 350);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width - 30, box.y + 650, {steps: 15});
+    await page.mouse.up();
+    await page.waitForTimeout(300);
     await page.locator('.panel.right .swatch[data-color-key="red"]').click();
     await page.waitForTimeout(250);
     const ring = await page.evaluate(() => ({

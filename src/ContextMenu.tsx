@@ -27,8 +27,12 @@ const NODE_ITEMS: Item[] = [
   {kind: 'action', id: 'front', label: 'Bring to front'},
   {kind: 'action', id: 'back', label: 'Send to back'},
   {kind: 'sep'},
-  {kind: 'action', id: 'note', label: 'Add note here'},
   {kind: 'action', id: 'delete', label: 'Delete', danger: true},
+  /* 'Add note here' REMOVED (2026-10-23, HARVEY) — the Note shape is hidden
+     from every create surface (NOTE_ENABLED=false); the context menu must not
+     re-offer it. The handler in App.tsx ctxAction stays (dead code behind a
+     removed menu row) — flagged for removal if NOTE_ENABLED ever ships false
+     permanently. */
 ];
 
 const EDGE_ITEMS: Item[] = [
