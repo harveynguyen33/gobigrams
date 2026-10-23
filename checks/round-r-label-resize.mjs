@@ -380,10 +380,18 @@ assert('R10 addNodeByLabel honours item.size (no App.tsx change needed)',
   'item.size is the first branch of the size expression; style is spread onto the node');
 
 /* ---- ROUND S: the floors now hold an invariant against the sheet ---- */
-assert('S1 the resizer floor is NEVER below the CSS content floor (.node min-width)',
+/* RE-ANCHORED (ROUND BF, 2026-10-23): the per-node derivation moved INSIDE
+   `resizeFloorsFor`, and the invariant became PER CLASS — text-card floor
+   >= .node's CSS floor (exactly as strict as before), connector/note carry
+   their own CSS floors (added strictness, not loosening: the connector's CSS
+   exemption is min-width 0 with the 64 silhouette floor above it, the note's
+   120 CSS floor is met by construction from NOTE_CSS_MIN_W). The headline
+   sentence changed from "the resizer floor is NEVER below the CSS content
+   floor" to "…per shape class", with the class table in the failure detail. */
+assert('S1 the resizer floor is NEVER below the CSS content floor, per shape class (.node min-width)',
   DIAG_CONSTS.NODE_MIN_W >= nodeCssMinW
-    && /Math\.min\(NODE_MIN_W, naturalWRef\.current\)/.test(DIAGRAM),
-  `clamp constant NODE_MIN_W ${DIAG_CONSTS.NODE_MIN_W} >= .node min-width ${nodeCssMinW} (the per-node floor is min(clamp, natural))`);
+    && /Math\.min\(NODE_MIN_W, naturalW \|\| NODE_MIN_W\)/.test(DIAGRAM),
+  `clamp constant NODE_MIN_W ${DIAG_CONSTS.NODE_MIN_W} >= .node min-width ${nodeCssMinW} (the per-node floor is max(cssFloor, min(clamp, natural)); connector: css 0 exempt, floor 64; note: css 120, floor ${'NOTE_MIN_W'} = 120+10)`);
 
 assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two)',
   cssContentMinW === nodeCssMinW && /CSS_CONTENT_MIN_W \+ FLOOR_SLACK_PX/.test(DIAGRAM),
@@ -395,10 +403,10 @@ assert('S2 DiagramNode derives its floor FROM the CSS floor (one number, not two
    too-short node instead of clipping — so S3 now pins the DERIVATION (the clamp
    must reference NODE_MIN_H) instead of a static number. */
 assert('S3 the floors clamp against the NODE_MIN constants (worst-case moved to auto-grow)',
-  /minWFloor = naturalWRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_W, naturalWRef\.current\)/.test(DIAGRAM)
-    && /minHFloor = naturalHRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_H, naturalHRef\.current\)/.test(DIAGRAM)
+  /w: Math\.max\(CSS_CONTENT_MIN_W, Math\.min\(NODE_MIN_W, naturalW \|\| NODE_MIN_W\)\)/.test(DIAGRAM)
+    && /h: Math\.min\(NODE_MIN_H, naturalH \|\| NODE_MIN_H\)/.test(DIAGRAM)
     && DIAG_CONSTS.NODE_MIN_W >= WORST_CONTENT_W,
-  `floors are per-node natural, clamped by NODE_MIN_W=${DIAG_CONSTS.NODE_MIN_W} (>= worst width ${WORST_CONTENT_W}) and NODE_MIN_H=${DIAG_CONSTS.NODE_MIN_H}`);
+  `floors are per-node natural, clamped by NODE_MIN_W=${DIAG_CONSTS.NODE_MIN_W} (>= worst width ${WORST_CONTENT_W}) and NODE_MIN_H=${DIAG_CONSTS.NODE_MIN_H} (ROUND BF: the derivation lives inside resizeFloorsFor, pinned to the CSS floor on W)`);
 
 assert('S4 the old 140x80 floors are GONE (a regression would be the defect)',
   diagW !== 140 && diagH !== 80,

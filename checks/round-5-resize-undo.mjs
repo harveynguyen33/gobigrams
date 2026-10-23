@@ -499,14 +499,21 @@ check('7a. no resizer gained a gesture callback prop (the feel is unchanged)', (
 
 check('7b. the diagram node floors are still wired to the same constants', () => {
   /* AQ19e 2026-10-16 — minWidth became per-node too (minWFloor, same pattern
-     as minHeight): measured natural width clamped by NODE_MIN_W. */
-  assert.match(DIAGRAM, /minWidth=\{minWFloor\}/, 'minWidth no longer uses the minWFloor derivation');
-  assert.match(DIAGRAM, /const minWFloor = naturalWRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_W, naturalWRef\.current\)/, 'the minWidth floor derivation changed');
-  /* AQ19c 2026-10-16 — minHeight became PER-NODE: `naturalHRef` (the measured
-     fresh-drop fit) clamped by NODE_MIN_H. The constant stays declared and the
-     clamp always Math.min()s against it. */
-  assert.match(DIAGRAM, /minHeight=\{minHFloor\}/, 'minHeight no longer uses the minHFloor derivation');
-  assert.match(DIAGRAM, /const minHFloor = naturalHRef\.current > 0[\s\S]{0,80}Math\.min\(NODE_MIN_H, naturalHRef\.current\)[\s\S]{0,20}: NODE_MIN_H/, 'the minHeight floor derivation changed');
+     as minHeight): measured natural width clamped by NODE_MIN_W.
+     RE-ANCHORED (ROUND BF, 2026-10-23): the derivation moved INSIDE the
+     exported `resizeFloorsFor(shape, naturalW, naturalH)` (per-shape-class
+     floors — connector 64 flat, note 130/44 flat, text-card unchanged
+     semantics with a max() pin to the CSS floor); the component now derives
+     both floors with ONE call and reads floors.w / floors.h. The regexes
+     retarget the function body; the constants themselves are unchanged. */
+  assert.match(DIAGRAM, /minWidth=\{floors\.w\}/, 'minWidth no longer reads the resizeFloorsFor derivation');
+  assert.match(DIAGRAM, /minHeight=\{floors\.h\}/, 'minHeight no longer reads the resizeFloorsFor derivation');
+  assert.match(DIAGRAM, /const floors = resizeFloorsFor\(shape, naturalWRef\.current, naturalHRef\.current\)/,
+    'the component no longer derives its floors via ONE resizeFloorsFor call from the natural refs');
+  assert.match(DIAGRAM, /w: Math\.max\(CSS_CONTENT_MIN_W, Math\.min\(NODE_MIN_W, naturalW \|\| NODE_MIN_W\)\)/,
+    'the text-card width floor derivation changed (max(cssFloor, min(clamp, natural)))');
+  assert.match(DIAGRAM, /h: Math\.min\(NODE_MIN_H, naturalH \|\| NODE_MIN_H\)/,
+    'the text-card height floor derivation changed');
   assert.match(DIAGRAM, /export const NODE_MIN_W = CSS_CONTENT_MIN_W \+ FLOOR_SLACK_PX/, 'NODE_MIN_W derivation changed');
   assert.match(DIAGRAM, /export const NODE_MIN_H = CONTENT_MIN_H \+ FLOOR_SLACK_PX/, 'NODE_MIN_H derivation changed');
 });

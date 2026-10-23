@@ -4,6 +4,7 @@ import {lucideByName} from './lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
 import {resolveColor, type ColorKey} from './colors';
 import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './textStyle';
+import {SHAPE_MIN_PX} from './customShape';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in
  *  both directions; the .node body fills the RF wrapper, so any width/height
@@ -94,6 +95,35 @@ const FLOOR_SLACK_PX = 10;
 /** The resizer floors. 200x141 — see the header for each number's derivation. */
 export const NODE_MIN_W = CSS_CONTENT_MIN_W + FLOOR_SLACK_PX;
 export const NODE_MIN_H = CONTENT_MIN_H + FLOOR_SLACK_PX;
+
+/* ROUND BF (2026-10-23) — PER-SHAPE-CLASS FLOORS. The uniform 200x141 floor
+   was applied to every class while the CSS exempts exactly one shape, so a
+   152px connector took a 48px folded clamp on the FIRST drag event (the
+   resize jerk). Two classes land in slice A:
+
+   - text-card (every RESIZABLE shape except connector; `note` joins in
+     slice C): the ROUND S AQ19c/e semantics, upgraded with the max() so the
+     effective floor can never drop below the CSS content floor even when a
+     measured natural is smaller.
+   - connector: FLAT 64 = 2 × SHAPE_MIN_PX (the import path's own minimum
+     box; the same derivation discipline as NODE_MIN_W from
+     CSS_CONTENT_MIN_W). The label wraps and AQ15 auto-grow handle overflow —
+     the floor is the silhouette, not the label.
+
+   `resizeFloorsFor` is PURE (no React, no DOM): the harnesses bundle and
+   EXECUTE it, and App-level callers can reuse it unchanged. */
+/** Silhouette minimum for the exempted symbol class: 2 × SHAPE_MIN_PX. */
+export const SYMBOL_FLOOR_PX = 2 * SHAPE_MIN_PX;
+
+/** Effective resizer floors for one node. See the ROUND BF header above. */
+export type Floors = {w: number; h: number};
+export function resizeFloorsFor(shape: NodeShape, naturalW: number, naturalH: number): Floors {
+  if (shape === 'connector') return {w: SYMBOL_FLOOR_PX, h: SYMBOL_FLOOR_PX};
+  return {
+    w: Math.max(CSS_CONTENT_MIN_W, Math.min(NODE_MIN_W, naturalW || NODE_MIN_W)),
+    h: Math.min(NODE_MIN_H, naturalH || NODE_MIN_H),
+  };
+}
 
 /** L3a: handle orientation. A flowchart reads top-to-bottom, and a diamond with
  *  only left/right ports physically cannot express "Yes ↓ / No →". */
@@ -372,17 +402,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   // React Flow writes width/height back into node.style, so the size persists.
   /* AQ19c — the floor is this node's MEASURED natural height when known
      (fresh-drop fit), falling back to the static worst-case NODE_MIN_H.
-     Harvey: stretch → shrink-to-min must land on the fresh-drop size. */
-  const minHFloor = naturalHRef.current > 0
-    ? Math.min(NODE_MIN_H, naturalHRef.current)
-    : NODE_MIN_H;
-  const minWFloor = naturalWRef.current > 0
-    ? Math.min(NODE_MIN_W, naturalWRef.current)
-    : NODE_MIN_W;
+     Harvey: stretch → shrink-to-min must land on the fresh-drop size.
+     ROUND BF — the derivation moved into `resizeFloorsFor` (per-class floors);
+     this call site passes the same refs. */
+  const floors = resizeFloorsFor(shape, naturalWRef.current, naturalHRef.current);
   const resizer = selected && RESIZABLE.has(shape) ? (
     <NodeResizer
-      minWidth={minWFloor}
-      minHeight={minHFloor}
+      minWidth={floors.w}
+      minHeight={floors.h}
       lineClassName="resize-line"
       handleClassName="resize-handle"
     />
