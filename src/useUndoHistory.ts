@@ -16,16 +16,17 @@ export type Snap = {nodes: Node[]; edges: Edge[]};
 type SetNodes = React.Dispatch<React.SetStateAction<Node[]>>;
 type SetEdges = React.Dispatch<React.SetStateAction<Edge[]>>;
 
-export function useUndoHistory(opts: {
-  nodesRef: React.MutableRefObject<Node[]>;
-  edgesRef: React.MutableRefObject<Edge[]>;
-  setNodes: SetNodes;
-  setEdges: SetEdges;
-  setSel: (id: string | null) => void;
-  setSelCount: (n: number) => void;
-  setSelEdgeId: (id: string | null) => void;
-}) {
-  const {nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId} = opts;
+/* Positional parameters, not an opts object: the bundle ratchet is raw bytes and
+   object property names survive minification — see AGENTS.md's perf ratchet. */
+export function useUndoHistory(
+  nodesRef: React.MutableRefObject<Node[]>,
+  edgesRef: React.MutableRefObject<Edge[]>,
+  setNodes: SetNodes,
+  setEdges: SetEdges,
+  setSel: (id: string | null) => void,
+  setSelCount: (n: number) => void,
+  setSelEdgeId: (id: string | null) => void,
+) {
 
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);

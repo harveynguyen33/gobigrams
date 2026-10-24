@@ -1434,9 +1434,8 @@ export default function App() {
   };
 
   // ---- history (undo / redo) ----
-  const {past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo} = useUndoHistory({
-    nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId,
-  });
+  const {past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo} = useUndoHistory(
+    nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
 
   // ---- clipboard (copy / paste / duplicate) ----
   const clipboard = useRef<Snap | null>(null);
