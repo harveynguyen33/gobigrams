@@ -168,6 +168,28 @@ the same mode from the keyboard.
 - **Export SVG** — vector, for the web.
 - **Export JSON** — the board as a file (re-importable).
 - **Import JSON** — load a board file into the current board.
+- **Print / PDF** — the browser print dialog (choose *Save as PDF*).
+
+### When to outline text
+
+The **Outline text** export option (off by default) converts every label to vector
+paths instead of `<text>` elements:
+
+- **Leave it OFF** when the file stays on the web — the SVG embeds the Inter and
+  JetBrains Mono subsets it needs, so text renders identically on machines that
+  have no fonts installed, stays selectable and searchable, and produces a
+  smaller file (~284 KB vs ~85 KB outlined).
+- **Turn it ON** for tools that rasterise or re-render SVG their own way
+  (some office suites, cutters, older viewers) — outlined text is immune to font
+  substitution because it carries no fonts at all.
+
+### Known differences between canvas and export
+
+- Selection rings, resize grips and connection handles are editor chrome and are
+  never exported.
+- The exported canvas uses the same measured font metrics as the live view;
+  if a label was authored in a font that no longer ships, it falls back to the
+  closest family and may re-wrap.
 
 ## Customising the look
 

@@ -1,6 +1,6 @@
 {
-  "name": "diagram-studio",
-  "private": true,
+  "name": "gobigrams",
+  "private": false,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -22,5 +22,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
-  }
+  },
+  "description": "Gobigrams \u2014 draw diagrams in your browser. Flowcharts, architecture and ER diagrams with real vector export.",
+  "homepage": "https://gobigrams.tech-goblin.com",
+  "license": "MIT"
 }
