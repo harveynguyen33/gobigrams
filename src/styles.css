@@ -5239,6 +5239,13 @@ kbd {
 .rm-ship-when { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 .rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 
+/* Settings → About: the public-launch feedback line. Tokens only (no new
+   hex); styled as a QUIET dim link so the pane's content stays the star. */
+.settings-feedback { margin: 20px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); }
+.settings-feedback a { color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--border); }
+.settings-feedback a:hover,
+.settings-feedback a:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
+
 /* The only per-tier rule this block needs: the shipped list IS three columns at
    a wide pane, so it stacks below the phone breakpoint. Same tier hook the
    template gallery and the inspector use. */

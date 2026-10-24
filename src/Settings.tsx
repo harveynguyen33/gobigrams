@@ -552,6 +552,21 @@ function AboutPane() {
           <span className="settings-state">{APP_VERSION}</span>
         </Row>
       </div>
+      {/* PUBLIC LAUNCH — the in-app feedback entry. One quiet line at the very
+          bottom of the About pane (LESS intrusive than the ? cheatsheet, whose
+          rows are width-budgeted by checks/package-o-metrics.mjs item 3 and
+          carry the same info as Settings → Shortcuts — a feedback row there
+          would break that pairing). External link → NEW TAB + noopener, the
+          only anchor pattern in the app (no prior target=_blank existed). */}
+      <p className="settings-feedback">
+        <a
+          href="https://github.com/harveynguyen33/goblin-diagrams/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Feedback — report a bug or request a shape
+        </a>
+      </p>
       <RoadmapBlock />
     </>
   );
