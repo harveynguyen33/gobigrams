@@ -61,10 +61,13 @@ const CSS = read('src/styles.css');
 
 {
   const about = SET.slice(SET.indexOf('function AboutPane()'), SET.indexOf('the shell'));
-  const img = about.match(/<img\s[^>]*src="\/brand\/logo\.svg"[^>]*>/);
+  /* ROUND BH re-anchor (c8cbe0b): the About icon became the FULL LOCKUP
+     (public/brand/lockup.svg, 280px) — the late brand decision superseded the
+     round's first 52px icon placement. Same contract, new asset. */
+  const img = about.match(/<img\s[^>]*src="\/brand\/lockup\.svg"[^>]*>/);
   assert('bh.g2.about-img-with-src-and-alt',
     !!img && /alt="Gobigrams"/.test(img[0]),
-    img ? img[0].replace(/\s+/g, ' ') : 'no /brand/logo.svg <img> in the About pane');
+    img ? img[0].replace(/\s+/g, ' ') : 'no /brand/lockup.svg <img> in the About pane');
 
   assert('bh.g3.about-img-above-the-wordmark-line',
     !!img && about.indexOf('<img') < about.indexOf('settings-sub'),
@@ -85,16 +88,15 @@ const CSS = read('src/styles.css');
 {
   const rule = (sel) => (CSS.match(new RegExp(`\\.?${sel.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\{[^}]*\\}`)) || [''])[0];
   const aboutRule = rule('about-logo');
-  assert('bh.g5.about-logo-rule-52px-tokens-only',
-    /width:\s*52px/.test(aboutRule) && /height:\s*52px/.test(aboutRule)
-      && !/#[0-9a-fA-F]{3,8}\b/.test(aboutRule),
-    aboutRule ? aboutRule.replace(/\s+/g, ' ').trim() : '.about-logo rule not found');
+  assert('bh.g5.about-logo-rule-280px-tokens-only',
+  /width:\s*280px/.test(aboutRule) && !/#[0-9a-fA-F]{3,8}\b/.test(aboutRule),
+  aboutRule ? aboutRule.replace(/\s+/g, ' ').trim() : '.about-logo rule not found');
 
   const ceRule = rule('ce-logo');
-  assert('bh.g6.ce-logo-rule-40px-tokens-only',
-    /width:\s*40px/.test(ceRule) && /height:\s*40px/.test(ceRule)
-      && !/#[0-9a-fA-F]{3,8}\b/.test(ceRule),
-    ceRule ? ceRule.replace(/\s+/g, ' ').trim() : '.ce-logo rule not found');
+  assert('bh.g6.ce-logo-rule-72px-tokens-only',
+  /width:\s*72px/.test(ceRule) && /height:\s*72px/.test(ceRule)
+    && !/#[0-9a-fA-F]{3,8}\b/.test(ceRule),
+  ceRule ? ceRule.replace(/\s+/g, ' ').trim() : '.ce-logo rule not found');
 
   const n = (CSS.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
   assert('bh.g7.hex-ceiling-untouched', n <= 144, `count=${n} (ceiling 144)`);
@@ -122,15 +124,15 @@ try {
     await page.waitForSelector('[data-settings-overlay]', {timeout: 10000});
     await page.click('[data-settings-cat="about"]');
     await page.waitForSelector('[data-settings-pane="about"]', {timeout: 10000});
-    await page.waitForSelector('[data-settings-pane="about"] img[src="/brand/logo.svg"]', {timeout: 5000});
+    await page.waitForSelector('[data-settings-pane="about"] img[src="/brand/lockup.svg"]', {timeout: 5000});
     const aboutImg = await page.evaluate(() => {
-      const img = document.querySelector('[data-settings-pane="about"] img[src="/brand/logo.svg"]');
+      const img = document.querySelector('[data-settings-pane="about"] img[src="/brand/lockup.svg"]');
       if (!img) return null;
       const r = img.getBoundingClientRect();
       return {w: r.width, h: r.height, natural: img.naturalWidth, alt: img.alt};
     });
-    assert('bh.g8.about-icon-renders-52-and-loads',
-      !!aboutImg && Math.round(aboutImg.w) === 52 && aboutImg.natural > 0 && aboutImg.alt === 'Gobigrams',
+    assert('bh.g8.about-icon-renders-and-loads',
+      !!aboutImg && Math.round(aboutImg.w) === 280 && aboutImg.natural > 0 && aboutImg.alt === 'Gobigrams',
       aboutImg ? `rendered ${Math.round(aboutImg.w)}x${Math.round(aboutImg.h)}px, naturalWidth ${aboutImg.natural}, alt "${aboutImg.alt}"` : 'img not found in the live About pane');
 
     /* the empty board's icon — probe board with zero nodes, BF's machinery */
@@ -145,8 +147,8 @@ try {
       const r = img.getBoundingClientRect();
       return {w: r.width, h: r.height, natural: img.naturalWidth, alt: img.alt};
     });
-    assert('bh.g9.empty-board-icon-renders-40-and-loads',
-      !!ceImg && Math.round(ceImg.w) === 40 && ceImg.natural > 0,
+    assert('bh.g9.empty-board-icon-renders-and-loads',
+      !!ceImg && Math.round(ceImg.w) === 72 && ceImg.natural > 0,
       ceImg ? `rendered ${Math.round(ceImg.w)}x${Math.round(ceImg.h)}px, naturalWidth ${ceImg.natural}, on the empty panel` : 'img not found on the empty panel');
   } finally {
     if (boardId) {
