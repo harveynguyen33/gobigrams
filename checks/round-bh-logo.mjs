@@ -76,13 +76,13 @@ const CSS = read('src/styles.css');
 
 {
   const ce = APP.slice(APP.indexOf('className="canvas-empty"'), APP.indexOf('className="canvas-empty"') + 1400);
-  const img = ce.match(/<img\s[^>]*src="\/brand\/logo\.svg"[^>]*>/);
+  const img = ce.match(/<img\s[^>]*src="\/brand\/logo-mark\.svg"[^>]*>/);
   assert('bh.g4.canvas-empty-img-above-the-title',
     !!img && /alt="Gobigrams"/.test(img[0])
       && ce.indexOf('<img') < ce.indexOf('This board is empty')
       && ce.indexOf('ce-title') < ce.indexOf('<img'),
     img ? 'icon inside .ce-title, above the title text: ' + img[0].replace(/\s+/g, ' ').slice(0, 90)
-        : 'no /brand/logo.svg <img> in the canvas-empty panel');
+        : 'no /brand/logo-mark.svg <img> in the canvas-empty panel');
 }
 
 {
@@ -93,8 +93,12 @@ const CSS = read('src/styles.css');
   aboutRule ? aboutRule.replace(/\s+/g, ' ').trim() : '.about-logo rule not found');
 
   const ceRule = rule('ce-logo');
-  assert('bh.g6.ce-logo-rule-72px-tokens-only',
-  /width:\s*72px/.test(ceRule) && /height:\s*72px/.test(ceRule)
+  /* Re-anchored (Harvey, 2026-10-24): the empty-board mark is a 240px hero with
+     aspect preserved (height:auto over the 800x440 logo-mark.svg) — the old
+     72x72 square squashed the 920x560 artwork. The guarantee kept here is
+     "display sizing only, tokens only, no inline hex". */
+  assert('bh.g6.ce-logo-rule-hero-tokens-only',
+  /width:\s*240px/.test(ceRule) && /height:\s*auto/.test(ceRule)
     && !/#[0-9a-fA-F]{3,8}\b/.test(ceRule),
   ceRule ? ceRule.replace(/\s+/g, ' ').trim() : '.ce-logo rule not found');
 
@@ -146,15 +150,15 @@ try {
     boardId = (await r0.json()).id;
     await page.request.put(`${APP_URL}api/boards/${boardId}`, {data: {id: boardId, name: `BH-PROBE-LOGO-${Date.now()}`, nodes: [], edges: []}});
     await page.goto(`${APP_URL}?board=${boardId}`, {waitUntil: 'networkidle'});
-    await page.waitForSelector('.canvas-empty img[src="/brand/logo.svg"]', {timeout: 15000});
+    await page.waitForSelector('.canvas-empty img[src="/brand/logo-mark.svg"]', {timeout: 15000});
     const ceImg = await page.evaluate(() => {
-      const img = document.querySelector('.canvas-empty img[src="/brand/logo.svg"]');
+      const img = document.querySelector('.canvas-empty img[src="/brand/logo-mark.svg"]');
       if (!img) return null;
       const r = img.getBoundingClientRect();
       return {w: r.width, h: r.height, natural: img.naturalWidth, alt: img.alt};
     });
     assert('bh.g9.empty-board-icon-renders-and-loads',
-      !!ceImg && Math.round(ceImg.w) === 72 && ceImg.natural > 0,
+      !!ceImg && Math.round(ceImg.w) === 240 && Math.abs(ceImg.w / ceImg.h - 1.82) < 0.05 && ceImg.natural > 0,
       ceImg ? `rendered ${Math.round(ceImg.w)}x${Math.round(ceImg.h)}px, naturalWidth ${ceImg.natural}, on the empty panel` : 'img not found on the empty panel');
   } finally {
     if (boardId) {
