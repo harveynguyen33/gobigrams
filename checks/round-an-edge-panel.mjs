@@ -65,6 +65,10 @@ const blankComments = src => src
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 
 const read = p => readFileSync(`${ROOT}/${p}`, 'utf8');
+/* ROUND BN PHASE A re-anchor: the AN-5 undo/redo cluster moved to
+   src/useUndoHistory.ts; the probes below read App PLUS the hook. */
+const readHook = p => { try { return read(p); } catch { return ''; }; };
+const APP_H = 'src/useUndoHistory.ts';
 const commitFile = (commit, p) =>
   execFileSync('git', ['show', `${commit}:${p}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
 const code = p => blankComments(read(p));
@@ -314,13 +318,13 @@ section('AN-4 — the FlowRail is deleted, the printed speed value stays');
 section('AN-5 — undo and redo keep the selection');
 
 {
-  const liveFn = /const liveSelection = useCallback\(\(\) => \(\{/.test(APP)
-    && /nodesRef\.current\.filter\(n => n\.selected\)\.map\(n => n\.id\)/.test(APP)
-    && /edgesRef\.current\.filter\(e => e\.selected\)\.map\(e => e\.id\)/.test(APP);
-  const survivorOnly = /const nKeep = new Set\(live\.nodes\.filter\(id => nodeIds\.has\(id\)\)\)/.test(APP)
-    && /const eKeep = new Set\(live\.edges\.filter\(id => edgeIds\.has\(id\)\)\)/.test(APP);
-  const reApplied = /setNodes\([\s\S]{0,60}selected: nKeep\.has\(n\.id\)/.test(APP)
-    && /setEdges\([\s\S]{0,60}selected: eKeep\.has\(e\.id\)/.test(APP);
+  const liveFn = /const liveSelection = useCallback\(\(\) => \(\{/.test(APP + readHook(APP_H))
+    && /nodesRef\.current\.filter\(n => n\.selected\)\.map\(n => n\.id\)/.test(readHook(APP_H))
+    && /edgesRef\.current\.filter\(e => e\.selected\)\.map\(e => e\.id\)/.test(readHook(APP_H));
+  const survivorOnly = /const nKeep = new Set\(live\.nodes\.filter\(id => nodeIds\.has\(id\)\)\)/.test(readHook(APP_H))
+    && /const eKeep = new Set\(live\.edges\.filter\(id => edgeIds\.has\(id\)\)\)/.test(readHook(APP_H));
+  const reApplied = /setNodes\([\s\S]{0,60}selected: nKeep\.has\(n\.id\)/.test(readHook(APP_H))
+    && /setEdges\([\s\S]{0,60}selected: eKeep\.has\(e\.id\)/.test(readHook(APP_H));
   assert('an5.the-live-selection-is-captured-and-re-applied-only-to-survivors',
     liveFn && survivorOnly && reApplied,
     `\`liveSelection()\` reads \`selected\` off the LIVE nodes and edges = ${liveFn}; \`applySelection\` keeps an id ` +
@@ -328,10 +332,10 @@ section('AN-5 — undo and redo keep the selection');
     `survivor set = ${reApplied}. That last clause is the edge case in the item: undoing a CREATE must clear the ` +
     `selection, because the selected entity is no longer in the graph.`);
 
-  const undoCalls = /const undo = useCallback\(\(\) => \{[\s\S]{0,400}applySelection\(prev\.nodes, prev\.edges, live\)/.test(APP);
+  const undoCalls = /const undo = useCallback\(\(\) => \{[\s\S]{0,400}applySelection\(prev\.nodes, prev\.edges, live\)/.test(APP + readHook(APP_H));
   /* a WIDER window for redo: its note between the `useCallback` and the call is
      longer than undo's, so a 400-char window stopped short of the call itself */
-  const redoCalls = /const redo = useCallback\(\(\) => \{[\s\S]{0,900}applySelection\(next\.nodes, next\.edges, live\)/.test(APP);
+  const redoCalls = /const redo = useCallback\(\(\) => \{[\s\S]{0,900}applySelection\(next\.nodes, next\.edges, live\)/.test(APP + readHook(APP_H));
   const noVerbatimRestore = !/setNodes\(prev\.nodes\)/.test(APP) && !/setNodes\(next\.nodes\)/.test(APP);
   assert('an5.both-undo-and-redo-apply-it-and-neither-restores-the-snapshot-verbatim',
     undoCalls && redoCalls && noVerbatimRestore,
@@ -342,9 +346,9 @@ section('AN-5 — undo and redo keep the selection');
 
   /* The three UI states are DERIVED from what survived, in the same SHAPE the
      selection callback uses — so the inspector cannot disagree with the canvas. */
-  const derived = /setSel\(keptNodes\[0\] \?\? null\)/.test(APP)
-    && /setSelCount\(keptNodes\.length\)/.test(APP)
-    && /setSelEdgeId\(keptEdges\.length === 1 \? keptEdges\[0\] : null\)/.test(APP);
+  const derived = /setSel\(keptNodes\[0\] \?\? null\)/.test(APP + readHook(APP_H))
+    && /setSelCount\(keptNodes\.length\)/.test(readHook(APP_H))
+    && /setSelEdgeId\(keptEdges\.length === 1 \? keptEdges\[0\] : null\)/.test(readHook(APP_H));
   const callbackShape = /setSelEdgeId\(se\.length === 1 \? se\[0\]\.id : null\)/.test(APP);
   assert('an5.sel-selCount-selEdgeId-are-derived-in-the-callbacks-own-shape',
     derived && callbackShape,
@@ -358,8 +362,8 @@ section('AN-5 — undo and redo keep the selection');
   /* AUDIT-8 re-anchor: the edge arm now ALSO copies `data` one level (the node
      arm always did) — history entries must not alias live edge objects. The
      `selected: false` normalisation is unchanged and still asserted. */
-  const snapshotClean = /edges: edgesRef\.current\.map\(e => \(\{\.\.\.e, data: \{\.\.\.\(e\.data as any\)\}, selected: false\}\)\)/.test(APP)
-    && /data: \{\.\.\.\(n\.data as any\)\}, selected: false,/.test(APP);
+  const snapshotClean = /edges: edgesRef\.current\.map\(e => \(\{\.\.\.e, data: \{\.\.\.\(e\.data as any\)\}, selected: false\}\)\)/.test(APP + readHook(APP_H))
+    && /data: \{\.\.\.\(n\.data as any\)\}, selected: false,/.test(readHook(APP_H));
   assert('an5.the-snapshot-still-normalises-selected-false',
     snapshotClean,
     `\`snapshot()\` maps every edge to \`{...e, data: {...}, selected: false}\` (AUDIT-8 added the data copy ` +

@@ -20,12 +20,16 @@ import {join} from 'node:path';
 
 const ROOT = process.env.AS_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* ROUND BN PHASE A re-anchor: pushHistory moved to src/useUndoHistory.ts;
+   read App PLUS the hook (concatenated source keeps the brace-span working). */
+let HOOK_RAW = '';
+try { HOOK_RAW = readFileSync(join(ROOT, 'src/useUndoHistory.ts'), 'utf8'); } catch {}
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, blank)
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
-const APP = stripTs(APP_RAW);
+const APP = stripTs(APP_RAW + HOOK_RAW);
 
 const results = [];
 const assert = (id, pass, detail = '') => {
