@@ -42,17 +42,24 @@ export interface ShippedEntry {
  */
 export const ROADMAP: RoadmapItem[] = [
   {
-    title: 'Templates for more diagram families',
-    desc: 'Flowchart templates ship at three levels. ERD, C4 and architecture families follow the same catalog.',
+    title: 'A canvas that mixes diagram families',
+    desc: 'Any shape on any board, with new-line defaults that follow the last style you set instead of the board\u2019s birth preset. Researched; the spec pass is next.',
     status: 'now',
     confidence: 'committed',
     area: 'editor',
   },
   {
-    title: 'Settings: the remaining panes',
-    desc: 'The Settings surface keeps filling group by group. Autosave, export defaults and the persisted canvas preferences have landed; input device is the marquee setting that already ships.',
+    title: 'Public launch',
+    desc: 'License, public repository and a hosted build so anyone can open the editor in a browser. Feedback and issue reporting shipped; the hosting decision is the gate.',
     status: 'now',
     confidence: 'committed',
+    area: 'site',
+  },
+  {
+    title: 'Rotation for shapes',
+    desc: 'Needs connection points to rotate with the shape, or every edge detaches. A round of its own, not a quick add.',
+    status: 'later',
+    confidence: 'exploring',
     area: 'editor',
   },
   {
@@ -77,15 +84,8 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'editor',
   },
   {
-    title: 'Rotation for shapes',
-    desc: 'Needs connection points to rotate with the shape, or every edge detaches. A round of its own, not a quick add.',
-    status: 'later',
-    confidence: 'exploring',
-    area: 'editor',
-  },
-  {
     title: 'More diagram notations',
-    desc: 'Beyond flowcharts, ERD, C4 and architecture — following the same shape-library and template structure.',
+    desc: 'Beyond flowcharts, ERD, C4 and architecture \u2014 following the same shape-library and template structure.',
     status: 'later',
     confidence: 'exploring',
     area: 'editor',
@@ -98,16 +98,23 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
-  {label: 'package 7', what: 'Settings completion — export defaults (PNG scale, padding), autosave control, persisted canvas preferences', when: '2026-10'},
-  {label: 'package 6', what: 'Roadmap surface — what the tool does today, next, and is exploring, in Settings → About', when: '2026-09'},
+  {label: 'round BG', what: 'Connection handles on imported art, plain arrows for every new line, feedback and issue reporting', when: '2026-10'},
+  {label: 'round BF', what: 'Per-shape resize floors and the selected-box ring for imported art \u2014 the resize snap is gone', when: '2026-10'},
+  {label: 'round AZ', what: 'Shipped fonts (Inter, JetBrains Mono) embedded in exports \u2014 files render the same on machines that have nothing installed', when: '2026-10'},
+  {label: 'round BA/AY', what: 'Real vector SVG and PNG export \u2014 text as text or outlined paths, measured pixel-accurate against the canvas', when: '2026-10'},
+  {label: 'round AT', what: 'Boards saved in the browser itself \u2014 the editor runs on a plain static host with no server', when: '2026-10'},
+  {label: 'round AS', what: 'Mermaid import that survives round-trips, and one-undo imports', when: '2026-10'},
+  {label: 'round AR', what: 'SVG export became real vector \u2014 selectable text, no flicker', when: '2026-10'},
+  {label: 'package 7', what: 'Settings completion \u2014 export defaults (PNG scale, padding), autosave control, persisted canvas preferences', when: '2026-10'},
+  {label: 'package 6', what: 'Roadmap surface \u2014 what the tool does today, next, and is exploring, in Settings \u2192 About', when: '2026-09'},
   {label: 'round 3', what: 'Colour palette, connection points, node resizing and rotation rules', when: '2026-09'},
-  {label: 'round 2', what: 'Edge utilities — labels, line markers, flow animation', when: '2026-09'},
+  {label: 'round 2', what: 'Edge utilities \u2014 labels, line markers, flow animation', when: '2026-09'},
   {label: 'round 1', what: 'Templates gallery with three difficulty levels', when: '2026-09'},
-  {label: 'package 5', what: 'Shape library — 34 shapes, search, favourites, custom SVG import', when: '2026-09'},
-  {label: 'package 4', what: 'Inspector panel — per-shape sections, icon pickers, fold state', when: '2026-09'},
-  {label: 'package 3', what: 'Settings and themes — five themes, one layout per screen size', when: '2026-09'},
-  {label: 'package 2', what: 'Multi-diagram types — flowchart, ERD, C4, architecture', when: '2026-09'},
-  {label: 'package 1', what: 'Onboarding — guided tour and a getting-started checklist', when: '2026-09'},
+  {label: 'package 5', what: 'Shape library \u2014 34 shapes, search, favourites, custom SVG import', when: '2026-09'},
+  {label: 'package 4', what: 'Inspector panel \u2014 per-shape sections, icon pickers, fold state', when: '2026-09'},
+  {label: 'package 3', what: 'Settings and themes \u2014 five themes, one layout per screen size', when: '2026-09'},
+  {label: 'package 2', what: 'Multi-diagram types \u2014 flowchart, ERD, C4, architecture', when: '2026-09'},
+  {label: 'package 1', what: 'Onboarding \u2014 guided tour and a getting-started checklist', when: '2026-09'},
 ];
 
 /**
@@ -115,4 +122,4 @@ export const SHIPPED: ShippedEntry[] = [
  * NOT a warning, a badge or a banner, and it changes nothing else: deleting this
  * one element is the whole change if it is ever dropped.
  */
-export const ROADMAP_REVIEWED = '2026-09-22';
+export const ROADMAP_REVIEWED = '2026-10-24';

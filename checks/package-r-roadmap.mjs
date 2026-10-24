@@ -133,7 +133,10 @@ if (!M) {
      not a pin. A pinned count goes RED on every future legitimate append, which
      is the same mistake the hex ratchet avoids by bounding, not pinning. */
   assert('r4  SHIPPED.length >= 8 (append-only ratchet)', SHIPPED.length >= 8, `measured ${SHIPPED.length}`);
-  assert('r5  ROADMAP_REVIEWED is 2026-09-22', ROADMAP_REVIEWED === '2026-09-22',
+  /* 2026-10-24 re-anchor: the reviewed line moved with the BF/BG review pass
+     (the pane's honest provenance — it tracks the last real review, and pinning
+     it to a past date would claim a review that did not happen). */
+  assert('r5  ROADMAP_REVIEWED is 2026-10-24', ROADMAP_REVIEWED === '2026-10-24',
     `measured ${JSON.stringify(ROADMAP_REVIEWED)}`);
 
   /* --- the no-dates rule (spec §2, the non-negotiable one) ----------------
@@ -180,19 +183,26 @@ if (!M) {
      order meaningful (numbers descend inside each family, families do not
      interleave). A comment saying "newest first" proves nothing. */
   /* PACKAGE-S re-anchor: package 6 + 7 appended (newest first). The probe keeps
-     checking the FULL sequence so an out-of-order insert still goes red. */
-  const EXPECT_ORDER = ['package 7', 'package 6', 'round 3', 'round 2', 'round 1', 'package 5', 'package 4', 'package 3', 'package 2', 'package 1'];
+     checking the FULL sequence so an out-of-order insert still goes red.
+     2026-10-24 re-anchor: the AR..BG arc prepended (newest first); the full
+     sequence stays pinned so an out-of-order insert still goes red. */
+  const EXPECT_ORDER = ['round BG', 'round BF', 'round AZ', 'round BA/AY', 'round AT', 'round AS', 'round AR', 'package 7', 'package 6', 'round 3', 'round 2', 'round 1', 'package 5', 'package 4', 'package 3', 'package 2', 'package 1'];
   const gotOrder = SHIPPED.map((s) => s.label);
   assert('r10 the shipped rows are in the spec order, newest first',
     gotOrder.length === EXPECT_ORDER.length && gotOrder.every((l, i) => l === EXPECT_ORDER[i]),
     `measured [${gotOrder.join(', ')}]`);
 
+  /* 2026-10-24 re-anchor: the AR..BG arc prepended. Those labels are LETTER
+     rounds (no trailing number) — their order is pinned by r10's full-sequence
+     probe instead. This loop keeps policing the NUMBERED families only; a
+     letter label that reaches it is skipped, not failed. */
   let desc = true, prevFam = null, prevN = Infinity;
   for (const s of SHIPPED) {
     const n = Number((s.label.match(/(\d+)\s*$/) || [])[1]);
+    if (!Number.isFinite(n)) continue;
     const f = s.label.replace(/\s*\d+$/, '').trim();
     if (f !== prevFam) { prevFam = f; prevN = Infinity; }
-    if (!Number.isFinite(n) || n > prevN) { desc = false; break; }
+    if (n > prevN) { desc = false; break; }
     prevN = n;
   }
   assert('r10b the numbers descend within each family and the families never interleave', desc,
