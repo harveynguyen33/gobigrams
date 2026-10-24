@@ -6299,7 +6299,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
           <div style={{position: 'relative'}}>
             <Tooltip label="Export / Import — scope, format, theme and a live preview">
               <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setExpOpen(true)}>
-                Export
+                <Upload size={13} style={{verticalAlign: -2}} /> Export
               </button>
             </Tooltip>
           </div>
