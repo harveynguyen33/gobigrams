@@ -74,6 +74,13 @@ export const ACTOR_ENABLED = false;
        keeps its nodes (shape rendering never consults this flag).
        HARVEY 2026-10-23 — the ERD preset itself stays in PRESETS (a stored
        erd board must still open as ERD); only its palette offer is gated.
+       HARVEY 2026-10-24 — the TEMPLATE is gated too (same flag, same
+       narrowness as C4_ENABLED's template gate): `templates` is the sole
+       source of the catalog's `erd` family, so gating the spread drops the
+       "Data model" family from the template catalog + gallery, and with no
+       templates a fresh ERD board is unreachable from every create path.
+       The `erd` key STAYS in PRESETS and erdTemplate stays in the tree —
+       a stored board with preset:'erd' still opens as ERD.
      · LANE_ENABLED — the swimlane; Harvey: Group and Lane are near-duplicates
        (both shape 'group', both a dashed boundary; Lane only adds a 420×200
        default size + swimlane aliases), so Lane goes, Group stays.
@@ -1189,7 +1196,16 @@ export const ERD_PRESET: DiagramPreset = {
   theme: {suggested: 'dark', canvas: 'plain', showLegend: true},
   guidance: {tip: 'Every table needs a primary key; draw the relationship from the FK column to the column it references.'},
   caps: {subflow: false, cyclePrevention: false, oneInput: false, resizable: true},
-  templates: [erdTemplate],
+  /* ERD_ENABLED (2026-10-24, HARVEY: template not needed yet) — the EXACT
+     C4_ENABLED pattern (see C4_PRESET's spread): the templates ARE the ERD
+     create offer, so the flag gates them. `templates: undefined` drops the
+     whole "Data model" family from `templateCatalog()` (a preset with no
+     templates contributes no family), hence from the gallery and the board
+     dialog; with no template a fresh ERD board is unreachable from every
+     create path. The erdTemplate spec stays in the tree and the `erd` key
+     stays in PRESETS — a STORED erd board still opens, renders and saves as
+     ERD. Flip ERD_ENABLED to true to put the family back. */
+  ...(ERD_ENABLED ? {templates: [erdTemplate]} : {}),
   showMode: 'ALL_FIELDS',
   note: 'FK edges attach column-to-column. Crow’s feet show cardinality: ring = zero, bar = one, foot = many.',
   legend: [
