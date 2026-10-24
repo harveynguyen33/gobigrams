@@ -93,8 +93,10 @@ assert('bh.n2.tour-welcomes-gobigrams',
   'Tour.tsx step 1 title');
 
 const APP = read('src/App.tsx');
+/* header follow-up re-anchor: the fake dot + 'diagrams' suffix were replaced by
+   the real brand mark (same turn) — the wordmark guarantee is now on the mark+name. */
 assert('bh.n3.brand-bar-wordmark-is-gobigrams',
-  APP.includes('<span className="dot" />Gobigrams<span className="path">diagrams</span>'),
+  APP.includes('<img className="brand-mark" src="/brand/icon-g.svg"') && /aria-hidden="true" \/>\s*Gobigrams/.test(APP),
   'App.tsx palette brand bar');
 
 assert('bh.n4.pdf-fallback-title-is-gobigrams',
