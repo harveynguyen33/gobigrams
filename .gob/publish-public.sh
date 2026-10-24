@@ -11,15 +11,16 @@
 #
 # Usage:  .gob/publish-public.sh [--push]
 set -euo pipefail
-cd "$(dirname "$0")/.."
-ROOT=$(pwd)
 
-# This script lives in the private tree (.gob/), which the publish itself removes
-# from the public branch — switching branches would delete the file WHILE bash is
-# still reading it. Re-exec from a temp copy so the run cannot be cut in half.
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+# .gob/ does not exist on the snapshot branch, so switching branches would delete
+# this file while bash is still reading it. Re-exec from the git dir (never checked
+# out of the snapshot, never cleaned) so the run cannot be cut in half.
 if [ -z "${PUBLISH_REEXEC:-}" ]; then
-  cp "$0" /tmp/publish-public.$$.sh
-  PUBLISH_REEXEC=1 exec bash /tmp/publish-public.$$.sh "$@"
+  cp "$0" "$ROOT/.git/publish-public.run.sh"
+  PUBLISH_REEXEC=1 exec bash "$ROOT/.git/publish-public.run.sh" "$@"
 fi
 
 if [ -n "$(git status --porcelain)" ]; then
