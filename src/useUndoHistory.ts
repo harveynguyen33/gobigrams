@@ -118,5 +118,8 @@ export function useUndoHistory(
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
 
-  return {past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo};
+/* Tuple return, not an object: the bundle ratchet counts raw bytes and object
+   property names survive minification (measured: -107 bytes vs the object
+   return). Order is documented here and the call site destructures positionally. */
+  return [past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo] as const;
 }
