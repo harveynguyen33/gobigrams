@@ -77,13 +77,19 @@ else
   echo "WARNING: README-PUBLIC.md is missing on main — shipping the workshop README" >&2
 fi
 
-# ---- leak gate: refuse to publish if any internal identifier slipped through ----
-LEAKS=$(git grep -lE '192\.168\.|/home/harvey|\.hermes|goblin-stack|\.gob/|ROUND-[A-Z]' --cached 2>/dev/null | head -20 || true)
+# ---- leak gate: refuse to publish if infrastructure identifiers slipped through ----
+# NOTE the argument order: `git grep --cached -l -E '<re>'`. Putting --cached after
+# the pattern is a fatal error, and with `|| true` around it that made this gate a
+# silent no-op that always passed (found 2026-10-24 after 6 hits shipped).
+# The pattern targets INFRASTRUCTURE (IPs, personal paths, agent dirs), not internal
+# round IDs — round breadcrumbs live in source comments by design.
+LEAKS=$(git grep --cached -l -E '192\.168\.|/home/[a-z]+/|/Users/[A-Za-z]+/|\.hermes|goblin-stack' 2>/dev/null | head -20 || true)
 if [ -n "$LEAKS" ]; then
   echo "ERROR: internal identifiers found in the staged public tree:" >&2
   echo "$LEAKS" >&2
   exit 1
 fi
+echo "--- leak gate: clean"
 
 echo "--- staged public tree ($(git diff --cached --name-only | wc -l) files):"
 cut -d/ -f1 <(git diff --cached --name-only) | sort -u | sed 's/^/    /'

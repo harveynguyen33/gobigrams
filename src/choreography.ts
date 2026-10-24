@@ -5,7 +5,7 @@
  * (classList.add/remove on `.react-flow__node[data-id]` /
  * `.react-flow__edge[data-id]`), so hovering never causes a React render.
  * Technique source: EventCatalog `packages/visualiser` (MIT) — see
- * `/home/harvey/ec-research/eventcatalog-reactflow-report.md` T1/T3/T4/T11.
+ * internal research notes, sections T1/T3/T4/T11.
  */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Edge} from '@xyflow/react';
