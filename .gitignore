@@ -22,8 +22,8 @@ dist/
 .env.local
 *.local
 
-# >>> goblin-stack >>>
-# goblin-stack runtime state (gates write these; they are not fixture)
+# >>> agent harness runtime state >>>
+# runtime state written by the local gate runner (not fixtures)
 .gob/last-gate-line
 .gob/.ds-report
 .gob/ratchet-last
@@ -34,7 +34,7 @@ dist/
 *.key
 # declared runtime_data (DS-01 hashes them around every gate run)
 .gob/state.json
-# <<< goblin-stack <<<
+# <<< agent harness runtime state <<<
 
 # research artifacts (deep-dive reports, harnesses)
 research/
