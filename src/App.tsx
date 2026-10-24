@@ -4642,6 +4642,16 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [theme, pngScale, buildSvg]);
 
+  /* ROUND BI — the feedback dialog's screenshot helper reuses THIS export path
+     verbatim (SVG emitter → rasterise, the same string the .png download gets):
+     one painter per pixel class, no second renderer. It resolves a DATA URL and
+     the pure clipboard module turns it into a Blob; App passes null when the
+     board is empty, which is what makes the helper row disappear. */
+  const boardPngForFeedback = useCallback(
+    () => buildPng({nodes, edges, theme}),
+    [buildPng, nodes, edges, theme],
+  );
+
   /* ROUND C — the print PDF route (Harvey-approved route (i)): build the
    * SAME svg string the .svg download gets (theme/scope already baked by
    * the caller; outline rides `outline: true` — the modal's checkbox
@@ -6484,6 +6494,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
           autosave={autosave}
           onAutosave={onAutosave}
           returnFocusTo={settingsBtnRef}
+          boardPng={nodes.length ? boardPngForFeedback : null}
         />
 
         <input

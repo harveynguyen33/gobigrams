@@ -27,11 +27,20 @@
 import {useEffect, useRef, useState} from 'react';
 import {FOCUSABLE} from './Settings';
 import {buildFeedbackIssueUrl, FEEDBACK_ISSUES_URL, type FeedbackKind} from './feedbackIssueUrl';
+/* ROUND BI — the screenshot helper's brain (clipboard + data URL → Blob). Pure,
+   injectable, harness-executable; see src/boardClipboard.ts for why there is no
+   upload and why the ClipboardItem is built synchronously. */
+import {clipboardUsable, copyPngToClipboard} from './boardClipboard';
 
 type Props = {
   onCancel: () => void;
   /** Focus restore, Settings.tsx's contract: on close, `.current?.focus()`. */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
+  /** ROUND BI — the CURRENT board as a PNG data URL, produced by the app's
+   *  existing export path (App's `buildPng`: SVG emitter → rasterise). App
+   *  passes null on an empty board, so this doubles as the "is there anything
+   *  to attach" gate and the helper row renders nothing at all. */
+  boardPng?: (() => Promise<string>) | null;
 };
 
 const KINDS: {key: FeedbackKind; label: string; hint: string}[] = [
@@ -39,15 +48,32 @@ const KINDS: {key: FeedbackKind; label: string; hint: string}[] = [
   {key: 'feature', label: 'Feature', hint: 'a shape, tool or improvement'},
 ];
 
-export default function FeedbackDialog({onCancel, returnFocusTo}: Props) {
+export default function FeedbackDialog({onCancel, returnFocusTo, boardPng}: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
   const [email, setEmail] = useState('');
+  /* ROUND BI — the screenshot helper's three states. 'idle' is the button,
+     'copied' swaps the label and adds the hairline note, 'failed' shows the
+     manual-screenshot line. Never a spinner, never a blocker. */
+  const [shot, setShot] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const canSubmit = title.trim().length > 0;
+  /* The row exists only when there IS something to copy (App passes null for an
+     empty board) AND the browser can take an image. Plain-http LAN origins
+     expose neither clipboard API, so they simply never see the row. */
+  const canAttach = !!boardPng && clipboardUsable();
+
+  /* Copy the board as a PNG. Fire-and-forget by design: the caller (a click, or
+     Send) must not wait on the rasterise or on a permission answer. */
+  const copyShot = () => {
+    if (!boardPng) return;
+    void copyPngToClipboard({buildDataUrl: boardPng}).then(r => {
+      setShot(r.ok ? 'copied' : 'failed');
+    });
+  };
 
   // Keep the latest handler for the document listener without re-binding it.
   const cancelRef = useRef(onCancel);
@@ -97,6 +123,11 @@ export default function FeedbackDialog({onCancel, returnFocusTo}: Props) {
 
   const submit = () => {
     if (!canSubmit) return;
+    /* ROUND BI — the screenshot rides along: copy the board as a PNG FIRST,
+       still inside this click's gesture (Safari only accepts a ClipboardItem
+       created synchronously during it), and do not wait for it. A refused
+       clipboard costs the user a manual screenshot, never the Send. */
+    void copyShot();
     /* The ONLY network act in the flow: open the prefilled form. window.open
        with noopener,noreferrer — the same no-new-handle guarantees as the
        app's existing target=_blank + rel anchors. The dialog stays open under
@@ -182,6 +213,35 @@ export default function FeedbackDialog({onCancel, returnFocusTo}: Props) {
             onChange={e => setEmail(e.target.value)}
           />
         </div>
+
+        {/* ROUND BI — the screenshot helper, above the actions. The app copies
+            the board as a PNG; the user pastes it into the GitHub body, where
+            GitHub's own uploader hosts it. Nothing is uploaded from here, and
+            the row only exists when there is a board to copy AND the clipboard
+            can take an image — no dead button on an empty board or a plain-http
+            origin. */}
+        {canAttach && (
+          <div className="fb-shot" data-fb-shot={shot}>
+            <button
+              type="button"
+              className="bd-btn fb-shot-btn"
+              data-fb-copy
+              onClick={copyShot}
+            >
+              {shot === 'copied'
+                ? 'Copied — paste it in the GitHub body (Ctrl+V / ⌘V)'
+                : 'Copy board as PNG'}
+            </button>
+            {shot === 'copied' && (
+              <span className="fb-shot-note">GitHub uploads pasted images for you.</span>
+            )}
+            {shot === 'failed' && (
+              <span className="fb-shot-err">
+                Couldn't copy — take a screenshot manually and paste it in the GitHub body.
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="fb-actions">
           <button type="button" className="bd-btn" onClick={onCancel}>Cancel</button>

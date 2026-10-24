@@ -106,6 +106,10 @@ type Props = {
   onZOrder: (m: ZOrderMode) => void;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
+  /** ROUND BI — the current board as a PNG data URL, through App's existing
+   *  export path (buildPng). Null on an empty board: the feedback dialog's
+   *  screenshot helper then renders nothing. */
+  boardPng?: (() => Promise<string>) | null;
 };
 
 /* ITEM 6b (2026-09-18) — EXPORTED so `BoardDialog.tsx` reuses this exact
@@ -538,7 +542,7 @@ function RoadmapBlock() {
   );
 }
 
-function AboutPane() {
+function AboutPane({boardPng}: {boardPng?: (() => Promise<string>) | null}) {
   /* HARVEY 2026-10-13 — the pane rewrite: wordmark + joke, bare version number,
      no Licence/Building-blocks rows (licensing is pending its own decision, and
      a displayed MIT row contradicts the anti-reverse-engineering direction),
@@ -584,7 +588,11 @@ function AboutPane() {
         </button>
       </p>
       {fbOpen && (
-        <FeedbackDialog onCancel={() => setFbOpen(false)} returnFocusTo={fbBtnRef} />
+        <FeedbackDialog
+          onCancel={() => setFbOpen(false)}
+          returnFocusTo={fbBtnRef}
+          boardPng={boardPng}
+        />
       )}
       <RoadmapBlock />
     </>
@@ -604,6 +612,7 @@ export default function Settings({
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
   returnFocusTo,
+  boardPng,
 }: Props) {
   const [cat, setCat] = useState<SettingsCat>('appearance');
   const [query, setQuery] = useState('');
@@ -727,7 +736,7 @@ export default function Settings({
         />
       );
       case 'keys':        return <KeyboardPane />;
-      case 'about':       return <AboutPane />;
+      case 'about':       return <AboutPane boardPng={boardPng} />;
       default:            return <AppearancePane mode={mode} onMode={onMode} resolved={resolved} />;
     }
   })();

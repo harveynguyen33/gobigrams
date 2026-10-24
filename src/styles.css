@@ -5289,6 +5289,21 @@ kbd {
 .fb-note a { color: var(--dim); border-bottom: 1px solid var(--border); text-decoration: none; }
 .fb-note a:hover,
 .fb-note a:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
+/* ROUND BI — the screenshot helper row: a hairline separation above the actions,
+   the copy button, and the two inline lines (success note / failure line). No
+   colour is invented here: bg/fg/dim/danger already carry these meanings. */
+.fb-shot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.fb-shot-btn { font-size: var(--fs-sm); }
+.fb-shot-note { font-size: var(--fs-xs); color: var(--dim); }
+.fb-shot-err { font-size: var(--fs-xs); color: var(--danger); }
 
 /* ---------- ROUND BH: the Gobigrams logo in the app ----------
    The ROUND BF brand asset (public/brand/logo.svg) at its two surfaces.

@@ -64,15 +64,22 @@ console.log('='.repeat(78));
 console.log('STATIC — src/FeedbackDialog.tsx, src/feedbackIssueUrl.ts, Settings wiring, CSS');
 console.log('='.repeat(78));
 
-let DLG = '', SET = '', CSS = '';
+let DLG = '', SET = '', CSS = '', CB = '', APP = '';
 try {
   DLG = blank(read('src/FeedbackDialog.tsx'));
+  /* ROUND BI — the screenshot helper's brain: a pure, React-free module the
+     harness can BUNDLE AND EXECUTE (the bh.u* discipline applied to the new
+     code path), so the clipboard contract is proved by behaviour and not only
+     by regex. */
+  try { CB = blank(read('src/boardClipboard.ts')); } catch { CB = ''; }
   assert('bh.s1.dialog-file-exists', true, 'src/FeedbackDialog.tsx reads and comment-blanks cleanly');
 } catch {
   assert('bh.s1.dialog-file-exists', false, 'src/FeedbackDialog.tsx not found (RED on the pre-change commit)');
 }
 try { SET = blank(read('src/Settings.tsx')); } catch { /* probed below */ }
 try { CSS = read('src/styles.css'); } catch { /* probed below */ }
+/* ROUND BI, ITEM 3 (help-sheet entry) lives in App.tsx; this harness reads it
+   in the commit that adds it. */
 
 if (DLG) {
   assert('bh.s2.focusable-imported-from-settings-one-definition',
@@ -127,12 +134,79 @@ if (DLG) {
       && /Or browse the issue tracker/.test(DLG)
       && /target="_blank"/.test(DLG) && /rel="noopener noreferrer"/.test(DLG),
     "caption states the GitHub hand-off ('press Submit there') + a plain 'browse the issue tracker' anchor, new tab + noopener noreferrer");
+
+  /* ------------------------------------------------------------------------
+     ROUND BI, ITEM 1 — THE SCREENSHOT HELPER (the honest static-host pattern,
+     continued): the app copies the CURRENT board to the clipboard as a PNG and
+     the user pastes it into the GitHub body, where GITHUB's own uploader hosts
+     the image. No backend, no token, no upload from the app — the only network
+     act stays window.open.
+     ------------------------------------------------------------------------ */
+
+  /* (i) the clipboard path exists AND is feature-detected. The gate is
+     `boardPng` (non-empty board, supplied by App) AND `clipboardUsable()`
+     (navigator.clipboard + window.ClipboardItem); when either is false the row
+     does not render at all — no dead button. */
+  assert('bh.s14.screenshot-helper-feature-detected-and-gated',
+    /Copy board as PNG/.test(DLG)
+      && /\{canAttach\s*&&/.test(DLG)
+      && /clipboardUsable\(\)/.test(DLG)
+      && /boardPng\?\s*:/.test(DLG)
+      && /navigator\.clipboard/.test(CB)
+      && /window\.ClipboardItem/.test(CB)
+      && /ClipboardItem/.test(CB),
+    `dialog renders the row only under {canAttach && ...} (boardPng prop AND clipboardUsable()); the pure module detects navigator.clipboard + window.ClipboardItem`);
+
+  /* the three pieces of copy the row must say, verbatim: the success label,
+     the hairline note, and the non-blocking failure line. */
+  assert('bh.s15.screenshot-helper-copy-is-honest',
+    /Copied — paste it in the GitHub body \(Ctrl\+V \/ ⌘V\)/.test(DLG)
+      && /GitHub uploads pasted images for you\./.test(DLG)
+      && /Couldn't copy — take a screenshot manually and paste it in the GitHub body\./.test(DLG),
+    'success label names the paste step + the Ctrl+V / ⌘V hint; the hairline note credits GitHub\'s uploader; failure is a manual-screenshot instruction');
+
+  /* (ii) NO upload/POST/token regression: the new code adds no transport. The
+     clipboard is a BROWSER API — it moves bytes to the user's own clipboard,
+     never to a server. */
+  assert('bh.s16.no-upload-no-post-no-secret-in-the-new-code',
+    !/fetch\s*\(/.test(DLG + CB) && !/XMLHttpRequest/.test(DLG + CB)
+      && !/new\s+Request\s*\(/.test(DLG + CB) && !/FormData/.test(DLG + CB)
+      && !/method\s*:\s*'POST'/i.test(DLG + CB) && !/Authorization/i.test(DLG + CB)
+      && !/api\.github\.com/.test(DLG + CB) && !/token/i.test(DLG + CB)
+      && !/sendBeacon/.test(DLG + CB) && !/WebSocket/.test(DLG + CB),
+    'dialog + boardClipboard.ts carry no fetch/XHR/Request/FormData/POST/Authorization/api.github.com/beacon/socket — the clipboard is a browser API, and the only network act is still window.open');
+
+  /* (iii) Send is NOT gated on the copy. The submit handler fires the copy and
+     then opens the form in the SAME gesture: fire-and-forget (`void`), never
+     awaited, and its only `return` is the can-submit guard ABOVE the copy. A
+     refused clipboard must cost the user nothing. */
+  const submitSrc = (() => {
+    const s0 = DLG.indexOf('const submit =');
+    if (s0 < 0) return '';
+    const s1 = DLG.indexOf('\n  };', s0);
+    return s1 > s0 ? DLG.slice(s0, s1) : DLG.slice(s0, s0 + 1400);
+  })();
+  const submitReturns = (submitSrc.match(/\breturn\b/g) || []).length;
+  assert('bh.s17.send-is-not-gated-on-the-copy',
+    submitSrc.length > 0
+      && /void copyShot\(\)/.test(submitSrc)
+      && !/await copyShot/.test(submitSrc)
+      && submitReturns === 1
+      && submitSrc.indexOf('return') < submitSrc.indexOf('void copyShot()')
+      && submitSrc.indexOf('window.open(') > submitSrc.indexOf('void copyShot()'),
+    `submit body: ${submitReturns} return (the can-submit guard, above the copy), copy fired as \`void copyShot()\` without await, window.open AFTER it — a failed copy cannot block Send`);
+
+  /* ITEM 2 — the title placeholder must fit the field: the old sentence was cut
+     mid-word ("...what happened, or what you") at desktop width. */
 }
 
 if (SET) {
   /* the label sits in a button whose onClick arrow (`=>`) breaks a [^>]* tag
-     regex, so the tag block is SLICED between the literal delimiters instead */
-  const about = SET.slice(SET.indexOf('function AboutPane()'), SET.indexOf('the shell'));
+     regex, so the tag block is SLICED between the literal delimiters instead.
+     ROUND BI re-anchor: the anchor dropped its `()` — AboutPane now takes a
+     props object ({boardPng}, the screenshot helper's board supplier), so a
+     literal 'function AboutPane()' no longer exists. Same body, same contract. */
+  const about = SET.slice(SET.indexOf('function AboutPane('), SET.indexOf('the shell'));
   const fbBtn = about.slice(about.indexOf('<button'), about.indexOf('</button>'));
   assert('bh.s10.about-entry-is-the-dialog-opener',
     fbBtn.includes(FEEDBACK_LABEL) && fbBtn.includes('setFbOpen(true)')
@@ -231,6 +305,139 @@ if (!M) {
       return body.includes('Contact: —') && !body.includes('\n\n\n');
     })(),
     'an empty email renders a placeholder dash (Contact: —), not a blank line');
+}
+
+/* ===========================================================================
+   UNIT 2 (ROUND BI) — the clipboard helper EXECUTED (esbuild, same technique):
+   the copy path is proved by BEHAVIOUR, not by regex. `ClipboardItem` and
+   `navigator.clipboard` are injected, so the module's real logic runs in Node
+   with no browser and no permission prompt.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log('UNIT 2 — copyPngToClipboard executed via esbuild (injected clipboard)');
+console.log('='.repeat(78));
+
+/* a REAL 3x3 PNG (colour type 2) — the base64 the rasteriser would hand over */
+const PNG64 = 'iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAAEElEQVR4nGP4H6ABQQxYWADNbg0wAv7yggAAAABJRU5ErkJggg==';
+const PNG_DATA_URL = `data:image/png;base64,${PNG64}`;
+const PNG_BYTES = Buffer.from(PNG64, 'base64');
+
+let CBM = null;
+try {
+  const outDir = mkdtempSync(join(tmpdir(), 'ds-bi-clip-'));
+  const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
+  let built = null;
+  if (existsSync(ESBUILD)) {
+    for (const [fmt, ext] of [['esm', '.mjs'], ['cjs', '.cjs']]) {
+      const out = join(outDir, `clip${ext}`);
+      try {
+        execFileSync(ESBUILD, [resolve(ROOT, 'src/boardClipboard.ts'), '--bundle', `--format=${fmt}`, `--outfile=${out}`], {stdio: 'pipe'});
+        built = out; break;
+      } catch { /* try the next format */ }
+    }
+  }
+  if (built) CBM = await import(pathToFileURL(built).href);
+  rmSync(outDir, {recursive: true, force: true});
+} catch { CBM = null; }
+
+if (!CBM) {
+  assert('bh.u7.clipboard-module-bundles-and-executes', false,
+    'src/boardClipboard.ts could not be bundled and executed (RED on the pre-change commit: the file does not exist)');
+} else {
+  assert('bh.u7.clipboard-module-bundles-and-executes',
+    typeof CBM.copyPngToClipboard === 'function' && typeof CBM.pngBlobFromDataUrl === 'function'
+      && typeof CBM.clipboardUsable === 'function',
+    'exports copyPngToClipboard + pngBlobFromDataUrl + clipboardUsable');
+
+  /* --- feature detection: BOTH halves are required, and a missing half is a
+     silent false (the caller then renders no button at all). --- */
+  const withClipboard = {clipboard: {write: async () => {}}};
+  assert('bh.u8.feature-detection-needs-both-halves',
+    CBM.clipboardUsable(withClipboard, function FakeCI() {}) === true
+      && CBM.clipboardUsable(withClipboard, undefined) === false
+      && CBM.clipboardUsable({}, function FakeCI() {}) === false
+      && CBM.clipboardUsable(null, function FakeCI() {}) === false,
+    'true only when navigator.clipboard.write AND window.ClipboardItem both exist; every half-missing case is a plain false');
+
+  /* --- the data URL → Blob conversion is byte-exact and typed image/png --- */
+  let blobOk = false, blobBytes = 0, blobType = '';
+  try {
+    const b = CBM.pngBlobFromDataUrl(PNG_DATA_URL);
+    blobType = b.type;
+    const u8 = new Uint8Array(await b.arrayBuffer());
+    blobBytes = u8.length;
+    blobOk = Buffer.from(u8).equals(PNG_BYTES)
+      /* PNG signature — the bytes really are a PNG, not the string re-wrapped */
+      && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
+  } catch { blobOk = false; }
+  assert('bh.u9.data-url-becomes-a-real-png-blob',
+    blobOk && blobType === 'image/png' && blobBytes === PNG_BYTES.length,
+    `${blobBytes} bytes, type=${blobType}, PNG signature intact — byte-exact against the base64 source`);
+  let rejectedNonPng = false;
+  try { CBM.pngBlobFromDataUrl('data:image/jpeg;base64,AAAA'); } catch { rejectedNonPng = true; }
+  assert('bh.u9b.non-png-data-url-is-rejected', rejectedNonPng,
+    'a non-PNG data URL throws instead of silently uploading the wrong format');
+
+  /* --- THE SAFARI CONTRACT: the ClipboardItem is constructed SYNCHRONOUSLY,
+     during the gesture, holding a PROMISE value (never an awaited Blob). --- */
+  const ctorCalls = [];
+  class SpyItem {
+    constructor(data) { ctorCalls.push(data); this._d = data; this.types = Object.keys(data); }
+    getType(t) { return Promise.resolve(this._d[t]); }
+  }
+  const written = [];
+  const okNav = {clipboard: {write: async (items) => {
+    const b = await items[0].getType('image/png');
+    written.push({size: b.size, type: b.type});
+  }}};
+  const pending = CBM.copyPngToClipboard({
+    buildDataUrl: async () => PNG_DATA_URL, nav: okNav, ClipboardItemCtor: SpyItem,
+  });
+  /* BEFORE any await: the item exists, was built synchronously, and its value
+     is a PROMISE — that is what Safari's gesture check accepts. */
+  const syncOk = ctorCalls.length === 1
+    && Object.keys(ctorCalls[0])[0] === 'image/png'
+    && typeof ctorCalls[0]['image/png'].then === 'function';
+  const outcome = await pending;
+  assert('bh.u10.clipboard-item-built-synchronously-with-a-promise-value',
+    syncOk && outcome.ok === true && written.length === 1
+      && written[0].size === PNG_BYTES.length && written[0].type === 'image/png',
+    `item constructed synchronously inside the call (types=[image/png], value is a Promise), write() then received a real ${written[0]?.size ?? '?'}-byte image/png — the Safari gesture contract`);
+
+  /* --- the build failing must be an OUTCOME, never a thrown error --- */
+  let threw = false, buildOutcome = null;
+  try {
+    buildOutcome = await CBM.copyPngToClipboard({
+      buildDataUrl: async () => '', nav: okNav, ClipboardItemCtor: SpyItem,
+    });
+  } catch { threw = true; }
+  assert('bh.u11.rasterise-failure-is-an-outcome-not-a-throw',
+    !threw && buildOutcome && buildOutcome.ok === false && buildOutcome.reason === 'build',
+    `an empty/broken PNG build resolves {ok:false, reason:'build'} — the caller shows the manual-screenshot line and keeps Send working`);
+
+  /* --- a refused clipboard (permission denied) is also an outcome --- */
+  const denyNav = {clipboard: {write: async () => { throw new DOMException('denied', 'NotAllowedError'); }}};
+  let denied = null, deniedThrew = false;
+  try {
+    denied = await CBM.copyPngToClipboard({
+      buildDataUrl: async () => PNG_DATA_URL, nav: denyNav, ClipboardItemCtor: SpyItem,
+    });
+  } catch { deniedThrew = true; }
+  assert('bh.u12.denied-clipboard-is-an-outcome-not-a-throw',
+    !deniedThrew && denied && denied.ok === false && denied.reason === 'denied',
+    `a refused clipboard resolves {ok:false, reason:'denied'} — nothing propagates into the Send handler`);
+
+  /* --- unsupported (the static-host reality: plain-http LAN origins expose
+     neither API) short-circuits BEFORE any rasterise work is done --- */
+  let builtWhenUnsupported = false;
+  const unsupportedOutcome = await CBM.copyPngToClipboard({
+    buildDataUrl: async () => { builtWhenUnsupported = true; return PNG_DATA_URL; },
+    nav: {}, ClipboardItemCtor: undefined,
+  });
+  assert('bh.u13.unsupported-short-circuits-without-rasterising',
+    unsupportedOutcome && unsupportedOutcome.ok === false && unsupportedOutcome.reason === 'unsupported'
+      && !builtWhenUnsupported,
+    'no clipboard support ⇒ {ok:false, reason:"unsupported"} and the export pipeline is never run');
 }
 
 /* ===========================================================================
@@ -342,6 +549,152 @@ try {
   }
 } catch (e) {
   assert('bh.live-pass-ran', false, `the live pass could not run: ${String(e).slice(0, 300)}`);
+}
+
+/* ===========================================================================
+   LIVE 2 (ROUND BI) — the screenshot helper on the real dev server.
+   Two probe boards (empty / one node), the REAL export pipeline rasterising to
+   a REAL PNG, an injected clipboard so the bytes can be inspected without a
+   permission prompt, and a DENYING clipboard to prove Send still opens GitHub.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log(`LIVE 2 — screenshot helper: ${APP_URL}`);
+console.log('='.repeat(78));
+
+const probeBoardIds = [];
+try {
+  const require_ = createRequire(join('/home/harvey/projects/tech-goblin/package.json', 'noop.js'));
+  const {chromium} = require_('playwright-core');
+  const browser = await chromium.launch();
+  const page = await browser.newPage({viewport: {width: 1500, height: 900}});
+  try {
+    await page.addInitScript(() => {
+      localStorage.setItem('diagram-studio:tour-seen', '1');
+      localStorage.removeItem('diagram-studio:last-board');
+      window.open = (u) => { (window.__fbUrls ||= []).push(String(u)); return null; };
+      /* THE INJECTION: the dev server is a plain-http LAN origin, which is NOT
+         a secure context — the browser exposes neither navigator.clipboard nor
+         ClipboardItem there, so the helper correctly renders nothing. To prove
+         the COPY path itself we supply the two globals (a spy that records the
+         real rasterised bytes instead of touching the OS clipboard) and one
+         switch (`__clipMode`) that makes write() refuse like a denied
+         permission. */
+      window.__clipMode = 'ok';
+      window.__copied = null;
+      window.ClipboardItem = class {
+        constructor(data) { this._d = data; this.types = Object.keys(data); }
+        getType(t) { return Promise.resolve(this._d[t]); }
+      };
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          write: async (items) => {
+            if (window.__clipMode === 'deny') throw new DOMException('denied', 'NotAllowedError');
+            const b = await items[0].getType('image/png');
+            const u8 = new Uint8Array(await b.arrayBuffer());
+            window.__copied = {size: b.size, type: b.type, head: [...u8.slice(0, 4)]};
+          },
+        },
+      });
+    });
+
+    const mkBoard = async (name, nodes) => {
+      const r = await page.request.post(`${APP_URL}api/boards`, {data: {name}});
+      const id = (await r.json()).id;
+      probeBoardIds.push(id);
+      const put = await page.request.put(`${APP_URL}api/boards/${id}`, {data: {id, name, nodes, edges: []}});
+      if (put.status() !== 200) throw new Error(`probe board PUT ${put.status()}`);
+      return id;
+    };
+    const openFeedback = async () => {
+      await page.goto(APP_URL, {waitUntil: 'networkidle'});
+      await page.click('[data-settings-btn]');
+      await page.waitForSelector('[data-settings-overlay]', {timeout: 10000});
+      await page.click('[data-settings-cat="about"]');
+      await page.waitForSelector('[data-settings-pane="about"]', {timeout: 10000});
+      await page.click('.settings-feedback button');
+      await page.waitForSelector('[data-feedback-dialog]', {timeout: 5000});
+      await page.waitForTimeout(120);
+    };
+
+    /* (1) EMPTY board → no helper row, no dead button */
+    await mkBoard(`BI-PROBE-EMPTY-${Date.now()}`, []);
+    await openFeedback();
+    const emptyState = await page.evaluate(() => ({
+      dialog: !!document.querySelector('[data-feedback-dialog]'),
+      btn: !!document.querySelector('[data-fb-copy]'),
+      boardEmpty: !!document.querySelector('.canvas-empty'),
+    }));
+    assert('bh.l7.empty-board-renders-no-helper-row',
+      emptyState.dialog && emptyState.boardEmpty && !emptyState.btn,
+      `dialog open=${emptyState.dialog}, empty-canvas panel=${emptyState.boardEmpty}, [data-fb-copy] present=${emptyState.btn} — an empty board offers no copy button at all`);
+
+    /* (2) ONE-NODE board → the row appears, labelled as specified */
+    await mkBoard(`BI-PROBE-NODE-${Date.now()}`, [{
+      id: 'n1', type: 'goblin', position: {x: 0, y: 0},
+      data: {shape: 'terminator', kicker: '', title: 'Copy me', sub: '', metric: '', metricUnit: '', icon: '', colorKey: 'green', body: 'label-only', handles: 'tb'},
+      style: {width: 260, height: 140}, measured: {width: 260, height: 140}, selected: false,
+    }]);
+    await openFeedback();
+    const rowInfo = await page.evaluate(() => {
+      const b = document.querySelector('[data-fb-copy]');
+      if (!b) return null;
+      return {
+        label: b.textContent.trim(),
+        aboveActions: !!(b.compareDocumentPosition(document.querySelector('.fb-actions')) & Node.DOCUMENT_POSITION_FOLLOWING),
+        nodeCount: document.querySelectorAll('.react-flow__node').length,
+      };
+    });
+    assert('bh.l8.non-empty-board-renders-the-helper-row-above-the-actions',
+      !!rowInfo && rowInfo.label === 'Copy board as PNG' && rowInfo.aboveActions,
+      rowInfo ? `label="${rowInfo.label}", ${rowInfo.nodeCount} node(s) on canvas, row sits ABOVE .fb-actions` : 'no [data-fb-copy] on a board that HAS nodes');
+
+    /* (3) the copy itself: the REAL buildPng → rasterise → Blob, then the
+       success label + the hairline note */
+    await page.click('[data-fb-copy]');
+    let copied = null;
+    try {
+      await page.waitForFunction(() => window.__copied !== null || document.querySelector('[data-fb-shot="failed"]'), {timeout: 40000});
+      copied = await page.evaluate(() => window.__copied);
+    } catch { /* asserted below */ }
+    const afterCopy = await page.evaluate(() => ({
+      label: document.querySelector('[data-fb-copy]')?.textContent.trim() || '',
+      note: document.querySelector('.fb-shot-note')?.textContent.trim() || '',
+      failed: !!document.querySelector('[data-fb-shot="failed"]'),
+    }));
+    assert('bh.l9.copy-produces-a-real-png-and-flips-the-label',
+      !!copied && copied.type === 'image/png' && copied.size > 1000
+        && copied.head.join(',') === '137,80,78,71'
+        && afterCopy.label === 'Copied — paste it in the GitHub body (Ctrl+V / ⌘V)'
+        && afterCopy.note === 'GitHub uploads pasted images for you.',
+      copied
+        ? `the app's own export path produced a ${copied.size}-byte image/png (signature ${copied.head.join(',')}); label="${afterCopy.label}"; note="${afterCopy.note}"`
+        : `no PNG reached the clipboard; failed-state=${afterCopy.failed}`);
+
+    /* (4) a DENIED clipboard must not block Send */
+    await page.evaluate(() => { window.__clipMode = 'deny'; });
+    await page.fill('#fb-title', 'Live probe: denied clipboard');
+    await page.click('[data-fb-submit]');
+    await page.waitForTimeout(400);
+    const afterDeny = await page.evaluate(() => ({
+      urls: window.__fbUrls || [],
+      failed: !!document.querySelector('[data-fb-shot="failed"]'),
+      failedText: document.querySelector('.fb-shot-err')?.textContent.trim() || '',
+    }));
+    assert('bh.l10.denied-copy-shows-the-manual-line-and-send-still-opens-github',
+      afterDeny.urls.length === 1 && /github\.com\/harveynguyen33\/goblin-diagrams\/issues\/new/.test(afterDeny.urls[0])
+        && afterDeny.failed
+        && afterDeny.failedText === "Couldn't copy — take a screenshot manually and paste it in the GitHub body.",
+      `${afterDeny.urls.length} window.open fired despite the refusal; inline line shown="${afterDeny.failedText}"`);
+  } finally {
+    for (const id of probeBoardIds) {
+      rmSync(join(ROOT, 'boards', `${id}.json`), {force: true});
+      rmSync(join(ROOT, 'boards', `${id}.json.bak`), {force: true});
+    }
+    await browser.close();
+  }
+} catch (e) {
+  assert('bh.live2-pass-ran', false, `the screenshot live pass could not run: ${String(e).slice(0, 300)}`);
 }
 
 /** The unit URL contract re-run against a LIVE-captured URL. */
