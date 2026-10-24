@@ -5291,6 +5291,18 @@ kbd {
 .fb-note a:hover,
 .fb-note a:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
 
+/* ---------- ROUND BH: the Gobigrams logo in the app ----------
+   The ROUND BF brand asset (public/brand/logo.svg) at its two surfaces.
+   Display-block sizing only, tokens only, zero new hex. */
+.about-logo {
+  display: block; width: 52px; height: 52px;
+  margin: 2px 0 10px;
+}
+.ce-logo {
+  display: block; width: 40px; height: 40px;
+  margin: 0 auto 10px;
+}
+
 /* The only per-tier rule this block needs: the shipped list IS three columns at
    a wide pane, so it stacks below the phone breakpoint. Same tier hook the
    template gallery and the inspector use. */

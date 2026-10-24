@@ -553,6 +553,10 @@ function AboutPane() {
   return (
     <>
       <h2 className="settings-h" id="settings-title">About</h2>
+      {/* ROUND BH (public launch) — the Gobigrams icon above the wordmark
+          line (public/brand/logo.svg, the ROUND BF brand asset). Tokens-only
+          sizing in styles.css (.about-logo); alt names the product. */}
+      <img className="about-logo" src="/brand/logo.svg" alt="Gobigrams" width={52} height={52} />
       <p className="settings-sub">
         <b>Gobigrams</b> — diagrams drawn by a goblin with a grudge and a ruler.
         Surprisingly straight lines. Zero patience for messy boxes.

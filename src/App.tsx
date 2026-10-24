@@ -6738,7 +6738,14 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
               className="canvas-empty"
               style={{marginTop: '12vh'}}
             >
-              <div className="ce-title">This board is empty</div>
+              <div className="ce-title">
+                {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
+                    natural header, above the "This board is empty" title
+                    (.ce-logo, 40px, tokens only). pointer-events:none is
+                    inherited from .canvas-empty. */}
+                <img className="ce-logo" src="/brand/logo.svg" alt="Gobigrams" width={40} height={40} />
+                This board is empty
+              </div>
               <div className="ce-sub">
                 Drag a shape from the left panel onto the canvas, or
                 <br />
