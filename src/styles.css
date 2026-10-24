@@ -5295,12 +5295,12 @@ kbd {
    The ROUND BF brand asset (public/brand/logo.svg) at its two surfaces.
    Display-block sizing only, tokens only, zero new hex. */
 .about-logo {
-  display: block; width: 52px; height: 52px;
-  margin: 2px 0 10px;
+  display: block; width: 280px; height: auto;
+  margin: 4px auto 12px;
 }
 .ce-logo {
-  display: block; width: 40px; height: 40px;
-  margin: 0 auto 10px;
+  display: block; width: 72px; height: 72px;
+  margin: 0 auto 12px;
 }
 
 /* The only per-tier rule this block needs: the shipped list IS three columns at
