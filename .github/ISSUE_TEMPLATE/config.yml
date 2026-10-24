@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions & answers
-    url: https://github.com/harveynguyen33/goblin-diagrams/discussions
+    url: https://github.com/harveynguyen33/gobigrams/discussions
     about: Ask how to do something in Gobigrams — the Discussions board is faster for Q&A than issues.
   - name: In-app feedback
-    url: https://github.com/harveynguyen33/goblin-diagrams/issues/new/choose
+    url: https://github.com/harveynguyen33/gobigrams/issues/new/choose
     about: The app's Feedback link (Settings → About) points here too.
