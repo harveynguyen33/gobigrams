@@ -1,5 +1,29 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-24 19:0x — PUBLIC PUBLISHING — one allowlist script, mirror removed
+
+**The GitHub repo is now fed by ONE path: `.gob/publish-public.sh`.**
+
+- Public repo: **github.com/harveynguyen33/gobigrams** (renamed from `goblin-diagrams`,
+  old URL 301-redirects). Workshop forge: Forgejo `harvey/goblin-diagrams`.
+- **The Forgejo push-mirror to GitHub has been DELETED** (it had `branch_filter: main`,
+  `sync_on_commit: true` — so every workshop commit re-published specs, handoffs,
+  `.hermes/`, `.gob/` to the public repo within seconds; it did this on 2026-10-24 and had
+  to be force-reverted). Do not re-create it: if a mirror is wanted later, mirror the
+  snapshot branch to a *private* repo, never `main` to the public one.
+- Publish = `.gob/publish-public.sh --push`. An **allowlist** (source, public/, manifests,
+  LICENSE/README/CONTRIBUTING/SECURITY/SUPPORT/.github) that also DELETES anything the
+  previous snapshot left behind, reads `README-PUBLIC.md` from `main` for the public README,
+  refuses a dirty tree, and aborts on infrastructure identifiers
+  (`192.168.` | `/home/<user>/` | `/Users/<user>/` | `.hermes` | `goblin-stack`).
+- Proof the snapshot is real: fresh clone → `npm ci` 0 → vite build 0. `package.json` had
+  `harfbuzzjs: file:/home/harvey/.hermes/...tgz`, which made the public repo uninstallable
+  for anyone else; repinned to `1.6.3` after confirming the tarball was byte-identical to
+  the registry build (sha256 d911e1d8…).
+- Lessons that cost time: `git grep -lE <re> --cached` is a fatal-arg-order no-op (my leak
+  gate never fired); and a snapshot publish must be verified from the *public* side (clone +
+  install), not from the local tree.
+
 ## ▶ 2026-10-24 11:2x — ROUND BG — crow's-foot defaults follow ERD_ENABLED + custom-shape handles COMPLETE (pushed)
 
 **State:** `main` @ **`e4c1abc`**, pushed to BOTH remotes, 0 ahead. Gates: `tsc 0` · `build 0` ·
