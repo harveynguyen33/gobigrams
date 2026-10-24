@@ -12,6 +12,9 @@ import {ZORDER_OPTS, type ZOrderMode} from './zOrderMode';
 /* PACKAGE-R — the roadmap surface's data. A pure, React-free module: the block
    further down this file is its only reader in the app. */
 import {ROADMAP, SHIPPED, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from './roadmap';
+/* ROUND BH — the in-app feedback dialog (public launch). Opened from the About
+ *  pane below; mirrors BoardDialog's accessibility contract. */
+import FeedbackDialog from './FeedbackDialog';
 
 /**
  * M2 — the Settings dialog.
@@ -540,6 +543,13 @@ function AboutPane() {
      no Licence/Building-blocks rows (licensing is pending its own decision, and
      a displayed MIT row contradicts the anti-reverse-engineering direction),
      no self-host note (lives elsewhere when the product ships). */
+  /* ROUND BH (public launch) — the entry is now a BUTTON that opens the
+     feedback dialog (src/FeedbackDialog.tsx): a token-free static app cannot
+     POST to the issues API, so the dialog prefills the repo's own new-issue
+     form and the user just presses Submit on GitHub. The plain anchor that
+     used to live here moved INTO the dialog as the no-account fallback. */
+  const [fbOpen, setFbOpen] = useState(false);
+  const fbBtnRef = useRef<HTMLButtonElement>(null);
   return (
     <>
       <h2 className="settings-h" id="settings-title">About</h2>
@@ -556,17 +566,22 @@ function AboutPane() {
           bottom of the About pane (LESS intrusive than the ? cheatsheet, whose
           rows are width-budgeted by checks/package-o-metrics.mjs item 3 and
           carry the same info as Settings → Shortcuts — a feedback row there
-          would break that pairing). External link → NEW TAB + noopener, the
-          only anchor pattern in the app (no prior target=_blank existed). */}
+          would break that pairing). ROUND BH: the link became this button +
+          dialog; the outbound anchor surface moved into the dialog's fallback
+          (see round-bg bg4's re-anchor). */}
       <p className="settings-feedback">
-        <a
-          href="https://github.com/harveynguyen33/goblin-diagrams/issues"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          ref={fbBtnRef}
+          className="settings-feedback-btn"
+          onClick={() => setFbOpen(true)}
         >
           Feedback — report a bug or request a shape
-        </a>
+        </button>
       </p>
+      {fbOpen && (
+        <FeedbackDialog onCancel={() => setFbOpen(false)} returnFocusTo={fbBtnRef} />
+      )}
       <RoadmapBlock />
     </>
   );
@@ -601,6 +616,12 @@ export default function Settings({
   useEffect(() => {
     if (!open) return;
     const onDocKey = (e: KeyboardEvent) => {
+      /* ROUND BH — while the feedback dialog is open, ITS capture listener
+         owns Escape and Tab (it registered later, but ours runs first, so we
+         must stand down entirely): Escape closes ONLY the dialog, and our Tab
+         trap must not fight the dialog's from behind. Same shape as App's
+         boardDlg guard. */
+      if (document.querySelector('[data-feedback-dialog]')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();

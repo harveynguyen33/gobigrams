@@ -5240,11 +5240,56 @@ kbd {
 .rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 
 /* Settings → About: the public-launch feedback line. Tokens only (no new
-   hex); styled as a QUIET dim link so the pane's content stays the star. */
+   hex); styled as a QUIET dim link so the pane's content stays the star.
+   ROUND BH: the entry is a BUTTON that opens the feedback dialog — same quiet
+   vocabulary, inherited font so it keeps reading as the pane's quiet line. */
 .settings-feedback { margin: 20px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); }
-.settings-feedback a { color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--border); }
+.settings-feedback a,
+.settings-feedback button {
+  color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--border);
+  background: none; border-top: 0; border-left: 0; border-right: 0;
+  font: inherit; padding: 0; cursor: pointer;
+}
 .settings-feedback a:hover,
-.settings-feedback a:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
+.settings-feedback button:hover,
+.settings-feedback a:focus-visible,
+.settings-feedback button:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
+
+/* ---------- ROUND BH: the feedback dialog ----------
+   BoardDialog's overlay/card vocabulary (sp-overlay + sp-card + bd-* pieces),
+   tokens only — zero new hex. .fb-overlay sits ABOVE the Settings modal
+   (80 > 70); .fb-card only narrows. The rest are the dialog's own rows. */
+.fb-overlay { z-index: 80; }
+.fb-card { width: 400px; }
+.fb-body { display: flex; flex-direction: column; gap: 4px; padding: 2px 2px 0; }
+.fb-label {
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
+  text-transform: lowercase; margin-top: 8px;
+}
+.fb-label-gap { margin-top: 12px; }
+.fb-kinds {
+  border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;
+}
+.fb-kinds legend { padding: 0; }
+.fb-kind { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.fb-kind input { margin-top: 3px; accent-color: var(--acc); }
+.fb-kind-text { display: flex; flex-direction: column; gap: 1px; }
+.fb-kind-name { font-size: var(--fs-sm); color: var(--fg); font-weight: 600; }
+.fb-kind-hint { font-size: var(--fs-xs); color: var(--dim); }
+.fb-details {
+  background: var(--elevated); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--fg);
+  resize: vertical; min-height: 88px;
+}
+.fb-details:focus,
+.fb-details:hover { border-color: var(--sel); outline: none; }
+.fb-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.fb-note {
+  margin: 10px 0 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2);
+}
+.fb-note a { color: var(--dim); border-bottom: 1px solid var(--border); text-decoration: none; }
+.fb-note a:hover,
+.fb-note a:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
 
 /* The only per-tier rule this block needs: the shipped list IS three columns at
    a wide pane, so it stacks below the phone breakpoint. Same tier hook the
