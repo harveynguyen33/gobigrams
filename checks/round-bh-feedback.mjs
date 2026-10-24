@@ -11,7 +11,7 @@
  *     api.github.com anywhere in the flow — a public static app cannot ship a
  *     secret, so the ONLY network act is window.open on a prefilled new-issue
  *     URL.
- *   UNIT    — the URL builder is EXECUTED (esbuild-bundles src/feedbackDialog.ts
+ *   UNIT    — the URL builder is EXECUTED (esbuild-bundles src/feedbackIssueUrl.ts
  *     the same way package-r-roadmap executes src/roadmap.ts) and its output is
  *     parsed with URLSearchParams: template selects bug_report.md vs
  *     feature_request.md, the title round-trips byte-exact (after trim,
@@ -26,7 +26,7 @@
  *     the unit assertions against it, for BOTH kinds.
  *
  * REPLAY: every probe is RED on the pinned pre-change commit — neither
- * src/FeedbackDialog.tsx nor src/feedbackDialog.ts exists there.
+ * src/FeedbackDialog.tsx nor src/feedbackIssueUrl.ts exists there.
  */
 import {readFileSync, existsSync, mkdtempSync, rmSync} from 'node:fs';
 import {join, dirname, resolve} from 'node:path';
@@ -61,7 +61,7 @@ console.log(`round-bh-feedback — ROOT=${ROOT}  APP_URL=${APP_URL}`);
    STATIC — the dialog component + the Settings wiring + the CSS
    =========================================================================== */
 console.log('='.repeat(78));
-console.log('STATIC — src/FeedbackDialog.tsx, src/feedbackDialog.ts, Settings wiring, CSS');
+console.log('STATIC — src/FeedbackDialog.tsx, src/feedbackIssueUrl.ts, Settings wiring, CSS');
 console.log('='.repeat(78));
 
 let DLG = '', SET = '', CSS = '';
@@ -168,7 +168,7 @@ try {
     for (const [fmt, ext] of [['esm', '.mjs'], ['cjs', '.cjs']]) {
       const out = join(outDir, `feedback${ext}`);
       try {
-        execFileSync(ESBUILD, [resolve(ROOT, 'src/feedbackDialog.ts'), '--bundle', `--format=${fmt}`, `--outfile=${out}`], {stdio: 'pipe'});
+        execFileSync(ESBUILD, [resolve(ROOT, 'src/feedbackIssueUrl.ts'), '--bundle', `--format=${fmt}`, `--outfile=${out}`], {stdio: 'pipe'});
         built = out; break;
       } catch { /* try the next format */ }
     }
@@ -179,7 +179,7 @@ try {
 
 if (!M) {
   assert('bh.u1.builder-module-bundles-and-executes', false,
-    'src/feedbackDialog.ts could not be bundled and executed (missing on the pre-change commit, or does not compile)');
+    'src/feedbackIssueUrl.ts could not be bundled and executed (missing on the pre-change commit, or does not compile)');
 } else {
   assert('bh.u1.builder-module-bundles-and-executes',
     typeof M.buildFeedbackIssueUrl === 'function' && typeof M.FEEDBACK_ISSUES_URL === 'string',

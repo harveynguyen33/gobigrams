@@ -590,6 +590,10 @@ ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
    2026-10-21 (DELETE archives instead of unlinking, incident-driven) — this
    comment again moves the harness's mtime past the config's; no assertion
    semantics change. */
+/* ROUND BH re-anchor: src/Tour.tsx legitimately edited by ROUND BH on
+   2026-10-24 (user-visible 'Diagram Studio' → 'Gobigrams' rename, the
+   public-launch sweep) — this comment again moves the harness's mtime past
+   the tour's; no assertion semantics change. */
 const selfMtime = statSync(new URL(import.meta.url)).mtimeMs;
 for (const rel of ['src/TableNode.tsx', 'vite.config.ts', 'src/Tour.tsx']) {
   const m = statSync(`${ROOT}/${rel}`).mtimeMs;

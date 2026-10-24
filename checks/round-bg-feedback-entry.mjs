@@ -70,8 +70,8 @@ assert('bg1 the About pane carries the feedback entry with the exact label (a bu
 
 assert('bg2 the dialog\'s fallback link points at the GitHub issues page',
   DLG.includes('href={FEEDBACK_ISSUES_URL}')
-    && read('src/feedbackDialog.ts').includes(`export const FEEDBACK_ISSUES_URL = '${FEEDBACK_URL}'`),
-  FEEDBACK_URL + ' (the constant the fallback binds, defined once in src/feedbackDialog.ts)');
+    && read('src/feedbackIssueUrl.ts').includes(`export const FEEDBACK_ISSUES_URL = '${FEEDBACK_URL}'`),
+  FEEDBACK_URL + ' (the constant the fallback binds, defined once in src/feedbackIssueUrl.ts)');
 
 assert('bg3 the fallback opens in a new tab with noopener (and noreferrer)',
   DLG.includes('target="_blank"') && DLG.includes('rel="noopener noreferrer"'),
