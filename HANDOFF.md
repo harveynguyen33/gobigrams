@@ -1,5 +1,27 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-24 10:4x — ROUND BF-2 (follow-up) — ring INVERTED + ERD template hidden COMPLETE (pushed)
+
+**State:** `main` @ **`46ecc24`**, pushed to BOTH remotes, 0 ahead. Gates: `tsc 0` · `build 0` ·
+`client_js_bytes` **924,382** (−366, ceiling 942,000) · `goblin-verify` 22/0/5 · sweep 71/71.
+
+**Harvey's follow-up (screenshot review 2026-10-24):**
+- **Item 1 `4a93211`** — the BF-1 ring was INVERTED vs intent: Harvey wanted the SELECTED
+  custom shape to read as a selected box (an outline connecting the 4 grips), not an at-rest
+  ring. Fix: at-rest paints NOTHING (pre-BF behavior); `.custom-shape-node.selected` paints the
+  exact `.node.selected` ring (`box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--sel)`,
+  radius 8px). round-bf-visibility re-anchored (RED 4 FAIL → GREEN 10/10, live-measured
+  rgb(59,130,246) = var(--sel), img rect identical 0.0 tolerance).
+- **Item 2 `46ecc24`** — 'Data model' (ERD) template family hidden behind the existing
+  `ERD_ENABLED = false` (now gates `templates:` too, exact C4/Queue pattern); erdTemplate +
+  'erd' preset key STAY (stored ERD boards still open). package-templates re-anchored
+  (RED 3 → GREEN 55/55).
+
+**Mac test items (updated):** (1) SELECT a custom-shape import → blue selected box ring
+connecting the 4 grips; at rest → no ring at all. (2) 'Data model' gone from the template
+catalog/gallery/new-board dialog. Earlier BF items still stand: connector resize no snap →
+64px, note → 130px, reload + grab no jerk.
+
 ## ▶ 2026-10-24 01:3x — ROUND BF — custom-shape ring + per-shape resize floors COMPLETE (reviewed, pushed)
 
 **State:** `main` @ **`dc6fdb6`**, pushed to BOTH remotes, 0 ahead. Tree clean except this
