@@ -186,7 +186,7 @@ export default function FeedbackDialog({onCancel, returnFocusTo, boardPng}: Prop
             className="sp-input"
             type="text"
             value={title}
-            placeholder="A short sentence: what happened, or what you want"
+            placeholder="One line: what happened?"
             autoComplete="off"
             onChange={e => setTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}

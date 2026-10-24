@@ -198,6 +198,10 @@ if (DLG) {
 
   /* ITEM 2 — the title placeholder must fit the field: the old sentence was cut
      mid-word ("...what happened, or what you") at desktop width. */
+  const titlePlaceholder = (DLG.match(/id="fb-title"[\s\S]{0,400}?placeholder="([^"]*)"/) || [])[1] || '';
+  assert('bh.s18.title-placeholder-fits-the-field',
+    titlePlaceholder === 'One line: what happened?' && titlePlaceholder.length <= 30,
+    `placeholder=${JSON.stringify(titlePlaceholder)} (${titlePlaceholder.length} chars, lower-case-consistent with the other placeholders)`);
 }
 
 if (SET) {
@@ -648,6 +652,31 @@ try {
     assert('bh.l8.non-empty-board-renders-the-helper-row-above-the-actions',
       !!rowInfo && rowInfo.label === 'Copy board as PNG' && rowInfo.aboveActions,
       rowInfo ? `label="${rowInfo.label}", ${rowInfo.nodeCount} node(s) on canvas, row sits ABOVE .fb-actions` : 'no [data-fb-copy] on a board that HAS nodes');
+
+    /* ITEM 2, measured: the placeholder must FIT the field at desktop width.
+       The canvas measures the string in the input's own computed font; the
+       budget is the content box. The OLD sentence is measured alongside, as the
+       evidence for why it was cut mid-sentence. */
+    const phFit = await page.evaluate(() => {
+      const el = document.querySelector('#fb-title');
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      const ctx = document.createElement('canvas').getContext('2d');
+      if (!ctx) return null;
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      return {
+        now: el.placeholder,
+        nowW: Math.round(ctx.measureText(el.placeholder).width),
+        oldW: Math.round(ctx.measureText('A short sentence: what happened, or what you want').width),
+        avail: Math.round(avail),
+      };
+    });
+    assert('bh.l11.title-placeholder-fits-the-rendered-field',
+      !!phFit && phFit.nowW <= phFit.avail,
+      phFit
+        ? `${JSON.stringify(phFit.now)} measures ${phFit.nowW}px in the field's font, ${phFit.avail}px available (the old sentence needed ${phFit.oldW}px — clipped mid-sentence)`
+        : '#fb-title not measurable');
 
     /* (3) the copy itself: the REAL buildPng → rasterise → Blob, then the
        success label + the hairline note */
