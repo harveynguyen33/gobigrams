@@ -58,15 +58,23 @@ function assert(name, ok, detail = '') {
 const FEEDBACK_URL = 'https://github.com/harveynguyen33/goblin-diagrams/issues';
 const LABEL = 'Feedback — report a bug or request a shape';
 
-const about = SET.slice(SET.indexOf('function AboutPane()'), SET.indexOf('the shell'));
+const about = SET.slice(SET.indexOf('function AboutPane('), SET.indexOf('the shell'));
 
+/* ROUND BI RE-ANCHOR (2026-10-24) — the dialog's MOUNT moved from the About
+   pane to App.tsx: one instance, two openers (this entry and the ? help
+   sheet's new "Send feedback" action). So the entry no longer renders
+   <FeedbackDialog> itself — it calls the opener App passes down, handing over
+   its own element for the focus restore. The intent this probe guards is
+   unchanged: ONE entry in the About pane, exact label, opening the in-app
+   dialog rather than navigating. The slice anchor also dropped its `()`
+   because AboutPane now takes a props object. */
 assert('bg1 the About pane carries the feedback entry with the exact label (a button that opens the dialog)',
   (() => {
     const fbBtn = about.slice(about.indexOf('<button'), about.indexOf('</button>'));
-    return fbBtn.includes(LABEL) && fbBtn.includes('setFbOpen(true)')
-      && about.includes('className="settings-feedback"') && SET.includes('<FeedbackDialog');
+    return fbBtn.includes(LABEL) && /onOpenFeedback\(fbBtnRef\.current\)/.test(fbBtn)
+      && about.includes('className="settings-feedback"') && APP.includes('<FeedbackDialog');
   })(),
-  'one quiet line under the Version row; opens the dialog, no direct navigation');
+  'one quiet line under the Version row; opens the app-level dialog (onOpenFeedback), no direct navigation');
 
 assert('bg2 the dialog\'s fallback link points at the GitHub issues page',
   DLG.includes('href={FEEDBACK_ISSUES_URL}')
@@ -99,7 +107,11 @@ assert('bg4 the dialog\'s fallback is the app\'s only external anchor',
   externalAnchors.length === 1 && externalAnchors[0] === 'src/FeedbackDialog.tsx: {FEEDBACK_ISSUES_URL}',
   externalAnchors.join(' | ') || 'none found');
 
-assert('bg5 the ? cheatsheet keeps no feedback/outbound link (help-pop rows stay shortcut rows)',
+/* ROUND BI: the sheet now carries a "Send feedback" ACTION — a button that
+   opens the dialog, deliberately NOT an anchor. This probe still guards the
+   thing it always did: no outbound link leaves the app from the sheet (the
+   only external anchor lives inside the dialog, bg4). */
+assert('bg5 the ? cheatsheet keeps no outbound anchor (its feedback action is a button, not a link)',
   (() => {
     const h = APP.slice(APP.indexOf('className="help-pop"'), APP.indexOf('className="help-pop"') + 5000);
     return !/<a\s|href=/.test(h);
