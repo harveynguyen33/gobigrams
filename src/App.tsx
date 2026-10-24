@@ -6,7 +6,7 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {rasterise} from './exportPng';
+const exportPngLazy = (): Promise<typeof import('./exportPng')> => import('./exportPng');
 import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
 import {mermaidToGraph} from './mermaid';
 import {
@@ -56,14 +56,27 @@ import BoardDialog, {type BoardDialogResult} from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
-import {exportSvgOf, domMeasurer, type ExportNode, type ExportEdge, type ExportInput, type SvgMeasurer} from './exportSvg';
-/* ROUND C — outline text (harfbuzzjs shaper) + the print PDF route. */
-import {localFontBytes, type OutlineShaper} from './textOutline';
-import {makeShaper} from './textOutlineHb';
-/* ROUND AZ — file-first font bytes (the committed subsets) + the embed
-   builder + the OS/2 fsType licence guard. */
-import {committedFontBytes, embeddingRefusal} from './fontFiles';
-import {printSvgAsPdf} from './printView';
+import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './exportSvg';
+/* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
+ * editing surface (canvas render) never needs the emitter at first paint:
+ * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
+ * printView are only reachable from user actions (Export modal build,
+ * Copy PNG, print PDF). So App keeps only the TYPES statically (import
+ * type — erased at build time) and pulls the values through ONE dynamic
+ * import seam at the point of use. First export pays one chunk fetch
+ * (~150-200 KB raw, ~40 KB gz) that used to sit in the boot bundle.
+ * The whole cluster is closed over App.tsx (no other app module imports
+ * these by value), so the seam here is the only door. */
+const exportSvgLazy = (): Promise<typeof import('./exportSvg')> => import('./exportSvg');
+/* ROUND BJ — same lazy seam as exportSvg above: the shaper stack and the
+ * print route only run inside export handlers. One memoised promise per
+ * module, so the first export pays the chunk once and every later export
+ * reuses it. Types stay static (erased). */
+const textOutlineLazy = (): Promise<typeof import('./textOutline')> => import('./textOutline');
+const textOutlineHbLazy = (): Promise<typeof import('./textOutlineHb')> => import('./textOutlineHb');
+import type {OutlineShaper} from './textOutline';
+const fontFilesLazy = (): Promise<typeof import('./fontFiles')> => import('./fontFiles');
+const printViewLazy = (): Promise<typeof import('./printView')> => import('./printView');
 
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
@@ -102,7 +115,7 @@ import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
 import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, tokensFor, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
-import {isQuotaError, QUOTA_MESSAGE} from './localStore';
+import {isQuotaError, QUOTA_MESSAGE, isVolatile} from './localStore';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
@@ -1347,10 +1360,11 @@ export default function App() {
       }
     }).catch(() => { /* line stays as-is */ });
     /* AT-2 — the volatile last resort: IndexedDB itself unavailable (storage
-       disabled). One-time flash; the board list still renders. */
-    import('./localStore').then(m => {
-      if (m.isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
-    }).catch(() => { /* never blocks the list */ });
+       disabled). One-time flash; the board list still renders.
+       ROUND BJ: was a dead dynamic import (localStore is also statically
+       imported — vite warned); the flag is a live module binding, read
+       directly. Zero behavior change. */
+    if (isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
   }, [flash]);
 
   const flushSave = useCallback(async () => {
@@ -4384,6 +4398,11 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
       const squeezedQuotes = squeezed.replace(/"/g, '');
       if (squeezedQuotes && !shapers.has(squeezedQuotes)) shapers.set(squeezedQuotes, shaper);
     };
+    /* ROUND BJ — the shaper stack lives behind the lazy export chunk: fetch
+     * the modules ONCE here, then use them synchronously below. */
+    const [{makeShaper}, {localFontBytes}, {committedFontBytes}] = await Promise.all([
+      textOutlineHbLazy(), textOutlineLazy(), fontFilesLazy(),
+    ]);
     for (const {family, weight} of pairs.values()) {
       const pairKey = `${family}|${weight}`;
       const already = resolvedAt.get(pairKey);
@@ -4434,6 +4453,8 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
     nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
   ): Promise<{css?: string; bytes: number; refusals: string[]}> => {
     void edges; void nodes;
+    /* ROUND BJ — fontFiles is behind the lazy export chunk. */
+    const {committedFontBytes, embeddingRefusal} = await fontFilesLazy();
     /* the same pair-collection the outline shaper does (defaultFamily covers
      * both stacks once the AZ swap landed) — but here only the FAMILY set
      * matters: the variable face embeds once per family. */
@@ -4574,6 +4595,8 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
          ROUND-AR-DEFECT-1: the measurer gets the CLONE ROOT so it can read
          the portalled `.edge-label[data-edge-id]` rows the EdgeLabelRenderer
          paints outside each edge's own element. */
+      /* ROUND BJ — domMeasurer comes with the lazy export chunk. */
+      const {domMeasurer} = await exportSvgLazy();
       const measure = domMeasurer(() => clone);
       try {
         /* ROUND C — outline mode: when requested, build the outline shaper
@@ -4618,7 +4641,10 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
             detail: `Font embed: skipped — ${embed.refusals.join('; ')}`,
           }));
         }
-        return exportSvgOf({
+        /* ROUND BJ — exportSvgOf comes with the lazy export chunk (same
+         * module the measurer came from; the promise is memoised by the
+         * dynamic-import machinery, so this second await is free). */
+        return (await exportSvgLazy()).exportSvgOf({
           nodes: exportNodes,
           edges: exportEdges,
           theme: eff,
@@ -4653,6 +4679,8 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
     const bg = eff === theme
       ? readToken('--bg', '#0b0b0d')
       : tokensFor(eff, ['--bg'])['--bg'];
+    /* ROUND BJ — rasterise comes with the lazy export chunk. */
+    const {rasterise} = await exportPngLazy();
     return rasterise(svg, {scale: pngScale, bg});
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [theme, pngScale, buildSvg]);
@@ -4679,6 +4707,8 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
      * thing that decides; the print view inherits whatever the modal shows. */
     const svg = await buildSvg({nodes: o.nodes, edges: o.edges, theme: o.theme, outline: !!o.outline});
     if (!svg) return;
+    /* ROUND BJ — the print route comes with the lazy export chunk. */
+    const {printSvgAsPdf} = await printViewLazy();
     printSvgAsPdf(svg, curBoard?.name || 'Gobigrams');
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [buildSvg, curBoard]);
