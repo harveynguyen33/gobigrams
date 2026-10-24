@@ -11,7 +11,7 @@
   "dependencies": {
     "@xyflow/react": "^12.11.6",
     "dompurify": "^3.4.15",
-    "harfbuzzjs": "file:/home/harvey/.hermes/profiles/coder/cache/scratch/step0/harfbuzzjs-1.6.3.tgz",
+    "harfbuzzjs": "1.6.3",
     "lucide-react": "^1.45.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
