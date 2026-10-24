@@ -4654,7 +4654,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
      * thing that decides; the print view inherits whatever the modal shows. */
     const svg = await buildSvg({nodes: o.nodes, edges: o.edges, theme: o.theme, outline: !!o.outline});
     if (!svg) return;
-    printSvgAsPdf(svg, curBoard?.name || 'Diagram Studio');
+    printSvgAsPdf(svg, curBoard?.name || 'Gobigrams');
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [buildSvg, curBoard]);
 
@@ -5753,7 +5753,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
       <aside className="panel">
         <div className="panel-head">
           <div className="brand">
-            <span className="dot" />Diagram Studio<span className="path">diagrams</span>
+            <span className="dot" />Gobigrams<span className="path">diagrams</span>
           </div>
           <div ref={boardsBtnRef} style={{position: 'relative', marginTop: 10}}>
             {/* CONFIG-FIX (2026-10-22) — HARVEY: the hover tooltip covered the
