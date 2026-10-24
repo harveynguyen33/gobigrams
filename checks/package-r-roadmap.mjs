@@ -246,7 +246,10 @@ const settings = src('src/Settings.tsx');
 const stripJsComments = (js) => js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 
 {
-  const about = stripJsComments(settings.slice(settings.indexOf('function AboutPane()')));
+  /* ROUND BI re-anchor: AboutPane's signature is a props object now
+     ({onOpenFeedback}), so the anchor drops its `()` — the pane body the r13
+     probe reads is unchanged. */
+  const about = stripJsComments(settings.slice(settings.indexOf('function AboutPane(')));
   const iRm = about.indexOf('<RoadmapBlock />');
   /* HARVEY 2026-10-13 re-anchor: AboutPane was rewritten (rows trimmed to one
      Version row; Licence/Building-blocks rows and the settings-note removed by
@@ -276,7 +279,7 @@ const stripJsComments = (js) => js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\
     /last reviewed \{ROADMAP_REVIEWED\}/.test(settings));
 
   /* The block links nowhere: no anchor, no href anywhere in it. */
-  const block = settings.slice(settings.indexOf('function RoadmapBlock()'), settings.indexOf('function AboutPane()'));
+  const block = settings.slice(settings.indexOf('function RoadmapBlock()'), settings.indexOf('function AboutPane('));
   assert('r21 the block contains no link out of the app', block.length > 0 && !/<a\s|href=/.test(block));
 }
 

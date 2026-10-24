@@ -60,7 +60,10 @@ const APP = blank(read('src/App.tsx'));
 const CSS = read('src/styles.css');
 
 {
-  const about = SET.slice(SET.indexOf('function AboutPane()'), SET.indexOf('the shell'));
+  /* ROUND BI re-anchor: AboutPane takes a props object now ({onOpenFeedback}),
+     so the literal 'function AboutPane()' is gone — the slice anchor drops its
+     `()` and reads the same pane body. */
+  const about = SET.slice(SET.indexOf('function AboutPane('), SET.indexOf('the shell'));
   /* ROUND BH re-anchor (c8cbe0b): the About icon became the FULL LOCKUP
      (public/brand/lockup.svg, 280px) — the late brand decision superseded the
      round's first 52px icon placement. Same contract, new asset. */
