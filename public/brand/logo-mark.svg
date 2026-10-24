@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 60 800 440" width="800" height="440">
-  <!-- GOBIGRAMS MARK (transparent, for in-app use) — node->DB eyes w/ glasses bridge, diamond nose, document-wave grin, ruler chin -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="131 117 657 406" width="657" height="406">
+  <!-- GOBIGRAMS MARK (transparent, cropped to the measured ink bbox x139-780 / y125-515;
+     the earlier 60/440 crop ended at y500 and sliced the ruler ticks — they run to y515) — GOBIGRAMS FINAL — node->DB eyes w/ glasses bridge, diamond nose, document-wave grin, ruler chin -->
 
   
   <g stroke="#c93801" stroke-width="30" fill="none" stroke-linecap="round" stroke-linejoin="round">
