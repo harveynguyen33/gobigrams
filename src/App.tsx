@@ -5753,7 +5753,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
       <aside className="panel">
         <div className="panel-head">
           <div className="brand">
-            <span className="dot" />Gobigrams<span className="path">diagrams</span>
+            <img className="brand-mark" src="/brand/icon-g.svg" alt="" width={16} height={16} aria-hidden="true" />Gobigrams
           </div>
           <div ref={boardsBtnRef} style={{position: 'relative', marginTop: 10}}>
             {/* CONFIG-FIX (2026-10-22) — HARVEY: the hover tooltip covered the

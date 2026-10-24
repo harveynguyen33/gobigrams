@@ -86,7 +86,9 @@ ok('empty-state panel gated on boardLoaded',
 // either static, hover-gated, or bound to user action.
 const css = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const candidates = [
-  ['brand dot (static, colour-only)', /\.brand \.dot \{[^}]*background: var\(--acc\)/.test(css) && !/\.brand \.dot[^}]*opacity/.test(css)],
+  /* ROUND BH re-anchor: the decorative dot was replaced by the static brand
+     mark img (.brand .brand-mark) — same guarantee: no opacity/fade route. */
+  ['brand mark (static, no fade)', /\.brand \.brand-mark \{[^}]*width: 1[46]px/.test(css) && !/\.brand-mark[^}]*opacity/.test(css) && !/\.brand-mark[^}]*animation/.test(css)],
   ['handle dots are hover/selection-gated', /\.react-flow__handle \{[\s\S]{0,200}?opacity: 0;/.test(css) && /@media \(hover: hover\) \{\s*\.react-flow__node:hover \.react-flow__handle \{ opacity: 1; \}/.test(css)],
   ['checklist items are not faded in', !/\.gsc-item[^}]*opacity: 0/.test(css)],
   ['save indicator has no fade-in', /\.save-ind \{[\s\S]{0,160}?min-height: 12px/.test(css) && !/\.save-ind[^}]*animation/.test(css)],
