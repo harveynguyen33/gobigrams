@@ -1,17 +1,28 @@
 // round-bg-feedback-entry.mjs — PUBLIC LAUNCH: the in-app Feedback link.
+/*
+  ROUND BH RE-ANCHOR (2026-10-24, commit 0c9b9df) — the entry became a BUTTON
+  that opens the in-app feedback dialog, and the outbound anchor moved INTO
+  the dialog (src/FeedbackDialog.tsx) as the no-GitHub-account fallback. The
+  probes below now assert that NEW shape; the intent each one guards is
+  unchanged: one entry, exact label, the issues page, new tab + noopener,
+  and an enumerable external-anchor surface. The URL contract itself has its
+  own dedicated harness now — checks/round-bh-feedback.mjs (33 assertions).
+*/
 //
 // WHAT IT CHECKS (source probes only — no browser, no network; whether GitHub
 // actually resolves the URL is out of scope here and covered by the repo being
 // public before launch):
-//   1. Settings → About carries ONE external link, labelled exactly
-//      "Feedback — report a bug or request a shape", pointing at the issues
-//      page, opening in a NEW TAB with rel noopener (+noreferrer).
-//   2. It is the ONLY anchor in the whole src/ tree that leaves the app —
-//      so the app's external-link surface stays enumerable from one line.
+//   1. Settings → About carries ONE feedback entry, labelled exactly
+//      "Feedback — report a bug or request a shape" — a BUTTON that opens the
+//      in-app dialog; the outbound link itself lives inside the dialog
+//      (new tab + noopener+noreferrer).
+//   2. The dialog's fallback is the ONLY anchor in the whole src/ tree that
+//      leaves the app — so the app's external-link surface stays enumerable
+//      from one line.
 //   3. The ? cheatsheet (help-pop) is untouched by this round: its rows are
 //      width-budgeted by checks/package-o-metrics.mjs item 3 and must stay
 //      keyboard/gesture rows only.
-//   4. The link's styles are TOKENS-ONLY (no new hex in .settings-feedback)
+//   4. The entry's styles are TOKENS-ONLY (no new hex in .settings-feedback)
 //      and the sheet's global hex-count gate (package-r-roadmap) still sees
 //      the same pre-change count.
 //
@@ -33,6 +44,8 @@ const blank = (src) => src
 const SET = blank(read('src/Settings.tsx'));
 const APP = blank(read('src/App.tsx'));
 const CSS = read('src/styles.css');
+/* ROUND BH — the outbound anchor now lives in the feedback dialog */
+const DLG = blank(read('src/FeedbackDialog.tsx'));
 
 const failures = [];
 let pass = 0, fail = 0, skip = 0;
@@ -47,32 +60,43 @@ const LABEL = 'Feedback — report a bug or request a shape';
 
 const about = SET.slice(SET.indexOf('function AboutPane()'), SET.indexOf('the shell'));
 
-assert('bg1 the About pane carries the feedback link with the exact label',
-  new RegExp(`<a\\s[^>]*>\\s*${LABEL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*<\\/a>`).test(about)
-    && about.includes('className="settings-feedback"'),
-  'one quiet line under the Version row');
+assert('bg1 the About pane carries the feedback entry with the exact label (a button that opens the dialog)',
+  (() => {
+    const fbBtn = about.slice(about.indexOf('<button'), about.indexOf('</button>'));
+    return fbBtn.includes(LABEL) && fbBtn.includes('setFbOpen(true)')
+      && about.includes('className="settings-feedback"') && SET.includes('<FeedbackDialog');
+  })(),
+  'one quiet line under the Version row; opens the dialog, no direct navigation');
 
-assert('bg2 it points at the GitHub issues page',
-  about.includes(`href="${FEEDBACK_URL}"`), FEEDBACK_URL);
+assert('bg2 the dialog\'s fallback link points at the GitHub issues page',
+  DLG.includes('href={FEEDBACK_ISSUES_URL}')
+    && read('src/feedbackDialog.ts').includes(`export const FEEDBACK_ISSUES_URL = '${FEEDBACK_URL}'`),
+  FEEDBACK_URL + ' (the constant the fallback binds, defined once in src/feedbackDialog.ts)');
 
-assert('bg3 it opens in a new tab with noopener (and noreferrer)',
-  about.includes('target="_blank"') && about.includes('rel="noopener noreferrer"'),
+assert('bg3 the fallback opens in a new tab with noopener (and noreferrer)',
+  DLG.includes('target="_blank"') && DLG.includes('rel="noopener noreferrer"'),
   'target=_blank + rel="noopener noreferrer"');
 
 /* the app's whole external-anchor surface: the Settings link is the ONLY
    src anchor with an http(s) href. printView's window.open is a different
    mechanism (a generated window, not a navigated document) and App.tsx:4271's
    download anchor carries no href to another origin. */
-const srcFiles = ['src/Settings.tsx', 'src/App.tsx'];
+/* ROUND BH: the anchor's href is a JSX EXPRESSION bound to the shared
+   constant (not a string literal), so the scan also matches that exact
+   binding — the surface stays one enumerable line. */
+const srcFiles = ['src/Settings.tsx', 'src/App.tsx', 'src/FeedbackDialog.tsx'];
 const externalAnchors = [];
 for (const f of srcFiles) {
   const s = blank(read(f));
   for (const m of s.matchAll(/<a\s[^>]*href="(https?:[^"]*)"[^>]*>/g)) {
     externalAnchors.push(`${f}: ${m[1]}`);
   }
+  for (const m of s.matchAll(/<a\s[^>]*href=\{FEEDBACK_ISSUES_URL\}[^>]*>/g)) {
+    externalAnchors.push(`${f}: {FEEDBACK_ISSUES_URL}`);
+  }
 }
-assert('bg4 the feedback link is the app\'s only external <a href> anchor',
-  externalAnchors.length === 1 && externalAnchors[0].endsWith(FEEDBACK_URL),
+assert('bg4 the dialog\'s fallback is the app\'s only external anchor',
+  externalAnchors.length === 1 && externalAnchors[0] === 'src/FeedbackDialog.tsx: {FEEDBACK_ISSUES_URL}',
   externalAnchors.join(' | ') || 'none found');
 
 assert('bg5 the ? cheatsheet keeps no feedback/outbound link (help-pop rows stay shortcut rows)',
