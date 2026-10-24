@@ -1,0 +1,47 @@
+# runtime data — one JSON file per board, written by the dev middleware
+boards/
+
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# logs / editor / OS noise
+*.log
+.DS_Store
+.vite/
+
+# harness scratch — checks/round-as-boards-put.mjs writes its probe output into the
+# repo root and used to leave it behind untracked (flagged by the reviewer as MAJOR
+# housekeeping 2026-10-21). The leak is being closed in the harness; this is the belt.
+.as-boards-out-*.cjs
+
+# local env — never commit secrets
+.env
+.env.local
+*.local
+
+# >>> goblin-stack >>>
+# goblin-stack runtime state (gates write these; they are not fixture)
+.gob/last-gate-line
+.gob/.ds-report
+.gob/ratchet-last
+# the secret family (SC-02): each is one `git add` away from a live credential
+.env
+.env.*
+*.pem
+*.key
+# declared runtime_data (DS-01 hashes them around every gate run)
+.gob/state.json
+# <<< goblin-stack <<<
+
+# research artifacts (deep-dive reports, harnesses)
+research/
+# ROUND AY item 4 scratch: the pixel-diff AFTER captures (regenerated per run
+# by checks/round-ay-png-diff.mjs; only the BEFORE fixtures are committed)
+.ay4-png-after/
+.ay4-diff-report.json
+# ROUND C scratch: the live-probe artefacts (probe board SVG/PNG rasters,
+# regenerated per run by checks/round-c-live.mjs)
+.rc-live/

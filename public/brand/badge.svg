@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="225" fill="#5cec56"/>
+  <g transform="translate(181,310) scale(0.72)">
+  
+  <!-- GOBIGRAMS mouth = real diagram symbol: N2-document-wave -->
+
+  
+  <g stroke="#c93801" stroke-width="30" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 235 140 C 186 140 186 176 186 197 C 186 221 186 233 154 244 C 186 255 186 267 186 291 C 186 312 186 348 235 348"/>
+    <path d="M 685 140 C 734 140 734 176 734 197 C 734 221 734 233 766 244 C 734 255 734 267 734 291 C 734 312 734 348 685 348"/>
+  </g>
+  <rect x="300" y="196" width="104" height="72" rx="16" fill="#1b1b1b"/>
+  <g>
+    <path d="M 520 208 L 520 256 A 52 20 0 0 0 624 256 L 624 208" fill="#1b1b1b"/>
+    <ellipse cx="572" cy="208" rx="52" ry="20" fill="#1b1b1b"/>
+    <path d="M 520 224 A 52 20 0 0 0 624 224" fill="none" stroke="#1b1b1b" stroke-width="7"/>
+    <path d="M 520 242 A 52 20 0 0 0 624 242" fill="none" stroke="#1b1b1b" stroke-width="7"/>
+  </g>
+  <path d="M 404 232 L 506 232" stroke="#1b1b1b" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <path d="M 514 232 L 500 224 M 514 232 L 500 240" stroke="#1b1b1b" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M 440 296 L 460 276 L 480 296 L 460 316 Z" fill="#e4833f"/>
+
+  <path d="M 336 384 L 584 384 L 584 432
+           C 568 448 552 432 536 448
+           C 520 464 504 448 488 448
+           C 472 448 456 464 440 448
+           C 424 432 408 448 392 448
+           C 376 464 360 448 336 432 Z" fill="#e4833f"/>
+  <g stroke="#1b1b1b" stroke-width="8" stroke-linecap="round">
+    <path d="M 340 486 L 340 512"/><path d="M 460 486 L 460 512"/><path d="M 580 486 L 580 512"/>
+    <path d="M 400 486 L 400 502"/><path d="M 520 486 L 520 502"/>
+  </g>
+
+
+  </g>
+</svg>

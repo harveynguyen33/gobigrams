@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Gobigrams — draw diagrams in your browser</title>
+    <!-- Brand (2026-10-24): favicon + apple-touch from the FINAL badge (green tile,
+         dark node→DB goblin). SVG logo/badge also shipped in /brand/. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <!-- SEO base (public launch prep): description + OG/Twitter. og:url/content
+         domain is intentionally the placeholder-free relative form; set the
+         canonical + og:url absolute URLs when the public host is chosen. -->
+    <meta name="description" content="Gobigrams is a free browser-based diagram editor — flowcharts, architecture and ER diagrams with real vector SVG export, no account needed. Draw diagrams in your browser, save them locally, export crisp SVG and PNG." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Gobigrams — draw diagrams in your browser" />
+    <meta property="og:description" content="Free browser diagram editor with real vector export. Flowcharts, architecture, ERD — no account, boards stay in your browser." />
+    <meta property="og:image" content="/brand/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- ITEM 1 — no theme flash on reload. This script is the boot theme writer
+         and it runs in <head>, before anything paints, so the document can never
+         show a theme React is about to replace. `:root` in styles.css defaults to
+         DARK; without this, the window between that first paint and React's
+         first committed effect painted the wrong theme.
+
+         It MUST agree with App.tsx's FIRST commit, so it mirrors src/theme.ts
+         exactly:
+           stored   = localStorage['diagram-studio:theme'] (loadMode) — an
+                      absent or unrecognised value reads as 'system'
+           hasStored= the key exists at all (hasStoredMode)
+           a concrete stored mode wins; otherwise, for a user who has NEVER
+           chosen, the DEFAULT preset's suggested theme wins (App.tsx starts
+           presetId at the default preset, so that suggestion is already in
+           force at mount); otherwise 'system' resolves via matchMedia.
+         The key string, the dark list and the default suggestion are asserted
+         against src/theme.ts / src/presets.ts by checks/theme-boot-sync.mjs so a
+         rename cannot silently desync the two. -->
+    <script>
+      (function () {
+        var KEY = 'diagram-studio:theme';
+        var DARK = ['dark', 'midnight', 'contrast'];
+        var CONCRETE = DARK.concat(['light', 'paper']);
+        var DEFAULT_SUGGEST = 'dark';
+        try {
+          var raw = window.localStorage.getItem(KEY);
+          var stored = CONCRETE.indexOf(raw) >= 0 || raw === 'system' ? raw : 'system';
+          var hasStored = raw !== null;
+          var resolved;
+          if (stored !== 'system') {
+            resolved = stored;
+          } else if (!hasStored && DEFAULT_SUGGEST) {
+            resolved = DEFAULT_SUGGEST;
+          } else {
+            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          var el = document.documentElement;
+          el.dataset.theme = resolved;
+          el.classList.toggle('dark', DARK.indexOf(resolved) >= 0);
+        } catch (e) { /* storage blocked — leave the :root dark default in place */ }
+      })();
+    </script>
+    <!-- ROUND AZ — preload the two faces that paint FIRST paint (the title
+         rows are sans 650, the chrome is mono 400; both files carry the
+         Vietnamese + latin ranges the boot board renders). crossorigin is
+         REQUIRED even for same-origin font preloads (the fetch is CORS-mode). -->
+    <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-variable.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
