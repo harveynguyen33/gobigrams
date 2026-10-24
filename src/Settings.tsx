@@ -12,9 +12,10 @@ import {ZORDER_OPTS, type ZOrderMode} from './zOrderMode';
 /* PACKAGE-R — the roadmap surface's data. A pure, React-free module: the block
    further down this file is its only reader in the app. */
 import {ROADMAP, SHIPPED, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from './roadmap';
-/* ROUND BH — the in-app feedback dialog (public launch). Opened from the About
- *  pane below; mirrors BoardDialog's accessibility contract. */
-import FeedbackDialog from './FeedbackDialog';
+/* ROUND BH — the in-app feedback dialog (public launch). ROUND BI, ITEM 3: the
+ *  dialog itself now mounts ONCE in App.tsx (the ? help sheet is its second
+ *  entry point), so Settings only forwards the opener through `onOpenFeedback`;
+ *  the component import lives in App.tsx. */
 
 /**
  * M2 — the Settings dialog.
@@ -110,6 +111,10 @@ type Props = {
    *  export path (buildPng). Null on an empty board: the feedback dialog's
    *  screenshot helper then renders nothing. */
   boardPng?: (() => Promise<string>) | null;
+  /** ROUND BI, ITEM 3 — the About pane's feedback entry opens the APP-level
+   *  dialog (App.tsx mounts the single instance; the ? help sheet is the other
+   *  opener). The element is passed so Esc returns focus to the exact control. */
+  onOpenFeedback: (from: HTMLElement | null) => void;
 };
 
 /* ITEM 6b (2026-09-18) — EXPORTED so `BoardDialog.tsx` reuses this exact
@@ -542,17 +547,19 @@ function RoadmapBlock() {
   );
 }
 
-function AboutPane({boardPng}: {boardPng?: (() => Promise<string>) | null}) {
+function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement | null) => void}) {
   /* HARVEY 2026-10-13 — the pane rewrite: wordmark + joke, bare version number,
      no Licence/Building-blocks rows (licensing is pending its own decision, and
      a displayed MIT row contradicts the anti-reverse-engineering direction),
      no self-host note (lives elsewhere when the product ships). */
-  /* ROUND BH (public launch) — the entry is now a BUTTON that opens the
-     feedback dialog (src/FeedbackDialog.tsx): a token-free static app cannot
-     POST to the issues API, so the dialog prefills the repo's own new-issue
-     form and the user just presses Submit on GitHub. The plain anchor that
-     used to live here moved INTO the dialog as the no-account fallback. */
-  const [fbOpen, setFbOpen] = useState(false);
+  /* ROUND BH (public launch) — the entry is a BUTTON that opens the feedback
+     dialog: a token-free static app cannot POST to the issues API, so the
+     dialog prefills the repo's own new-issue form and the user just presses
+     Submit on GitHub. The plain anchor that used to live here moved INTO the
+     dialog as the no-account fallback.
+     ROUND BI, ITEM 3 — the dialog now lives at APP level (one instance, two
+     openers: this entry and the ? help sheet), so this button only asks App to
+     open it and hands over its own element for the focus restore. */
   const fbBtnRef = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -582,18 +589,11 @@ function AboutPane({boardPng}: {boardPng?: (() => Promise<string>) | null}) {
           type="button"
           ref={fbBtnRef}
           className="settings-feedback-btn"
-          onClick={() => setFbOpen(true)}
+          onClick={() => onOpenFeedback(fbBtnRef.current)}
         >
           Feedback — report a bug or request a shape
         </button>
       </p>
-      {fbOpen && (
-        <FeedbackDialog
-          onCancel={() => setFbOpen(false)}
-          returnFocusTo={fbBtnRef}
-          boardPng={boardPng}
-        />
-      )}
       <RoadmapBlock />
     </>
   );
@@ -613,6 +613,7 @@ export default function Settings({
   autosave, onAutosave,
   returnFocusTo,
   boardPng,
+  onOpenFeedback,
 }: Props) {
   const [cat, setCat] = useState<SettingsCat>('appearance');
   const [query, setQuery] = useState('');
@@ -736,7 +737,7 @@ export default function Settings({
         />
       );
       case 'keys':        return <KeyboardPane />;
-      case 'about':       return <AboutPane boardPng={boardPng} />;
+      case 'about':       return <AboutPane onOpenFeedback={onOpenFeedback} />;
       default:            return <AppearancePane mode={mode} onMode={onMode} resolved={resolved} />;
     }
   })();

@@ -20,6 +20,7 @@ import {
   PanelLeftClose, PanelRightClose, Eye,
   LayoutTemplate,
   Settings as SettingsIcon,
+  MessageSquarePlus,
   X,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -106,6 +107,10 @@ import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
 import Settings from './Settings';
+/* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
+   help sheet and Settings → About are two entry points into the same form
+   (one open-state, one focus-restore target per opener). */
+import FeedbackDialog from './FeedbackDialog';
 import TemplatesGallery from './TemplatesGallery';
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
@@ -1032,6 +1037,16 @@ export default function App() {
   // ---- H1/H2: onboarding — guided tour + getting-started checklist ----
   const TOUR_SEEN_KEY = 'diagram-studio:tour-seen';
   const [tourOpen, setTourOpen] = useState(false);
+  /* ROUND BI, ITEM 3 — ONE feedback dialog for the whole app: the ? help sheet
+     and Settings → About both open THIS one. `feedbackReturn` is the element
+     that opened it, so Esc/Cancel hands the caret back to that exact control
+     (? button or the About entry) instead of the toolbar. */
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const feedbackReturn = useRef<HTMLElement | null>(null);
+  const openFeedback = useCallback((from: HTMLElement | null) => {
+    feedbackReturn.current = from;
+    setFeedbackOpen(true);
+  }, []);
   /** Discrete "user did it" signals for the checklist (idempotent per task). */
   const [doneSignal, setDoneSignal] = useState<ChecklistTaskId | null>(null);
   const tickTask = useCallback((id: ChecklistTaskId) => { setDoneSignal(id); }, []);
@@ -6386,6 +6401,21 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
             <button type="button" className="help-tour-btn" onClick={() => { setHelp(false); setTourOpen(true); }}>
               <Waypoints size={13} /> Take a tour
             </button>
+            {/* ROUND BI, ITEM 3 — the SECOND action of the same block: the
+                feedback form, one click from the shortcuts sheet. Same
+                .help-tour-btn treatment (its own 8px bottom margin is the gap
+                between the two, so the pair reads as one block and no colour or
+                new class is introduced). The popover closes FIRST, exactly like
+                the tour button, so the dialog's own autofocus lands inside it
+                and Esc hands the caret back to this ? button. */}
+            <button
+              type="button"
+              className="help-tour-btn"
+              data-help-feedback
+              onClick={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
+            >
+              <MessageSquarePlus size={13} /> Send feedback
+            </button>
             {/* Item 4: this sheet and Settings → Shortcuts must present the
                 SAME information — same two groups, same entries, same order,
                 same wording. Keys render as `kbd` chips; gestures render as
@@ -6495,7 +6525,21 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
           onAutosave={onAutosave}
           returnFocusTo={settingsBtnRef}
           boardPng={nodes.length ? boardPngForFeedback : null}
+          onOpenFeedback={openFeedback}
         />
+
+        {/* ROUND BI, ITEM 3 — the app's ONE feedback dialog (see the import and
+            the state above). Rendered here, inside `.canvas-wrap` beside
+            Settings, so its scrim covers the canvas column like every other
+            modal; `.fb-overlay`'s z-index (80) keeps it above the Settings
+            modal (70) and the help sheet (30) whichever opener started it. */}
+        {feedbackOpen && (
+          <FeedbackDialog
+            onCancel={() => setFeedbackOpen(false)}
+            returnFocusTo={feedbackReturn}
+            boardPng={nodes.length ? boardPngForFeedback : null}
+          />
+        )}
 
         <input
           ref={fileRef}

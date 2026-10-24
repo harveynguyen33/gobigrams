@@ -78,8 +78,10 @@ try {
 }
 try { SET = blank(read('src/Settings.tsx')); } catch { /* probed below */ }
 try { CSS = read('src/styles.css'); } catch { /* probed below */ }
-/* ROUND BI, ITEM 3 (help-sheet entry) lives in App.tsx; this harness reads it
-   in the commit that adds it. */
+/* ROUND BI, ITEM 3 — the help sheet lives in App.tsx, so the harness reads it
+   too (blanked: the assertions below are about ELEMENTS and handlers, not
+   comments). */
+try { APP = blank(read('src/App.tsx')); } catch { /* probed below */ }
 
 if (DLG) {
   assert('bh.s2.focusable-imported-from-settings-one-definition',
@@ -212,10 +214,15 @@ if (SET) {
      literal 'function AboutPane()' no longer exists. Same body, same contract. */
   const about = SET.slice(SET.indexOf('function AboutPane('), SET.indexOf('the shell'));
   const fbBtn = about.slice(about.indexOf('<button'), about.indexOf('</button>'));
+  /* ROUND BI, ITEM 3 re-anchor: the dialog's MOUNT moved to App.tsx (one
+     instance, two openers — Settings → About and the ? help sheet), so the
+     About entry no longer renders <FeedbackDialog> itself; it calls the opener
+     App passes down, handing over its own element for the focus restore. Same
+     contract — one click on the About entry, one feedback form — new mechanism. */
   assert('bh.s10.about-entry-is-the-dialog-opener',
-    fbBtn.includes(FEEDBACK_LABEL) && fbBtn.includes('setFbOpen(true)')
-      && about.includes('className="settings-feedback"') && /<FeedbackDialog/.test(SET),
-    'the About pane entry is a BUTTON with the exact round-BG label that mounts <FeedbackDialog>');
+    fbBtn.includes(FEEDBACK_LABEL) && /onOpenFeedback\(fbBtnRef\.current\)/.test(fbBtn)
+      && about.includes('className="settings-feedback"') && /onOpenFeedback:/.test(SET),
+    'the About pane entry is a BUTTON with the exact round-BG label that calls the app-level feedback opener (onOpenFeedback), passing itself as the focus-restore target');
 
   assert('bh.s11.settings-keyboard-defers-to-the-dialog',
     /querySelector\('\[data-feedback-dialog\]'\)/.test(SET)
@@ -234,6 +241,66 @@ if (SET) {
   const n = (CSS.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
   assert('bh.s13.styles-css-hex-count-still-within-r11-ceiling', n <= 144,
     `count=${n} (raw sheet, ceiling 144 — this round adds zero hex)`);
+}
+
+/* ---------------------------------------------------------------------------
+   ROUND BI, ITEM 3 — "Send feedback" in the ? help sheet, DIRECTLY under
+   "Take a tour": a second action in the same block, opening the SAME
+   FeedbackDialog from app state (so the sheet and Settings → About feed one
+   dialog), with the popover closed first so focus lands in the dialog.
+   --------------------------------------------------------------------------- */
+if (APP) {
+  const tourIdx = APP.indexOf('className="help-tour-btn"');
+  const tourStart = tourIdx < 0 ? -1 : APP.lastIndexOf('<button', tourIdx);
+  const tourEnd = tourIdx < 0 ? -1 : APP.indexOf('</button>', tourIdx) + '</button>'.length;
+  const fbIdx = APP.indexOf('Send feedback');
+  const fbStart = fbIdx < 0 ? -1 : APP.lastIndexOf('<button', fbIdx);
+  const fbEnd = fbIdx < 0 ? -1 : APP.indexOf('</button>', fbIdx) + '</button>'.length;
+  const between = tourEnd > 0 && fbStart > tourEnd ? APP.slice(tourEnd, fbStart) : null;
+  const fbBlock = fbStart >= 0 && fbEnd > fbStart ? APP.slice(fbStart, fbEnd) : '';
+
+  /* (a) ORDER, not presence: the feedback action is the element DIRECTLY after
+     the tour button — no `help-group` divider, no other tag between them. The
+     only thing allowed in between is whitespace and the braces of a blanked
+     JSX comment (`{/* … *\/}` — the comment body is already stripped, the two
+     braces are what a comment leaves behind). */
+  const betweenBare = between === null ? null : between.replace(/[{}]/g, '').trim();
+  assert('bh.s23.help-feedback-is-the-second-action-directly-after-the-tour',
+    betweenBare === '' && /help-tour-btn/.test(fbBlock)
+      && /Send feedback/.test(fbBlock) && /Take a tour/.test(APP.slice(tourStart, tourEnd)),
+    between === null
+      ? 'the help sheet has no "Send feedback" button after "Take a tour"'
+      : `nothing but whitespace between the tour button and the feedback button (${JSON.stringify(betweenBare)}); the feedback action reuses .help-tour-btn so the two read as one block`);
+
+  /* (b) the handler closes the popover FIRST (so focus lands in the dialog,
+     exactly like the tour button) and THEN opens the app-level dialog. */
+  const handler = (fbBlock.match(/onClick=\{([\s\S]*?)\}\s*>/g) || [])[0] || fbBlock;
+  assert('bh.s24.help-feedback-handler-closes-help-then-opens-the-dialog',
+    /setHelp\(false\)/.test(handler)
+      && /setFeedbackOpen\(true\)/.test(handler)
+      && handler.indexOf('setHelp(false)') < handler.indexOf('setFeedbackOpen(true)'),
+    `handler: ${handler.replace(/\s+/g, ' ').slice(0, 200)}`);
+
+  /* ONE dialog, TWO openers: the component mounts at app level only (Settings
+     hands its About entry to `onOpenFeedback`), so there is a single instance,
+     a single open-state, and one focus-restore target per opener. */
+  const dialogMounts = (APP.match(/<FeedbackDialog/g) || []).length;
+  const settingsMounts = (SET.match(/<FeedbackDialog/g) || []).length;
+  assert('bh.s25.one-app-level-dialog-fed-by-both-openers',
+    dialogMounts === 1 && settingsMounts === 0
+      && /onOpenFeedback/.test(SET) && /feedbackOpen\s*&&|feedbackOpen\s*\?/.test(APP)
+      && /returnFocusTo=\{feedbackReturn\}/.test(APP),
+    `App mounts <FeedbackDialog> ${dialogMounts}x, Settings ${settingsMounts}x; the About entry reaches it through onOpenFeedback, and the dialog returns focus to whichever opener set feedbackReturn`);
+
+  /* (c) token-only styling: the action block reuses .help-tour-btn's rules and
+     this round adds no colour literal anywhere near them. */
+  const tourRules = (CSS.match(/\.help-tour-btn[^{]*\{[^}]*\}/g) || []);
+  const hexAll = (CSS.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
+  assert('bh.s26.help-action-block-keeps-token-only-styling',
+    tourRules.length >= 1 && tourRules.every(r => !/#[0-9a-fA-F]{3,8}\b/.test(r))
+      && /--(elevated|border-strong|fg|acc|fs-md)/.test(tourRules.join(' '))
+      && hexAll <= 144,
+    `${tourRules.length} .help-tour-btn rule(s), zero hex literals, spacing from the rule's own margin-bottom (no new class, no new colour); sheet total ${hexAll} (ceiling 144)`);
 }
 
 /* ===========================================================================
@@ -724,6 +791,74 @@ try {
   }
 } catch (e) {
   assert('bh.live2-pass-ran', false, `the screenshot live pass could not run: ${String(e).slice(0, 300)}`);
+}
+
+/* ===========================================================================
+   LIVE 3 (ROUND BI, ITEM 3) — "Send feedback" inside the ? help sheet.
+   =========================================================================== */
+console.log('\n' + '='.repeat(78));
+console.log(`LIVE 3 — help sheet → feedback: ${APP_URL}`);
+console.log('='.repeat(78));
+
+try {
+  const require_ = createRequire(join('/home/harvey/projects/tech-goblin/package.json', 'noop.js'));
+  const {chromium} = require_('playwright-core');
+  const browser = await chromium.launch();
+  const page = await browser.newPage({viewport: {width: 1500, height: 900}});
+  try {
+    await page.addInitScript(() => {
+      localStorage.setItem('diagram-studio:tour-seen', '1');
+      localStorage.removeItem('diagram-studio:last-board');
+    });
+    await page.goto(APP_URL, {waitUntil: 'networkidle'});
+    await page.click('.help-btn');
+    await page.waitForSelector('.help-pop', {timeout: 5000});
+    const sheet = await page.evaluate(() => {
+      const pop = document.querySelector('.help-pop');
+      const btns = [...pop.querySelectorAll('button.help-tour-btn')];
+      return {
+        n: btns.length,
+        labels: btns.map(b => b.textContent.trim()),
+        adjacent: btns.length === 2 && btns[1].previousElementSibling === btns[0],
+        heights: btns.map(b => Math.round(b.getBoundingClientRect().height)),
+        gap: btns.length === 2
+          ? Math.round(btns[1].getBoundingClientRect().top - btns[0].getBoundingClientRect().bottom)
+          : null,
+      };
+    });
+    assert('bh.l12.help-sheet-lists-the-two-actions-in-order',
+      sheet.n === 2 && sheet.labels[0] === 'Take a tour' && sheet.labels[1] === 'Send feedback' && sheet.adjacent,
+      `${sheet.n} actions: [${sheet.labels.join(', ')}], adjacent siblings=${sheet.adjacent}, heights ${sheet.heights.join('/')}px, ${sheet.gap}px gap — one block`);
+
+    /* clicking it closes the popover FIRST and opens the dialog focused */
+    await page.click('.help-pop button.help-tour-btn:nth-of-type(2)');
+    await page.waitForSelector('[data-feedback-dialog]', {timeout: 5000});
+    await page.waitForTimeout(150);
+    const afterClick = await page.evaluate(() => ({
+      pop: !!document.querySelector('.help-pop'),
+      dialog: !!document.querySelector('[data-feedback-dialog]'),
+      focus: document.activeElement?.id || document.activeElement?.className || '',
+    }));
+    assert('bh.l13.help-feedback-closes-the-popover-and-opens-the-dialog',
+      !afterClick.pop && afterClick.dialog && afterClick.focus === 'fb-title',
+      `popover open=${afterClick.pop}, dialog open=${afterClick.dialog}, focus=${afterClick.focus} — the sheet closes first, so the dialog's own autofocus lands`);
+
+    /* Esc returns focus to the ? button (the opener), not the toolbar */
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    const afterEsc = await page.evaluate(() => ({
+      dialog: !!document.querySelector('[data-feedback-dialog]'),
+      focus: document.activeElement?.className || '',
+      pop: !!document.querySelector('.help-pop'),
+    }));
+    assert('bh.l14.esc-returns-focus-to-the-help-button',
+      !afterEsc.dialog && /help-btn/.test(afterEsc.focus) && !afterEsc.pop,
+      `dialog gone=${!afterEsc.dialog}, focus=${JSON.stringify(afterEsc.focus)} (the ? button), popover stays closed — the opener is recorded per open`);
+  } finally {
+    await browser.close();
+  }
+} catch (e) {
+  assert('bh.live3-pass-ran', false, `the help-sheet live pass could not run: ${String(e).slice(0, 300)}`);
 }
 
 /** The unit URL contract re-run against a LIVE-captured URL. */
