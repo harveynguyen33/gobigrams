@@ -45,3 +45,10 @@ research/
 # ROUND C scratch: the live-probe artefacts (probe board SVG/PNG rasters,
 # regenerated per run by checks/round-c-live.mjs)
 .rc-live/
+
+# transient agent-run litter (never shipped)
+.ay4-entry.ts
+.ay4-out.mjs
+.az-live/
+.rc-entry.ts
+.rc-out.mjs
