@@ -15,10 +15,25 @@
  * are two independent guards, so the markup is never injected as live DOM.
  * Anything that renders it as DOM throws both away at once.
  *
- * There is NO ShapeFrame here: the user's SVG *is* the artwork. Painting an app
+ * * No ShapeFrame here: the user's SVG *is* the artwork. Painting an app
  * shape behind it would show through any transparent area of the import.
  *
- * No connection handles — imported artwork is not a box to wire up.
+ * ROUND BG, item B (2026-10-24) — REVERSED: custom shapes DO get connection
+ * handles now. Harvey: "custom shapes đang không có mối nối, thêm vào". The
+ * original "imported artwork is not a box to wire up" reasoning is recorded
+ * here as history: the node IS a box on the canvas (it resizes like one,
+ * exports as one), so the four midpoints are exactly as wireable as a
+ * goblin node's. This file now mirrors `NodeHandles` (src/DiagramNode.tsx)
+ * — the same four ids ('left'/'right'/'top'/'bottom'), the same
+ * all-SOURCE scheme (so App.tsx's GOBLIN_HANDLE_IDS direction guard and the
+ * `gobi:handle-connect` dblclick auto-connect apply to custom shapes too),
+ * the same `.react-flow__handle` styling hooks (styles.css styles every
+ * handle through the class — hover reveal, 12px dot, z-index 5 above
+ * NodeResizer's grips). The handles sit on the BOX edge (the node box), not
+ * the letterboxed art — same geometry a goblin node's handles paint at.
+ * Handles are app chrome: the SVG exporter never rendered them for goblin
+ * nodes and does not for custom nodes either (checked: exportSvg.ts's
+ * customshape branch inlines rawSvg only).
  *
  * ITEM 2b (2026-09-18) — NO AUTO-SHOW ACTION STRIP ON THIS KIND EITHER. The
  * floating strip that used to appear above a selected import is gone, exactly as
@@ -30,7 +45,7 @@
  * with it — and `App.tsx` no longer injects the value.
  */
 import {memo} from 'react';
-import {NodeResizer, type NodeProps} from '@xyflow/react';
+import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
 import {resolveColor} from './colors';
 import type {ColorKey} from './colors';
@@ -42,7 +57,20 @@ export type CustomShapeKind = {
   colorKey: ColorKey;
 };
 
-const CustomShapeNode = memo(({data, selected}: NodeProps) => {
+/* The goblin node's scheme, verbatim (DiagramNode's handleDblClick +
+   NodeHandles): every handle is a SOURCE, so a drag builds the edge the way
+   the user drew it and App.tsx's GOBLIN_HANDLE_IDS direction guard covers
+   this kind too. Same ids, so dblclick auto-connect works from an imported
+   shape as well. */
+function handleDblClick(nodeId: string) {
+  return (handleId: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('gobi:handle-connect', {detail: {nodeId, handleId}}));
+  };
+}
+
+const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as CustomShapeKind;
   /* ROUND BF (2026-10-23) — `--nc` reaches this node kind (wired then for
      BF-1's at-rest ring). ROUND BF-2 (2026-10-24) INVERTED the ring: the
@@ -52,6 +80,7 @@ const CustomShapeNode = memo(({data, selected}: NodeProps) => {
      STAYS: the connect-handle hover emphasis and the node-ico tokens still
      theme with the node's own colourKey. */
   const nc = resolveColor(d);
+  const onHandleDblClick = handleDblClick(id);
   return (
     <div
       className={`custom-shape-node${selected ? ' selected' : ''}`}
@@ -85,6 +114,16 @@ const CustomShapeNode = memo(({data, selected}: NodeProps) => {
         draggable={false}
         style={{width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none'}}
       />
+      {/* ROUND BG, item B — the four midpoints of the BOX (the node box, not
+          the letterboxed art), the goblin node's scheme verbatim: same ids,
+          all SOURCE, same class styling (hover reveal, 12px dot, z-index 5
+          above the resizer grips). App.tsx's direction guard keys on these
+          ids via GOBLIN_HANDLE_IDS, so a custom-shape drag is normalised the
+          same way a goblin drag is. */}
+      <Handle type="source" id="left" position={Position.Left} onDoubleClick={onHandleDblClick('left')} />
+      <Handle type="source" id="right" position={Position.Right} onDoubleClick={onHandleDblClick('right')} />
+      <Handle type="source" id="top" position={Position.Top} onDoubleClick={onHandleDblClick('top')} />
+      <Handle type="source" id="bottom" position={Position.Bottom} onDoubleClick={onHandleDblClick('bottom')} />
     </div>
   );
 });
