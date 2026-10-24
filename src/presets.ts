@@ -419,14 +419,29 @@ export const FLOWCHART_EDGES: EdgeDefaults = {
   flowAllowed: true,
 };
 
+/* ROUND BG, item A (2026-10-24) — HARVEY: drew plain flowchart arrows on a
+   stored 'erd'-preset board and every NEW edge arrived with crow's-foot
+   markers ("why does a normal arrow suddenly have crow's foot? absurd.").
+   The crow seeds on new edges now follow ERD_ENABLED, the SAME flag that has
+   hidden the whole ERD create surface since 46ecc24: flag false → plain
+   markerEnd ArrowClosed, exactly like FLOWCHART_EDGES, on every creation
+   path (all of them consume `preset.edges` through makeEdge). The branch
+   below keeps this a DEFAULTS table, never a board rewrite — stored edges
+   keep their baked crow markers, and an explicit seed crowStart/crowEnd
+   (the erdTemplate relationship seeds) still passes through makeEdge.
+   Flip ERD_ENABLED to true and the full crow pair returns. */
 export const ERD_EDGES: EdgeDefaults = {
   path: 'smoothstep',
   strokeKey: 'slate',
   dash: 'solid',
   markerStart: null,
-  markerEnd: null,
-  crowStart: 'one',
-  crowEnd: 'many',
+  ...(
+    /* Read the real flag, never a hard-coded branch: the table itself flips
+       with the switch, so a future re-enable cannot ship a stale half. */
+    ERD_ENABLED
+      ? {markerEnd: null, crowStart: 'one', crowEnd: 'many' as const}
+      : {markerEnd: MarkerType.ArrowClosed, crowStart: undefined, crowEnd: undefined}
+  ),
   strokeWidth: 1.6,
   flowAllowed: false,
 };
