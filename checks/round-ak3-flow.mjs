@@ -38,15 +38,22 @@ const blankComments = s => s
 const readAt = (rel, commit) => commit
   ? execFileSync('git', ['show', `${commit}:${rel}`], {cwd: ROOT, encoding: 'utf8'})
   : readFileSync(`${ROOT}/${rel}`, 'utf8');
+const safeReadAt = (rel, commit) => {
+  try { return readAt(rel, commit); } catch { return ''; }
+};
 
 const bundleOf = commit => {
   const raw = {
+    /* ROUND BN: boardMigrations.ts may not exist at the pinned PRE commit —
+       readAt returns '' there, and the probes fall back to App.code. */
+    Migrations: commit ? safeReadAt('src/boardMigrations.ts', commit) : readFileSync(`${ROOT}/src/boardMigrations.ts`, 'utf8'),
     App: readAt('src/App.tsx', commit),
     GoblinEdge: readAt('src/GoblinEdge.tsx', commit),
     styles: readAt('src/styles.css', commit),
     choreography: readAt('src/choreography.ts', commit),
   };
   return {
+    Migrations: {raw: raw.Migrations, code: blankComments(raw.Migrations)},
     App: {raw: raw.App, code: blankComments(raw.App)},
     GoblinEdge: {raw: raw.GoblinEdge, code: blankComments(raw.GoblinEdge)},
     styles: {raw: raw.styles, code: blankComments(raw.styles)},
@@ -89,9 +96,11 @@ P.envelopeOptionGone = src => !/'Envelope'/.test(src.App.code);
 /* AK-16 (2) — `event` IS FOLDED, AND THE FOLD IS ON READ.
    A stored `flow:'event'` must still animate, and the board must NOT be
    rewritten: the mapping lives in `migrateEdge`, which runs on the way IN. */
-P.foldOnRead = src => /\.flow === 'event'/.test(src.App.code)
-  && /flow:\s*'icon'/.test(src.App.code)
-  && /flowIcon:\s*'mail'/.test(src.App.code);
+/* ROUND BN re-anchor: migrateEdge moved to src/boardMigrations.ts; the probe
+   reads the migration module when present, else falls back to App (pre-BN). */
+P.foldOnRead = src => /\.flow === 'event'/.test(src.Migrations?.code ?? src.App.code)
+  && /flow:\s*'icon'/.test(src.Migrations?.code ?? src.App.code)
+  && /flowIcon:\s*'mail'/.test(src.Migrations?.code ?? src.App.code);
 /** the renderer can no longer receive `event`: the branch and its envelope are
  *  gone, so nothing draws it twice. */
 P.eventBranchAndEnvelopeDeleted = src => !/flow === 'event'/.test(src.GoblinEdge.code)

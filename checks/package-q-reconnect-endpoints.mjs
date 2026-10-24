@@ -81,7 +81,10 @@ import {readFileSync, statSync} from 'node:fs';
 
 const ROOT = process.env.DS_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 
-const APP = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN re-anchor: RECONNECT_RADIUS moved to src/boardConstants.ts; the
+   App.tsx read stays because the <ReactFlow> prop call site lives in App. */
+const APP = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
+  + readFileSync(`${ROOT}/src/boardConstants.ts`, 'utf8');
 const OUR_CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const PRESETS = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
 const DIAGRAM = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');

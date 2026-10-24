@@ -218,8 +218,10 @@ console.log('\nDEFECT B — migrateEdge folds legacy data.label onto top-level (
 {
   /* drive the REAL migrateEdge by brace-span extraction, the same mechanism
      round-ar-modal-stability.mjs uses for App.tsx-internal functions. */
-  const src = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
-  const start = src.indexOf('const migrateEdge = (e: Edge): Edge =>');
+  /* ROUND BN re-anchor: migrateEdge moved to src/boardMigrations.ts (the
+     declaration gained an `export` keyword; the body is byte-identical). */
+  const src = readFileSync(join(ROOT, 'src', 'boardMigrations.ts'), 'utf8');
+  const start = src.indexOf('export const migrateEdge = (e: Edge): Edge =>');
   let depth = 0, i = src.indexOf('{', start), end = i;
   for (; i < src.length; i++) {
     if (src[i] === '{') depth++;

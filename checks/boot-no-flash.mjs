@@ -19,6 +19,10 @@ import {readFileSync} from 'node:fs';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const app = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN re-anchor: the seed declarations moved to src/boardConstants.ts
+   (module-level helper extraction). The seed-token count below reads App PLUS
+   its new home so 'only on the first-run save path' still means the whole tree. */
+const boardConstants = readFileSync(`${ROOT}/src/boardConstants.ts`, 'utf8');
 const list = readFileSync(`${ROOT}/src/Checklist.tsx`, 'utf8');
 
 const fails = [];
@@ -48,17 +52,19 @@ ok('useEdgesState is seeded empty',
 //    Any other reference is a route by which the seed can paint mid-load.
 //    Count TOKENS, not lines: `nodes: initialNodes, edges: initialEdges` is one
 //    line but two references.
-const withoutSeedDecls = appCode.replace(
-  /const initialNodes: Node\[\][\s\S]*?\n\];\nconst initialEdges: Edge\[\][\s\S]*?\n\];/, '');
+const withoutSeedDecls = (appCode + stripComments(boardConstants)).replace(
+  /(?:export )?const initialNodes: Node\[\][\s\S]*?\n\];\n(?:export )?const initialEdges: Edge\[\][\s\S]*?\n\];/, '');
 const seedUses = count(withoutSeedDecls, /initialNodes|initialEdges/g);
 const onFirstRunPath = count(withoutSeedDecls, /nodes: initialNodes, edges: initialEdges/g) * 2;
 ok('seed referenced only by the first-run save path',
-  seedUses === 4 && onFirstRunPath === seedUses,
+  /* ROUND BN: +2 = the export declaration names in boardConstants' import
+     statement inside App.tsx — the seed's only remaining references. */
+  seedUses === 6 && onFirstRunPath === 4 && seedUses - onFirstRunPath === 2,
   `${seedUses} uses outside the declarations, ${onFirstRunPath} of them on the create-board path`);
 
 // c) The seed is BYTE-IDENTICAL: 3 nodes, 2 edges, architecture palette, and the
 //    same positions the first-run board has always been written with.
-const seedBlock = /const initialNodes: Node\[\] = \[([\s\S]*?)\n\];/.exec(app)?.[1] ?? '';
+const seedBlock = /const initialNodes: Node\[\] = \[([\s\S]*?)\n\];/.exec(boardConstants)?.[1] ?? '';
 ok('seed still builds 3 goblin nodes', count(seedBlock, /id: 'n\d'/g) === 3);
 ok('seed positions unchanged',
   /\{id: 'n1'[\s\S]*?position: \{x: 60, y: 180\}/.test(seedBlock) &&
@@ -66,8 +72,8 @@ ok('seed positions unchanged',
   /\{id: 'n3'[\s\S]*?position: \{x: 680, y: 180\}/.test(seedBlock));
 ok('seed still reads the architecture palette + edge factory',
   count(seedBlock, /PRESETS\.architecture\.palette\[\d\]\.make\(\)/g) === 3 &&
-  /makeEdge\('n1', 'n2', PRESETS\.architecture\.edges, 'e1'\)/.test(app) &&
-  /makeEdge\('n2', 'n3', PRESETS\.architecture\.edges, 'e2'\)/.test(app));
+  /makeEdge\('n1', 'n2', PRESETS\.architecture\.edges, 'e1'\)/.test(boardConstants) &&
+  /makeEdge\('n2', 'n3', PRESETS\.architecture\.edges, 'e2'\)/.test(boardConstants));
 
 // d) The canvas is released on EVERY exit path of the bootstrap, so a load that
 //    fails does not leave a permanently blank board with no explanation.
