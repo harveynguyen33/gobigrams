@@ -26,7 +26,7 @@
  */
 import {useEffect, useRef, useState} from 'react';
 import {FOCUSABLE} from './Settings';
-import {buildFeedbackIssueUrl, FEEDBACK_ISSUES_URL, type FeedbackKind} from './feedbackDialog';
+import {buildFeedbackIssueUrl, FEEDBACK_ISSUES_URL, type FeedbackKind} from './feedbackIssueUrl';
 
 type Props = {
   onCancel: () => void;
