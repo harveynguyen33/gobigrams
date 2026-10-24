@@ -1,5 +1,32 @@
 # HANDOFF — Diagram Studio
 
+## ▶ 2026-10-24 11:2x — ROUND BG — crow's-foot defaults follow ERD_ENABLED + custom-shape handles COMPLETE (pushed)
+
+**State:** `main` @ **`e4c1abc`**, pushed to BOTH remotes, 0 ahead. Gates: `tsc 0` · `build 0` ·
+`client_js_bytes` **924,881** (+499, ceiling 942,000) · `goblin-verify` 22/0/5 · sweep 73/73.
+
+**Harvey's follow-up #2 (2026-10-24 morning):**
+- **Item A `b7e5e69`** — root cause of the crow's-foot surprise: his board ('Untitled',
+  boards/mvl3dlxwe682f666.json) carries preset 'erd', and `ERD_EDGES` seeds crowStart one /
+  crowEnd many into EVERY new edge via makeEdge. Fix: ERD_EDGES reads ERD_ENABLED at the
+  declaration — flag false → plain ArrowClosed (byte-identical markers to FLOWCHART_EDGES);
+  flag true → the crow pair returns. Single site covers onConnect / drop-create / dblclick.
+  Stored edges + erdTemplate seeds untouched. round-bg-edges 7/7 (RED 2/7 on pre-change).
+- **Item B `e4c1abc`** — CustomShapeNode now mirrors goblin NodeHandles: four source handles
+  (left/right/top/bottom) on the box edge, hover/selected reveal, z-index over resizer grips;
+  GOBLIN_HANDLE_IDS direction guard covers custom shapes; exportSvg draws no handles.
+  Reverses the old 'no connection handles' decision (recorded in the header). round-bg-handles
+  13/13 incl. a REAL drag custom→goblin persisting edge with sourceHandle/targetHandle.
+- **DESIGN RESEARCH in flight** (read answers): preset-vs-modeless report at
+  /home/harvey/diagram-studio-research/PRESET-VS-MODELESS-CANVAS-REPORT.md — peer convergence
+  is Option 1 (preset = creation profile; board-level mutable edgeDefaults + 'Set as default
+  for new lines'; narrow Table→Table crow seed). Harvey deciding; if adopted it supersedes
+  the flag-gating in item A long-term (flag stays as the ERD-hide control).
+
+**Mac test items:** (1) on the erd-preset board, NEW edges get plain arrows (no crow's feet);
+(2) custom shapes have 4 connection handles on hover — drag one to a goblin node, arrow
+connects; (3) previous BF items still stand.
+
 ## ▶ 2026-10-24 10:4x — ROUND BF-2 (follow-up) — ring INVERTED + ERD template hidden COMPLETE (pushed)
 
 **State:** `main` @ **`46ecc24`**, pushed to BOTH remotes, 0 ahead. Gates: `tsc 0` · `build 0` ·
