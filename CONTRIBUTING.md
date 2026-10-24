@@ -6,9 +6,9 @@ about lines, bytes and honesty in its own test harness. A few house rules.
 ## Issues welcome
 
 Bug reports and feature ideas both go through the
-[issue templates](https://github.com/harveynguyen33/goblin-diagrams/issues) —
+[issue templates](https://github.com/harveynguyen33/gobigrams/issues) —
 short answers are fine. Questions are faster in
-[Discussions](https://github.com/harveynguyen33/goblin-diagrams/discussions).
+[Discussions](https://github.com/harveynguyen33/gobigrams/discussions).
 
 ## Before you open a PR
 

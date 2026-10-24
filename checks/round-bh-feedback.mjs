@@ -52,7 +52,7 @@ const assert = (id, pass, detail = '') => {
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${id}  —  ${detail}`);
 };
 
-const FEEDBACK_REPO = 'https://github.com/harveynguyen33/goblin-diagrams';
+const FEEDBACK_REPO = 'https://github.com/harveynguyen33/gobigrams';
 const FEEDBACK_LABEL = 'Feedback — report a bug or request a shape';
 
 console.log(`round-bh-feedback — ROOT=${ROOT}  APP_URL=${APP_URL}`);
@@ -778,7 +778,7 @@ try {
       failedText: document.querySelector('.fb-shot-err')?.textContent.trim() || '',
     }));
     assert('bh.l10.denied-copy-shows-the-manual-line-and-send-still-opens-github',
-      afterDeny.urls.length === 1 && /github\.com\/harveynguyen33\/goblin-diagrams\/issues\/new/.test(afterDeny.urls[0])
+      afterDeny.urls.length === 1 && /github\.com\/harveynguyen33\/gobigrams\/issues\/new/.test(afterDeny.urls[0])
         && afterDeny.failed
         && afterDeny.failedText === "Couldn't copy — take a screenshot manually and paste it in the GitHub body.",
       `${afterDeny.urls.length} window.open fired despite the refusal; inline line shown="${afterDeny.failedText}"`);

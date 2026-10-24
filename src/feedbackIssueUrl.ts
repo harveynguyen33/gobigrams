@@ -22,8 +22,11 @@
  * regexing source.
  */
 
-/** The repo's issues root — the fallback link and the URL builder's base. */
-export const FEEDBACK_ISSUES_URL = 'https://github.com/harveynguyen33/goblin-diagrams/issues';
+/** The repo's issues root — the fallback link and the URL builder's base.
+ *  ROUND BI: the repo is `harveynguyen33/gobigrams` (renamed from
+ *  `goblin-diagrams`, which still 301-redirects — this constant is the
+ *  canonical one the app must ship). */
+export const FEEDBACK_ISSUES_URL = 'https://github.com/harveynguyen33/gobigrams/issues';
 
 /** The two kinds the dialog offers; each maps to one template file. */
 export type FeedbackKind = 'bug' | 'feature';

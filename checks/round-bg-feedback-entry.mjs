@@ -55,7 +55,7 @@ function assert(name, ok, detail = '') {
   else { fail += 1; console.log(`FAIL  ${name}${detail ? ' - ' + detail : ''}`); failures.push(name); }
 }
 
-const FEEDBACK_URL = 'https://github.com/harveynguyen33/goblin-diagrams/issues';
+const FEEDBACK_URL = 'https://github.com/harveynguyen33/gobigrams/issues';
 const LABEL = 'Feedback — report a bug or request a shape';
 
 const about = SET.slice(SET.indexOf('function AboutPane('), SET.indexOf('the shell'));
