@@ -16,6 +16,7 @@ import {type Edge, type Node} from '@xyflow/react';
 import {type PaletteItem} from './palette';
 import {type CustomShape} from './customShape';
 import {getLibrary as getLibraryLocal, saveLibrary as saveLibraryLocal} from './localStore';
+import {probeServerModeOnce} from './storageMode';
 
 /* ---------------------------------------------------------------------------
    §6.1 — the stored item shape.
@@ -135,14 +136,16 @@ export const saveLibrary = (doc: LibraryDoc): Promise<LibraryDoc> =>
       })
     : saveLibraryLocal(doc.favourites, doc.shapes));
 
-/* The memoised probe lives in boards.ts; importing it here would make a
-   library→boards→library cycle, so the SEAM is imported from localStore's
-   sibling: boards.ts re-exports the decision. To keep the dependency one-way
-   the probe is read through a lazy dynamic import (the module graph is
-   static — boards.ts statically imports library.ts for the constants). */
+/* The memoised probe lives in the leaf src/storageMode.ts (ROUND BJ:
+   extracted from boards.ts). library.ts must NOT import boards.ts — that
+   would drag presets → @xyflow/react into library's dependency cone. The
+   old dynamic import('./boards') here was DEAD (vite warned: boards.ts is
+   also statically imported by App.tsx, so the import() never moved it to
+   another chunk) — replaced with this static leaf import. Zero behavior
+   change: same memoised promise, same one-probe-per-session contract. */
 let probePromise: Promise<boolean> | null = null;
 function voidProbe(): Promise<boolean> {
-  probePromise ??= import('./boards').then(m => m.probeServerModeOnce().then(mode => mode === 'server'));
+  probePromise ??= probeServerModeOnce().then(mode => mode === 'server');
   return probePromise;
 }
 

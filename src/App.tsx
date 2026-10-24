@@ -115,7 +115,7 @@ import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
 import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, tokensFor, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
-import {isQuotaError, QUOTA_MESSAGE} from './localStore';
+import {isQuotaError, QUOTA_MESSAGE, isVolatile} from './localStore';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
@@ -1360,10 +1360,11 @@ export default function App() {
       }
     }).catch(() => { /* line stays as-is */ });
     /* AT-2 — the volatile last resort: IndexedDB itself unavailable (storage
-       disabled). One-time flash; the board list still renders. */
-    import('./localStore').then(m => {
-      if (m.isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
-    }).catch(() => { /* never blocks the list */ });
+       disabled). One-time flash; the board list still renders.
+       ROUND BJ: was a dead dynamic import (localStore is also statically
+       imported — vite warned); the flag is a live module binding, read
+       directly. Zero behavior change. */
+    if (isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
   }, [flash]);
 
   const flushSave = useCallback(async () => {
