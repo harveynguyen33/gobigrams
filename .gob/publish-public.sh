@@ -67,10 +67,14 @@ if [ "${#leaving[@]}" -gt 0 ]; then
   git rm -rq --cached --ignore-unmatch -- "${leaving[@]}" 2>/dev/null || true
 fi
 
-# README: the public one is a purpose-built file, not the workshop README
-if [ -f README-PUBLIC.md ]; then
-  cp README-PUBLIC.md README.md
+# README: the public one is purpose-built, not the workshop README.
+# It lives on `main` only, so it must be read from there — the working tree on
+# this branch does not have the file (that silently shipped the stale one once).
+if git cat-file -e main:README-PUBLIC.md 2>/dev/null; then
+  git show main:README-PUBLIC.md > README.md
   git add README.md
+else
+  echo "WARNING: README-PUBLIC.md is missing on main — shipping the workshop README" >&2
 fi
 
 # ---- leak gate: refuse to publish if any internal identifier slipped through ----
