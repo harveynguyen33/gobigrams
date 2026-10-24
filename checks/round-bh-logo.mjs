@@ -116,7 +116,13 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage({viewport: {width: 1500, height: 900}});
   try {
-    await page.addInitScript(() => localStorage.setItem('diagram-studio:tour-seen', '1'));
+    await page.addInitScript(() => {
+      localStorage.setItem('diagram-studio:tour-seen', '1');
+      /* the app boots into the LAST-OPEN board (or the newest) and IGNORES
+         ?board= — so each navigation must fall back to "newest", which after
+         the PUT below is always this harness's empty probe board. */
+      localStorage.removeItem('diagram-studio:last-board');
+    });
 
     /* the About pane's icon */
     await page.goto(APP_URL, {waitUntil: 'networkidle'});
