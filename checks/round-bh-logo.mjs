@@ -79,7 +79,7 @@ const CSS = read('src/styles.css');
 
 {
   const ce = APP.slice(APP.indexOf('className="canvas-empty"'), APP.indexOf('className="canvas-empty"') + 1400);
-  const img = ce.match(/<img\s[^>]*src="\/brand\/logo-mark\.svg"[^>]*>/);
+  const img = ce.match(/<img\s[^>]*src="\/brand\/logo-mark\.svg(?:\?[^"]*)?"[^>]*>/);
   assert('bh.g4.canvas-empty-img-above-the-title',
     !!img && /alt="Gobigrams"/.test(img[0])
       && ce.indexOf('<img') < ce.indexOf('This board is empty')
@@ -153,15 +153,15 @@ try {
     boardId = (await r0.json()).id;
     await page.request.put(`${APP_URL}api/boards/${boardId}`, {data: {id: boardId, name: `BH-PROBE-LOGO-${Date.now()}`, nodes: [], edges: []}});
     await page.goto(`${APP_URL}?board=${boardId}`, {waitUntil: 'networkidle'});
-    await page.waitForSelector('.canvas-empty img[src="/brand/logo-mark.svg"]', {timeout: 15000});
+    await page.waitForSelector('.canvas-empty img[src^="/brand/logo-mark.svg"]', {timeout: 15000});
     const ceImg = await page.evaluate(() => {
-      const img = document.querySelector('.canvas-empty img[src="/brand/logo-mark.svg"]');
+      const img = document.querySelector('.canvas-empty img[src^="/brand/logo-mark.svg"]');
       if (!img) return null;
       const r = img.getBoundingClientRect();
       return {w: r.width, h: r.height, natural: img.naturalWidth, alt: img.alt};
     });
     assert('bh.g9.empty-board-icon-renders-and-loads',
-      !!ceImg && Math.round(ceImg.w) === 240 && Math.abs(ceImg.w / ceImg.h - 1.82) < 0.05 && ceImg.natural > 0,
+      !!ceImg && Math.round(ceImg.w) === 240 && Math.abs(ceImg.w / ceImg.h - 1.618) < 0.05 && ceImg.natural > 0,
       ceImg ? `rendered ${Math.round(ceImg.w)}x${Math.round(ceImg.h)}px, naturalWidth ${ceImg.natural}, on the empty panel` : 'img not found on the empty panel');
   } finally {
     if (boardId) {

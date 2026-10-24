@@ -6796,9 +6796,9 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
               <div className="ce-title">
                 {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
                     natural header, above the "This board is empty" title
-                    (.ce-logo, 240px hero, aspect-true, tokens only). pointer-events:none is
+                    (.ce-logo, 240px hero, aspect-true 657:406, tokens only). pointer-events:none is
                     inherited from .canvas-empty. */}
-                <img className="ce-logo" src="/brand/logo-mark.svg" alt="Gobigrams" width={240} height={132} />
+                <img className="ce-logo" src="/brand/logo-mark.svg?v=2" alt="Gobigrams" width={240} height={148} />
                 This board is empty
               </div>
               <div className="ce-sub">
