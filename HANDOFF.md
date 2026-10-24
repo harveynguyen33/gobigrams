@@ -4,8 +4,8 @@
 
 **The GitHub repo is now fed by ONE path: `.gob/publish-public.sh`.**
 
-- Public repo: **github.com/harveynguyen33/gobigrams** (renamed from `goblin-diagrams`,
-  old URL 301-redirects). Workshop forge: Forgejo `harvey/goblin-diagrams`.
+- Public repo: **github.com/harveynguyen33/gobigrams** and workshop forge **harvey/gobigrams** —
+  BOTH renamed from `goblin-diagrams` on 2026-10-24 (GitHub's old URL 301-redirects). Workshop forge: Forgejo `harvey/gobigrams` (renamed 2026-10-24; the old name still 303s for signed-in users).
 - **The Forgejo push-mirror to GitHub has been DELETED** (it had `branch_filter: main`,
   `sync_on_commit: true` — so every workshop commit re-published specs, handoffs,
   `.hermes/`, `.gob/` to the public repo within seconds; it did this on 2026-10-24 and had
