@@ -64,7 +64,7 @@ export default function FeedbackDialog({onCancel, returnFocusTo, boardPng}: Prop
   /* The row exists only when there IS something to copy (App passes null for an
      empty board) AND the browser can take an image. Plain-http LAN origins
      expose neither clipboard API, so they simply never see the row. */
-  const canAttach = !!boardPng && clipboardUsable();
+  const clipboardReady = clipboardUsable();
 
   /* Copy the board as a PNG. Fire-and-forget by design: the caller (a click, or
      Send) must not wait on the rasterise or on a permission answer. */
@@ -220,18 +220,28 @@ export default function FeedbackDialog({onCancel, returnFocusTo, boardPng}: Prop
             the row only exists when there is a board to copy AND the clipboard
             can take an image — no dead button on an empty board or a plain-http
             origin. */}
-        {canAttach && (
-          <div className="fb-shot" data-fb-shot={shot}>
-            <button
-              type="button"
-              className="bd-btn fb-shot-btn"
-              data-fb-copy
-              onClick={copyShot}
-            >
-              {shot === 'copied'
-                ? 'Copied — paste it in the GitHub body (Ctrl+V / ⌘V)'
-                : 'Copy board as PNG'}
-            </button>
+        {boardPng && (
+          <div className="fb-shot" data-fb-shot={shot} data-fb-clipboard={clipboardReady ? 'yes' : 'no'}>
+            {clipboardReady ? (
+              <button
+                type="button"
+                className="bd-btn fb-shot-btn"
+                data-fb-copy
+                onClick={copyShot}
+              >
+                {shot === 'copied'
+                  ? 'Copied — paste it in the GitHub body (Ctrl+V / ⌘V)'
+                  : 'Copy board as PNG'}
+              </button>
+            ) : (
+              /* The Clipboard API only exists in a secure context, so a plain-http
+                 host (a LAN dev server) can never copy. Say WHY instead of hiding
+                 the whole affordance: a hidden control reads as "this app cannot
+                 take a screenshot at all". Nothing here is a dead button. */
+              <span className="fb-shot-note" data-fb-clipboard-blocked="1">
+                Copying needs HTTPS — on this address take a screenshot instead.
+              </span>
+            )}
             {shot === 'copied' && (
               <span className="fb-shot-note">GitHub uploads pasted images for you.</span>
             )}
@@ -242,6 +252,13 @@ export default function FeedbackDialog({onCancel, returnFocusTo, boardPng}: Prop
             )}
           </div>
         )}
+        {/* Media that cannot travel on the clipboard (video, animated GIF, extra
+            screenshots) goes straight into the issue body by drag-and-drop —
+            GitHub hosts it there. Stated once, outside the board-dependent row so
+            it is true even on an empty board. */}
+        <p className="fb-note">
+          Images or video? Drag the file into the GitHub issue body — GitHub hosts it for you.
+        </p>
 
         <div className="fb-actions">
           <button type="button" className="bd-btn" onClick={onCancel}>Cancel</button>
