@@ -5298,8 +5298,12 @@ kbd {
   margin: 4px auto 12px;
 }
 .ce-logo {
-  display: block; width: 72px; height: 72px;
-  margin: 0 auto 12px;
+  /* 240px wide, aspect preserved (800x440 artwork). The first cut forced a
+     square 72x72 onto a 920x560 SVG — it squashed the face AND the artwork
+     carried a baked near-black background rect that broke light/paper themes;
+     both fixed by shipping logo-mark.svg (transparent), height auto. */
+  display: block; width: 240px; height: auto;
+  margin: 0 auto 16px;
 }
 
 /* The only per-tier rule this block needs: the shipped list IS three columns at

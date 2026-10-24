@@ -124,7 +124,7 @@ export default function FeedbackDialog({onCancel, returnFocusTo}: Props) {
         <div className="bd-head">
           <div>
             <h2 className="bd-title" id="fb-title-h">Send feedback</h2>
-            <p className="bd-sub">It becomes a prefilled issue — you review it on GitHub.</p>
+            <p className="bd-sub">The goblin reads every note — thank you, he'll be on it right away.</p>
           </div>
         </div>
 
@@ -186,16 +186,16 @@ export default function FeedbackDialog({onCancel, returnFocusTo}: Props) {
         <div className="fb-actions">
           <button type="button" className="bd-btn" onClick={onCancel}>Cancel</button>
           <button type="button" className="bd-btn primary" data-fb-submit disabled={!canSubmit} onClick={submit}>
-            Open GitHub issue
+            Send feedback
           </button>
         </div>
-        {/* The honest caption — what actually happens next — plus a plain
-            fallback for people without a GitHub account. */}
+        {/* Honest, but in the product's voice: Send opens GitHub with the note
+            already written, so the only step left there is Submit. The plain
+            link covers people who would rather not go through the form. */}
         <p className="fb-note">
-          Opening GitHub — you'll just press Submit.
-          No account?{' '}
+          Send opens GitHub with your note written — press Submit there.{' '}
           <a href={FEEDBACK_ISSUES_URL} target="_blank" rel="noopener noreferrer">
-            email-free bug tracker
+            Or browse the issue tracker
           </a>
         </p>
       </div>

@@ -116,11 +116,17 @@ if (DLG) {
       && !/fetch\(/.test(DLG) && !/XMLHttpRequest/.test(DLG),
     'no api.github.com / Authorization / token / fetch / XHR in the dialog — the only network act is window.open');
 
+  /* Re-anchored (Harvey, 2026-10-24): the caption was rewritten into product
+     voice ("Send opens GitHub with your note written — press Submit there.")
+     and the odd "email-free bug tracker" link became "Or browse the issue
+     tracker". The guarantee is unchanged: the GitHub hand-off is still stated
+     and the plain fallback anchor still exists with new-tab + noopener. */
   assert('bh.s9.honest-caption-and-fallback-link',
-    /you&#x27;ll just press Submit|you'll just press Submit|you\u2019ll just press Submit/.test(DLG)
+    /press Submit there/.test(DLG)
       && new RegExp(`href=\\{?FEEDBACK_ISSUES_URL\\}?`).test(DLG)
+      && /Or browse the issue tracker/.test(DLG)
       && /target="_blank"/.test(DLG) && /rel="noopener noreferrer"/.test(DLG),
-    "caption says \"you'll just press Submit\"; plain fallback anchor to the issues page, new tab + noopener noreferrer");
+    "caption states the GitHub hand-off ('press Submit there') + a plain 'browse the issue tracker' anchor, new tab + noopener noreferrer");
 }
 
 if (SET) {
