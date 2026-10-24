@@ -4654,7 +4654,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
      * thing that decides; the print view inherits whatever the modal shows. */
     const svg = await buildSvg({nodes: o.nodes, edges: o.edges, theme: o.theme, outline: !!o.outline});
     if (!svg) return;
-    printSvgAsPdf(svg, curBoard?.name || 'Diagram Studio');
+    printSvgAsPdf(svg, curBoard?.name || 'Gobigrams');
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [buildSvg, curBoard]);
 
@@ -5753,7 +5753,7 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
       <aside className="panel">
         <div className="panel-head">
           <div className="brand">
-            <span className="dot" />Diagram Studio<span className="path">diagrams</span>
+            <span className="dot" />Gobigrams<span className="path">diagrams</span>
           </div>
           <div ref={boardsBtnRef} style={{position: 'relative', marginTop: 10}}>
             {/* CONFIG-FIX (2026-10-22) — HARVEY: the hover tooltip covered the
@@ -6738,7 +6738,14 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
               className="canvas-empty"
               style={{marginTop: '12vh'}}
             >
-              <div className="ce-title">This board is empty</div>
+              <div className="ce-title">
+                {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
+                    natural header, above the "This board is empty" title
+                    (.ce-logo, 40px, tokens only). pointer-events:none is
+                    inherited from .canvas-empty. */}
+                <img className="ce-logo" src="/brand/logo.svg" alt="Gobigrams" width={40} height={40} />
+                This board is empty
+              </div>
               <div className="ce-sub">
                 Drag a shape from the left panel onto the canvas, or
                 <br />

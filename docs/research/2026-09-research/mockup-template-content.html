@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template content — notation grammar (mockup)</title>
+<style>
+:root{
+  --bg:#0b0b0d; --surface:#131316; --elevated:#1a1b1f;
+  --border:#26272c; --border-strong:#33343a;
+  --fg:#e8e8ea; --dim:#8a8a92; --dim2:#63636b;
+  --acc:#f54e00; --acc-soft:rgba(245,78,0,.14); --on-acc:#fff;
+  --green:#4ade80; --red:#f87171;
+  --dots:rgba(255,255,255,.14);
+  --shadow-pop:0 30px 70px -12px rgba(0,0,0,.85);
+  --c-accent:#f54e00; --c-green:#4ade80; --c-cyan:#22d3ee;
+  --c-violet:#a78bfa; --c-amber:#fbbf24; --c-slate:#94a3b8;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#08080a;color:var(--fg);font-family:var(--sans);
+  display:flex;flex-direction:column;align-items:center;gap:16px;padding:18px 14px 60px}
+h1{font-family:var(--mono);font-size:14px;font-weight:600;margin:0;letter-spacing:.02em}
+.lede{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:0;text-align:center;max-width:1080px;line-height:1.75}
+.lede b{color:var(--fg)}
+.pane{display:none;flex-direction:column;gap:18px;align-items:center;width:100%}
+.pane.on{display:flex}
+.picker{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:50;
+  padding:8px;background:rgba(8,8,10,.93);backdrop-filter:blur(6px);border-radius:10px}
+.picker button{font-family:var(--mono);font-size:11.5px;padding:8px 14px;border-radius:7px;cursor:pointer;
+  background:var(--elevated);color:var(--dim);border:1px solid var(--border)}
+.picker button.on{background:var(--acc-soft);color:var(--acc);border-color:var(--acc);font-weight:700}
+.block{border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  padding:15px;display:flex;flex-direction:column;gap:11px;max-width:1120px;width:100%}
+.block > .cap{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--acc)}
+.block > .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim2);line-height:1.75}
+table.g{font-family:var(--mono);font-size:10.5px;border-collapse:collapse;width:100%}
+table.g th,table.g td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;line-height:1.65}
+table.g th{background:var(--elevated);color:var(--dim);font-size:9.5px;text-transform:uppercase;letter-spacing:.06em}
+table.g td.s{color:var(--c-cyan);font-weight:700;white-space:nowrap}
+table.g td.r{color:var(--fg)}
+table.g tr.bad td.s{color:var(--red)}
+.verdict{font-family:var(--mono);font-size:10.5px;line-height:1.8;color:var(--dim)}
+.verdict .no{color:var(--red);font-weight:700} .yes{color:var(--green);font-weight:700}
+
+/* node render — real silhouettes */
+.row{display:flex;align-items:center;gap:14px;padding:9px;border:1px solid var(--border);
+  border-radius:10px;background:var(--bg);min-width:0}
+.row + .row{margin-top:7px}
+.nd{position:relative;flex:none;display:flex;align-items:center;justify-content:center;
+  padding:6px 12px;min-width:132px}
+.nd svg{position:absolute;inset:0;width:100%;height:100%}
+.nd .t{position:relative;font-family:var(--mono);font-size:9.5px;line-height:1.35;text-align:center;
+  color:var(--fg);overflow-wrap:anywhere;max-width:100%}
+.nd .k{position:absolute;top:9px;left:0;right:0;text-align:center;font-family:var(--mono);
+  font-size:7.5px;letter-spacing:.08em;color:var(--dim2);text-transform:uppercase}
+.nd.card .t{margin-top:16px}
+.meta{font-family:var(--mono);font-size:10px;color:var(--dim2);min-width:0;line-height:1.6}
+.old{font-family:var(--mono);font-size:10px;color:var(--red);text-decoration:line-through;opacity:.85}
+.new{font-family:var(--mono);font-size:10.5px;color:var(--green);font-weight:700}
+.why{font-family:var(--mono);font-size:9.5px;color:var(--dim2);line-height:1.6}
+.tag{font-family:var(--mono);font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:4px;
+  border:1px solid var(--border-strong);color:var(--dim);white-space:nowrap}
+.tag.action{color:var(--green);border-color:var(--green)}
+.tag.data{color:var(--c-cyan);border-color:var(--c-cyan)}
+.tag.q{color:var(--c-amber);border-color:var(--c-amber)}
+.tag.obj{color:var(--c-violet);border-color:var(--c-violet)}
+.dias{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.dia{border:1px solid var(--border);border-radius:11px;background:var(--bg);overflow:hidden;
+  display:flex;flex-direction:column;flex:none}
+.dia .dh{font-family:var(--mono);font-size:11px;font-weight:700;padding:9px 12px;background:var(--surface);
+  border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dia .dh .m{font-size:9.5px;color:var(--dim2);font-weight:400}
+.dia .db{position:relative;background-image:radial-gradient(var(--dots) 1px,transparent 1px);background-size:16px 16px}
+.dia .df{font-family:var(--mono);font-size:9.5px;color:var(--dim2);padding:8px 12px;background:var(--surface);
+  border-top:1px solid var(--border);line-height:1.65}
+.legend{font-family:var(--mono);font-size:10px;color:var(--dim2);max-width:1080px;line-height:1.75;text-align:center}
+table.g.rw td{font-size:10px}
+table.g.rw td.old{color:var(--red);text-decoration:line-through;opacity:.9}
+table.g.rw td .new{color:var(--green);font-weight:700}
+.keepmark{color:var(--dim2)}
+.chip{display:inline-block;vertical-align:middle}
+.dia{max-width:100%}
+</style>
+</head>
+<body>
+
+<h1>Template content — viết đúng "ngữ pháp" của từng ký hiệu</h1>
+<p class="lede">Vấn đề: chữ trong node hiện tại <b>không khớp với ý nghĩa của shape</b>. Ví dụ hình bình hành
+(Input / Output) lại chứa một <b>hành động</b> ("Count the parts…"), nên user không thể suy ra nó là gì.
+Dưới đây là bản viết lại: mỗi shape chỉ chứa đúng <b>loại nội dung</b> mà nó biểu diễn — nhìn là hiểu.</p>
+
+<div class="picker">
+  <button class="on" data-p="p1">1 · Lỗi hiện tại</button>
+  <button data-p="p2">2 · Ngữ pháp 16 ký hiệu</button>
+  <button data-p="p3">3 · Viết lại 3 template</button>
+</div>
+
+<!-- ============ PANE 1 — WHAT'S WRONG ============ -->
+<div class="pane on" id="p1">
+  <div class="block">
+    <div class="cap">Cùng một board hiện tại — chữ đặt sai chỗ</div>
+    <div class="sub">Đọc từng node và tự hỏi "nếu tôi không biết ISO 5807, tôi có đoán ra shape này nghĩa gì không?" —
+      <b>5 trong 10 node của Basic trả lời là KHÔNG.</b></div>
+
+    <div class="row"><div class="nd" data-shape="io" data-color="violet" data-w="150" data-h="66"><span class="t">Count the parts against the checklist</span></div>
+      <div class="meta"><span class="tag q">shape = DỮ LIỆU vào/ra</span><br>
+        <span class="old">Count the parts against the checklist</span><br>
+        <span class="why">← đây là một HÀNH ĐỘNG. Người mới sẽ tưởng hình bình hành = "làm gì đó".</span></div></div>
+
+    <div class="row"><div class="nd" data-shape="document" data-color="violet" data-w="150" data-h="66"><span class="t">Follow the printed step sheet</span></div>
+      <div class="meta"><span class="tag obj">shape = TÀI LIỆU</span><br>
+        <span class="old">Follow the printed step sheet</span><br>
+        <span class="why">← cũng là hành động ("follow"). Lẽ ra phải là TÊN tài liệu.</span></div></div>
+
+    <div class="row"><div class="nd" data-shape="looplimit" data-color="amber" data-w="150" data-h="66"><span class="t">Loop: for each of the 8 cam locks</span></div>
+      <div class="meta"><span class="tag obj">shape = ĐIỂM BẮT ĐẦU vòng lặp</span><br>
+        <span class="old">Loop: for each of the 8 cam locks</span><br>
+        <span class="why">← mô tả cả vòng lặp, không phải cái mốc bắt đầu. Chữ "Loop:" cũng thừa —
+          chính cái shape đã nói điều đó.</span></div></div>
+
+    <div class="row"><div class="nd" data-shape="manualinput" data-color="green" data-w="150" data-h="66"><span class="t">Write the unit number on the box label by hand</span></div>
+      <div class="meta"><span class="tag data">shape = DỮ LIỆU nhập tay</span><br>
+        <span class="old">Write the unit number on the box label by hand</span><br>
+        <span class="why">← hành động "write". Shape này nói về DỮ LIỆU được nhập, không phải việc nhập.</span></div></div>
+
+    <div class="row"><div class="nd" data-shape="storeddata" data-color="violet" data-w="150" data-h="66"><span class="t">Leftover screws — kept in the box</span></div>
+      <div class="meta"><span class="tag data">shape = NƠI LƯU trữ</span><br>
+        <span class="old">Leftover screws — kept in the box</span><br>
+        <span class="why">← gần đúng, nhưng dài. Nên là TÊN của kho: "Spare-screw bag".</span></div></div>
+
+    <div class="verdict">Và <b>5 node đã đúng</b>, để so sánh: <span class="yes">"Lay out the panels and the fittings"</span> (process = hành động — khớp),
+      <span class="yes">"All parts present?"</span> (decision = câu hỏi — khớp),
+      <span class="yes">"Frame square and steady?"</span> (decision — khớp),
+      <span class="yes">"Fit the dowels and the cam locks"</span> (process — khớp),
+      <span class="yes">"Tighten every cam a quarter turn"</span> (process — khớp).<br><br>
+      <b>Vậy vấn đề không phải shape, mà là câu chữ không theo một quy tắc nào.</b> Tab 2 là quy tắc đó.</div>
+  </div>
+</div>
+
+<!-- ============ PANE 2 — THE GRAMMAR ============ -->
+<div class="pane" id="p2">
+  <div class="block">
+    <div class="cap">Quy tắc: mỗi shape chỉ nhận MỘT loại câu</div>
+    <div class="sub">Đây là toàn bộ cách sửa — và nó cũng là thứ dạy user đọc bản vẽ. 4 nhóm:
+      <b>HÀNH ĐỘNG</b> (động từ mệnh lệnh) · <b>CÂU HỎI</b> (có dấu ?) · <b>DỮ LIỆU / VẬT</b> (danh từ) ·
+      <b>MỐC</b> (điểm bắt đầu / kết thúc).</div>
+    <table class="g">
+      <tr><th>Shape</th><th>Loại câu</th><th>Mẫu</th><th>Sai thì sao</th></tr>
+      <tr><td class="s">Terminal</td><td><span class="tag obj">MỐC</span></td><td class="r">"Flat box opened" · "Unit assembled"</td><td>Một câu hành động ở đây làm mất ranh giới bắt đầu/kết thúc</td></tr>
+      <tr><td class="s">Process</td><td><span class="tag action">HÀNH ĐỘNG</span></td><td class="r">"Lay out the panels and fittings"</td><td>—</td></tr>
+      <tr><td class="s">Decision</td><td><span class="tag q">CÂU HỎI</span></td><td class="r">"All parts present?"</td><td>Thiếu dấu ? thì không ai biết đây là chỗ rẽ nhánh</td></tr>
+      <tr><td class="s">Input / Output</td><td><span class="tag data">DỮ LIỆU</span></td><td class="r">"Parts checklist"</td><td>Chứa hành động → mất hẳn nghĩa dữ liệu</td></tr>
+      <tr><td class="s">Document</td><td><span class="tag obj">TÀI LIỆU</span></td><td class="r">"Printed instruction sheet"</td><td>"Follow the sheet" là việc, không phải tài liệu</td></tr>
+      <tr><td class="s">Predefined process</td><td><span class="tag obj">THỦ TỤC Ở NGOÀI</span></td><td class="r">"Drawer box assembly (own sheet)"</td><td>Nếu ghi hành động thường thì thành process thường</td></tr>
+      <tr><td class="s">Preparation</td><td><span class="tag action">CHUẨN BỊ</span></td><td class="r">"Set out panels, fittings, allen key"</td><td>—</td></tr>
+      <tr><td class="s">Manual operation</td><td><span class="tag action">LÀM BẰNG TAY</span></td><td class="r">"Hold the side panel by hand"</td><td>Phải nói rõ "by hand" thì mới phân biệt với Process</td></tr>
+      <tr><td class="s">Delay</td><td><span class="tag obj">CHỜ</span></td><td class="r">"Wait 30 min for the glue"</td><td>—</td></tr>
+      <tr><td class="s">On-page connector</td><td><span class="tag obj">NHÃN NHẢY</span></td><td class="r">"A" (một cặp khớp nhau)</td><td>Bản thân nó chỉ là chữ cái — phải CÓ CẶP mới hiểu</td></tr>
+      <tr><td class="s">Off-page connector</td><td><span class="tag obj">SANG TRANG</span></td><td class="r">"To page 2: fix to wall"</td><td>Thiếu chữ "To page N" thì không rõ là đi đâu</td></tr>
+      <tr><td class="s">Manual input</td><td><span class="tag data">DỮ LIỆU NHẬP TAY</span></td><td class="r">"Unit number (written on the box)"</td><td>Chứa hành động "write" → mất nghĩa dữ liệu</td></tr>
+      <tr><td class="s">Display</td><td><span class="tag data">DỮ LIỆU HIỆN RA</span></td><td class="r">"Programme + time remaining"</td><td>Phải là DỮ LIỆU được hiện, không phải "xem màn hình"</td></tr>
+      <tr><td class="s">Stored data</td><td><span class="tag data">KHO LƯU</span></td><td class="r">"Spare-screw bag"</td><td>Danh từ. "kept in the box" là giải thích, không phải tên kho</td></tr>
+      <tr><td class="s">Loop limit</td><td><span class="tag obj">MỐC LẶP</span></td><td class="r">"For each of 8 cam locks"</td><td>Chữ "Loop:" thừa — chính shape đã nói rồi</td></tr>
+      <tr><td class="s">Internal storage</td><td><span class="tag data">KHO TẠM</span></td><td class="r">"Loose fittings in the box"</td><td>Đối lập với Stored data: cái này MẤT khi việc xong</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ============ PANE 3 — THE REWRITE ============ -->
+<div class="pane" id="p3">
+  <p class="lede">Ba template, viết lại theo quy tắc trên. Cột trái = hiện tại, cột phải = đề xuất.
+    <b>Shape và đường nối không đổi</b> — chỉ đổi chữ. Nên số node/edge/số shape vẫn 10/11/5, 15/15/10, 25/27/16.</p>
+  <div class="dias" id="rewrite"></div>
+  <div class="legend">Chú ý ba chỗ "before" bị đánh dấu đỏ ở tab 1 sẽ biến mất: hình bình hành giờ chứa
+    <b>"Parts checklist"</b> (dữ liệu), document chứa <b>"Printed instruction sheet"</b> (tài liệu),
+    và loop limit chứa <b>"For each of 8 cam locks"</b> (mốc lặp, không có chữ "Loop:").</div>
+</div>
+
+<script>
+function shapeSvg(shape,color,w,h,card){
+  const c='var(--c-'+color+')';
+  const p='fill="'+c+'" fill-opacity="0.10" stroke="'+c+'" stroke-width="2"';
+  const line='stroke="'+c+'" stroke-width="2" fill="none"';
+  let inner='';
+  switch(shape){
+    case 'terminator': inner='<rect x="2" y="2" width="196" height="96" rx="48" '+p+'/>'; break;
+    case 'process': inner='<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/>'; break;
+    case 'decision': inner='<path d="M100 3 L197 50 L100 97 L3 50 Z" '+p+'/>'; break;
+    case 'io': inner='<path d="M36 3 H197 L164 97 H3 Z" '+p+'/>'; break;
+    case 'document': inner='<path d="M2 2 H198 V78 C175 96 155 68 131 80 S91 96 67 78 S27 62 2 78 Z" '+p+'/>'; break;
+    case 'subprocess': inner='<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/><path d="M26 3 V97" '+line+'/><path d="M174 3 V97" '+line+'/>'; break;
+    case 'preparation': inner='<path d="M46 3 H154 L197 50 L154 97 H46 L3 50 Z" '+p+'/>'; break;
+    case 'manual': inner='<path d="M3 3 H197 L164 97 H36 Z" '+p+'/>'; break;
+    case 'delay': inner='<path d="M3 3 H100 A47 47 0 0 1 100 97 H3 Z" '+p+'/>'; break;
+    case 'connector': inner='<circle cx="100" cy="50" r="47" '+p+'/>'; break;
+    case 'offpage': inner='<path d="M3 3 H197 V50 L100 97 H3 Z" '+p+'/>'; break;
+    case 'manualinput': inner='<path d="M3 28 H197 V97 H3 Z" '+p+'/><path d="M3 28 H197" '+line+'/>'; break;
+    case 'display': inner='<path d="M3 22 Q100 3 197 22 L168 97 H32 Z" '+p+'/>'; break;
+    case 'storeddata': inner='<path d="M3 17 V83 A97 15 0 0 0 197 83 V17" '+p+'/><ellipse cx="100" cy="17" rx="97" ry="15" '+p+'/>'; break;
+    case 'looplimit': inner='<path d="M3 30 L30 3 H170 L197 30 V97 H3 Z" '+p+'/>'; break;
+    case 'internalstorage': inner='<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/><path d="M3 26 H197" '+line+'/><path d="M26 3 V97" '+line+'/>'; break;
+    default: inner='<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/>';
+  }
+  return '<svg viewBox="0 0 200 100" preserveAspectRatio="none">'+inner+'</svg>';
+}
+const COLOR={terminator:'green',process:'cyan',decision:'amber',io:'violet',document:'violet',
+  subprocess:'cyan',preparation:'cyan',manual:'green',delay:'amber',connector:'slate',
+  offpage:'slate',manualinput:'green',display:'violet',storeddata:'violet',looplimit:'amber',
+  internalstorage:'violet'};
+document.querySelectorAll('.nd[data-shape]').forEach(el=>{
+  const s=el.dataset.shape,c=el.dataset.color||COLOR[s]||'slate';
+  el.style.width=(el.dataset.w||150)+'px'; el.style.height=(el.dataset.h||66)+'px';
+  el.insertAdjacentHTML('afterbegin', shapeSvg(s,c));
+});
+
+/* the rewrite comparison — a TABLE (each changed row shows a tiny shape chip + before/after) */
+const T = {
+  'flow-basic': ['1 · BASIC — 10 nodes · 11 edges · 5 shapes', [
+    ['terminator','Start — open the flat box','Flat box opened','MỐC'],
+    ['io','Count the parts against the checklist','Parts checklist','DỮ LIỆU'],
+    ['process','Lay out the panels and the fittings','Lay out the panels and fittings','HÀNH ĐỘNG'],
+    ['decision','All parts present?','All parts present?','CÂU HỎI'],
+    ['process','Keep the spare fittings in the box','Keep spare fittings in the box','HÀNH ĐỘNG'],
+    ['process','Fit the dowels and the cam locks','Fit the dowels and cam locks','HÀNH ĐỘNG'],
+    ['document','Follow the printed step sheet','Printed step sheet','TÀI LIỆU'],
+    ['decision','Frame square and steady?','Frame square and steady?','CÂU HỎI'],
+    ['process','Tighten every cam a quarter turn','Tighten every cam a quarter turn','HÀNH ĐỘNG'],
+    ['terminator','End — unit assembled','Unit assembled','MỐC']
+  ]],
+  'flow-advanced': ['2 · ADVANCED — 15 nodes · 15 edges · 10 shapes', [
+    ['terminator','Start — open the flat box','Flat box opened','MỐC'],
+    ['io','Compare the box contents with the parts checklist','Parts checklist','DỮ LIỆU'],
+    ['preparation','Lay out the panels, the fittings and the allen key','Set out panels, fittings, allen key','CHUẨN BỊ'],
+    ['decision','Needs a second pair of hands?','Needs a second pair of hands?','CÂU HỎI'],
+    ['manual','Ask a second person to hold the side panel','Hold the side panel by hand','LÀM TAY'],
+    ['subprocess','Build the drawer box (set out on its own sheet)','Drawer box assembly (own sheet)','NGOÀI'],
+    ['delay','Wait 30 minutes for the wood glue to set','Wait 30 min for the glue','CHỜ'],
+    ['process','Fit the shelf and tighten the cam locks','Fit the shelf, tighten cam locks','HÀNH ĐỘNG'],
+    ['document','Check the frame against the printed drawing','Frame drawing','TÀI LIỆU'],
+    ['decision','Frame square and level?','Frame square and level?','CÂU HỎI'],
+    ['connector','A','A  (phải có CẶP A ↔ A)','NHÃN'],
+    ['connector','A','A  (phải có CẶP A ↔ A)','NHÃN'],
+    ['process','Wipe the unit down and move it into place','Wipe down, move into place','HÀNH ĐỘNG'],
+    ['terminator','End — unit assembled','Unit assembled','MỐC']
+  ]],
+  'flow-complex': ['3 · COMPLEX — 25 nodes · 27 edges · ALL 16 shapes', [
+    ['terminator','Start — flat box on the floor','Flat box on the floor','MỐC'],
+    ['io','Compare the box contents with the parts checklist','Parts checklist','DỮ LIỆU'],
+    ['document','Read the printed instruction sheet','Printed instruction sheet','TÀI LIỆU'],
+    ['manualinput','Write the unit number on the box label by hand','Unit number (written on the box)','NHẬP TAY'],
+    ['preparation','Lay out the panels, the fittings and the allen key','Set out panels, fittings, allen key','CHUẨN BỊ'],
+    ['decision','Needs a second pair of hands?','Needs a second pair of hands?','CÂU HỎI'],
+    ['manual','Ask a second person to hold the side panel','Hold the side panel by hand','LÀM TAY'],
+    ['subprocess','Build the drawer box (set out on its own sheet)','Drawer box assembly (own sheet)','NGOÀI'],
+    ['display','Step diagram — the page you keep re-reading','Step diagram (the page being read)','HIỆN RA'],
+    ['internalstorage','Loose fittings held in the box during the job','Loose fittings in the box','KHO TẠM'],
+    ['looplimit','Loop: for each of the 8 cam locks','For each of 8 cam locks','MỐC LẶP'],
+    ['process','Push the next cam lock home','Push the next cam lock home','HÀNH ĐỘNG'],
+    ['decision','Cam locks left to fit?','Cam locks left to fit?','CÂU HỎI'],
+    ['delay','Wait 30 minutes for the wood glue to set','Wait 30 min for the glue','CHỜ'],
+    ['process','Fit the shelf and the drawer box','Fit the shelf and drawer box','HÀNH ĐỘNG'],
+    ['decision','Frame square and level?','Frame square and level?','CÂU HỎI'],
+    ['connector','A','A  (phải có CẶP A ↔ A)','NHÃN'],
+    ['connector','A','A  (phải có CẶP A ↔ A)','NHÃN'],
+    ['storeddata','Leftover screws — kept in the box','Spare-screw bag','KHO LƯU'],
+    ['offpage','To page 2 — fix the unit to the wall','To page 2: fix to wall','SANG TRANG'],
+    ['offpage','From page 1 — unit assembled','From page 1: frame assembled','SANG TRANG'],
+    ['process','Lift the unit into place','Lift the unit into place','HÀNH ĐỘNG'],
+    ['decision','Sits flush against the wall?','Sits flush against the wall?','CÂU HỎI'],
+    ['terminator','End — unit assembled and in place','Unit assembled in place','MỐC']
+  ]]
+};
+const TAGCLS = {'HÀNH ĐỘNG':'action','DỮ LIỆU':'data','NHẬP TAY':'data','HIỆN RA':'data','KHO LƯU':'data',
+  'KHO TẠM':'data','CÂU HỎI':'q','MỐC':'obj','MỐC LẶP':'obj','TÀI LIỆU':'obj','CHUẨN BỊ':'action',
+  'LÀM TAY':'action','CHỜ':'obj','NGOÀI':'obj','NHÃN':'obj','SANG TRANG':'obj'};
+const host=document.getElementById('rewrite');
+for(const [id,[head,pairs]] of Object.entries(T)){
+  const rows = pairs.map(([sh,oldT,newT,lab])=>{
+    const changed = oldT!==newT;
+    const chip = '<td style="text-align:center"><span class="nd" data-shape="'+sh+'" data-color="'+(COLOR[sh]||'slate')+
+      '" style="width:46px;height:26px;min-width:0;padding:0"></span></td>';
+    return '<tr>' + chip
+      + '<td><span class="tag '+(TAGCLS[lab]||'obj')+'">'+lab+'</span></td>'
+      + '<td class="'+(changed?'old':'keep')+'">'+oldT+'</td>'
+      + '<td>' + (changed ? '<span class="new">'+newT+'</span>' : '<span class="keepmark">giữ nguyên (đã đúng)</span>') + '</td>'
+      + '</tr>';
+  }).join('');
+  host.insertAdjacentHTML('beforeend',
+    '<div class="dia"><div class="dh">' + head + '</div>'
+    + '<table class="g rw"><tr><th style="width:56px">Shape</th><th style="width:110px">Loại</th>'
+    + '<th>Hiện tại</th><th>Đề xuất</th></tr>' + rows + '</table>'
+    + '<div class="df">Shape + đường nối KHÔNG đổi — nên mọi acceptance criterion (5 / 10 / 16 shape) vẫn giữ nguyên.</div></div>');
+}
+document.querySelectorAll('.nd[data-shape]').forEach(el=>{
+  if(el.querySelector('svg')) return;
+  const s=el.dataset.shape,c=el.dataset.color||COLOR[s]||'slate';
+  el.insertAdjacentHTML('afterbegin', shapeSvg(s,c));
+});
+document.querySelectorAll('.picker button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.picker button').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); document.getElementById(b.dataset.p).classList.add('on');
+    window.scrollTo(0,0);
+  });
+});
+</script>
+</body>
+</html>

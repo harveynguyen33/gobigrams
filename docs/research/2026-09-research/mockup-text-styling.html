@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Diagram Studio — text styling & overflow: three options</title>
+<style>
+  :root{
+    --bg:#0b0b0d; --surface:#131317; --elevated:#1a1b1f; --border:#2a2b31; --border-strong:#3a3c44;
+    --fg:#e8e8ea; --dim:#9a9ba3; --dim2:#6b6c74; --acc:#f54e00; --sel:#3b82f6; --acc-soft:rgba(245,78,0,.18);
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace; --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px;background:var(--bg);color:var(--fg);font:13px/1.5 var(--sans)}
+  h1{font-size:17px;margin:0 0 4px}
+  .lede{color:var(--dim);margin:0 0 22px;max-width:760px}
+  h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:30px 0 12px;
+     padding-bottom:7px;border-bottom:1px solid var(--border)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(292px,1fr));gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:15px}
+  .card h3{margin:0 0 3px;font-size:13.5px}
+  .tagline{color:var(--dim);font-size:11.5px;margin:0 0 13px;min-height:32px}
+  .pill{display:inline-block;font:600 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+        padding:4px 7px;border-radius:999px;margin-bottom:9px}
+  .pill.rec{background:var(--acc-soft);color:var(--acc);border:1px solid var(--acc)}
+  .verdict{border-top:1px solid var(--border);margin-top:12px;padding-top:10px;font-size:11.5px;color:var(--dim)}
+  .verdict b{color:var(--fg)}
+
+  /* --- the canvas mock --- */
+  .canvas{position:relative;background:#15161a;border:1px solid var(--border);border-radius:9px;
+          height:196px;overflow:hidden;background-image:radial-gradient(circle,#232429 1px,transparent 1px);
+          background-size:16px 16px}
+  .nd{position:absolute;background:var(--surface);border:1.5px solid var(--border-strong);border-radius:8px;
+      padding:15px 18px 14px;width:180px}
+  .nd.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--sel)}
+  .k{font:700 10.5px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+  .t{font-size:14.5px;font-weight:650;display:flex;align-items:center;gap:7px}
+  .s{font:11.5px var(--mono);color:var(--dim);margin-top:6px}
+  .m{font:700 20px var(--mono);color:var(--acc);margin-top:7px;letter-spacing:-.02em}
+
+  /* A: the floating toolbar (what ROUND O removed) */
+  .floatbar{position:absolute;display:flex;gap:2px;background:var(--elevated);border:1px solid var(--border-strong);
+            border-radius:8px;padding:3px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  .fbtn{width:26px;height:26px;display:grid;place-items:center;border-radius:5px;color:var(--dim);
+        font-size:13px;cursor:pointer;border:none;background:transparent}
+  .fbtn:hover{background:var(--surface);color:var(--fg)}
+  .fbtn.on{background:var(--acc-soft);color:var(--acc)}
+
+  /* B: a Text section in the right inspector */
+  .insp{position:absolute;right:0;top:0;bottom:0;width:172px;background:var(--surface);
+        border-left:1px solid var(--border);padding:11px;font-size:11.5px;overflow:hidden}
+  .insp .sec{font:700 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin:0 0 9px}
+  .fld{margin-bottom:9px}
+  .fld label{display:block;color:var(--dim);font-size:10.5px;margin-bottom:4px}
+  .ctl{width:100%;background:var(--elevated);border:1px solid var(--border);border-radius:7px;
+       color:var(--fg);font:11.5px var(--mono);padding:5px 7px;appearance:none}
+  .swatches{display:flex;gap:5px;flex-wrap:wrap}
+  .sw{width:19px;height:19px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+  .sw.on{border-color:var(--fg)}
+  .row2{display:flex;gap:7px}
+  .row2>*{flex:1;min-width:0}
+  .segmented{display:flex;background:var(--elevated);border:1px solid var(--border);border-radius:7px;padding:2px}
+  .segmented span{flex:1;text-align:center;padding:3px 0;border-radius:5px;font:11px var(--mono);color:var(--dim);cursor:pointer}
+  .segmented span.on{background:var(--acc-soft);color:var(--acc)}
+
+  /* C: text-styling row on the toolbar (no inspector trip) */
+  .tbar{position:absolute;left:8px;right:8px;bottom:8px;display:flex;align-items:center;gap:6px;
+        background:var(--elevated);border:1px solid var(--border-strong);border-radius:8px;padding:5px 7px;font-size:11px}
+  .tbar .lbl{color:var(--dim2);font:700 9.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;flex:none}
+  .tbar select{background:var(--surface);border:1px solid var(--border);color:var(--fg);border-radius:5px;
+               font:11px var(--mono);padding:3px 5px}
+</style>
+</head>
+<body>
+<h1>Text styling for a node — and the overflow fix</h1>
+<p class="lede">Both questions in one mock: <b>where</b> you edit a node's text (size / colour / weight / align),
+and the overflow rule that makes any of it safe. Your ROUND O feedback removed a floating toolbar over the node —
+so option A is a reversal, and option C is a narrower version of it. Pick one; the numbering is not a ranking.</p>
+
+<h2>Where the controls live</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="pill rec">A · what you described</span>
+    <h3>Floating toolbar over the selected node</h3>
+    <p class="tagline">A small bar appears above the node when selected. Text size / colour / weight inline; a chevron opens the rest.</p>
+    <div class="canvas">
+      <div class="nd sel" style="left:22px;top:56px">
+        <div class="k">external</div><div class="t">CDC Source</div>
+        <div class="s">change data capture</div><div class="m">45 <small style="font-size:11px;color:var(--dim);font-weight:400">msg/s</small></div>
+      </div>
+      <div class="floatbar" style="left:22px;top:22px">
+        <button class="fbtn" title="Text size">A<span style="font-size:9px">▾</span></button>
+        <button class="fbtn" title="Colour">◍</button>
+        <button class="fbtn" title="Bold"><b>B</b></button>
+        <button class="fbtn" title="Align">≡</button>
+        <button class="fbtn on" title="More">⋯</button>
+      </div>
+    </div>
+    <div class="verdict"><b>Trade-off:</b> fastest to reach, but it is the thing you asked to remove — it covers the canvas, moves with the node, and needs touch handling for the tablet tier.</div>
+  </div>
+
+  <div class="card">
+    <span class="pill">B · most conservative</span>
+    <h3>Text section in the right inspector</h3>
+    <p class="tagline">A new "Text" group in the existing edge/node inspector. Nothing new appears on the canvas.</p>
+    <div class="canvas">
+      <div class="nd sel" style="left:22px;top:56px">
+        <div class="k">external</div><div class="t">CDC Source</div>
+        <div class="s">change data capture</div><div class="m">45 <small style="font-size:11px;color:var(--dim);font-weight:400">msg/s</small></div>
+      </div>
+      <div class="insp">
+        <div class="sec">Text</div>
+        <div class="fld"><label>size</label><select class="ctl"><option>11</option><option>12</option><option selected>14.5</option><option>16</option><option>18</option></select></div>
+        <div class="fld"><label>weight</label><div class="segmented"><span>400</span><span class="on">650</span><span>800</span></div></div>
+        <div class="fld"><label>colour</label><div class="swatches">
+          <span class="sw on" style="background:var(--fg)"></span><span class="sw" style="background:var(--acc)"></span>
+          <span class="sw" style="background:var(--sel)"></span><span class="sw" style="background:#22c55e"></span>
+          <span class="sw" style="background:#a855f7"></span></div></div>
+        <div class="fld"><label>align</label><div class="segmented"><span class="on">◧</span><span>◫</span><span>◨</span></div></div>
+      </div>
+    </div>
+    <div class="verdict"><b>Trade-off:</b> zero canvas clutter, reuses the inspector you already know, and works on tablet as-is. But it is a trip to the right panel for every tweak — slower for a small change.</div>
+  </div>
+
+  <div class="card">
+    <span class="pill">C · middle</span>
+    <h3>Text row docked in the toolbar</h3>
+    <p class="tagline">Always visible along the bottom of the canvas; applies to the selected node. No popup over the node.</p>
+    <div class="canvas">
+      <div class="nd sel" style="left:22px;top:30px">
+        <div class="k">external</div><div class="t">CDC Source</div>
+        <div class="s">change data capture</div>
+      </div>
+      <div class="tbar">
+        <span class="lbl">text</span>
+        <select><option>Aa 12</option><option selected>Aa 14.5</option><option>Aa 16</option><option>Aa 18</option></select>
+        <button class="fbtn" title="Bold"><b>B</b></button>
+        <button class="fbtn" title="Italic"><i>I</i></button>
+        <button class="fbtn" title="Align">≡</button>
+        <span style="display:flex;gap:4px;margin-left:4px">
+          <span class="sw on" style="width:16px;height:16px;background:var(--fg)"></span>
+          <span class="sw" style="width:16px;height:16px;background:var(--acc)"></span>
+          <span class="sw" style="width:16px;height:16px;background:var(--sel)"></span>
+        </span>
+      </div>
+    </div>
+    <div class="verdict"><b>Trade-off:</b> fast AND never covers the node. Costs a permanent strip of canvas, and the bottom bar already gets crowded on the phone tier (it wraps there).</div>
+  </div>
+</div>
+
+<h2>What each can style — scope</h2>
+<div class="card">
+  <div class="grid" style="gap:12px">
+    <div>
+      <h3 style="margin-bottom:6px">Proposed, per element</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tr style="color:var(--dim);text-align:left"><th style="padding:5px 0;border-bottom:1px solid var(--border)">element</th><th style="border-bottom:1px solid var(--border)">size</th><th style="border-bottom:1px solid var(--border)">weight</th><th style="border-bottom:1px solid var(--border)">colour</th><th style="border-bottom:1px solid var(--border)">align</th></tr>
+        <tr><td style="padding:5px 0;border-bottom:1px solid var(--border)">kicker</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td></tr>
+        <tr><td style="padding:5px 0;border-bottom:1px solid var(--border)">title</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td></tr>
+        <tr><td style="padding:5px 0;border-bottom:1px solid var(--border)">subtitle</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td></tr>
+        <tr><td style="padding:5px 0;border-bottom:1px solid var(--border)">metric</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">—</td></tr>
+        <tr><td style="padding:5px 0">Text node</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td><td style="border-bottom:1px solid var(--border)">✓</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 style="margin-bottom:6px">The overflow rule (all options)</h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.65">
+        <p style="margin:0 0 8px">Non-negotiable, independent of where the controls live:</p>
+        <p style="margin:0 0 5px"><b style="color:var(--fg)">1. A long word breaks.</b> <code style="font-family:var(--mono);font-size:11px">overflow-wrap:anywhere</code> on every text row — so one long token wraps instead of running 240px out of the box.</p>
+        <p style="margin:0 0 5px"><b style="color:var(--fg)">2. Nothing paints outside.</b> The text container gets <code style="font-family:var(--mono);font-size:11px">overflow:hidden</code>, so content is clipped at the box you actually see, at any zoom.</p>
+        <p style="margin:0 0 5px"><b style="color:var(--fg)">3. The Text node too</b> — its long annotation currently escapes 65px below a short box.</p>
+        <p style="margin:0 0 5px"><b style="color:var(--fg)">4. A clamp is NOT the fix.</b> Silently truncating to "CDC Sou…" would hide your own data. Wrapping + clipping keeps every character reachable.</p>
+        <p style="margin:8px 0 0;color:var(--dim2);font-style:italic">Optional (my recommendation): a subtle "needs more room" affordance when content is clipped, so it is never silent.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="lede" style="margin-top:24px">
+  <b>My recommendation:</b> <b>B + the overflow fix</b>. It adds nothing to the canvas, reuses the inspector you
+  already have, and works on the tablet/phone tiers with no new gesture. If you want the speed of A, say so and I
+  will build A with the touch behaviour handled — but I am not undoing the ROUND O removal without your word.
+</p>
+</body>
+</html>

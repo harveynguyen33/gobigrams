@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates (mẫu) — mockup (Diagram Studio)</title>
+<style>
+/* ============================================================
+   Tokens copied verbatim from src/styles.css (dark theme).
+   Standalone PAGE mockup — it owns its background/font.
+   ============================================================ */
+:root{
+  --bg:#0b0b0d; --surface:#131316; --elevated:#1a1b1f;
+  --border:#26272c; --border-strong:#33343a;
+  --fg:#e8e8ea; --dim:#8a8a92; --dim2:#63636b;
+  --acc:#f54e00; --acc-soft:rgba(245,78,0,.14); --on-acc:#fff;
+  --sel:#3b82f6; --sel-soft:rgba(59,130,246,.14);
+  --green:#4ade80; --red:#f87171;
+  --scrim:rgba(11,11,13,.72); --dots:rgba(255,255,255,.14);
+  --panel-glass:rgba(19,19,22,.86);
+  --shadow-sm:0 6px 20px -6px rgba(0,0,0,.6);
+  --shadow-pop:0 30px 70px -12px rgba(0,0,0,.85);
+  --shadow-strong:0 18px 40px -10px rgba(0,0,0,.75);
+  --c-accent:#f54e00; --c-green:#4ade80; --c-cyan:#22d3ee;
+  --c-violet:#a78bfa; --c-amber:#fbbf24; --c-slate:#94a3b8;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#08080a;color:var(--fg);font-family:var(--sans);
+  display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 12px 56px}
+h1{font-family:var(--mono);font-size:14px;font-weight:600;margin:0;letter-spacing:.02em}
+h2{font-family:var(--mono);font-size:12px;font-weight:700;margin:0;letter-spacing:.04em;text-transform:uppercase;color:var(--acc)}
+.lede{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:0;text-align:center;max-width:1000px;line-height:1.7}
+.picker{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:50;
+  padding:8px;background:rgba(8,8,10,.92);backdrop-filter:blur(6px);border-radius:10px}
+.picker button{font-family:var(--mono);font-size:11.5px;padding:8px 14px;border-radius:7px;cursor:pointer;
+  background:var(--elevated);color:var(--dim);border:1px solid var(--border)}
+.picker button.on{background:var(--acc-soft);color:var(--acc);border-color:var(--acc);font-weight:700}
+.pane{display:none;flex-direction:column;gap:18px;align-items:center;width:100%}
+.pane.on{display:flex}
+.note{font-family:var(--mono);font-size:10.5px;color:var(--dim2);max-width:1000px;line-height:1.75;text-align:left}
+.note b{color:var(--dim);font-weight:600}
+.note .k{color:var(--acc);font-weight:700}
+.card-block{border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  padding:14px;display:flex;flex-direction:column;gap:10px;max-width:1180px;width:100%;min-width:0}
+.card-block > .cap{font-family:var(--mono);font-size:11px;color:var(--fg);font-weight:600}
+.card-block > .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim2);line-height:1.7}
+
+/* ---------- app window ---------- */
+.app.solo{grid-template-columns:minmax(0,1fr)}
+.app{display:grid;grid-template-columns:236px minmax(0,1fr) 288px;width:100%;max-width:1180px;height:640px;
+  background:var(--bg);border:1px solid var(--border-strong);border-radius:12px;
+  overflow:hidden;box-shadow:var(--shadow-pop);flex:none;position:relative}
+.panel{background:var(--surface);display:flex;flex-direction:column;min-height:0;min-width:0}
+.panel.left{border-right:1px solid var(--border)}
+.panel.right{border-left:1px solid var(--border)}
+.panel-body{flex:1;min-height:0;overflow-y:auto;padding:10px}
+.brand{font-family:var(--mono);font-size:12px;font-weight:700;padding:11px 12px 0;display:flex;gap:6px;align-items:center}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:none}
+.brand .path{color:var(--dim2);font-weight:400;font-size:10.5px}
+.canvas{position:relative;background:var(--bg);min-width:0}
+.canvas::before{content:'';position:absolute;inset:0;
+  background-image:radial-gradient(var(--dots) 1px,transparent 1px);background-size:16px 16px}
+.toolbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;
+  padding:6px;border-radius:10px;background:var(--elevated);border:1px solid var(--border);box-shadow:var(--shadow-sm);z-index:3}
+.toolbar span{width:26px;height:26px;border-radius:7px;background:var(--surface);border:1px solid var(--border);
+  display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:var(--dim2)}
+.toolbar span.hot{background:var(--acc-soft);border-color:var(--acc);color:var(--acc);font-weight:700}
+.ghost{position:absolute;border-radius:8px;background:var(--elevated);border:1px solid var(--border);
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:var(--dim2)}
+
+/* ---------- boards menu (existing) with the NEW row ---------- */
+.pop{position:absolute;min-width:236px;background:var(--panel-glass);backdrop-filter:blur(10px);
+  border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-strong);padding:6px;z-index:6}
+.pop .pop-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;
+  font-family:var(--mono);font-size:11.5px;color:var(--fg);cursor:default}
+.pop .pop-item:hover{background:var(--elevated)}
+.pop .pop-item.new{background:var(--acc-soft);color:var(--acc);font-weight:700;border:1px solid var(--acc)}
+.pop .pop-sep{height:1px;background:var(--border);margin:5px 2px}
+.pop .pop-hd{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim2);padding:5px 9px 3px}
+.badge-new{font-family:var(--mono);font-size:8.5px;font-weight:700;padding:2px 5px;border-radius:4px;
+  background:var(--acc);color:var(--on-acc);margin-left:auto;letter-spacing:.06em}
+
+/* ---------- gallery modal ---------- */
+.modal{position:absolute;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:10}
+.tg-card{width:min(1010px,calc(100% - 20px));height:min(600px,calc(100% - 20px));background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:14px;box-shadow:var(--shadow-pop);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+.tg-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.tg-title{font-family:var(--mono);font-size:13px;font-weight:700}
+.tg-sub{font-family:var(--mono);font-size:10.5px;color:var(--dim2)}
+.tg-x{margin-left:auto;width:26px;height:26px;border-radius:7px;border:1px solid var(--border);
+  background:var(--elevated);display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.tg-body{display:grid;grid-template-columns:184px 1fr;min-height:0}
+.tg-rail{border-right:1px solid var(--border);background:var(--elevated);padding:10px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:2px}
+.tg-rail .rl{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--dim2);padding:9px 8px 4px}
+.tg-rail .ri{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;
+  font-family:var(--mono);font-size:11px;color:var(--dim)}
+.tg-rail .ri.on{background:var(--acc-soft);color:var(--acc);font-weight:700;border:1px solid var(--acc)}
+.tg-rail .ri .ct{margin-left:auto;font-size:9.5px;color:var(--dim2)}
+.tg-grid{padding:14px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;align-content:start;min-width:0}
+.tile{border:1px solid var(--border);border-radius:10px;background:var(--elevated);padding:11px;
+  display:flex;flex-direction:column;gap:8px;min-width:0}
+.tile.hot{border-color:var(--sel);box-shadow:0 0 0 3px var(--sel-soft)}
+.tile .tname{font-family:var(--mono);font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.tile .thint{font-family:var(--mono);font-size:10px;color:var(--dim2);line-height:1.6}
+.tile .strip{display:flex;gap:5px;align-items:center;height:40px}
+.tile .strip svg{width:34px;height:20px;flex:none}
+.chip{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;
+  border:1px solid var(--border-strong);color:var(--dim);background:var(--surface);letter-spacing:.03em}
+.chip.b{color:var(--green);border-color:var(--green)}
+.chip.a{color:var(--c-amber);border-color:var(--c-amber)}
+.chip.c{color:var(--c-violet);border-color:var(--c-violet)}
+.chip.n{color:var(--dim2);border-color:var(--border)}
+.tile .go{margin-top:auto;font-family:var(--mono);font-size:10px;color:var(--acc);font-weight:700}
+
+/* ---------- create dialog with the NEW browse row ---------- */
+.bd-card{width:min(520px,calc(100% - 24px));background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;
+  box-shadow:var(--shadow-pop);overflow:hidden}
+.bd-head{font-family:var(--mono);font-size:12px;font-weight:700;padding:13px 16px;border-bottom:1px solid var(--border)}
+.bd-b{padding:14px 16px;display:flex;flex-direction:column;gap:11px}
+.bd-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+.bd-input{font-family:var(--mono);font-size:12px;padding:9px 11px;border-radius:7px;
+  background:var(--elevated);border:1px solid var(--border-strong);color:var(--fg)}
+.bd-list{display:flex;flex-direction:column;gap:4px;max-height:250px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:8px;padding:5px;background:var(--bg)}
+.bd-opt{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:7px;
+  border:1px solid transparent;font-family:var(--mono);font-size:11.5px}
+.bd-opt:hover{background:var(--elevated)}
+.bd-opt.on{background:var(--elevated);border-color:var(--sel)}
+.bd-opt .tick{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--border-strong);flex:none}
+.bd-opt.on .tick{border-color:var(--sel);background:var(--sel);box-shadow:inset 0 0 0 2.5px var(--surface)}
+.bd-opt-text{display:flex;flex-direction:column;line-height:1.4;min-width:0}
+.bd-opt-name{font-weight:600}
+.bd-opt-hint{font-size:9.5px;color:var(--dim2)}
+.bd-hd{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim2);padding:8px 9px 3px;display:flex;align-items:center;gap:7px}
+.bd-opt.browse{background:var(--acc-soft);border-color:var(--acc);color:var(--acc);font-weight:700}
+.bd-foot{display:flex;gap:8px;justify-content:flex-end;padding:0 16px 15px}
+.btn{font-family:var(--mono);font-size:11.5px;padding:8px 15px;border-radius:7px;cursor:default;
+  background:var(--elevated);color:var(--dim);border:1px solid var(--border-strong)}
+.btn.pri{background:var(--acc);color:var(--on-acc);border-color:var(--acc);font-weight:700}
+
+/* ---------- tier variants ---------- */
+.tier{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.dev{border:1px solid var(--border-strong);border-radius:14px;background:var(--surface);overflow:hidden;
+  display:flex;flex-direction:column;flex:none;box-shadow:var(--shadow-strong)}
+.dev .dhd{font-family:var(--mono);font-size:10px;color:var(--dim2);padding:7px 10px;border-bottom:1px solid var(--border);
+  display:flex;gap:7px;align-items:center}
+.dev .dhd b{color:var(--dim)}
+.dev .dbody{flex:1;min-height:0;position:relative;background:var(--bg)}
+.phone{width:360px;height:600px}
+.tablet{width:560px;height:460px}
+.tg-sheet{position:absolute;inset:0;background:var(--surface);display:flex;flex-direction:column}
+.tg-sheet .sh{padding:11px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;font-weight:700;
+  display:flex;align-items:center;gap:8px}
+.tg-strip{display:flex;gap:5px;padding:9px 10px;border-bottom:1px solid var(--border);overflow-x:auto;flex:none}
+.tg-strip .si{font-family:var(--mono);font-size:10px;padding:5px 9px;border-radius:6px;white-space:nowrap;
+  background:var(--elevated);color:var(--dim);border:1px solid var(--border)}
+.tg-strip .si.on{background:var(--acc-soft);color:var(--acc);border-color:var(--acc);font-weight:700}
+.tg-list{flex:1;min-height:0;overflow-y:auto;padding:10px;display:grid;gap:9px;align-content:start}
+.phone .tg-list{grid-template-columns:1fr}
+.tablet .tg-list{grid-template-columns:repeat(2,1fr)}
+.dev .cap2{font-family:var(--mono);font-size:9.5px;color:var(--dim2);padding:7px 10px;border-top:1px solid var(--border);line-height:1.6}
+
+/* ---------- level / scenario diagrams ---------- */
+.dias{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.dia{border:1px solid var(--border);border-radius:11px;background:var(--bg);overflow:hidden;flex:none;
+  display:flex;flex-direction:column}
+.dia .dh{font-family:var(--mono);font-size:11px;font-weight:700;padding:9px 11px;background:var(--surface);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.dia .dh .meta{font-size:9.5px;color:var(--dim2);font-weight:400}
+.dia .db{position:relative;background-image:radial-gradient(var(--dots) 1px,transparent 1px);
+  background-size:16px 16px;overflow:hidden}
+.dia .df{font-family:var(--mono);font-size:9.5px;color:var(--dim2);padding:8px 11px;background:var(--surface);
+  border-top:1px solid var(--border);line-height:1.65}
+.dia .df .k{color:var(--acc);font-weight:700}
+.nd{position:absolute;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  text-align:center;font-family:var(--mono);font-size:8px;line-height:1.25;padding:2px 4px;
+  border:1.5px solid var(--nc);color:var(--fg);background:color-mix(in srgb, var(--nc) 9%, transparent)}
+.nd.green{--nc:var(--c-green)} .nd.cyan{--nc:var(--c-cyan)} .nd.amber{--nc:var(--c-amber)}
+.nd.violet{--nc:var(--c-violet)} .nd.slate{--nc:var(--c-slate)} .nd.accent{--nc:var(--c-accent)}
+.nd.lane{background:transparent;border:1px dashed var(--border-strong);border-radius:9px;
+  align-items:flex-start;justify-content:flex-start;color:var(--dim2);font-size:8px;padding:5px 7px}
+.shp{position:absolute;display:flex;align-items:center;justify-content:center;padding:3px 8px}
+.shp svg{position:absolute;inset:0;width:100%;height:100%}
+.shp-t{position:relative;font-family:var(--mono);font-size:8px;line-height:1.28;text-align:center;color:var(--fg);
+  overflow-wrap:anywhere;max-width:100%}
+.nd.r2{border-radius:10px}
+.nd.r49{border-radius:14px}
+.nd.diamond{border-radius:3px;transform:rotate(45deg)}
+.nd.diamond i{transform:rotate(-45deg);font-style:normal;display:block;max-width:62px}
+.nd.dot{border-radius:50%;background:transparent}
+.nd.plate{border-radius:6px 6px 3px 14px}
+.nd.note{background:var(--elevated);border-color:var(--border-strong);border-style:solid;color:var(--dim)}
+.nd.lbl{background:none;border:none;color:var(--dim2);font-size:9px;justify-content:flex-start}
+.nd.dbl::before,.nd.dbl::after{content:'';position:absolute;top:8%;bottom:8%;width:0;border-left:1.5px solid var(--nc)}
+.nd.dbl::before{left:14%} .nd.dbl::after{right:14%}
+.cov{display:flex;flex-wrap:wrap;gap:4px;max-width:1000px;justify-content:center}
+.cov .c{font-family:var(--mono);font-size:9px;padding:3px 6px;border-radius:5px;border:1px solid var(--border-strong);
+  color:var(--dim);background:var(--elevated)}
+.cov .c.has{color:var(--fg);border-color:var(--c-green)}
+.cov .c.no{color:var(--dim2);opacity:.45;text-decoration:line-through}
+.verdict{font-family:var(--mono);font-size:10.5px;color:var(--dim);max-width:1000px;line-height:1.75}
+.verdict .yes{color:var(--green);font-weight:700} .verdict .no{color:var(--red);font-weight:700}
+table.plain{font-family:var(--mono);font-size:10.5px;border-collapse:collapse;width:100%;max-width:1040px}
+table.plain th,table.plain td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top;line-height:1.6}
+table.plain th{background:var(--elevated);color:var(--dim);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase}
+table.plain td.k{color:var(--acc);font-weight:700}
+.legend{font-family:var(--mono);font-size:10px;color:var(--dim2);max-width:1000px;line-height:1.7;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>Templates (mẫu) — mockup · Diagram Studio</h1>
+<p class="lede">Three tabs: <b>1</b> where it lives, <b>2</b> the three flowchart levels, <b>3</b> the scenario
+(domain) candidates for you to approve. Every colour is an existing token; the diagrams are drawn with the
+app's own shape silhouettes so the notation reads the same as the canvas.</p>
+
+<div class="picker">
+  <button class="on" data-p="p1">1 · Vị trí (placement)</button>
+  <button data-p="p2">2 · 3 mức độ flowchart</button>
+  <button data-p="p3">3 · Kịch bản (scenarios)</button>
+</div>
+
+<!-- ============================ PANE 1 — PLACEMENT ============================ -->
+<div class="pane on" id="p1">
+
+  <div class="card-block">
+    <div class="cap">A · The boards menu — the new entry (recommended home)</div>
+    <div class="sub">This menu already owns “documents”. One new row, <b>Templates…</b>, sits beside
+      <b>New board</b>. The toolbar is deliberately NOT used: at the phone tier it already carries tier
+      rules, and a 6th chip costs room there.</div>
+    <div class="app" style="height:360px">
+      <div class="panel left"><div class="brand"><span class="dot"></span>diagrams <span class="path">/ wash-day</span></div>
+        <div class="panel-body"><div class="ghost" style="position:static;height:22px;margin-bottom:6px"></div>
+          <div class="ghost" style="position:static;height:22px;margin-bottom:6px"></div>
+          <div class="ghost" style="position:static;height:22px"></div></div></div>
+      <div class="canvas">
+        <div class="toolbar"><span>↖</span><span>▭</span><span class="hot">T</span><span>⇄</span><span>⌗</span><span>⚙</span></div>
+        <div class="pop" style="top:56px;left:56px">
+          <div class="pop-hd">Boards</div>
+          <div class="pop-item">＋ New board…</div>
+          <div class="pop-item new">▦ Templates…<span class="badge-new">NEW</span></div>
+          <div class="pop-sep"></div>
+          <div class="pop-item">✎ Rename…</div>
+          <div class="pop-item">🗑 Delete…</div>
+          <div class="pop-sep"></div>
+          <div class="pop-item">↧ Export PNG / SVG / JSON</div>
+        </div>
+      </div>
+      <div class="panel right"><div class="panel-body"></div></div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">B · The gallery itself (desktop, ≥1229) — 2 panes: family/level rail + cards</div>
+    <div class="sub">Opened from <b>Templates…</b>. Cards show the template's own glyph strip as the preview
+      (no screenshots to keep in sync). <b>Level is a LABEL</b> — a coloured chip on the card and a grouping
+      header in the list — <b>not a filter</b>: at 7 cards a filter hides nothing and costs a row of chrome.
+      The right rail groups by <b>family</b>; inside a family the levels read top-to-bottom.</div>
+    <div class="app solo" style="height:620px">
+      <div class="canvas">
+        <div class="modal">
+          <div class="tg-card">
+            <div class="tg-head">
+              <span class="tg-title">Templates</span>
+              <span class="tg-sub">start a new board from a worked example</span>
+              <span class="tg-x">✕</span>
+            </div>
+            <div class="tg-body">
+              <div class="tg-rail">
+                <div class="rl">All</div>
+                <div class="ri">▦ Every template<span class="ct">7</span></div>
+                <div class="rl">Flowchart</div>
+                <div class="ri">▭ Basic<span class="ct">1</span></div>
+                <div class="ri">▭ Advanced<span class="ct">2</span></div>
+                <div class="ri">▭ Complex<span class="ct">1</span></div>
+                <div class="rl">Other</div>
+                <div class="ri">◫ C4<span class="ct">2</span></div>
+                <div class="ri">▤ Data model<span class="ct">1</span></div>
+              </div>
+              <div class="tg-grid">
+                <div class="tile hot">
+                  <div class="tname">Wash day <span class="chip b">BASIC</span></div>
+                  <div class="strip" data-shapes="terminator,process,decision,io,document"></div>
+                  <div class="thint">10 nodes · 5 common shapes · one rewash loop</div>
+                  <div class="go">Use template →</div>
+                </div>
+                <div class="tile">
+                  <div class="tname">Wash day · hand wash <span class="chip a">ADVANCED</span></div>
+                  <div class="strip" data-shapes="terminator,process,decision,subprocess,preparation,manual,delay,connector"></div>
+                  <div class="thint">adds subprocess, preparation, manual, delay, connector · 2 lanes</div>
+                  <div class="go">Use template →</div>
+                </div>
+                <div class="tile">
+                  <div class="tname">Wash day · full notation <span class="chip c">COMPLEX</span></div>
+                  <div class="strip" data-shapes="offpage,manualinput,display,storeddata,looplimit,internalstorage"></div>
+                  <div class="thint">all 16 flowchart shapes · two pages · 3 loops</div>
+                  <div class="go">Use template →</div>
+                </div>
+                <div class="tile">
+                  <div class="tname">Approval request <span class="chip a">ADVANCED</span></div>
+                  <div class="strip" data-shapes="terminator,process,decision,manual,document,connector"></div>
+                  <div class="thint">two lanes · decision · Yes/No · loop-back <span class="chip n">existing</span></div>
+                  <div class="go">Use template →</div>
+                </div>
+                <div class="tile">
+                  <div class="tname">C4 Context <span class="chip n">—</span></div>
+                  <div class="strip" data-shapes="service,actor,external"></div>
+                  <div class="thint">one system + its people and neighbours · L1 <span class="chip n">existing</span></div>
+                  <div class="go">Use template →</div>
+                </div>
+                <div class="tile">
+                  <div class="tname">Users / orders <span class="chip n">—</span></div>
+                  <div class="strip" data-shapes="database,process"></div>
+                  <div class="thint">one-to-many · associative table · enum · unique <span class="chip n">existing</span></div>
+                  <div class="go">Use template →</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel right"><div class="panel-body"></div></div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">C · The create dialog, kept as the fast path — one new row links into the gallery</div>
+    <div class="sub">The existing <b>New board…</b> dialog keeps its list, now with <b>grouping headers</b>
+      (Basic / Advanced / Complex) instead of one flat run, plus a trailing <b>Browse all templates…</b> row
+      that hands a pre-selected choice to the gallery. Board creation stays single-owner: the gallery never
+      creates a board itself.</div>
+    <div style="display:grid;place-items:center">
+      <div class="app" style="height:520px;grid-template-columns:236px 1fr 288px">
+        <div class="panel left"><div class="panel-body"></div></div>
+        <div class="canvas">
+          <div class="modal">
+            <div class="bd-card">
+              <div class="bd-head">New board</div>
+              <div class="bd-b">
+                <div class="bd-lbl">Name</div>
+                <div class="bd-input">Untitled</div>
+                <div class="bd-lbl">Start from</div>
+                <div class="bd-list">
+                  <div class="bd-opt"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">Empty board</span>
+                    <span class="bd-opt-hint">nothing on the canvas</span></span></div>
+                  <div class="bd-hd">Flowchart · Basic <span class="chip b">BASIC</span></div>
+                  <div class="bd-opt on"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">Wash day</span>
+                    <span class="bd-opt-hint">10 nodes · 5 common shapes · one rewash loop</span></span></div>
+                  <div class="bd-hd">Flowchart · Advanced <span class="chip a">ADV</span></div>
+                  <div class="bd-opt"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">Wash day · hand wash</span>
+                    <span class="bd-opt-hint">adds subprocess, preparation, manual, delay, connector</span></span></div>
+                  <div class="bd-opt"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">Approval request</span>
+                    <span class="bd-opt-hint">two lanes · decision · Yes/No · loop-back</span></span></div>
+                  <div class="bd-hd">Flowchart · Complex <span class="chip c">CPLX</span></div>
+                  <div class="bd-opt"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">Wash day · full notation</span>
+                    <span class="bd-opt-hint">all 16 flowchart shapes · two pages · 3 loops</span></span></div>
+                  <div class="bd-hd">Other families</div>
+                  <div class="bd-opt"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">C4 Context / C4 Container / Users &amp; orders</span>
+                    <span class="bd-opt-hint">existing templates, grouped</span></span></div>
+                  <div class="bd-opt browse"><span class="tick"></span><span class="bd-opt-text">
+                    <span class="bd-opt-name">▦ Browse all templates…</span>
+                    <span class="bd-opt-hint">opens the gallery with this choice pre-selected</span></span></div>
+                </div>
+              </div>
+              <div class="bd-foot"><span class="btn">Cancel</span><span class="btn pri">Create</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel right"><div class="panel-body"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">D · Phone + tablet — no new breakpoint number, no new prop or state flag</div>
+    <div class="sub">Both variants are scoped on the EXISTING <b>.app[data-form-factor]</b> /
+      <b>[data-orientation]</b> attributes. Phone = full-bleed sheet, one column, the rail becomes a
+      horizontal scrolling strip. Tablet = same sheet, 2 columns, strip on top. Desktop keeps the 2-pane
+      layout. The threshold stays <b>1229</b> — the one number the project already owns.</div>
+    <div class="tier">
+      <div class="dev phone">
+        <div class="dhd"><b>phone</b> 360×600 · [data-form-factor="phone"]</div>
+        <div class="dbody">
+          <div class="tg-sheet">
+            <div class="sh">Templates <span class="tg-sub" style="margin-left:auto">✕</span></div>
+            <div class="tg-strip">
+              <span class="si on">All 7</span><span class="si">Basic</span><span class="si">Advanced</span>
+              <span class="si">Complex</span><span class="si">C4</span><span class="si">Data model</span>
+            </div>
+            <div class="tg-list">
+              <div class="tile hot"><div class="tname">Wash day <span class="chip b">BASIC</span></div>
+                <div class="strip" data-shapes="terminator,process,decision,io"></div>
+                <div class="thint">10 nodes · +1</div></div>
+              <div class="tile"><div class="tname">Wash day · hand wash <span class="chip a">ADVANCED</span></div>
+                <div class="strip" data-shapes="subprocess,preparation,manual,delay"></div>
+                <div class="thint">adds 5 rarer shapes · +4</div></div>
+              <div class="tile"><div class="tname">Wash day · full <span class="chip c">COMPLEX</span></div>
+                <div class="strip" data-shapes="offpage,storeddata,looplimit,internalstorage"></div>
+                <div class="thint">all 16 shapes · +12</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap2">full-bleed: width/height 100%, no radius, no border · preview strip caps at 4 glyphs + “+N”</div>
+      </div>
+      <div class="dev tablet">
+        <div class="dhd"><b>tablet portrait</b> 560×460 · [data-form-factor="tablet"][data-orientation="portrait"]</div>
+        <div class="dbody">
+          <div class="tg-sheet">
+            <div class="sh">Templates <span class="tg-sub" style="margin-left:auto">✕</span></div>
+            <div class="tg-strip">
+              <span class="si on">All 7</span><span class="si">Basic</span><span class="si">Advanced</span>
+              <span class="si">Complex</span><span class="si">C4</span>
+            </div>
+            <div class="tg-list">
+              <div class="tile hot"><div class="tname">Wash day <span class="chip b">BASIC</span></div>
+                <div class="strip" data-shapes="terminator,process,decision,io"></div>
+                <div class="thint">10 nodes · 5 shapes</div></div>
+              <div class="tile"><div class="tname">Wash day · hand wash <span class="chip a">ADV</span></div>
+                <div class="strip" data-shapes="subprocess,preparation,manual,delay"></div>
+                <div class="thint">adds 5 rarer shapes</div></div>
+              <div class="tile"><div class="tname">Wash day · full <span class="chip c">CPLX</span></div>
+                <div class="strip" data-shapes="offpage,storeddata,looplimit,internalstorage"></div>
+                <div class="thint">all 16 flowchart shapes</div></div>
+              <div class="tile"><div class="tname">Approval request <span class="chip a">ADV</span></div>
+                <div class="strip" data-shapes="terminator,decision,manual,document"></div>
+                <div class="thint">existing template</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap2">rail → horizontal strip (the pattern Settings already uses at this tier) · 2-column grid</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">E · What this round does NOT do</div>
+    <table class="plain">
+      <tr><th>Not in scope</th><th>Why</th></tr>
+      <tr><td class="k">Insert a template into the CURRENT board</td>
+        <td>A template BELONGS to a preset. Seeding a C4 template into a Mixed board would give it C4 nodes
+          under Mixed's edge rules and no C4 legend. <b>You settled this:</b> template = new board only.</td></tr>
+      <tr><td class="k">A level FILTER control</td>
+        <td>7 cards, no level with more than 2 rows — a filter would hide nothing and cost a row of chrome.
+          <b>You settled this:</b> label first.</td></tr>
+      <tr><td class="k">Reinstating the “Diagram type” picker</td>
+        <td>It was removed on purpose earlier; <code>preset</code> survives as data driving 7 behaviours. The
+          template list is now the discovery surface instead.</td></tr>
+      <tr><td class="k">Changing the layout engine</td>
+        <td>See tab 3, note on lanes — auto-arrange already leaves lane bands behind. Separate round.</td></tr>
+      <tr><td class="k">A toolbar entry for the gallery</td>
+        <td>Cheap to add later with no data change; the phone toolbar is crowded. Open question for you.</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- ============================ PANE 2 — LEVELS ============================ -->
+<div class="pane" id="p2">
+
+  <p class="lede">The three levels are NOT “5, 10 and 16 shapes picked by feel”. They are three
+    <b>contiguous bands of the flowchart palette you already curated in order</b> — which makes the claim
+    measurable: level 1 = palette rows 0–4, level 2 = rows 0–9, level 3 = rows 0–15.</p>
+
+  <div class="cov" id="covBars"></div>
+
+  <div class="dias">
+    <div class="dia">
+      <div class="dh">① Cơ bản · BASIC <span class="chip b">BASIC</span>
+        <span class="meta">10 nodes · 11 edges · 5 shapes · 1 loop</span></div>
+      <div class="db" style="width:520px;height:560px" id="diaBasic" data-w="522"></div>
+      <div class="df">Shapes: <span class="k">terminator, process, decision, io, document</span> — the five
+        that appear in almost every real process sketch, and the first five rows of the panel, so a user who
+        has only used Basic has already met every shape in it. No lanes, no note: nothing needs explaining.</div>
+    </div>
+
+    <div class="dia">
+      <div class="dh">② Nâng cao · ADVANCED <span class="chip a">ADVANCED</span>
+        <span class="meta">~17 nodes · 10 shapes · 2 lanes</span></div>
+      <div class="db" style="width:560px;height:560px" id="diaAdv" data-w="562"></div>
+      <div class="df">Adds <span class="k">subprocess, preparation, manual, delay, connector</span> — each
+        answers a question a beginner rarely asks (defined elsewhere / setup / by hand / wait / jump), and
+        each sits below the fold in the panel. Lanes arrive here.</div>
+    </div>
+  </div>
+
+  <div class="dias">
+    <div class="dia">
+      <div class="dh">③ Phức tạp · COMPLEX — full notation <span class="chip c">COMPLEX</span>
+        <span class="meta">31 nodes · 27 edges · ALL 16 shapes · 3 loops · 2 pages</span></div>
+      <div class="db" style="width:1000px;height:620px" id="diaComplex" data-w="1002"></div>
+      <div class="df">Every one of the 16 ISO 5807 symbols has an <b>honest job</b>, not a metaphor —
+        the two storage symbols are the giveaway: <span class="k">storeddata</span> = the wash log kept
+        between washes; <span class="k">internalstorage</span> = the drum holding items right now and gone
+        when the run ends. <span class="k">offpage</span> = the procedure is documented on two pages.</div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">The 16 symbols, and how far down the palette each level goes</div>
+    <div class="cov" id="covMatrix"></div>
+    <div class="sub" id="covLegend"></div>
+  </div>
+
+</div>
+
+<!-- ============================ PANE 3 — SCENARIOS ============================ -->
+<div class="pane" id="p3">
+
+  <p class="lede">You said fun / everyday is fine — so here are four candidate scenarios, each drawn as a
+    mini flowchart so you can judge <b>by eye</b>. Score = how many of the 16 symbols get an
+    <b>honest</b> job (not a bolted-on one). Pick one; the rest are dropped.</p>
+
+  <div class="card-block">
+    <div class="cap">⚠ First, the lane problem — measured, and it decides one thing in this spec</div>
+    <table class="plain">
+      <tr><th>What</th><th>Measured result</th></tr>
+      <tr><td class="k">Auto-arrange on a template WITH lanes</td>
+        <td>The engine places <b>11 of 14</b> nodes; the 3 lane bands are FROZEN at their authored y
+          (0 / 70 / 320). The laid-out flow runs y <b>0 → 780</b> while the lanes only cover
+          <b>0 → 550</b>. Result: <b>only 6 of 10</b> flow nodes stay inside a lane band — the rest
+          spill out of the swimlane entirely.</td></tr>
+      <tr><td class="k">On a 31-node / 3-lane template</td>
+        <td>Far worse. Pressing Auto-arrange on the Complex template would visibly scatter the flow out of
+          its bands.</td></tr>
+      <tr><td class="k">Recommended action</td>
+        <td><b>Do not use Lane nodes in the three new templates.</b> Use plain <code>label</code> nodes for
+          phase headings (they are canvas annotations and are never laid out). Zero layout-engine risk, the
+          template ships clean, and the existing <code>approval</code> template is untouched. A separate
+          round can make lanes layout-aware and then the templates adopt them as a pure data edit.</td></tr>
+    </table>
+  </div>
+
+  <div class="dias">
+    <div class="dia">
+      <div class="dh">A · Wash day <span class="chip n">current pick</span>
+        <span class="meta">everyday · 16/16 honest</span></div>
+      <div class="db" style="width:470px;height:400px" id="scWash"></div>
+      <div class="df"><b>For:</b> understood with zero training, no brand/locale, long enough to have real
+        phases. <b>The giveaway pair:</b> <span class="k">storeddata</span> = the wash log kept between
+        washes vs <span class="k">internalstorage</span> = the drum holding items only during the run.
+        <b>Against:</b> a household chore for a tool people use at work.</div>
+    </div>
+
+    <div class="dia">
+      <div class="dh">B · Flat-pack furniture <span class="chip b">FUNNY</span>
+        <span class="meta">16/16 honest</span></div>
+      <div class="db" style="width:470px;height:400px" id="scFlat"></div>
+      <div class="df"><b>For:</b> funnier and equally universal; the symbol fit is arguably tighter than
+        wash day — <span class="k">offpage</span> is literally page 2 of the instructions,
+        <span class="k">storeddata</span> is the bag of leftover screws you keep forever,
+        <span class="k">internalstorage</span> is the parts held in the box during assembly,
+        <span class="k">display</span> is the step diagram you keep re-reading, and
+        <span class="k">delay</span> is waiting for the glue. <b>Against:</b> a long flow needs many steps to
+        stay honest (allen key, two-person step, wrong-hole redo).</div>
+    </div>
+
+    <div class="dia">
+      <div class="dh">C · Getting the cat into the carrier <span class="chip b">FUNNY</span>
+        <span class="meta">13/16 honest</span></div>
+      <div class="db" style="width:470px;height:400px" id="scCat"></div>
+      <div class="df"><b>For:</b> the funniest, and the loops are earned rather than decorative (cat escapes
+        → back to step 1, honestly). <b>Against:</b> <span class="no">storeddata</span> and
+        <span class="no">internalstorage</span> and <span class="no">offpage</span> are contrived — you would
+        be faking 3 of 16. <b>Verdict: reject for the Complex level</b>, excellent as a small
+        single-level example later.</div>
+    </div>
+
+    <div class="dia">
+      <div class="dh">D · Out the door on time <span class="chip n">everyday</span>
+        <span class="meta">14/16 honest</span></div>
+      <div class="db" style="width:470px;height:400px" id="scDoor"></div>
+      <div class="df"><b>For:</b> the most universally relatable morning; real waits
+        (<span class="k">delay</span>), real preparation, real manual steps. <b>Against:</b>
+        <span class="no">offpage</span> and <span class="no">storeddata</span> are a stretch — 2 of 16 faked.
+        <b>Verdict: good, second to A/B.</b></div>
+    </div>
+  </div>
+
+  <div class="card-block">
+    <div class="cap">Coverage matrix — which symbols each scenario can host honestly</div>
+    <div class="cov" id="scMatrix"></div>
+    <div class="sub" id="scLegend"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---- mini shape renderer: the app's own silhouettes, scaled down ---- */
+function shapeSvg(shape,color,w,h,big){
+  const sw = big ? 2.2 : 3;
+  const c = 'var(--c-'+color+')';
+  const p = 'fill="color-mix(in srgb, '+c+' 10%, transparent)" stroke="'+c+'" stroke-width="'+sw+'"';
+  const line = 'stroke="'+c+'" stroke-width="3" fill="none"';
+  let inner = '';
+  switch(shape){
+    case 'terminator': inner = '<rect x="2" y="2" width="196" height="96" rx="48" '+p+'/>'; break;
+    case 'process': inner = '<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/>'; break;
+    case 'decision': inner = '<path d="M100 3 L197 50 L100 97 L3 50 Z" '+p+'/>'; break;
+    case 'io': inner = '<path d="M36 3 H197 L164 97 H3 Z" '+p+'/>'; break;
+    case 'document': inner = '<path d="M2 2 H198 V78 C175 96 155 68 131 80 S91 96 67 78 S27 62 2 78 Z" '+p+'/>'; break;
+    case 'subprocess': inner = '<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/><path d="M26 3 V97" '+line+'/><path d="M174 3 V97" '+line+'/>'; break;
+    case 'preparation': inner = '<path d="M46 3 H154 L197 50 L154 97 H46 L3 50 Z" '+p+'/>'; break;
+    case 'manual': inner = '<path d="M3 3 H197 L164 97 H36 Z" '+p+'/>'; break;
+    case 'delay': inner = '<path d="M3 3 H100 A47 47 0 0 1 100 97 H3 Z" '+p+'/>'; break;
+    case 'connector': inner = '<circle cx="100" cy="50" r="47" '+p+'/>'; break;
+    case 'offpage': inner = '<path d="M3 3 H197 V50 L100 97 H3 Z" '+p+'/>'; break;
+    case 'manualinput': inner = '<path d="M3 28 H197 V97 H3 Z" '+p+'/><path d="M3 28 H197" '+line+'/>'; break;
+    case 'display': inner = '<path d="M3 22 Q100 3 197 22 L168 97 H32 Z" '+p+'/>'; break;
+    case 'storeddata': inner = '<path d="M3 17 V83 A97 15 0 0 0 197 83 V17" '+p+'/><ellipse cx="100" cy="17" rx="97" ry="15" '+p+'/>'; break;
+    case 'looplimit': inner = '<path d="M3 30 L30 3 H170 L197 30 V97 H3 Z" '+p+'/>'; break;
+    case 'internalstorage': inner = '<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/><path d="M3 26 H197" '+line+'/><path d="M26 3 V97" '+line+'/>'; break;
+    case 'note': inner = '<path d="M3 3 H197 V75 L150 97 H3 Z" '+p+'/><path d="M150 97 V75 H197" '+line+'/>'; break;
+    case 'service': inner = '<rect x="2" y="2" width="196" height="96" rx="10" '+p+'/>'; break;
+    case 'database': inner = '<path d="M3 17 V83 A97 15 0 0 0 197 83 V17" '+p+'/><ellipse cx="100" cy="17" rx="97" ry="15" '+p+'/>'; break;
+    case 'actor': inner = '<circle cx="100" cy="24" r="19" '+p+'/><path d="M100 43 V75 M62 55 H138 M100 75 L74 97 M100 75 L126 97" '+line+'/>'; break;
+    case 'external': inner = '<rect x="2" y="2" width="196" height="96" rx="3" stroke-dasharray="10 7" '+p+'/>'; break;
+    case 'group': inner = '<rect x="2" y="2" width="196" height="96" rx="12" stroke-dasharray="12 8" '+p+'/>'; break;
+    default: inner = '<rect x="2" y="2" width="196" height="96" rx="3" '+p+'/>';
+  }
+  return '<svg viewBox="0 0 200 100" width="'+w+'" height="'+h+'" preserveAspectRatio="none">'+inner+'</svg>';
+}
+/* glyph strips inside gallery tiles */
+document.querySelectorAll('.strip[data-shapes]').forEach(el=>{
+  const keys = {terminator:'green',process:'cyan',decision:'amber',io:'violet',document:'violet',
+    subprocess:'cyan',preparation:'cyan',manual:'green',delay:'amber',connector:'slate',
+    offpage:'slate',manualinput:'green',display:'violet',storeddata:'violet',looplimit:'amber',
+    internalstorage:'violet',service:'cyan',actor:'green',external:'slate',note:'slate',group:'slate'};
+  const colorOf = s => keys[s] || 'slate';
+  const list = el.dataset.shapes.split(',');
+  el.innerHTML = list.map(s=>shapeSvg(s,colorOf(s),34,20)).join('')
+    + (el.dataset.more ? '<span class="chip n">+'+el.dataset.more+'</span>' : '');
+});
+
+/* ---- diagram builder ---- */
+/* node = [id, shape, title, colorKey, x, y, w, h] ; lane = [id, x, y, w, h, label] */
+function build(diaId, nodes, lanes, W, H){
+  const host = document.getElementById(diaId);
+  if(!host) return;
+  let html = '';
+  (lanes||[]).forEach(l=>{
+    html += '<div class="nd lane" style="left:'+l[1]+'px;top:'+l[2]+'px;width:'+l[3]+'px;height:'+l[4]+'px">'+(l[5]||'')+'</div>';
+  });
+  nodes.forEach(n=>{
+    const [id,shape,title,color,x,y,w,h] = n;
+    if(shape==='__label'){
+      html += '<div class="nd lbl" style="left:'+x+'px;top:'+y+'px;width:'+(w||180)+'px">'+title+'</div>';
+      return;
+    }
+    if(shape==='__note'){
+      html += '<div class="nd note" style="left:'+x+'px;top:'+y+'px;width:'+(w||170)+'px;height:'+(h||44)+'px">'+title+'</div>';
+      return;
+    }
+    /* REAL silhouette: the app's own shape outline as an SVG background, text on top */
+    html += '<div class="shp" style="left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px">'
+          + shapeSvg(shape,color,w,h,true)
+          + '<span class="shp-t">'+title+'</span></div>';
+  });
+  host.innerHTML = html;
+  host.style.width = W+'px'; host.style.height = H+'px';
+  /* clamp the CARD to its diagram width so a long header wraps instead of inflating the card */
+  const card = host.closest('.dia');
+  if (card) card.style.width = W+'px';
+}
+/* keep every .dia box inside the viewport on first paint, before its diagram is built */
+function clampCards(){
+  document.querySelectorAll('.dia').forEach(c=>{
+    if (c.style.width) return;
+    const max = Math.max(280, document.documentElement.clientWidth - 40);
+    c.style.width = 'min(100%, ' + max + 'px)';
+  });
+}
+/* edge overlay: draw plain arrows between node centres */
+function edges(diaId, nodes, pairs, W, H){
+  const host = document.getElementById(diaId);
+  if(!host) return;
+  const byId = {}; nodes.forEach(n=>byId[n[0]]=n);
+  const svg = ['<svg width="'+W+'" height="'+H+'" style="position:absolute;inset:0;pointer-events:none">'];
+  svg.push('<defs><marker id="ar-'+diaId+'" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
+    +'<path d="M0 0 L9 4.5 L0 9 z" fill="var(--c-slate)"/></marker></defs>');
+  pairs.forEach(([a,b,label])=>{
+    const A=byId[a], B=byId[b]; if(!A||!B) return;
+    const ax=A[4]+A[6]/2, ay=A[5]+A[7], bx=B[4]+B[6]/2, by=B[5];
+    const ay2 = (by>ay+10) ? ay : A[5];        /* upward back-edge: leave the top */
+    const by2 = (by>ay+10) ? by : B[5]+B[7];
+    svg.push('<path d="M'+ax+' '+ay2+' C'+ax+' '+(ay2+40)+' '+bx+' '+(by2-40)+' '+bx+' '+by2+'" fill="none" '
+      +'stroke="var(--c-slate)" stroke-width="1.6" marker-end="url(#ar-'+diaId+')"/>');
+    if(label){
+      const mx=(ax+bx)/2, my=(ay2+by2)/2;
+      svg.push('<text x="'+mx+'" y="'+my+'" fill="var(--dim2)" font-size="8" font-family="var(--mono)" '
+        +'text-anchor="middle" style="paint-order:stroke;stroke:var(--bg);stroke-width:3px">'+label+'</text>');
+    }
+  });
+  svg.push('</svg>');
+  host.insertAdjacentHTML('afterbegin', svg.join(''));
+}
+
+/* ---------- LEVEL 1 BASIC ---------- */
+const basicNodes = [
+ ['b1','terminator','Start — wash day','green',170,20,180,54],
+ ['b2','io','Read the care labels','violet',170,104,180,54],
+ ['b3','process','Sort into whites and colours','cyan',170,188,180,54],
+ ['b4','decision','Enough for a full load?','amber',175,272,170,54],
+ ['b5','process','Keep aside for next wash day','cyan',0,356,160,54],
+ ['b6','process','Load drum, add detergent','cyan',170,356,180,54],
+ ['b7','process','Run the wash cycle','cyan',170,440,180,54],
+ ['b8','decision','Stains gone?','amber',175,524,170,54],
+ ['b9','document','Hang out to dry','violet',170,608,180,54],
+ ['b10','terminator','End','green',170,692,180,54]
+];
+build('diaBasic', basicNodes, [], 520, 770);
+edges('diaBasic', basicNodes, [['b1','b2'],['b2','b3'],['b3','b4'],['b4','b6','Yes'],['b4','b5','No'],
+ ['b6','b7'],['b7','b8'],['b8','b9','Yes'],['b8','b7','No — rewash'],['b9','b10'],['b5','b10']], 520, 770);
+
+/* ---------- LEVEL 2 ADVANCED ---------- */
+const advNodes = [
+ ['pool',null,null,null,0,0,0,0],
+ ['a1','terminator','Start','green',200,24,170,50],
+ ['a2','io','Gather the basket','violet',200,104,170,50],
+ ['a3','document','Read the care labels','violet',200,184,170,50],
+ ['a4','decision','Hand-wash only?','amber',205,264,160,50],
+ ['a5','subprocess','Hand-wash cycle','cyan',10,348,160,50],
+ ['a6','delay','Soak 30 minutes','amber',10,428,160,50],
+ ['a7','preparation','Set temp, load the drum','cyan',200,348,170,50],
+ ['a8','process','Run the wash cycle','cyan',200,428,170,50],
+ ['a9','decision','Stains gone?','amber',205,508,160,50],
+ ['a10','manual','Rub the stain by hand','green',10,588,160,50],
+ ['a11','connector','A','slate',255,678,60,50],
+ ['a12','process','Hang out to dry','cyan',200,760,170,50],
+ ['a13','terminator','End','green',200,840,170,50],
+ ['lbl1','__label','Prepare · who does what',10,4,300,0],
+ ['lbl2','__label','Wash · the machine',10,700,300,0]
+];
+build('diaAdv', advNodes.slice(1), [
+ ['pool',0,0,400,920,'']
+], 560, 940);
+edges('diaAdv', advNodes.slice(1), [['a1','a2'],['a2','a3'],['a3','a4'],['a4','a5','Yes'],['a4','a7','No'],
+ ['a5','a6'],['a6','a11'],['a7','a8'],['a8','a9'],['a9','a10','No'],['a9','a12','Yes'],
+ ['a10','a9','retry'],['a11','a8','revise'],['a12','a13']], 560, 940);
+
+/* ---------- LEVEL 3 COMPLEX ---------- */
+const cplx = [
+ ['p1','terminator','Start — wash day','green',380,30,170,48],
+ ['p2','io','Gather the laundry basket','violet',380,108,170,48],
+ ['p3','document','Read each care label','violet',380,186,170,48],
+ ['p4','decision','Hand-wash only?','amber',385,264,160,48],
+ ['p5','subprocess','Hand-wash cycle (care guide)','cyan',20,342,170,48],
+ ['p6','delay','Soak 30 minutes','amber',20,420,170,48],
+ ['p7','manualinput','Set the programme','green',380,342,170,48],
+ ['p8','display','Panel shows programme + time','violet',380,420,170,48],
+ ['p9','preparation','Set temperature, load drum','cyan',380,498,170,48],
+ ['p10','internalstorage','Drum — items held in machine','violet',380,576,170,48],
+ ['p11','looplimit','Loop: spot-treat each item','amber',380,654,170,48],
+ ['p12','manual','Rub the stain by hand','green',20,732,170,48],
+ ['p13','decision','Items left to treat?','amber',20,810,160,48],
+ ['p14','process','Run the wash cycle','cyan',380,810,170,48],
+ ['p15','decision','Stains gone?','amber',385,888,160,48],
+ ['p16','connector','A','slate',430,966,60,48],
+ ['p17','connector','A','slate',760,810,60,48],
+ ['p18','storeddata','Write the load in the wash log','violet',720,888,180,48],
+ ['p19','offpage','To page 2 — dry and fold','slate',720,966,180,48],
+ ['p20','offpage','From page 1 — washed load','slate',700,576,180,48],
+ ['p21','process','Hang out or lay flat to dry','cyan',700,498,180,48],
+ ['p22','decision','Dry?','amber',710,420,160,48],
+ ['p23','delay','Wait 20 minutes','amber',710,342,170,48],
+ ['p24','terminator','End — load finished','green',710,264,180,48],
+ ['nt','__note','Two pages: page 1 washes, page 2 dries. The off-page connectors mark the page break.',700,108,220,60],
+ ['lb1','__label','Page 1 · wash',30,6,200,0],
+ ['lb2','__label','Page 2 · dry and fold',700,6,220,0]
+];
+build('diaComplex', cplx, [], 1000, 1040);
+edges('diaComplex', cplx, [['p1','p2'],['p2','p3'],['p3','p4'],['p4','p5','Yes'],['p4','p7','No'],
+ ['p5','p6'],['p6','p18','hand-washed — log it'],['p7','p8'],['p8','p9'],['p9','p10'],['p10','p11'],
+ ['p11','p12'],['p12','p13'],['p13','p11','Yes — next item'],['p13','p14','No — all treated'],
+ ['p14','p15'],['p15','p18','Yes'],['p15','p16','No — rewash'],['p16','p17'],['p17','p14','revise'],
+ ['p18','p19'],['p19','p20','page 2'],['p20','p21'],['p21','p22'],['p22','p24','Yes'],
+ ['p22','p23','No — more time'],['p23','p21','again']], 1000, 1040);
+
+/* ---------- SCENARIOS ---------- */
+const scWash = [
+ ['w1','terminator','Start','green',150,16,150,44],
+ ['w2','io','Gather basket','violet',150,86,150,44],
+ ['w3','decision','Hand-wash?','amber',155,156,140,44],
+ ['w4','manual','Rub stain','green',0,226,140,44],
+ ['w5','preparation','Load drum','cyan',150,226,150,44],
+ ['w6','internalstorage','Drum holds items','violet',150,296,150,44],
+ ['w7','looplimit','Loop each item','amber',150,366,150,44],
+ ['w8','process','Wash cycle','cyan',150,436,150,44],
+ ['w9','delay','Wait 20 min','amber',150,506,150,44],
+ ['w10','storeddata','Wash log','violet',150,576,150,44],
+ ['w11','offpage','Page 2 dry','slate',150,646,150,44],
+ ['w12','terminator','End','green',150,716,150,44]
+];
+build('scWash', scWash, [], 470, 790);
+edges('scWash', scWash, [['w1','w2'],['w2','w3'],['w3','w4','Yes'],['w3','w5','No'],['w5','w6'],['w6','w7'],
+ ['w7','w8'],['w8','w9'],['w9','w10'],['w10','w11'],['w11','w12'],['w4','w10','log it']], 470, 790);
+
+const scFlat = [
+ ['f1','terminator','Open the box','green',150,16,150,44],
+ ['f2','io','Check parts vs list','violet',150,86,150,44],
+ ['f3','preparation','Lay out + tool','cyan',150,156,150,44],
+ ['f4','internalstorage','Parts held in box','violet',150,226,150,44],
+ ['f5','decision','Step needs 2 people?','amber',155,296,140,44],
+ ['f6','manual','Ask someone','green',0,366,140,44],
+ ['f7','display','Re-read the diagram','violet',150,366,150,44],
+ ['f8','looplimit','Loop per step','amber',150,436,150,44],
+ ['f9','subprocess','Sub-assembly','cyan',0,506,140,44],
+ ['f10','delay','Wait for glue','amber',150,506,150,44],
+ ['f11','decision','Screws left over?','amber',155,576,140,44],
+ ['f12','storeddata','Bag of spare screws','violet',150,646,150,44],
+ ['f13','offpage','Page 2 of manual','slate',150,716,150,44],
+ ['f14','terminator','Done','green',150,786,150,44]
+];
+build('scFlat', scFlat, [], 470, 860);
+edges('scFlat', scFlat, [['f1','f2'],['f2','f3'],['f3','f4'],['f4','f5'],['f5','f6','Yes'],['f5','f7','No'],
+ ['f7','f8'],['f8','f9'],['f9','f10'],['f10','f11'],['f11','f12','Yes'],['f11','f13','No'],
+ ['f12','f13'],['f13','f14'],['f6','f7']], 470, 860);
+
+const scCat = [
+ ['c1','terminator','Cat asleep on the bed','green',150,16,150,44],
+ ['c2','manualinput','Set the alarm for 6am','green',150,86,150,44],
+ ['c3','decision','Cat noticed the carrier?','amber',155,156,140,44],
+ ['c4','process','Lure with a treat','cyan',150,226,150,44],
+ ['c5','delay','Wait for the cat','amber',150,296,150,44],
+ ['c6','decision','Cat in the carrier?','amber',155,366,140,44],
+ ['c7','manual','Pick the cat up','green',0,436,140,44],
+ ['c8','looplimit','Loop: try again','amber',150,436,150,44],
+ ['c9','display','Check the carrier latch','violet',150,506,150,44],
+ ['c10','process','Drive to the vet','cyan',150,576,150,44],
+ ['c11','terminator','At the vet','green',150,646,150,44]
+];
+build('scCat', scCat, [], 470, 720);
+edges('scCat', scCat, [['c1','c2'],['c2','c3'],['c3','c4','No'],['c3','c5','Yes'],['c4','c5'],['c5','c6'],
+ ['c6','c9','Yes'],['c6','c7','No'],['c7','c8'],['c8','c3','cat escapes'],['c9','c10'],['c10','c11']], 470, 720);
+
+const scDoor = [
+ ['d1','terminator','Alarm rings','green',150,16,150,44],
+ ['d2','decision','Snooze?','amber',155,86,140,44],
+ ['d3','delay','9 more minutes','amber',0,156,140,44],
+ ['d4','process','Shower','cyan',150,156,150,44],
+ ['d5','preparation','Pick clothes','cyan',150,226,150,44],
+ ['d6','manual','Make coffee','green',150,296,150,44],
+ ['d7','decision','Keys in the bowl?','amber',155,366,140,44],
+ ['d8','manualinput','Type the door code','green',150,436,150,44],
+ ['d9','io','Check the phone','violet',150,506,150,44],
+ ['d10','decision','Bus in 4 min?','amber',155,576,140,44],
+ ['d11','process','Run for it','cyan',150,646,150,44],
+ ['d12','terminator','At work','green',150,716,150,44]
+];
+build('scDoor', scDoor, [], 470, 790);
+edges('scDoor', scDoor, [['d1','d2'],['d2','d3','Yes'],['d2','d4','No'],['d3','d2','again'],
+ ['d4','d5'],['d5','d6'],['d6','d7'],['d7','d8','No'],['d7','d9','Yes'],['d8','d9'],['d9','d10'],
+ ['d10','d11','Yes'],['d10','d9','No — wait'],['d11','d12']], 470, 790);
+
+/* ---------- coverage matrices ---------- */
+const SHAPES = [['terminator','Terminal'],['process','Process'],['decision','Decision'],['io','Input/Output'],
+ ['document','Document'],['subprocess','Predefined process'],['preparation','Preparation'],['manual','Manual operation'],
+ ['delay','Delay'],['connector','On-page connector'],['offpage','Off-page connector'],['manualinput','Manual input'],
+ ['display','Display'],['storeddata','Stored data'],['looplimit','Loop limit'],['internalstorage','Internal storage']];
+
+function covMatrix(elId, legId, rows){
+  const el = document.getElementById(elId), leg = document.getElementById(legId);
+  if(!el) return;
+  el.innerHTML = rows.map(([name,has])=>{
+    const cells = SHAPES.map(([id,label])=>{
+      const ok = has.includes(id);
+      return '<span class="c '+(ok?'has':'no')+'" title="'+label+'">'+label+'</span>';
+    }).join('');
+    return '<div style="display:flex;gap:8px;align-items:flex-start;max-width:100%"><div style="font-family:var(--mono);'
+      +'font-size:10px;color:var(--acc);font-weight:700;min-width:168px;text-align:right;padding-top:4px">'+name
+      +'</div><div class="cov" style="justify-content:flex-start;max-width:760px">'+cells+'</div></div>';
+  }).join('<div style="height:8px"></div>');
+  if(leg) leg.innerHTML = 'Green border = the scenario hosts that symbol <b>honestly</b>. '
+    +'Struck-through = it would have to be faked. Level 1 (Basic) takes the first 5; Level 2 adds the next 5; '
+    +'Level 3 takes all 16.';
+}
+const L1 = ['terminator','process','decision','io','document'];
+const L2 = L1.concat(['subprocess','preparation','manual','delay','connector']);
+const L3 = SHAPES.map(s=>s[0]);
+covMatrix('covMatrix','covLegend',[
+  ['① Basic — rows 0–4', L1],
+  ['② Advanced — rows 0–9', L2],
+  ['③ Complex — rows 0–15', L3]
+]);
+/* the little bar row at the top of pane 2 */
+const cb = document.getElementById('covBars');
+if(cb) cb.innerHTML = [['① Cơ bản · BASIC',5,'b'],['② Nâng cao · ADVANCED',10,'a'],['③ Phức tạp · COMPLEX',16,'c']]
+  .map(([n,c,k])=>'<span class="chip '+k+'" style="font-size:10px;padding:5px 9px">'+n+' — '+c+'/16 shapes</span>').join('');
+
+covMatrix('scMatrix','scLegend',[
+  ['A · Wash day', L3],
+  ['B · Flat-pack furniture', L3],
+  ['C · Cat into the carrier', ['terminator','process','decision','io','document','subprocess','preparation','manual','delay','connector','manualinput','display','looplimit']],
+  ['D · Out the door on time', ['terminator','process','decision','io','document','subprocess','preparation','manual','delay','connector','manualinput','display','looplimit']]
+]);
+
+/* ---------- tabs ---------- */
+clampCards();
+document.querySelectorAll('.picker button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.picker button').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById(b.dataset.p).classList.add('on');
+    window.scrollTo(0,0);
+  });
+});
+</script>
+</body>
+</html>

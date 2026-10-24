@@ -11,7 +11,7 @@ export type TourStep = {
 
 export const TOUR_STEPS: TourStep[] = [
   {
-    title: 'Welcome to Diagram Studio',
+    title: 'Welcome to Gobigrams',
     body: 'Draw your system as boxes and arrows. Everything autosaves.',
   },
   {

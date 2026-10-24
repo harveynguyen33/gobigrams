@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Edge reshape — drag the middle of a connection</title>
+<style>
+  :root{
+    --bg:#0b0b0d; --surface:#131316; --elevated:#1a1b1f;
+    --border:#26272c; --border-strong:#33343a;
+    --fg:#e8e8ea; --dim:#8a8a92; --dim2:#63636b;
+    --acc:#f54e00; --acc-soft:rgba(245,78,0,.16);
+    --sel:#3b82f6; --sel-soft:rgba(59,130,246,.18);
+    --green:#4ade80; --red:#f87171; --amber:#fbbf24;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans:Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --r:8px;
+    --grid:rgba(255,255,255,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;padding:26px 22px 70px;line-height:1.5}
+  h1{font-family:var(--mono);font-size:14.5px;letter-spacing:.06em;text-transform:uppercase}
+  .lede{color:var(--dim);font-size:13px;max-width:980px;margin:8px 0 0}
+  .lede b{color:var(--fg)}
+  .meas{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--acc);
+    border-radius:8px;padding:12px 14px;margin:18px 0 26px;max-width:980px}
+  .meas h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin-bottom:8px}
+  .meas table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .meas td{padding:3px 0;vertical-align:top}
+  .meas td:first-child{color:var(--dim);width:250px}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--elevated);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+  .good{color:var(--green)} .bad{color:var(--red)} .mid{color:var(--amber)}
+
+  .cards{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+  .v{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;width:352px}
+  .v h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--acc)}
+  .tag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+       border-radius:4px;padding:1px 6px;margin-bottom:8px}
+  .tag.ok{background:rgba(74,222,128,.14);color:var(--green);border:1px solid rgba(74,222,128,.35)}
+  .tag.no{background:rgba(248,113,113,.14);color:var(--red);border:1px solid rgba(248,113,113,.35)}
+  .tag.mid{background:rgba(251,191,36,.14);color:var(--amber);border:1px solid rgba(251,191,36,.35)}
+  .stance{font-size:12px;color:var(--dim);min-height:66px;margin:3px 0 10px}
+  .stance b{color:var(--fg)}
+
+  .stage{position:relative;height:250px;border-radius:var(--r);border:1px solid var(--border);overflow:hidden;
+    background:radial-gradient(var(--grid) 1.2px,transparent 1.2px) 0 0/16px 16px,#08080a;margin-bottom:10px}
+  .node{position:absolute;background:var(--elevated);border:1.5px solid;border-radius:var(--r);
+    font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+    display:grid;place-items:center;padding:0 8px;z-index:3}
+  .nA{left:18px;top:96px;width:96px;height:56px;border-color:#22d3ee}
+  .nB{right:18px;top:96px;width:96px;height:56px;border-color:#22d3ee}
+  .nB2{right:18px;top:180px;width:96px;height:56px;border-color:#22d3ee}
+
+  /* the 2 endpoint grabbers (today's, Round Q) — shown faintly so the contrast is visible */
+  .ep{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--elevated);
+      border:2px solid var(--sel);z-index:6;opacity:.45}
+
+  /* the MID-DRAG handle — the thing being proposed */
+  .mid{position:absolute;width:11px;height:11px;border-radius:50%;background:var(--bg);
+       border:2px solid var(--acc);z-index:7;cursor:grab}
+  .mid::after{content:"";position:absolute;inset:11px}   /* invisible hit ring */
+
+  .hint{font-family:var(--mono);font-size:10px;color:var(--dim2);border-top:1px solid var(--border);padding-top:8px}
+  .hint b{color:var(--fg)}
+
+  .sum{width:100%;border-collapse:collapse;margin-top:30px;font-size:12.5px;max-width:1060px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+  td.d{color:var(--dim)}
+  .verdict{margin-top:24px;max-width:1060px;font-size:13px}
+  .verdict b{color:var(--acc)}
+</style>
+</head>
+<body>
+
+<h1>Reshape an edge — drag its middle to move the line</h1>
+<p class="lede">
+  Your words: <b>“kéo 1 connect dài… bạn thường sẽ có 1 vài dot ở giữa để kéo cái connection line đó ra vị
+  trí khác cho đẹp → chứ không phải là đổi connect tới shape khác.”</b>
+  So: a handle at the <b>MIDDLE</b> that bends the line — not a handle at the ends that re-attaches it.
+</p>
+
+<div class="meas">
+  <h3>Measured first — the two features are different things</h3>
+  <table>
+    <tr>
+      <td>Today's 4 big dots (<code>r=14</code>)</td>
+      <td>sit exactly ON the edge endpoints — measured at the source node's right border and the target's left border.
+        That is Round Q's <b>reconnect</b>: it re-attaches an end to a different node.</td>
+    </tr>
+    <tr>
+      <td>What you want</td>
+      <td>a handle at the <b>midpoint</b> that <b>reshapes</b> the path. The two ends never move.</td>
+    </tr>
+    <tr>
+      <td>React Flow support</td>
+      <td><code>getSmoothStepPath</code> takes <code>centerX</code>/<code>centerY</code> <span class="good">(supported)</span> —
+        but <code>getBezierPath</code> and <code>getStraightPath</code> take <span class="bad">nothing</span>.</td>
+    </tr>
+    <tr>
+      <td>Consequence</td>
+      <td>a mid-drag handle is <span class="good">native for step / smoothstep</span> and needs a
+        <span class="mid">custom path</span> for bezier. This decides which variants are cheap.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="cards">
+
+  <!-- 0 — TODAY -->
+  <div class="v">
+    <span class="tag no">today</span>
+    <h2>0 — end dots only</h2>
+    <p class="stance">Two big dots at the <b>ends</b>. Dragging them re-attaches the connection to another
+      shape. There is <b>no way to bend the line</b> — you cannot tidy a long edge.</p>
+    <div class="stage">
+      <div class="node nA">CDC Source</div>
+      <div class="node nB">ETL Consumers</div>
+      <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 352 250" preserveAspectRatio="none">
+        <path d="M114,124 C200,124 200,124 238,124" stroke="#5a5a62" stroke-width="2" fill="none"/>
+      </svg>
+      <div class="ep" style="left:107px;top:117px"></div>
+      <div class="ep" style="left:231px;top:117px"></div>
+    </div>
+    <div class="hint">drag an end → <b class="bad">re-attaches</b> · bend the line → <b class="bad">impossible</b></div>
+  </div>
+
+  <!-- A — MIDPOINT HANDLE ON HOVER -->
+  <div class="v">
+    <span class="tag ok">recommended</span>
+    <h2>A — midpoint handle</h2>
+    <p class="stance">Hover the line → <b>one small accent dot appears at its middle</b>. Drag it, and the
+      path bends while <b>both ends stay put</b>. Native for step / smoothstep
+      (<code>centerX</code>/<code>centerY</code>).</p>
+    <div class="stage">
+      <div class="node nA">CDC Source</div>
+      <div class="node nB">ETL Consumers</div>
+      <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 352 250" preserveAspectRatio="none">
+        <path id="pa" d="M114,124 C170,124 190,124 238,124" stroke="#3b82f6" stroke-width="2" fill="none"/>
+      </svg>
+      <div class="ep" style="left:107px;top:117px"></div>
+      <div class="ep" style="left:231px;top:117px"></div>
+      <div class="mid" id="mA" style="left:170px;top:119px" title="drag me"></div>
+    </div>
+    <div class="hint">drag the middle dot → <b class="good">the line moves, ends stay</b>. Slide it vertically too.</div>
+  </div>
+
+  <!-- B — VERTICAL OFFSET ONLY (simplest) -->
+  <div class="v">
+    <span class="tag mid">simplest</span>
+    <h2>B — vertical only</h2>
+    <p class="stance">Same midpoint dot, but it only moves <b>up / down</b> — enough to separate two parallel
+      edges and stop them overlapping. Much less code, no free-form waypoints.</p>
+    <div class="stage">
+      <div class="node nA">CDC Source</div>
+      <div class="node nB">ETL Consumers</div>
+      <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 352 250" preserveAspectRatio="none">
+        <path d="M114,112 C176,112 176,112 238,112" stroke="#5a5a62" stroke-width="2" fill="none"/>
+        <path d="M114,136 C176,136 176,136 238,136" stroke="#5a5a62" stroke-width="2" fill="none"/>
+      </svg>
+      <div class="ep" style="left:107px;top:105px"></div>
+      <div class="ep" style="left:231px;top:105px"></div>
+      <div class="mid" style="left:172px;top:107px"></div>
+    </div>
+    <div class="hint">one axis only · <b>fixes overlapping parallel edges</b>, the common real need</div>
+  </div>
+
+  <!-- C — FREE WAYPOINTS -->
+  <div class="v">
+    <span class="tag mid">more work</span>
+    <h2>C — free waypoints</h2>
+    <p class="stance">Drag the middle anywhere and it <b>stays</b> — a real waypoint you can re-grab later.
+      Richest, and the only one that works for <b>bezier</b> too (needs a custom path).</p>
+    <div class="stage">
+      <div class="node nA">CDC Source</div>
+      <div class="node nB">ETL Consumers</div>
+      <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 352 250" preserveAspectRatio="none">
+        <path d="M114,124 C140,124 150,52 176,52 C202,52 210,124 238,124" stroke="#3b82f6" stroke-width="2" fill="none"/>
+      </svg>
+      <div class="ep" style="left:107px;top:117px"></div>
+      <div class="ep" style="left:231px;top:117px"></div>
+      <div class="mid" style="left:170px;top:47px"></div>
+    </div>
+    <div class="hint">stays where you put it · saved per edge · works for <b>all 4 path types</b></div>
+  </div>
+
+</div>
+
+<table class="sum">
+  <tr><th>Dimension</th><th>0 — today</th><th>A — midpoint</th><th>B — vertical only</th><th>C — waypoints</th></tr>
+  <tr><td>Solves the complaint</td><td class="d">no</td><td class="d">yes</td><td class="d">partly</td><td class="d">yes</td></tr>
+  <tr><td>Both ends stay put</td><td class="d">—</td><td class="d">yes</td><td class="d">yes</td><td class="d">yes</td></tr>
+  <tr><td>Works on step / smoothstep</td><td class="d">—</td><td class="d">native</td><td class="d">native</td><td class="d">native</td></tr>
+  <tr><td>Works on bezier / straight</td><td class="d">—</td><td class="d">needs custom path</td><td class="d">needs custom path</td><td class="d">custom path</td></tr>
+  <tr><td>Handle stays re-grabbable</td><td class="d">—</td><td class="d">while hovering</td><td class="d">while hovering</td><td class="d">always</td></tr>
+  <tr><td>Code size</td><td class="d">—</td><td class="d">medium</td><td class="d">small</td><td class="d">largest</td></tr>
+  <tr><td>Undo-able</td><td class="d">—</td><td class="d">yes (one step per drag)</td><td class="d">yes</td><td class="d">yes</td></tr>
+</table>
+
+<p class="verdict">
+  <b>My take: A.</b> It is exactly what you described — one dot mid-line, drag it, the connection moves
+  for looks, the ends never change. It uses React Flow's own <code>centerX</code>/<code>centerY</code>, so
+  it is native for the step and smoothstep edges you already use.
+  <br><br>
+  <b>B</b> is the 80% answer: most of the time the only reason you want to move a line is that two
+  parallel edges overlap, and up/down fixes that with half the code.
+  <b>C</b> is the most powerful and the most work (custom path maths for bezier, plus persistence).
+  All three keep the Round Q end dots — this is a new handle, not a replacement.
+  <br><br>
+  One thing I will verify rather than assume: the mid-drag handle must not fight the <b>edge label</b>
+  (which already sits at the path's centre) or the click that selects the edge. I will measure the
+  overlap and report the numbers before shipping.
+</p>
+
+<script>
+  // drag the midpoint dot in card A — moves the control point, ends stay fixed
+  (function(){
+    const mid = document.getElementById('mA');
+    const path = document.getElementById('pa');
+    if(!mid||!path) return;
+    let dragging=false;
+    const stage = mid.closest('.stage');
+    const sr = () => stage.getBoundingClientRect();
+    const draw = (cx, cy) => {
+      const r = sr();
+      // svg is 352x250 stretched to the stage; convert to viewBox units
+      const vx = cx / r.width * 352, vy = cy / r.height * 250;
+      path.setAttribute('d', `M114,124 C${114+(vx-114)*0.6},${vy} ${238-(238-vx)*0.6},${vy} 238,124`);
+      mid.style.left = (cx - 5.5) + 'px';
+      mid.style.top  = (cy - 5.5) + 'px';
+    };
+    mid.addEventListener('pointerdown', e => { dragging=true; mid.setPointerCapture(e.pointerId); e.preventDefault(); });
+    mid.addEventListener('pointermove', e => {
+      if(!dragging) return;
+      const r = sr();
+      const cy = Math.max(20, Math.min(230, e.clientY - r.top));
+      draw(r.width/2, cy);
+    });
+    mid.addEventListener('pointerup', () => dragging=false);
+    // clicking the line reveals the dot too (mirrors "hover the line")
+    stage.addEventListener('click', e => {
+      if (e.target === mid) return;
+      if (getComputedStyle(mid).opacity === '0') mid.style.opacity = '1';
+    });
+  })();
+</script>
+</body>
+</html>

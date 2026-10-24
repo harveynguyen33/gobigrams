@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Diagram Studio — resize grip mockups</title>
+<style>
+  /* ---- Diagram Studio real tokens (dark) ---- */
+  :root{
+    --bg:#0b0b0d; --surface:#131316; --elevated:#1a1b1f;
+    --border:#26272c; --border-strong:#33343a;
+    --fg:#e8e8ea; --dim:#8a8a92; --dim2:#5a5a62;
+    --acc:#f54e00; --acc-soft:rgba(245,78,0,.16);
+    --sel:#3b82f6; --sel-soft:rgba(59,130,246,.16);
+    --green:#4ade80;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans:Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --r:8px;
+    --grid-dot:rgba(255,255,255,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--fg); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.45; padding:28px 22px 60px;
+  }
+  h1{font-family:var(--mono);font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg)}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 22px;max-width:760px}
+  .sub b{color:var(--fg);font-weight:600}
+  .note{
+    font-family:var(--mono);font-size:11px;color:var(--dim);
+    border-left:2px solid var(--acc);padding:6px 0 6px 10px;margin:0 0 26px;max-width:760px;
+  }
+  /* ---- the three variant cards ---- */
+  .variants{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+  .v{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:14px; width:352px;
+  }
+  .v h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);margin-bottom:2px}
+  .v .stance{font-size:12px;color:var(--dim);margin-bottom:12px;min-height:32px}
+  .stage{
+    position:relative;height:210px;border-radius:var(--r);
+    background:
+      radial-gradient(var(--grid-dot) 1.2px, transparent 1.2px) 0 0/16px 16px,
+      #08080a;
+    border:1px solid var(--border);overflow:hidden;
+  }
+  /* the "wire" from a previous node into this one */
+  .wire{position:absolute;left:0;top:96px;width:74px;height:2px;background:#5a5a62}
+  .wire::after{
+    content:"";position:absolute;right:-1px;top:-3px;
+    border-left:6px solid #5a5a62;border-top:4px solid transparent;border-bottom:4px solid transparent;
+  }
+  .wire-label{
+    position:absolute;left:6px;top:74px;font-family:var(--mono);font-size:10px;
+    color:var(--dim);background:var(--bg);border:1px solid var(--border);
+    border-radius:4px;padding:0 5px;
+  }
+  /* the node being resized */
+  .node{
+    position:absolute;left:74px;top:64px;width:190px;height:84px;
+    background:var(--elevated);border:1.5px solid #22d3ee;border-radius:var(--r);
+    /* ONE ring, box-shadow (the app's real selection signal) */
+    box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--sel);
+    z-index:3;
+  }
+  .node .kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);margin:11px 0 0 14px}
+  .node .title{font-size:13.5px;font-weight:600;margin:2px 0 0 14px}
+  .node .metric{font-family:var(--mono);font-size:10px;color:var(--dim);margin:5px 0 0 14px}
+
+  /* ============================================================
+     THE GRIP IMPLEMENTATIONS — one set per variant
+     ============================================================ */
+
+  /* ---------- VARIANT A — hairline + tiny corner squares ---------- */
+  .A .rail{
+    position:absolute;background:var(--sel);opacity:.55;z-index:4;
+  }
+  .A .rail.t{left:0;right:0;top:-1px;height:1px}
+  .A .rail.b{left:0;right:0;bottom:-1px;height:1px}
+  .A .rail.l{top:0;bottom:0;left:-1px;width:1px}
+  .A .rail.r{top:0;bottom:0;right:-1px;width:1px}
+  .A .g{
+    position:absolute;width:7px;height:7px;background:var(--sel);
+    border-radius:2px;z-index:5;
+    /* invisible hit area, exactly like the app's ::after inset ring */
+    outline:6px solid transparent;
+  }
+  .A .g.tl{left:-3.5px;top:-3.5px}
+  .A .g.tr{right:-3.5px;top:-3.5px}
+  .A .g.bl{left:-3.5px;bottom:-3.5px}
+  .A .g.br{right:-3.5px;bottom:-3.5px}
+
+  /* ---------- VARIANT B — corner L-brackets (canvas-tool style) ----------
+     NO edge-midpoint ticks: in the real app the 4 connect handles sit at the
+     edge MIDPOINTS, so a tick there collides with the thing you click to draw
+     a wire. Corners only. */
+  .B .rail{position:absolute;z-index:4;border-color:var(--sel);opacity:.9}
+  .B .rail.tl{left:-2px;top:-2px;width:15px;height:15px;border-left:2px solid;border-top:2px solid;border-top-left-radius:5px}
+  .B .rail.tr{right:-2px;top:-2px;width:15px;height:15px;border-right:2px solid;border-top:2px solid;border-top-right-radius:5px}
+  .B .rail.bl{left:-2px;bottom:-2px;width:15px;height:15px;border-left:2px solid;border-bottom:2px solid;border-bottom-left-radius:5px}
+  .B .rail.br{right:-2px;bottom:-2px;width:15px;height:15px;border-right:2px solid;border-bottom:2px solid;border-bottom-right-radius:5px}
+  /* a very faint full rail so the box still reads as one object */
+  .B .ring{position:absolute;inset:-1px;border:1px solid var(--sel);border-radius:var(--r);opacity:.28;z-index:3}
+  .B .mid{display:none}
+
+  /* ---------- VARIANT C — accent corner dot + fading rail ----------
+     The rail FADES but never disappears (a 30% floor at the midpoint), because
+     an edge that vanishes at the midpoint reads as a broken outline — and the
+     midpoint is exactly where the connect handle sits. */
+  .C .rail{position:absolute;background:linear-gradient(90deg,var(--sel),rgba(59,130,246,.30),var(--sel));z-index:4}
+  .C .rail.t{left:10%;right:10%;top:-1px;height:1px}
+  .C .rail.b{left:10%;right:10%;bottom:-1px;height:1px}
+  .C .rail.l{top:10%;bottom:10%;left:-1px;width:1px;background:linear-gradient(180deg,var(--sel),rgba(59,130,246,.30),var(--sel))}
+  .C .rail.r{top:10%;bottom:10%;right:-1px;width:1px;background:linear-gradient(180deg,var(--sel),rgba(59,130,246,.30),var(--sel))}
+  .C .g{
+    position:absolute;width:9px;height:9px;border-radius:50%;
+    background:var(--bg);border:2px solid var(--sel);z-index:5;
+    outline:6px solid transparent;
+  }
+  .C .g.tl{left:-4.5px;top:-4.5px}
+  .C .g.tr{right:-4.5px;top:-4.5px}
+  .C .g.bl{left:-4.5px;bottom:-4.5px}
+  .C .g.br{right:-4.5px;bottom:-4.5px}
+  .C .g::after{
+    content:"";position:absolute;inset:2px;border-radius:50%;background:var(--sel);
+  }
+
+  /* ---- the "rest" state: nothing painted (what ships today) ---- */
+  .rest-msg{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    font-family:var(--mono);font-size:10.5px;color:var(--dim2);text-align:center;
+    pointer-events:none;letter-spacing:.04em;
+  }
+
+  .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  button{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+    background:var(--elevated);color:var(--fg);border:1px solid var(--border-strong);
+    border-radius:7px;padding:6px 10px;cursor:pointer;
+  }
+  button:hover{border-color:var(--sel)}
+  button.on{background:var(--sel-soft);border-color:var(--sel);color:#9dc0ff}
+
+  table{width:100%;border-collapse:collapse;margin-top:30px;font-size:12.5px;max-width:1060px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+  td.dim{color:var(--dim)}
+  .verdict{margin-top:24px;max-width:1060px;font-size:13px}
+  .verdict b{color:var(--acc)}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--elevated);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+
+<h1>Resize grip — 3 variants</h1>
+<p class="sub">
+  Today's grip: <b>10×10 solid square</b>, no rail, appearing the instant a node is selected.
+  Below: three lighter redesigns. In all three the grip also <b>appears when you touch the wire</b>
+  (hover the line on the left of each node) — that is the new part.
+</p>
+<p class="note">
+  Hover a node's WIRE → the grip set fades in. Click the node → it stays.
+  Click <b>“grip: always”</b> / <b>“on wire touch”</b> to compare reveal rules.
+</p>
+
+<div class="variants">
+
+  <!-- ================= A ================= -->
+  <div class="v A" id="cardA">
+    <h2>Variant A — hairline</h2>
+    <p class="stance">A 1px rail traces the box; 7px squares only at the corners. Quietest possible
+      affordance — reads as “this is selected”, not “grab me”.</p>
+    <div class="stage">
+      <div class="wire"></div><div class="wire-label">produce</div>
+      <div class="node">
+        <div class="rail t"></div><div class="rail b"></div><div class="rail l"></div><div class="rail r"></div>
+        <div class="g tl"></div><div class="g tr"></div><div class="g bl"></div><div class="g br"></div>
+        <div class="kicker">CONSUMER GROUP</div>
+        <div class="title">ETL Consumers</div>
+        <div class="metric">5 pods</div>
+      </div>
+      <div class="rest-msg">wire hover → grips appear</div>
+    </div>
+    <div class="controls">
+      <button data-v="A" data-m="select" class="on">grip: on select</button>
+      <button data-v="A" data-m="wire">on wire touch</button>
+    </div>
+  </div>
+
+  <!-- ================= B ================= -->
+  <div class="v B" id="cardB">
+    <h2>Variant B — brackets</h2>
+    <p class="stance">Corner L-brackets over a faint rail, like Figma / canvas tools.
+      You always know which corner you grabbed. Nothing sits at the edge midpoints — that is
+      where the connect dots live.</p>
+    <div class="stage">
+      <div class="wire"></div><div class="wire-label">produce</div>
+      <div class="node">
+        <div class="ring"></div>
+        <div class="rail tl"></div><div class="rail tr"></div><div class="rail bl"></div><div class="rail br"></div>
+        <div class="kicker">CONSUMER GROUP</div>
+        <div class="title">ETL Consumers</div>
+        <div class="metric">5 pods</div>
+      </div>
+      <div class="rest-msg">wire hover → grips appear</div>
+    </div>
+    <div class="controls">
+      <button data-v="B" data-m="select" class="on">grip: on select</button>
+      <button data-v="B" data-m="wire">on wire touch</button>
+    </div>
+  </div>
+
+  <!-- ================= C ================= -->
+  <div class="v C" id="cardC">
+    <h2>Variant C — dot</h2>
+    <p class="stance">Accent dot with a hollow core at each corner; the rail dims toward the
+      middle but never disappears. Most “designed”, slightly louder than A.</p>
+    <div class="stage">
+      <div class="wire"></div><div class="wire-label">produce</div>
+      <div class="node">
+        <div class="rail t"></div><div class="rail b"></div><div class="rail l"></div><div class="rail r"></div>
+        <div class="g tl"></div><div class="g tr"></div><div class="g bl"></div><div class="g br"></div>
+        <div class="kicker">CONSUMER GROUP</div>
+        <div class="title">ETL Consumers</div>
+        <div class="metric">5 pods</div>
+      </div>
+      <div class="rest-msg">wire hover → grips appear</div>
+    </div>
+    <div class="controls">
+      <button data-v="C" data-m="select" class="on">grip: on select</button>
+      <button data-v="C" data-m="wire">on wire touch</button>
+    </div>
+  </div>
+
+</div>
+
+<table>
+  <tr><th>Dimension</th><th>A — hairline</th><th>B — brackets</th><th>C — dot</th></tr>
+  <tr><td>Visual weight</td><td class="dim">lightest</td><td class="dim">medium</td><td class="dim">medium</td></tr>
+  <tr><td>“Which corner am I grabbing?”</td><td class="dim">ok (small squares)</td><td class="dim">excellent</td><td class="dim">good</td></tr>
+  <tr><td>Clear of the 4 connect dots (edge midpoints)</td><td class="dim">yes</td><td class="dim">yes</td><td class="dim">yes</td></tr>
+  <tr><td>Clashes with the selection ring?</td><td class="dim">no — 1px inside the ring</td><td class="dim">no — brackets sit on the ring</td><td class="dim">no — dots sit on the ring</td></tr>
+  <tr><td>Hit target (invisible, unchanged)</td><td>22×22</td><td>22×22</td><td>22×22</td></tr>
+  <tr><td>Touch (no hover)</td><td class="dim">shown on select</td><td class="dim">shown on select</td><td class="dim">shown on select</td></tr>
+</table>
+
+<p class="verdict">
+  <b>My take:</b> <b>B</b> is the one that also fixes a real complaint you had — “khó kéo thấy”
+  (hard to tell what you’re grabbing). The corner brackets tell you exactly which of the four
+  corners is under your pointer, and edge ticks show the one-axis resizes.
+  <b>A</b> if you want the canvas as quiet as possible; <b>C</b> if you want it to feel designed.
+  All three keep the invisible 22px hit area, so none of them is harder to grab than today.
+</p>
+
+<script>
+  // ---- reveal interaction: on select (always) vs on wire touch ----
+  const cards = {A: document.getElementById('cardA'), B: document.getElementById('cardB'), C: document.getElementById('cardC')};
+
+  function setMode(v, mode){
+    const card = cards[v];
+    card.dataset.mode = mode;
+    card.querySelectorAll('.controls button').forEach(b =>
+      b.classList.toggle('on', b.dataset.m === mode));
+    paint(card, mode === 'select');
+  }
+  function paint(card, show){
+    const node = card.querySelector('.node');
+    node.querySelectorAll('.rail,.g,.mid').forEach(el => {
+      el.style.transition = 'opacity .15s';
+      el.style.opacity = show ? '' : '0';
+    });
+    card.querySelector('.rest-msg').style.opacity = show ? '0' : '1';
+  }
+
+  Object.keys(cards).forEach(v => {
+    const card = cards[v];
+    // start in "on select"
+    setMode(v, 'select');
+    card.querySelectorAll('.controls button').forEach(b =>
+      b.addEventListener('click', () => setMode(v, b.dataset.m)));
+    // wire hover reveals in BOTH modes (the new ask)
+    const wire = card.querySelector('.wire');
+    wire.addEventListener('mouseenter', () => paint(card, true));
+    wire.addEventListener('mouseleave', () => { if (card.dataset.mode === 'wire') paint(card, false); });
+    // node hover keeps them visible for a moment
+    card.querySelector('.node').addEventListener('mouseenter', () => paint(card, true));
+  });
+
+  // click a node to "stay selected" in wire mode
+  document.querySelectorAll('.node').forEach(n => {
+    n.addEventListener('click', () => {
+      const card = n.closest('.v');
+      setMode(card.id.slice(-1), 'select');
+    });
+  });
+</script>
+</body>
+</html>
