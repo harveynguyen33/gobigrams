@@ -149,15 +149,20 @@ if (DLG) {
      `boardPng` (non-empty board, supplied by App) AND `clipboardUsable()`
      (navigator.clipboard + window.ClipboardItem); when either is false the row
      does not render at all — no dead button. */
+  /* Re-anchored (Harvey, 2026-10-24: "tôi thấy nó vẫn là textarea" — he never saw
+     the helper because a plain-http LAN origin hid the whole row, which reads as
+     "this app cannot take a screenshot at all"). The contract changed on purpose:
+     the row now renders whenever there IS a board, and a missing clipboard shows
+     an explanation instead of nothing. The feature detection is unchanged. */
   assert('bh.s14.screenshot-helper-feature-detected-and-gated',
     /Copy board as PNG/.test(DLG)
-      && /\{canAttach\s*&&/.test(DLG)
-      && /clipboardUsable\(\)/.test(DLG)
-      && /boardPng\?\s*:/.test(DLG)
+      && /\{boardPng\s*&&/.test(DLG)
+      && /const clipboardReady = clipboardUsable\(\)/.test(DLG)
+      && /data-fb-clipboard-blocked/.test(DLG)
+      && /Copying needs HTTPS/.test(DLG)
       && /navigator\.clipboard/.test(CB)
-      && /window\.ClipboardItem/.test(CB)
-      && /ClipboardItem/.test(CB),
-    `dialog renders the row only under {canAttach && ...} (boardPng prop AND clipboardUsable()); the pure module detects navigator.clipboard + window.ClipboardItem`);
+      && /window\.ClipboardItem/.test(CB),
+    `the helper row renders for any non-empty board; when the clipboard is unavailable it explains (Copying needs HTTPS) instead of hiding; the pure module still detects navigator.clipboard + window.ClipboardItem`);
 
   /* the three pieces of copy the row must say, verbatim: the success label,
      the hairline note, and the non-blocking failure line. */
