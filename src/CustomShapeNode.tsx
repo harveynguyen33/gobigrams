@@ -44,9 +44,13 @@ export type CustomShapeKind = {
 
 const CustomShapeNode = memo(({data, selected}: NodeProps) => {
   const d = data as unknown as CustomShapeKind;
-  /* ROUND BF (2026-10-23) — `--nc` finally reaches this node kind: the ring
-     rule in styles.css reads it, so the at-rest affordance (BF-1) themes with
-     the node's own colourKey. Same wiring every other node kind already had. */
+  /* ROUND BF (2026-10-23) — `--nc` reaches this node kind (wired then for
+     BF-1's at-rest ring). ROUND BF-2 (2026-10-24) INVERTED the ring: the
+     at-rest outline is gone and `.custom-shape-node.selected` now paints the
+     box-shadow ring in var(--sel) instead (see styles.css), so the selected
+     import reads as a selected box like every other shape. The --nc wiring
+     STAYS: the connect-handle hover emphasis and the node-ico tokens still
+     theme with the node's own colourKey. */
   const nc = resolveColor(d);
   return (
     <div

@@ -1180,24 +1180,25 @@ body {
   align-items: center;
   justify-content: center;
 }
+/* ROUND BF-2 (2026-10-24) — the SELECTED ring, INVERTED from BF-1. Harvey's
+   device test: the dashed at-rest outline read as a defect ("the selected
+   custom shape should read as a selected box, like every other shape"), so
+   BF-1's `.custom-shape-node:not(.selected)` outline rule is GONE — the
+   unselected node paints exactly as before ROUND BF (the art, nothing else).
+   What replaces it is the SAME selection signal every other node kind ships:
+   the `.node.selected` ring (styles.css:1080) is a two-layer box-shadow in
+   var(--sel) — 2px board-colour gap + 4px ring — that follows border-radius;
+   this rule restates it weight-for-weight and colour-for-colour, rounded the
+   same 8px, so a selected import reads as a selected box with the four resize
+   grips sitting ON its corners. box-shadow paints outside the border box and
+   joins no layout (border-box sizing never sees it), so the art rect is
+   untouched — the ROUND BE class of defect stays closed. The grips/lines
+   themselves are NOT restyled here: NodeResizer paints them, and their rules
+   elsewhere in this sheet stay exactly as they are. */
 .custom-shape-node.selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--sel);
+  border-radius: 8px;
   outline: none;
-}
-/* ROUND BF-1 (2026-10-23) — the AT-REST ring. A transparent-region import
-   painted nothing until selection showed the grips, so the node read as
-   invisible until clicked. A 1.5px dashed ring in the node's OWN colour
-   (via --nc, wired in CustomShapeNode.tsx this round) delineates the exact
-   box NodeResizer will grip. It must be an OUTLINE, never a border or a
-   box-shadow: `* { box-sizing: border-box }` (line 343) makes a border
-   subtract from the content box — the art would shift and shrink by the
-   ring width, exactly the ROUND BE class of defect this round closes.
-   An outline is layout-neutral, and outline-offset: 0 keeps it on the box
-   so it coincides with the grip geometry. Scoped :not(.selected) — once
-   selected, the grips delineate the box (the .selected rule above keeps
-   its outline: none). */
-.custom-shape-node:not(.selected) {
-  outline: 1.5px dashed var(--nc, var(--border-strong));
-  outline-offset: 0;
 }
 
 /* react-flow handles — quiet at rest, appear on node hover / selection.
