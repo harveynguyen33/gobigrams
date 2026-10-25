@@ -50,7 +50,12 @@ function assert(name, ok, detail = '') {
 }
 function skipProbe(name, why) { skipped++; console.log(`  SKIP  ${name} — ${why}`); }
 
-const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+/* ROUND BN-4 — src/Settings.tsx split along its pane seams (helpers ->
+   src/settings/controls.tsx, Canvas + About/Roadmap panes -> panes.tsx, verbatim).
+   Reads of the settings source read PANES + SETTINGS CONCATENATED. */
+const src = (p) => p === 'src/Settings.tsx'
+  ? ['panes', 'Settings'].map(f => readFileSync(resolve(ROOT, f === 'panes' ? 'src/settings/panes.tsx' : 'src/Settings.tsx'), 'utf8')).join('\n')
+  : readFileSync(resolve(ROOT, p), 'utf8');
 
 const srcAt = (commit, p) => {
   try {

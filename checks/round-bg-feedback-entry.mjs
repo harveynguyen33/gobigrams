@@ -34,7 +34,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+/* ROUND BN-4 — src/Settings.tsx split along its pane seams (helpers ->
+   src/settings/controls.tsx, Canvas + About/Roadmap panes -> panes.tsx, verbatim).
+   Reads of the settings source read PANES + SETTINGS CONCATENATED. */
+const read = (p) => p === 'src/Settings.tsx'
+  ? ['panes', 'Settings'].flatMap(f => {
+      try { return [readFileSync(join(ROOT, f === 'panes' ? 'src/settings/panes.tsx' : 'src/Settings.tsx'), 'utf8')]; } catch { return []; }
+    }).join('\n')
+  : readFileSync(join(ROOT, p), 'utf8');
 // comments BLANKED, not stripped (line numbers stay true; a comment quoting the
 // link cannot read as the link being present)
 const blank = (src) => src

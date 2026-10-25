@@ -69,7 +69,11 @@ const BUDGETS = new Map([
   ['src/InspectorPickers.tsx', 930],  // now 845,
   ['src/LabelNode.tsx', 301],  // now 273,
   ['src/SearchPalette.tsx', 124],  // now 112,
-  ['src/Settings.tsx', 885],  // now 804,
+  ['src/Settings.tsx', 440],  // ROUND BN-4: panes+helpers split out (now 424)
+  ['src/settings/panes.tsx', 205],  // now 198 (Canvas + About/Roadmap panes)
+  ['src/settings/controls.tsx', 145],  // now 138 (Row/Toggle/Segmented/etc)
+  ['src/settings/shared.ts', 80],  // now 74 (Props)
+  ['src/settings/version.ts', 10],  // now 6 (APP_VERSION)
   ['src/TableNode.tsx', 171],  // now 155,
   ['src/TemplatesGallery.tsx', 359],  // now 326,
   ['src/ThemePicker.tsx', 248],  // now 225,

@@ -658,7 +658,8 @@ assert('ag19.the-shared-swatches-row-is-still-flex',
   /\.swatches\s*\{[^}]*display:\s*flex/.test(STYLES) || /\.swatches\s*\{[^}]*display:\s*flex/.test(STYLES_RAW),
   `the colour swatch row keeps display:flex (the segmented rows get their own two-class rule)`);
 assert('ag20.the-shortcut-table-is-untouched',
-  readFileSync(`${ROOT}/src/Settings.tsx`, 'utf8').includes('SHORTCUTS_MOUSE'),
+  /* ROUND BN-4 — Settings split; the union reads panes+Settings. */
+  ['panes', 'Settings'].map(f => readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/panes.tsx' : 'Settings.tsx'}`, 'utf8')).join('\n').includes('SHORTCUTS_MOUSE'),
   `SHORTCUTS_MOUSE is still declared and rendered in src/Settings.tsx`);
 
 /* THE HEX-COUNT ARITHMETIC, on file. ROUND AG1 ADDS colour on purpose, so the

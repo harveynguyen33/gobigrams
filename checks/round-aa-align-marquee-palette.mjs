@@ -38,7 +38,12 @@ const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
    every count and regex below still measures the same surface the single file had. */
 const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
   .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
-const SET_RAW = readFileSync(`${ROOT}/src/Settings.tsx`, 'utf8');
+/* ROUND BN-4 — src/Settings.tsx split along its pane seams (helpers ->
+   src/settings/controls.tsx, Canvas + About/Roadmap panes -> panes.tsx, verbatim).
+   Reads of the settings source read PANES + SETTINGS CONCATENATED. */
+const SET_RAW = ['panes', 'Settings'].flatMap(f => {
+  try { return [readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/panes.tsx' : 'Settings.tsx'}`, 'utf8')]; } catch { return []; }
+}).join('\n');
 
 /** Strip block + line comments; blanking keeps byte offsets (and line numbers). */
 const blank = m => m.replace(/[^\n]/g, ' ');

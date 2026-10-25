@@ -30,7 +30,19 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const APP_URL = process.env.BH_APP_URL || process.env.AY_APP_URL || 'http://192.168.33.200:5200/';
 
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+/* ROUND BN-4 — src/Settings.tsx split along its pane seams: the helpers
+   (Row/Toggle/Segmented/…) moved to src/settings/controls.tsx, the Canvas and
+   About+Roadmap panes to src/settings/panes.tsx, Props to shared.ts, verbatim.
+   Reads of the settings source read PANES + SETTINGS CONCATENATED (panes
+   first: the positional AboutPane->'the shell' slice keeps its order), so
+   every probe below still measures the same surface. */
+const read = (p) => p === 'src/Settings.tsx'
+  ? ['panes', 'Settings'].flatMap(f => {
+    try { return [f === 'panes'
+      ? readFileSync(join(ROOT, 'src/settings/panes.tsx'), 'utf8')
+      : readFileSync(join(ROOT, 'src/Settings.tsx'), 'utf8')]; } catch { return []; }
+  }).join('\n')
+  : readFileSync(join(ROOT, p), 'utf8');
 const blank = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
