@@ -27,7 +27,13 @@ const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
    keep counting the same surface set. */
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
   + '\n' + readFileSync(`${ROOT}/src/components/Toolbar.tsx`, 'utf8');
-const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
+/* ROUND BN-4 — src/InspectorPickers.tsx split along its section banners
+   into src/pickers/{popover,art,rows,stepperFlow,section}.tsx (verbatim; the
+   old path stays as a re-export shell so bundle entries are unchanged). Reads
+   of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
+const PICKS_RAW = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+  }).join('\n');
 const INSP_RAW = readFileSync(`${ROOT}/src/inspector.ts`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 /* PACKAGE-P PASS 2 (§E) — the Text section's data half, and the in-place editor
@@ -293,7 +299,9 @@ const carriedBy = (app, table, want, root = ROOT) => {
      guarantee that every value (the four old ones included) is reachable. Read
      from the file that declares it, so the claim cannot drift from the code. */
   if (want === 'slider') {
-    const picks = readFileSync(`${root}/src/InspectorPickers.tsx`, 'utf8');
+    const picks = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+    try { return [readFileSync(`${root}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+  }).join('\n');
     return new RegExp(`export const ${table}\\s*=`).test(picks);
   }
   return false;

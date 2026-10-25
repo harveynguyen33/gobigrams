@@ -27,7 +27,13 @@ import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
-const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
+/* ROUND BN-4 — src/InspectorPickers.tsx split along its section banners
+   into src/pickers/{popover,art,rows,stepperFlow,section}.tsx (verbatim; the
+   old path stays as a re-export shell so bundle entries are unchanged). Reads
+   of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
+const PICKS_RAW = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+  }).join('\n');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 
 /** Strip block + line comments; blanking keeps byte offsets (and line numbers). */

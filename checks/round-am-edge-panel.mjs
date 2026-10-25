@@ -83,7 +83,13 @@ const blankComments = src => src
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 
-const read = p => readFileSync(`${ROOT}/${p}`, 'utf8');
+/* ROUND BN-4 — InspectorPickers.tsx split into src/pickers/ slices; reads of
+   it return the FIVE SLICES + SHELL CONCATENATED (verbatim moves). */
+const read = p => p === 'src/InspectorPickers.tsx'
+  ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    }).join('\n')
+  : readFileSync(`${ROOT}/${p}`, 'utf8');
 const commitFile = (commit, p) =>
   execFileSync('git', ['show', `${commit}:${p}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
 /* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
@@ -92,7 +98,11 @@ const commitFile = (commit, p) =>
    Working-tree reads of the component now read the FOUR SLICES CONCATENATED so
    every regex below still measures the same surface. Git reads (PRE_COMMIT)
    keep the single file, which every pinned commit has. */
-const code = p => blankComments(p === 'src/GoblinEdge.tsx'
+const code = p => blankComments(p === 'src/InspectorPickers.tsx'
+  ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    }).join('\n')
+  : p === 'src/GoblinEdge.tsx'
   ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
       .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
   : read(p));

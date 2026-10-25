@@ -91,7 +91,13 @@ try {
    ROUND AM, AM-5 — `picks` is added so a probe can read `src/InspectorPickers.tsx`
    too. `P_HALF_APPLIED` needs it because AM-5 moved the Speed row's carrier out
    of `App.tsx` entirely, into that file's `FlowSpeed`. */
-const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
+/* ROUND BN-4 — src/InspectorPickers.tsx split along its section banners
+   into src/pickers/{popover,art,rows,stepperFlow,section}.tsx (verbatim; the
+   old path stays as a re-export shell so bundle entries are unchanged). Reads
+   of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
+const PICKS_RAW = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+  }).join('\n');
 const SHIP_B = {appRaw: APP_RAW, stylesRaw: STYLES_RAW, app: APP, styles: STYLES, picks: PICKS_RAW};
 
 const results = [];

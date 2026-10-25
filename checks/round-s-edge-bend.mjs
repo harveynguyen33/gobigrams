@@ -600,7 +600,9 @@ head('(i) NO SLIDER — the bend-position control is gone from the sources');
   console.log(`     scanned ${files.length} files under src/ (comments stripped)`);
   console.log(`     range inputs found in: ${rangeHomes.join(', ') || 'none'}  (AM-5's flow-speed slider)`);
   ok(rangeRow === 0, '0 `.range-row` occurrences in live source', where.join('; ') || '0');
-  ok(rangeOutsideSlider === 0 && /type="range"/.test(readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8')),
+  ok(rangeOutsideSlider === 0 && /type="range"/.test(['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+  }).join('\n')),
     'the ONLY range input is AM-5\'s flow-speed slider in InspectorPickers.tsx — App.tsx has none',
     rangeHomes.join('; ') || '0');
   ok(bendLabel === 0, '0 `bend position` labels in live source', '0');

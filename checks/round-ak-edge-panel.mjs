@@ -80,6 +80,10 @@ const FILES = ['src/App.tsx', 'src/GoblinEdge.tsx', 'src/inspector.ts',
 function readOne(path, commit) {
   const raw = commit
     ? execFileSync('git', ['show', `${commit}:${path}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28})
+    : path === 'src/InspectorPickers.tsx'
+      ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+          try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+        }).join('\n')
     : path === 'src/GoblinEdge.tsx'
       ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
           .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')

@@ -69,7 +69,15 @@ const blankComments = src => src
    registry moved out verbatim). Working-tree reads of the component read the
    FOUR SLICES CONCATENATED; git reads (codeAt/PRE_COMMIT) keep the single
    file every pinned commit has. */
-const read = p => p === 'src/GoblinEdge.tsx'
+/* ROUND BN-4 — src/InspectorPickers.tsx split along its section banners
+   into src/pickers/{popover,art,rows,stepperFlow,section}.tsx (verbatim; the
+   old path stays as a re-export shell so bundle entries are unchanged). Reads
+   of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
+const read = p => p === 'src/InspectorPickers.tsx'
+  ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    }).join('\n')
+  : p === 'src/GoblinEdge.tsx'
   ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
       .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
   : readFileSync(`${ROOT}/${p}`, 'utf8');

@@ -66,7 +66,12 @@ const BUDGETS = new Map([
   ['src/edges/index.ts', 30],  // now 20
   ['src/HelperLinesView.tsx', 58],  // now 52,
   ['src/IconPicker.tsx', 129],  // now 117,
-  ['src/InspectorPickers.tsx', 930],  // now 845,
+  ['src/InspectorPickers.tsx', 30],  // ROUND BN-4: re-export shell (now 21)
+  ['src/pickers/popover.tsx', 160],  // now 151
+  ['src/pickers/art.tsx', 150],  // now 142
+  ['src/pickers/rows.tsx', 300],  // now 288
+  ['src/pickers/stepperFlow.tsx', 165],  // now 156
+  ['src/pickers/section.tsx', 110],  // now 103
   ['src/LabelNode.tsx', 301],  // now 273,
   ['src/SearchPalette.tsx', 124],  // now 112,
   ['src/Settings.tsx', 440],  // ROUND BN-4: panes+helpers split out (now 424)
