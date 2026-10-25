@@ -128,9 +128,13 @@ assert('bd1.old-lowercase-axis-labels-gone',
 /* Extract each surface's mapping as sorted action:icon pairs and compare. */
 const mapOf = (slice) => {
   const pairs = [];
-  const re = /aria-label="([^"]+)"[^>]*onClick=\{\(\) => (align|distribute|reorderSelection)\('([^']+)'\)\}><(\w+) size=\{15\}/g;
+  /* BN-3 PHASE B: the sel-bar's handlers are threaded props now —
+     `p.onAlign('left')` in Toolbar.tsx vs `align('left')` in the panel (the
+     prop name capitalises the action). `[oO]n?` matches both spellings; the
+     ACTION and ICON are unchanged. */
+  const re = /aria-label="([^"]+)"[^>]*onClick=\{\(\) => (?:p\.)?(?:on)?([aA]lign|[dD]istribute|[rR]eorderSelection)\('([^']+)'\)\}><(\w+) size=\{15\}/g;
   let m;
-  while ((m = re.exec(slice))) pairs.push(`${m[2]}('${m[3]}')=${m[4]}`);
+  while ((m = re.exec(slice))) pairs.push(`${m[2].toLowerCase()}('${m[3]}')=${m[4]}`);
   return pairs.sort().join(' | ');
 };
 const panelMap = mapOf(MULTI);
@@ -138,8 +142,19 @@ const panelMap = mapOf(MULTI);
    and the inspector's opening. The bar's map is the SUBSET of actions it
    carries (duplicate/delete are not in the icon mapping regex); the panel
    must carry the bar's ENTIRE mapping plus Arrange. */
-const SELBAR_START = APP.indexOf('selCount >= 2 && (\n          <div className="sel-bar">');
-const SELBAR = SELBAR_START > 0 ? APP.slice(SELBAR_START, MULTI_START) : '';
+/* ROUND BN-3 PHASE B — the toolbar + sel-bar moved to src/components/Toolbar.tsx;
+   the SELBAR slice reads App + Toolbar concatenated so the mapping follows the
+   code home. MULTI_* offsets below still index App alone (the multi branch never
+   moved), so they stay on the plain APP text. */
+const SELBAR = (() => {
+  /* BN-3 PHASE B re-anchor: the sel-bar LIVES in Toolbar.tsx now; slice that
+     file directly from its opening div to the last distribute button. */
+  const tb = stripTs(readFileSync(`${ROOT}/src/components/Toolbar.tsx`, 'utf8'));
+  const i = tb.indexOf('<div className="sel-bar">');
+  const j = tb.indexOf('Distribute vertically', i);
+  const end = j >= 0 ? tb.indexOf('/>', j) : -1;  /* past the last icon in the v-pair */
+  return i >= 0 && end > 0 ? tb.slice(i, end) : '';
+})();
 const selbarMap = mapOf(SELBAR);
 console.log(`  panel mapping:   ${panelMap}`);
 console.log(`  sel-bar mapping: ${selbarMap}`);
@@ -191,8 +206,12 @@ assert('bd1.single-node-branches-no-multi-controls',
   countOf(SINGLE, 'reorderSelection') === 0 && countOf(SINGLE, 'multi-grid3') === 0
     && countOf(SINGLE, 'multi-grid2') === 0 && countOf(SINGLE, 'multi-danger') === 0,
   'no multi-block control leaks into the single-node branches (table/label/goblin renderSections branches untouched)');
+/* BN-3 PHASE B: the toolbar's two call sites moved to Toolbar.tsx — the
+   budget counts the union (App's handlers + Toolbar's onClick bindings + the
+   Toolbar props-type declaration `onDuplicate: () => void;` = one more). */
+const APP_TBAR = APP + '\n' + stripTs(readFileSync(`${ROOT}/src/components/Toolbar.tsx`, 'utf8'));
 assert('bd1.handler-occurrence-budget',
-  countOf(APP, 'duplicateSelection') === 6 && countOf(APP, 'deleteSelection') === 3,
+  countOf(APP_TBAR, 'duplicateSelection') + countOf(APP_TBAR, 'onDuplicate') === 6 + 3 && countOf(APP_TBAR, 'deleteSelection') + countOf(APP_TBAR, 'onDelete') === 3 + 3,
   'duplicateSelection ×6 / deleteSelection ×3 — package-p\'s (j) budget as re-anchored for ROUND BD ' +
   '(4 -> 3: the block\'s second delete call site died with the merged pill)');
 

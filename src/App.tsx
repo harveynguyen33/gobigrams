@@ -8,16 +8,15 @@ import {
 } from '@xyflow/react';
 import {type ExportScope, type ExportFormat} from './ExportModal';
 import {
-  Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
+  Copy, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
-  LayoutGrid, Plus, Pencil, Save, AlignCenter,
+  LayoutGrid, Plus, Pencil, Save,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   BringToFront, SendToBack,
-  PanelLeftClose, PanelRightClose, Eye,
+  PanelLeftClose, PanelRightClose,
   LayoutTemplate,
-  Settings as SettingsIcon,
   X,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -109,6 +108,7 @@ import Tour from './Tour';
 import {HelpSheet} from './components/HelpSheet';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
+import {Toolbar} from './components/Toolbar';
 import Checklist, {type ChecklistTaskId} from './Checklist';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
@@ -4266,125 +4266,36 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ref={wrap}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}>
-        <div className="toolbar">
-          <Tooltip label="Undo — Cmd/Ctrl+Z">
-            <button className="tbtn-icon" aria-label="Undo" disabled={!canUndo} onClick={undo}><Undo2 size={15} /></button>
-          </Tooltip>
-          <Tooltip label="Redo — Cmd/Ctrl+Shift+Z">
-            <button className="tbtn-icon" aria-label="Redo" disabled={!canRedo} onClick={redo}><Redo2 size={15} /></button>
-          </Tooltip>
-          {sep()}
-          <Tooltip label="Fit view to diagram — Shift+1">
-            <button className="tbtn-icon" aria-label="Fit view" onClick={() => rf?.fitView({padding: 0.25})}><Maximize size={15} /></button>
-          </Tooltip>
-          {/* Part B — read-only review mode. Sits with the other VIEW toggles
-              (fit view / alignment guides / snap), not in the export group: it
-              is a way of looking at the board, not an output. */}
-          <Tooltip label={readOnly ? 'Read-only review: ON — drag and scroll to pan, nothing can be selected or moved — Shift+2' : 'Read-only review: OFF — Shift+2'}>
-            <button
-              className={`tbtn-icon${readOnly ? ' on' : ''}`}
-              aria-label="Read-only review"
-              aria-pressed={readOnly}
-              onClick={toggleReadOnly}
-            ><Eye size={15} /></button>
-          </Tooltip>
-          <Tooltip label={alignGuides ? 'Alignment guides: ON — a NEARBY node that lines up gets a dashed guide and the node snaps to it' : 'Alignment guides: OFF — drag freely, no auto-align'}>
-            <button
-              className={`tbtn-icon${alignGuides ? ' on' : ''}`}
-              aria-label="Alignment guides"
-              aria-pressed={alignGuides}
-              onClick={() => {
-                const next = !alignGuides;
-                setAlignGuides(next);
-                if (!next) setGuides({vertical: null, horizontal: null});
-              }}
-            ><AlignCenter size={15} /></button>
-          </Tooltip>
-          <Tooltip label={snap ? `Snap to grid: ON — nodes align to ${gridSize}px` : 'Snap to grid: OFF — free drag'}>
-            <button
-              className={`tbtn-icon${snap ? ' on' : ''}`}
-              aria-label="Snap to grid"
-              aria-pressed={snap}
-              onClick={() => {
-                const next = !snap;
-                setSnap(next);
-                // when turning snap ON, round existing nodes onto the grid so the
-                // whole diagram aligns; turning it OFF returns to free dragging.
-                if (next) {
-                  pushHistory();
-                  setNodes(ns => ns.map(n => ({
-                    ...n,
-                    position: {
-                      x: Math.round(n.position.x / gridSize) * gridSize,
-                      y: Math.round(n.position.y / gridSize) * gridSize,
-                    },
-                  })));
-                }
-              }}
-            ><Magnet size={15} /></button>
-          </Tooltip>
-          <Tooltip label="Duplicate selection — Cmd/Ctrl+D">
-            <button className="tbtn-icon" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={15} /></button>
-          </Tooltip>
-          {sep()}
-          <Tooltip label="Auto-arrange the diagram into clean layers (animated, undoable)">
-            <button className="tbtn-icon" aria-label="Auto-layout diagram" onClick={autoLayout}><LayoutGrid size={15} /></button>
-          </Tooltip>
-          {sep()}
-
-          <div style={{position: 'relative'}}>
-            <Tooltip label="Export / Import — scope, format, theme and a live preview">
-              <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setExpOpen(true)}>
-                <Upload size={13} style={{verticalAlign: -2}} /> Export
-              </button>
-            </Tooltip>
-          </div>
-
-          {sep()}
-          <button
-            type="button"
-            ref={settingsBtnRef}
-            className="tbtn-dd settings-btn"
-            data-settings-btn
-            aria-label="Settings"
-            aria-haspopup="dialog"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen(true)}
-          ><SettingsIcon size={14} /> Settings</button>
-
-          {/* AQ12 — align/distribute moved OFF the toolbar: they only mean
-              something WITH a selection, so they live on the selection bar
-              below (the toolbar kept duplicate, export, settings...). */}
-        </div>
-
-        {/* floating action bar for a 2+ node selection. AQ13 — redesigned:
-            ONE icon language (lucide at 15px everywhere — the old mix of
-            oversized Copy/Trash + skinny unicode arrows ⇤↔⇥ read as three
-            different bars glued together), a single-line count chip, and an
-            even gap rhythm from the flex container instead of ad-hoc seps. */}
-        {selCount >= 2 && (
-          <div className="sel-bar">
-            <span className="sel-count">{selCount}</span>
-            <span className="sel-count-label">selected</span>
-            {sep()}
-            <Tooltip label="Duplicate — Cmd/Ctrl+D">
-              <button className="tbtn-icon" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={15} /></button>
-            </Tooltip>
-            <Tooltip label="Delete — Del">
-              <button className="tbtn-icon" aria-label="Delete selection" onClick={deleteSelection}><Trash2 size={15} /></button>
-            </Tooltip>
-            {sep()}
-            <Tooltip label="Align left edges"><button className="tbtn-icon" aria-label="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align horizontal centers"><button className="tbtn-icon" aria-label="Align horizontal centers" onClick={() => align('hcenter')}><AlignCenterVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align right edges"><button className="tbtn-icon" aria-label="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align top edges"><button className="tbtn-icon" aria-label="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button></Tooltip>
-            <Tooltip label="Align vertical middles"><button className="tbtn-icon" aria-label="Align vertical middles" onClick={() => align('vcenter')}><AlignCenterHorizontal size={15} /></button></Tooltip>
-            <Tooltip label="Align bottom edges"><button className="tbtn-icon" aria-label="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button></Tooltip>
-            {sep()}
-            <Tooltip label="Distribute horizontally"><button className="tbtn-icon" aria-label="Distribute horizontally" onClick={() => distribute('h')}><AlignHorizontalSpaceAround size={15} /></button></Tooltip>
-            <Tooltip label="Distribute vertically"><button className="tbtn-icon" aria-label="Distribute vertically" onClick={() => distribute('v')}><AlignVerticalSpaceAround size={15} /></button></Tooltip>
-          </div>
-        )}
+        {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
+            in src/components/Toolbar.tsx; App threads every state/handler. */}
+        <Toolbar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
+          onFitView={() => rf?.fitView({padding: 0.25})}
+          readOnly={readOnly}
+          onToggleReadOnly={toggleReadOnly}
+          alignGuides={alignGuides}
+          onSetAlignGuides={setAlignGuides}
+          onSetGuides={setGuides}
+          snap={snap}
+          onSetSnap={setSnap}
+          onPushHistory={pushHistory}
+          onSetNodes={setNodes}
+          gridSize={gridSize}
+          onDuplicate={() => duplicateSelection()}
+          onAutoLayout={autoLayout}
+          onOpenExport={setExpOpen}
+          settingsOpen={settingsOpen}
+          onOpenSettings={setSettingsOpen}
+          settingsBtnRef={settingsBtnRef}
+          selCount={selCount}
+          onAlign={align}
+          onDistribute={distribute}
+          onDelete={deleteSelection}
+          sep={sep}
+        />
 
         {notice && <div className="toast">{notice}</div>}
 
