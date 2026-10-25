@@ -56,11 +56,11 @@ assert('bh.g1.brand-asset-exists',
   'public/brand/logo.svg exists (the ROUND BF brand asset)');
 
 const SET = blank(read('src/Settings.tsx'));
-/* ROUND BN-3 PHASE B — the help sheet's JSX moved to src/components/HelpSheet.tsx;
-   `APP` reads the UNION so the sheet's markup assertions follow the code home.
-   The canvas-empty panel still lives in App.tsx (extracted in a later BN-3
-   commit — the union keeps working wherever it lands). */
-const APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx'));
+/* ROUND BN-3 PHASE B — the help sheet (HelpSheet.tsx), the modal mounts
+   (ModalMounts.tsx) and the canvas-empty panel (CanvasEmptyPanel.tsx) moved
+   out of App.tsx; `APP` reads the UNION so every markup assertion follows
+   the code home. */
+const APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx') + '\n' + read('src/components/ModalMounts.tsx') + '\n' + read('src/components/CanvasEmptyPanel.tsx'));
 const CSS = read('src/styles.css');
 
 {

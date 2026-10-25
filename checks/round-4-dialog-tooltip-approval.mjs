@@ -37,7 +37,11 @@ const DIALOG_RAW = readFileSync(join(ROOT, 'src/BoardDialog.tsx'), 'utf8');
 const DIALOG = stripTs(DIALOG_RAW);
 const TOOLTIP_RAW = readFileSync(join(ROOT, 'src/Tooltip.tsx'), 'utf8');
 const TOOLTIP = stripTs(TOOLTIP_RAW);
-const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* ROUND BN-3 PHASE B — the modal mounts live in src/components/ModalMounts.tsx
+   now; App threads the same handlers through it. Read the UNION so pins follow
+   the code home. */
+const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src/components/ModalMounts.tsx'), 'utf8');
 const APP = stripTs(APP_RAW);
 const PRESETS_RAW = readFileSync(join(ROOT, 'src/presets.ts'), 'utf8');
 const STYLES_RAW = readFileSync(join(ROOT, 'src/styles.css'), 'utf8');
@@ -98,7 +102,7 @@ assert('i1b.NEITHER-row-is-a-radio-and-there-is-no-walk-to-enter',
 assert('i1c.Use-template-opens-the-GALLERY-and-creates-nothing-itself',
   /onClick=\{\(\) => \(row\.key === 'browse' \? onBrowse\?\.\(trimmed\) : submit\(\)\)\}/.test(DIALOG_RAW)
     && /onBrowse\?: \(name: string\) => void;/.test(DIALOG)
-    && /onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP)
+    && /onBrowseTemplates=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP)
     && /submitRef\.current\(\{kind: 'create', name: trimmed, seed: null\}\)/.test(DIALOG),
   'the "Use template" row is an ACTION: its press branches on `row.key === \'browse\'` and calls `onBrowse?.(trimmed)` rather than submitting, App.tsx wires that to '
   + '`setBoardDlg(null); setTgOpen(true)` — the gallery — and the row carries no `role`/`tabIndex` (asserted in i1b). The dialog still creates only an UNSEEDED board '

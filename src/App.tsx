@@ -108,6 +108,7 @@ import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import {HelpSheet} from './components/HelpSheet';
 import {ModalMounts} from './components/ModalMounts';
+import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import Checklist, {type ChecklistTaskId} from './Checklist';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
@@ -4730,30 +4731,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               and the board really has no nodes. `boardLoaded` is what stops a
               load in flight from claiming "This board is empty" over a canvas
               whose content is merely still on its way. */}
-          {boardLoaded && nodes.length === 0 && (
-            <Panel
-              position="top-center"
-              className="canvas-empty"
-              style={{marginTop: '12vh'}}
-            >
-              <div className="ce-title">
-                {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
-                    natural header, above the "This board is empty" title
-                    (.ce-logo, 240px hero, aspect-true 657:406, tokens only). pointer-events:none is
-                    inherited from .canvas-empty. */}
-                <img className="ce-logo" src="/brand/logo-mark.svg?v=2" alt="Gobigrams" width={240} height={148} />
-                This board is empty
-              </div>
-              <div className="ce-sub">
-                Drag a shape from the left panel onto the canvas, or
-                <br />
-                <b>double-click anywhere</b> to search and insert one.
-              </div>
-              <div className="ce-hint">
-                Then drag from a node's edge handle to connect · press <kbd>?</kbd> for shortcuts
-              </div>
-            </Panel>
-          )}
+          {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
+              and the board really has no nodes. `boardLoaded` is what stops a
+              load in flight from claiming "This board is empty" over a canvas
+              whose content is merely still on its way.
+              ROUND BN-3 PHASE B: the panel body lives in
+              src/components/CanvasEmptyPanel.tsx; the GATE stays here
+              (boot-no-flash pins it to App.tsx). */}
+          <CanvasEmptyPanel show={boardLoaded && nodes.length === 0} />
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}

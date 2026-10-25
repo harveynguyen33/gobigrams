@@ -87,8 +87,10 @@ const finallyBlock = /finally \{[\s\S]{0,400}?setBoardLoaded\(true\)/.test(persi
 ok('bootstrap releases the canvas in a finally', finallyBlock);
 
 // e) The empty-state panel is gated so a load in flight never shows it.
+/* ROUND BN-3 PHASE B — the panel body moved to src/components/CanvasEmptyPanel.tsx;
+   the GATE stayed in App as the `show` prop binding. Same predicate, new home. */
 ok('empty-state panel gated on boardLoaded',
-  /\{boardLoaded && nodes\.length === 0 && \(/.test(app));
+  /<CanvasEmptyPanel show=\{boardLoaded && nodes\.length === 0\} \/>/.test(app));
 
 /* ============================ ITEM 2b — the "dot" ========================= */
 // Sweep of every self-fading candidate named in the brief. Each entry maps a
