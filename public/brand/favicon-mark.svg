@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- favicon-mark v2: a G DESIGNED for 16px — one thick stroke, huge counter, heavy crossbar.
+       Braces dropped (mud below 24px). The crossbar is 2x the stroke so it survives downsampling. -->
+  <rect width="512" height="512" rx="112" fill="#1b1b1b"/>
+  <!-- the C-part: 300-degree arc -->
+  <path d="M 372 148 A 148 148 0 1 0 388 286"
+        fill="none" stroke="#5cec56" stroke-width="76" stroke-linecap="round"/>
+  <!-- the spur: horizontal bar into the center + down-notch (the G's defining feature) -->
+  <path d="M 388 286 L 268 286 A 12 12 0 0 0 256 298 L 256 348"
+        fill="none" stroke="#5cec56" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
