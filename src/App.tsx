@@ -4428,7 +4428,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             to THIS React Flow instance. K3: ds-animating-layout (added/removed
             around programmatic layouts) and ds-no-anim (animation gating). */}
         <ReactFlow
-          nodes={rfNodes} edges={rfEdges}
+          nodes={rfNodes} edges={rfEdges} /* badge hidden 2026-10-25; credit -> About */ proOptions={{hideAttribution: true}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange}
           onConnect={onConnectRules}
           onConnectStart={(_e, params) => { if (params.nodeId) { pendingDrop.current = {source: params.nodeId!, target: '', sourceHandle: params.handleId, targetHandle: null} as any as Connection; connectOrigin.current = {nodeId: params.nodeId!, handleId: params.handleId}; } }}

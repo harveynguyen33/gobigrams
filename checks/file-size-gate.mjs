@@ -75,7 +75,7 @@ const BUDGETS = new Map([
   ['src/LabelNode.tsx', 301],  // now 273,
   ['src/SearchPalette.tsx', 124],  // now 112,
   ['src/Settings.tsx', 440],  // ROUND BN-4: panes+helpers split out (now 424)
-  ['src/settings/panes.tsx', 220],  // 198 + author-audit By row (2026-10-25, Harvey-requested)
+  ['src/settings/panes.tsx', 233],  // 198 + By row + React Flow credit row (2026-10-25, Harvey)
   ['src/settings/controls.tsx', 145],  // now 138 (Row/Toggle/Segmented/etc)
   ['src/settings/shared.ts', 80],  // now 74 (Props)
   ['src/settings/version.ts', 10],  // now 6 (APP_VERSION)

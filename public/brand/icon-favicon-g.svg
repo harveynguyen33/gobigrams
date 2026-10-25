@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- T6V4-double-ear -->
-<rect width="512" height="512" rx="112" fill="#1b1b1b"/>
-  <path d="M 356 176 C 320 134 254 120 204 146 C 144 178 124 254 148 312 C 172 370 244 400 304 378"
-        fill="none" stroke="#5cec56" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 356 176 L 356 262 L 274 262" fill="none" stroke="#5cec56" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 108 176 C 80 176 80 208 80 226 C 80 244 80 252 62 258 C 80 264 80 272 80 290 C 80 308 80 340 108 340" fill="none" stroke="#c93801" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 404 176 C 432 176 432 208 432 226 C 432 244 432 252 450 258 C 432 264 432 272 432 290 C 432 308 432 340 404 340" fill="none" stroke="#c93801" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

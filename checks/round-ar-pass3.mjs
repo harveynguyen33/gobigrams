@@ -105,8 +105,13 @@ try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.messa
 console.log('\nAR-7 — attribution kept and themed');
 
 const app = read('src/App.tsx') ?? '';
-assert('AR7-no-hideAttribution', !/hideAttribution/.test(stripComments(app)),
-  'src/App.tsx carries no hideAttribution (comment-stripped)');
+/* HARVEY 2026-10-25 REVERSED the PASS-3 decision: the corner badge is now
+   HIDDEN (proOptions.hideAttribution) and the MIT credit lives in Settings →
+   About ("Built with React Flow") + the shipped LICENSE notices. The probe
+   now pins the NEW contract: hideAttribution must be present exactly once,
+   and the About credit anchor must exist (bg4a pins its href). */
+assert('AR7-hideAttribution-set-once', (stripComments(app).match(/hideAttribution/g) ?? []).length === 1,
+  'src/App.tsx sets proOptions.hideAttribution exactly once (badge hidden, Harvey 2026-10-25)');
 
 const css = read('src/styles.css') ?? '';
 assert('AR7-css-attribution-not-hidden',

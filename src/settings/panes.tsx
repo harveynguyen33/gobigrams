@@ -193,8 +193,21 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
             target="_blank"
             rel="noreferrer"
           >
-            source
+            GitHub source
           </a>
+        </Row>
+        {/* CREDIT — the React Flow corner badge is hidden (Harvey 2026-10-25);
+            the credit lives here, next to the author. One line, tokens only. */}
+        <Row label="Built with">
+          <a
+            className="settings-link"
+            href="https://reactflow.dev"
+            target="_blank"
+            rel="noreferrer"
+          >
+            React Flow
+          </a>
+          {' (MIT)'}
         </Row>
       </div>
       {/* PUBLIC LAUNCH — the in-app feedback entry. One quiet line at the very

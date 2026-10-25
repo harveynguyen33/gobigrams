@@ -119,14 +119,19 @@ for (const f of srcFiles) {
    bg4 still guards the FEEDBACK surface: the dialog's fallback stays the app's
    only external anchor OUTSIDE the About pane, and the About anchor's href is
    pinned exactly. mailto: links are not http-external and never counted. */
-const aboutPanes = externalAnchors.filter(e => e.startsWith('src/settings/') || e.startsWith('src/Settings.tsx'));
-const others = externalAnchors.filter(e => !(e.startsWith('src/settings/') || e.startsWith('src/Settings.tsx')));
+const ABOUT = e => e.startsWith('src/settings/') || e.startsWith('src/Settings.tsx');
+const aboutPanes = externalAnchors.filter(ABOUT);
+const others = externalAnchors.filter(e => !ABOUT(e));
 assert('bg4 the dialog\'s fallback stays the app\'s only external anchor outside About',
   others.length === 1 && others[0] === 'src/FeedbackDialog.tsx: {FEEDBACK_ISSUES_URL}',
   externalAnchors.join(' | ') || 'none found');
-assert('bg4a the About pane\'s author-audit anchor is pinned to the source repo',
-  aboutPanes.length === 1 &&
-    aboutPanes[0] === 'src/Settings.tsx: https://github.com/harveynguyen33/gobigrams',
+/* The About pane carries EXACTLY two pinned anchors: the author-audit source
+   link and the React Flow credit (badge hidden 2026-10-25 — credit moved
+   here). Order not pinned; hrefs are. */
+assert('bg4a the About pane\'s two anchors are pinned (source repo + React Flow credit)',
+  aboutPanes.length === 2 &&
+    aboutPanes.includes('src/Settings.tsx: https://github.com/harveynguyen33/gobigrams') &&
+    aboutPanes.includes('src/Settings.tsx: https://reactflow.dev'),
   aboutPanes.join(' | ') || 'none found');
 
 /* ROUND BI: the sheet now carries a "Send feedback" ACTION — a button that
