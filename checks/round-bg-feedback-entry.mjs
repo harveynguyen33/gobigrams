@@ -114,9 +114,20 @@ for (const f of srcFiles) {
     externalAnchors.push(`${f}: {FEEDBACK_ISSUES_URL}`);
   }
 }
-assert('bg4 the dialog\'s fallback is the app\'s only external anchor',
-  externalAnchors.length === 1 && externalAnchors[0] === 'src/FeedbackDialog.tsx: {FEEDBACK_ISSUES_URL}',
+/* AUTHOR AUDIT (2026-10-25) — Settings -> About now carries a second, deliberate
+   external anchor (the "source" link to github.com/harveynguyen33/gobigrams).
+   bg4 still guards the FEEDBACK surface: the dialog's fallback stays the app's
+   only external anchor OUTSIDE the About pane, and the About anchor's href is
+   pinned exactly. mailto: links are not http-external and never counted. */
+const aboutPanes = externalAnchors.filter(e => e.startsWith('src/settings/') || e.startsWith('src/Settings.tsx'));
+const others = externalAnchors.filter(e => !(e.startsWith('src/settings/') || e.startsWith('src/Settings.tsx')));
+assert('bg4 the dialog\'s fallback stays the app\'s only external anchor outside About',
+  others.length === 1 && others[0] === 'src/FeedbackDialog.tsx: {FEEDBACK_ISSUES_URL}',
   externalAnchors.join(' | ') || 'none found');
+assert('bg4a the About pane\'s author-audit anchor is pinned to the source repo',
+  aboutPanes.length === 1 &&
+    aboutPanes[0] === 'src/Settings.tsx: https://github.com/harveynguyen33/gobigrams',
+  aboutPanes.join(' | ') || 'none found');
 
 /* ROUND BI: the sheet now carries a "Send feedback" ACTION — a button that
    opens the dialog, deliberately NOT an anchor. This probe still guards the

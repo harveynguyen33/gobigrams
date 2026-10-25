@@ -175,6 +175,27 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
         <Row label="Version">
           <span className="settings-state">{APP_VERSION}</span>
         </Row>
+        {/* AUTHOR AUDIT (2026-10-25) — one quiet line proving who built this.
+            The same email chains across git history, package.json, LICENSE,
+            CODEOWNERS and the GitHub account; the repo link is the source of
+            truth. Displayed as text (mailto only) — no new surfaces. */}
+        <Row label="By">
+          <a
+            className="settings-link"
+            href="mailto:harvey.nguyen33@gmail.com"
+          >
+            Harvey Nguyen
+          </a>
+          {' · '}
+          <a
+            className="settings-link"
+            href="https://github.com/harveynguyen33/gobigrams"
+            target="_blank"
+            rel="noreferrer"
+          >
+            source
+          </a>
+        </Row>
       </div>
       {/* PUBLIC LAUNCH — the in-app feedback entry. One quiet line at the very
           bottom of the About pane (LESS intrusive than the ? cheatsheet, whose

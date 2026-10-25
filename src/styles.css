@@ -5249,6 +5249,14 @@ kbd {
   background: none; border-top: 0; border-left: 0; border-right: 0;
   font: inherit; padding: 0; cursor: pointer;
 }
+/* AUTHOR AUDIT (2026-10-25) — Settings → About "By" row: quiet dim links in
+   the same vocabulary as the feedback line above (tokens only). */
+.settings-rows a.settings-link {
+  color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--border);
+}
+.settings-rows a.settings-link:hover,
+.settings-rows a.settings-link:focus-visible { color: var(--acc); border-bottom-color: var(--acc); }
+
 .settings-feedback a:hover,
 .settings-feedback button:hover,
 .settings-feedback a:focus-visible,
