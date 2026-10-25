@@ -1,5 +1,14 @@
 # HANDOFF — Diagram Studio
 
+## ▶ BRANCH MODEL (since 2026-10-25) — READ THIS FIRST
+
+- **develop** = the workshop trunk. ALL work lands here (coders/agents push here). It NEVER deploys.
+- **main** = the release branch. It moves ONLY through `.gob/release.sh` after Harvey says release.
+- `.gob/release.sh [--dry]`: gates (tsc/build/bytes/goblin-verify) -> ff-only develop→main -> push -> `SRC_BRANCH=main .gob/publish-public.sh --push` -> CF Pages auto-deploys ~1 min.
+- `publish-public.sh` reads `$SRC_BRANCH` (default main). Normal work on develop does NOT publish.
+- When dispatching coders: they work as before, but "push" now means origin develop.
+
+
 ## ▶ 2026-10-24 19:0x — PUBLIC PUBLISHING — one allowlist script, mirror removed
 
 **The GitHub repo is now fed by ONE path: `.gob/publish-public.sh`.**
