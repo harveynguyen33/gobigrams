@@ -4,7 +4,7 @@ entry_paths:
   - src/ThemePicker.tsx
   - src/colors.ts
   - src/styles.css
-  - src/settings/panes.tsx
+  - src/settings/Panes.tsx
   - src/components/ModalMounts.tsx
 verified: never-driven (2026-10-12; homes re-pointed 2026-10-25, ROUND BN-4 Phase D)
 ---
@@ -44,6 +44,6 @@ colour-grid geometry.
 
 *Module homes (after the BN decomposition)*
 
-- `src/settings/` — the Settings panes: `panes.tsx` (the five panes incl. Appearance),
-  `controls.tsx`, `shared.ts`, `version.ts`; `src/Settings.tsx` is the 424-line shell
+- `src/settings/` — the Settings panes: `Panes.tsx` (the five panes incl. Appearance),
+  `Controls.tsx`, `shared.ts`, `version.ts`; `src/Settings.tsx` is the 424-line shell
 - `src/components/ModalMounts.tsx` — Settings mounts there, fed by App's settingsProps object

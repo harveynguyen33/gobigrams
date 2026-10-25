@@ -45,8 +45,8 @@ const stripComments = (src) =>
 const read = (p) => {
   if (p === 'src/GoblinEdge.tsx') {
     try {
-      return ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-        .map(f => readFileSync(join(ROOT, `src/edges/${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`), 'utf8')).join('\n');
+      return ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+        .map(f => readFileSync(join(ROOT, `src/edges/${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`), 'utf8')).join('\n');
     } catch { return null; }
   }
   try { return readFileSync(join(ROOT, p), 'utf8'); } catch { return null; }

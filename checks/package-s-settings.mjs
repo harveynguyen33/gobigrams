@@ -45,14 +45,14 @@ const PERS_SOURCE = (() => { try { return persistenceSource(); } catch { return 
    guard as above). */
 const EXP_SOURCE = (() => { try { return readFileSync(join(ROOT, 'src/useExportActions.ts'), 'utf8'); } catch { return ''; } })();
 /* ROUND BN-4 — src/Settings.tsx split along its pane seams: the helpers
-   (Row/Toggle/Segmented/…) moved to src/settings/controls.tsx, the Canvas and
-   About+Roadmap panes to src/settings/panes.tsx, Props to shared.ts, verbatim.
+   (Row/Toggle/Segmented/…) moved to src/settings/Controls.tsx, the Canvas and
+   About+Roadmap panes to src/settings/Panes.tsx, Props to shared.ts, verbatim.
    Reads of the settings source read PANES + SETTINGS CONCATENATED (panes
    first: the positional AboutPane->'the shell' slice keeps its order), so
    every probe below still measures the same surface. */
 const settingsSource = () => ['panes', 'Settings'].flatMap(f => {
     try { return [f === 'panes'
-      ? readFileSync(join(ROOT, 'src/settings/panes.tsx'), 'utf8')
+      ? readFileSync(join(ROOT, 'src/settings/Panes.tsx'), 'utf8')
       : readFileSync(join(ROOT, 'src/Settings.tsx'), 'utf8')]; } catch { return []; }
   }).join('\n');
 const prefsSource = () => readFileSync(join(ROOT, 'src/prefs.ts'), 'utf8');

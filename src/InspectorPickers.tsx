@@ -3,9 +3,9 @@
    section banners); every import of './InspectorPickers' — including the
    esbuild bundle entries in the harnesses — is unchanged. */
 export {popoverPlacement, placementStyle} from './pickers/popover';
-export {G, ArtWidth, ArtDash, ArtFlow, ArtCurve, ArtArrow, ArtCardinality} from './pickers/art';
-export {IconPickerRow, ShapesPicker, ToggleRow, type PickerOption} from './pickers/rows';
-export {Stepper, SPEED_MIN, SPEED_MAX, sliderSeconds, storableSeconds, FlowSpeed} from './pickers/stepperFlow';
-export {Section, CardReadout} from './pickers/section';
+export {G, ArtWidth, ArtDash, ArtFlow, ArtCurve, ArtArrow, ArtCardinality} from './pickers/Art';
+export {IconPickerRow, ShapesPicker, ToggleRow, type PickerOption} from './pickers/Rows';
+export {Stepper, SPEED_MIN, SPEED_MAX, sliderSeconds, storableSeconds, FlowSpeed} from './pickers/StepperFlow';
+export {Section, CardReadout} from './pickers/Section';
 export {SHAPES} from './shapes';
 export {COLOR_VAR} from './colors';

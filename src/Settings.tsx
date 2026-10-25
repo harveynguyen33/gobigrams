@@ -14,9 +14,9 @@ import {ZORDER_OPTS, type ZOrderMode} from './zOrderMode';
 /* ROUND BN-4 — Props moved to ./settings/shared; the two largest panes
    (Canvas, About+Roadmap) moved verbatim to ./settings/panes. */
 import type {Props} from './settings/shared';
-import {Row, ToolbarChip, Toggle, Segmented, dblRangeOptions} from './settings/controls';
+import {Row, ToolbarChip, Toggle, Segmented, dblRangeOptions} from './settings/Controls';
 import {APP_VERSION} from './settings/version';
-import {CanvasPane, AboutPane} from './settings/panes';
+import {CanvasPane, AboutPane} from './settings/Panes';
 /* ROUND BH — the in-app feedback dialog (public launch). ROUND BI, ITEM 3: the
  *  dialog itself now mounts ONCE in App.tsx (the ? help sheet is its second
  *  entry point), so Settings only forwards the opener through `onOpenFeedback`;

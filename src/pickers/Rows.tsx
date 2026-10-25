@@ -5,7 +5,7 @@ import {useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode
 import {SHAPES, ShapePreview, type Shape} from '../shapes';
 import {COLOR_VAR} from '../colors';
 import {usePopoverPlacement} from './popover';
-import {G} from './art';
+import {G} from './Art';
 
 /* ===========================================================================
    IconPickerRow — trigger + caret + popover of icon+label rows (§B #2-#6,#9,#10).

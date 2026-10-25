@@ -322,7 +322,7 @@ const VISIBLE_FILES = [
   'src/App.tsx', 'src/Tour.tsx', 'src/colorKeyNote.ts', 'src/Settings.tsx', 'src/BoardDialog.tsx',
   'src/InspectorPickers.tsx', 'src/IconPicker.tsx', 'src/SearchPalette.tsx', 'src/ContextMenu.tsx',
   'src/TableNode.tsx', 'src/LabelNode.tsx', 'src/CustomShapeNode.tsx', 'src/ThemePicker.tsx',
-  'src/edges/GoblinEdge.tsx', 'src/edges/EdgeData.ts', 'src/edges/flowPayloads.tsx', 'src/edges/index.ts',
+  'src/edges/GoblinEdge.tsx', 'src/edges/edgeData.ts', 'src/edges/flowPayloads.tsx', 'src/edges/index.ts',
   'src/Checklist.tsx', 'src/Tooltip.tsx', 'src/DiagramNode.tsx',
 ];
 const ATTRS = ['title', 'aria-label', 'placeholder', 'label'];

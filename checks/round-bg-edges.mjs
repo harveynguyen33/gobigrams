@@ -50,7 +50,7 @@ const ENTRY = join(ROOT, '.bg-entry.ts');
 const OUT = join(ROOT, '.bg-out.mjs');
 writeFileSync(ENTRY,
   `export {makeEdge, ERD_EDGES, FLOWCHART_EDGES, ERD_ENABLED} from './src/presets';\n` +
-  `export {isCrowFoot, CROW_FOOT_IDS} from './src/crowfoot';\n`);
+  `export {isCrowFoot, CROW_FOOT_IDS} from './src/Crowfoot';\n`);
 writeFileSync(OUT, execFileSync(join(ROOT, 'node_modules/.bin/esbuild'),
   [ENTRY, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
     '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],

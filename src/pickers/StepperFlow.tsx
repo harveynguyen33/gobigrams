@@ -2,7 +2,7 @@
    verbatim, 2026-10-25 along the section banners the file declares).
    src/InspectorPickers.tsx re-exports the union, so no importer changes. */
 import {useCallback, useEffect, useRef, useState} from 'react';
-import type {PickerOption} from './rows';
+import type {PickerOption} from './Rows';
 
 /* ===========================================================================
    Stepper — §B #7. A numeric ordinal from 1..6 has no icon vocabulary, and a

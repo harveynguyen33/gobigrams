@@ -28,13 +28,13 @@ import {readFileSync} from 'node:fs';
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 /* ROUND BN-4 — src/Settings.tsx split along its pane seams: the helpers
-   (Row/Toggle/Segmented/…) moved to src/settings/controls.tsx, the Canvas and
-   About+Roadmap panes to src/settings/panes.tsx, Props to shared.ts, verbatim.
+   (Row/Toggle/Segmented/…) moved to src/settings/Controls.tsx, the Canvas and
+   About+Roadmap panes to src/settings/Panes.tsx, Props to shared.ts, verbatim.
    Reads of the settings source read PANES + SETTINGS CONCATENATED (panes
    first: the positional AboutPane->'the shell' slice keeps its order), so
    every probe below still measures the same surface. */
 const SET_RAW = ['panes', 'Settings'].flatMap(f => {
-    try { return [readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/panes.tsx' : 'Settings.tsx'}`, 'utf8')]; } catch { return []; }
+    try { return [readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/Panes.tsx' : 'Settings.tsx'}`, 'utf8')]; } catch { return []; }
   }).join('\n');
 const README = readFileSync(`${ROOT}/README.md`, 'utf8');
 

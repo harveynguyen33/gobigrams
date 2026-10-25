@@ -61,22 +61,22 @@ const BUDGETS = new Map([
   // the component itself (the part a dozen harnesses pin spellings inside)
   // moved to src/edges/GoblinEdge.tsx.
   ['src/edges/GoblinEdge.tsx', 1050],  // now 1042
-  ['src/edges/EdgeData.ts', 165],  // now 158
+  ['src/edges/edgeData.ts', 165],  // now 158
   ['src/edges/flowPayloads.tsx', 100],  // now 95
   ['src/edges/index.ts', 30],  // now 20
   ['src/HelperLinesView.tsx', 58],  // now 52,
   ['src/IconPicker.tsx', 129],  // now 117,
   ['src/InspectorPickers.tsx', 30],  // ROUND BN-4: re-export shell (now 21)
-  ['src/pickers/popover.tsx', 160],  // now 151
-  ['src/pickers/art.tsx', 150],  // now 142
-  ['src/pickers/rows.tsx', 300],  // now 288
-  ['src/pickers/stepperFlow.tsx', 165],  // now 156
-  ['src/pickers/section.tsx', 110],  // now 103
+  ['src/pickers/popover.ts', 160],  // now 151
+  ['src/pickers/Art.tsx', 150],  // now 142
+  ['src/pickers/Rows.tsx', 300],  // now 288
+  ['src/pickers/StepperFlow.tsx', 165],  // now 156
+  ['src/pickers/Section.tsx', 110],  // now 103
   ['src/LabelNode.tsx', 301],  // now 273,
   ['src/SearchPalette.tsx', 124],  // now 112,
   ['src/Settings.tsx', 440],  // ROUND BN-4: panes+helpers split out (now 424)
-  ['src/settings/panes.tsx', 233],  // 198 + By row + React Flow credit row (2026-10-25, Harvey)
-  ['src/settings/controls.tsx', 145],  // now 138 (Row/Toggle/Segmented/etc)
+  ['src/settings/Panes.tsx', 233],  // 198 + By row + React Flow credit row (2026-10-25, Harvey)
+  ['src/settings/Controls.tsx', 145],  // now 138 (Row/Toggle/Segmented/etc)
   ['src/settings/shared.ts', 80],  // now 74 (Props)
   ['src/settings/version.ts', 10],  // now 6 (APP_VERSION)
   ['src/TableNode.tsx', 171],  // now 155,
@@ -90,7 +90,7 @@ const BUDGETS = new Map([
   ['src/choreography.ts', 465],  // now 422,
   ['src/colorKeyNote.ts', 116],  // now 105,
   ['src/colors.ts', 118],  // now 107,
-  ['src/crowfoot.tsx', 137],  // now 124,
+  ['src/Crowfoot.tsx', 137],  // now 124,
   ['src/customShape.ts', 573],  // now 520,
   ['src/edgeBend.ts', 409],  // now 371,
   ['src/edgeLabel.ts', 655],  // now 595,

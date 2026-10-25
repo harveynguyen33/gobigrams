@@ -122,7 +122,7 @@ import {layoutDiagram} from './layout';
    same map. The module holds no React Flow, so the panel can read it without
    pulling the canvas in. */
 import {FLOW_ICON_PATHS} from './flowIcons';
-import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './crowfoot';
+import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './Crowfoot';
 import {
   useHoverChoreography, useInteractionGuard, useLayoutTransition, useAnimationGating,
   useHoverHighlight,

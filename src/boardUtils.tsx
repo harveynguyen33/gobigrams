@@ -7,7 +7,7 @@
 import {MarkerType, type Edge, type Node} from '@xyflow/react';
 import {COLOR_VAR, isColorKey, keyForHex, resolveColor, resolveColorKey, type ColorKey} from './colors';
 import {asShape, SHAPE_IDS, ShapePreview, type Shape} from './shapes';
-import {isCrowFoot, markerIdFor} from './crowfoot';
+import {isCrowFoot, markerIdFor} from './Crowfoot';
 import {applyDrag, drawnMid, isSide4, type BendGeo, type Pt, type Side4} from './edgeBend';
 import {LIBRARY, DEFAULT_PRESET_ID, getPreset} from './presets';
 import * as library from './library';
@@ -18,7 +18,7 @@ import type {EdgeData} from './App';
 /** The live marker id for an edge's crow's-foot end. React Flow wraps a STRING
  *  marker in `url('#…')` itself and skips string markers when building its own
  *  `<defs>`, so we hand it a bare id and render the matching glyph ourselves
- *  (see crowfoot.tsx). Derived from the data, so a theme switch needs no rewrite. */
+ *  (see Crowfoot.tsx). Derived from the data, so a theme switch needs no rewrite. */
 export const edgeMarkerUrl = (e: Edge, which: 'start' | 'end'): string | undefined => {
   const m = (which === 'start' ? e.markerStart : e.markerEnd) as any;
   if (!isCrowFoot(m?.type)) return undefined;

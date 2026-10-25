@@ -54,7 +54,7 @@ import {edgeTextStyleVars, type TextStyle} from '../textStyle';
    BOTH the renderer (here, below) and `App.tsx` read THAT file. The path data
    is untouched: only its address changed. */
 import {FLOW_ICON_PATHS} from '../flowIcons';
-import type {EdgeData} from './EdgeData';
+import type {EdgeData} from './edgeData';
 import {useFlowPayloads} from './flowPayloads';
 
 /**

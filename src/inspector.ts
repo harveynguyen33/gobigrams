@@ -47,7 +47,7 @@ export type InspectorTarget =
       /** ROUND AK, AK-8 — THE CARDINALITY GATE, READ FROM THE EDGE ITSELF.
        *  `true` when the edge carries a crow's-foot marker on EITHER end. The
        *  predicate is computed by the caller from the selected edge's own
-       *  `markerStart` / `markerEnd` (`isCrowFoot()` in `src/crowfoot.tsx`), so a
+       *  `markerStart` / `markerEnd` (`isCrowFoot()` in `src/Crowfoot.tsx`), so a
        *  section can no longer appear or vanish because of the board's preset.
        *
        *  THE CONSEQUENCE IS DELIBERATE (spec §2): a plain C4 board whose edge has

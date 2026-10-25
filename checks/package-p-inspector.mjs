@@ -32,7 +32,7 @@ const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
    old path stays as a re-export shell so bundle entries are unchanged). Reads
    of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
 const PICKS_RAW = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
   }).join('\n');
 const INSP_RAW = readFileSync(`${ROOT}/src/inspector.ts`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
@@ -300,7 +300,7 @@ const carriedBy = (app, table, want, root = ROOT) => {
      from the file that declares it, so the claim cannot drift from the code. */
   if (want === 'slider') {
     const picks = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-    try { return [readFileSync(`${root}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    try { return [readFileSync(`${root}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
   }).join('\n');
     return new RegExp(`export const ${table}\\s*=`).test(picks);
   }

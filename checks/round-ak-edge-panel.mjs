@@ -82,11 +82,11 @@ function readOne(path, commit) {
     ? execFileSync('git', ['show', `${commit}:${path}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28})
     : path === 'src/InspectorPickers.tsx'
       ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-          try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+          try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
         }).join('\n')
     : path === 'src/GoblinEdge.tsx'
-      ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-          .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+      ? ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+          .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
     : path === 'src/presets.ts'
       ? ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
           .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n')

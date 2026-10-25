@@ -43,8 +43,8 @@ const blankComments = s => s
 const readAt = (rel, commit) => commit
   ? execFileSync('git', ['show', `${commit}:${rel}`], {cwd: ROOT, encoding: 'utf8'})
   : rel === 'src/GoblinEdge.tsx'
-    ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-        .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+    ? ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+        .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
     : readFileSync(`${ROOT}/${rel}`, 'utf8');
 const safeReadAt = (rel, commit) => {
   try { return readAt(rel, commit); } catch { return ''; }

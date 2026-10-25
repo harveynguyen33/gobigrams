@@ -75,11 +75,11 @@ const blankComments = src => src
    of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
 const read = p => p === 'src/InspectorPickers.tsx'
   ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
     }).join('\n')
   : p === 'src/GoblinEdge.tsx'
-  ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+  ? ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
   : readFileSync(`${ROOT}/${p}`, 'utf8');
 /* ROUND BN PHASE A re-anchor: the AN-5 undo/redo cluster moved to
    src/useUndoHistory.ts; the probes below read App PLUS the hook. */

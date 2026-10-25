@@ -35,11 +35,11 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* ROUND BN-4 — src/Settings.tsx split along its pane seams (helpers ->
-   src/settings/controls.tsx, Canvas + About/Roadmap panes -> panes.tsx, verbatim).
+   src/settings/Controls.tsx, Canvas + About/Roadmap panes -> Panes.tsx, verbatim).
    Reads of the settings source read PANES + SETTINGS CONCATENATED. */
 const read = (p) => p === 'src/Settings.tsx'
   ? ['panes', 'Settings'].flatMap(f => {
-      try { return [readFileSync(join(ROOT, f === 'panes' ? 'src/settings/panes.tsx' : 'src/Settings.tsx'), 'utf8')]; } catch { return []; }
+      try { return [readFileSync(join(ROOT, f === 'panes' ? 'src/settings/Panes.tsx' : 'src/Settings.tsx'), 'utf8')]; } catch { return []; }
     }).join('\n')
   : readFileSync(join(ROOT, p), 'utf8');
 // comments BLANKED, not stripped (line numbers stay true; a comment quoting the

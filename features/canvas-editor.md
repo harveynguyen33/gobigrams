@@ -30,7 +30,7 @@ connections. Selecting a node or edge opens the inspector panel on the right.
 - `src/useCanvasTools.ts` — align, distribute, z-order, auto-layout
 - `src/useUndoHistory.ts` — the 50-step history with selection-preserving undo/redo
 - `src/edges/` — the edge family: `GoblinEdge.tsx` (the ONE live component, all 5 type
-  ids), `EdgeData.ts` (typed data block), `flowPayloads.tsx` (the K2 payload memo),
+  ids), `edgeData.ts` (typed data block), `flowPayloads.tsx` (the K2 payload memo),
   `index.ts` (the type registry)
 - `src/DiagramNode.tsx` — the node component (resize floors, measure)
 

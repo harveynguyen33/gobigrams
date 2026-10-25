@@ -3951,7 +3951,7 @@ Spec: `PACKAGE-L-SPEC.md`. Design reference: `/home/harvey/diagram-studio-resear
 
 **New files:** `src/theme.ts` (theme controller), `src/colors.ts` (symbolic colour layer),
 `src/presets.ts` (the preset spine + the 3 real presets), `src/TableNode.tsx` (ERD `table` node),
-`src/crowfoot.tsx` (crow's-foot markers).
+`src/Crowfoot.tsx` (crow's-foot markers).
 
 | # | What shipped | Measured browser evidence |
 |---|---|---|

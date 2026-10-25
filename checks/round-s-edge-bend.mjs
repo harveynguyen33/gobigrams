@@ -36,12 +36,12 @@ const APP_SRC = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const CONN_SRC = readFileSync(`${ROOT}/src/useConnections.ts`, 'utf8');
 /* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
    src/edges/GoblinEdge.tsx; the EdgeData type, the K2 flow-payload machinery and
-   the type registry moved to EdgeData.ts / flowPayloads.tsx / index.ts, verbatim).
+   the type registry moved to edgeData.ts / flowPayloads.tsx / index.ts, verbatim).
    Working-tree reads of the component now read the FOUR SLICES CONCATENATED so
    every regex below still measures the same surface. Git reads (PRE_COMMIT)
    keep the single file, which every pinned commit has. */
-const EDGE_SRC = ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-  .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n');
+const EDGE_SRC = ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+  .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n');
 const CSS_SRC = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const SYS_LINES = SYS_SRC.split('\n');
 
@@ -601,7 +601,7 @@ head('(i) NO SLIDER — the bend-position control is gone from the sources');
   console.log(`     range inputs found in: ${rangeHomes.join(', ') || 'none'}  (AM-5's flow-speed slider)`);
   ok(rangeRow === 0, '0 `.range-row` occurrences in live source', where.join('; ') || '0');
   ok(rangeOutsideSlider === 0 && /type="range"/.test(['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
   }).join('\n')),
     'the ONLY range input is AM-5\'s flow-speed slider in InspectorPickers.tsx — App.tsx has none',
     rangeHomes.join('; ') || '0');

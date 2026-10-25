@@ -87,24 +87,24 @@ const blankComments = src => src
    it return the FIVE SLICES + SHELL CONCATENATED (verbatim moves). */
 const read = p => p === 'src/InspectorPickers.tsx'
   ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
     }).join('\n')
   : readFileSync(`${ROOT}/${p}`, 'utf8');
 const commitFile = (commit, p) =>
   execFileSync('git', ['show', `${commit}:${p}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28});
 /* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
    src/edges/GoblinEdge.tsx; the EdgeData type, the K2 flow-payload machinery and
-   the type registry moved to EdgeData.ts / flowPayloads.tsx / index.ts, verbatim).
+   the type registry moved to edgeData.ts / flowPayloads.tsx / index.ts, verbatim).
    Working-tree reads of the component now read the FOUR SLICES CONCATENATED so
    every regex below still measures the same surface. Git reads (PRE_COMMIT)
    keep the single file, which every pinned commit has. */
 const code = p => blankComments(p === 'src/InspectorPickers.tsx'
   ? ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+      try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
     }).join('\n')
   : p === 'src/GoblinEdge.tsx'
-  ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
-      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+  ? ['GoblinEdge', 'edgeData', 'flowPayloads', 'index']
+      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'edgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
   : read(p));
 const codeAt = (commit, p) => blankComments(commitFile(commit, p));
 

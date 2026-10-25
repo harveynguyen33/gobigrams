@@ -21,7 +21,7 @@ The edge family homes and their roles:
 
 - `src/edges/GoblinEdge.tsx` — the ONE live edge component (all 5 type ids; both gesture
   handlers live in-component — they share one per-instance useEdgeGesture claim latch)
-- `src/edges/EdgeData.ts` — the typed edge data block
+- `src/edges/edgeData.ts` — the typed edge data block
 - `src/edges/flowPayloads.tsx` — the K2 payload memo (dots/dash/pulse/icon/envelope)
 - `src/edges/index.ts` — the type registry
 - `src/edgeLabel.ts` — label geometry/anchoring

@@ -5,7 +5,7 @@ import {COLOR_VAR, type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
 import {type Shape} from '../shapes';
 import {gridLayout, layoutDiagram, type LayoutDirection, type LayoutSpacing} from '../layout';
-import {type CrowFoot} from '../crowfoot';
+import {type CrowFoot} from '../Crowfoot';
 import {type ThemeName} from '../theme';
 import {type ShowMode} from '../TableNode';
 import type {Node} from '@xyflow/react';

@@ -39,10 +39,10 @@ const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
   .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 /* ROUND BN-4 — src/Settings.tsx split along its pane seams (helpers ->
-   src/settings/controls.tsx, Canvas + About/Roadmap panes -> panes.tsx, verbatim).
+   src/settings/Controls.tsx, Canvas + About/Roadmap panes -> Panes.tsx, verbatim).
    Reads of the settings source read PANES + SETTINGS CONCATENATED. */
 const SET_RAW = ['panes', 'Settings'].flatMap(f => {
-  try { return [readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/panes.tsx' : 'Settings.tsx'}`, 'utf8')]; } catch { return []; }
+  try { return [readFileSync(`${ROOT}/src/${f === 'panes' ? 'settings/Panes.tsx' : 'Settings.tsx'}`, 'utf8')]; } catch { return []; }
 }).join('\n');
 
 /** Strip block + line comments; blanking keeps byte offsets (and line numbers). */
@@ -96,7 +96,7 @@ try {
    old path stays as a re-export shell so bundle entries are unchanged). Reads
    of the picker source read the FIVE SLICES + SHELL CONCATENATED. */
 const PICKS_RAW = ['popover', 'art', 'rows', 'stepperFlow', 'section', 'shell'].flatMap(f => {
-    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + f + '.tsx'}`, 'utf8')]; } catch { return []; }
+    try { return [readFileSync(`${ROOT}/src/${f === 'shell' ? 'InspectorPickers.tsx' : 'pickers/' + {popover: 'popover.ts', art: 'Art.tsx', rows: 'Rows.tsx', stepperFlow: 'StepperFlow.tsx', section: 'Section.tsx'}[f]}`, 'utf8')]; } catch { return []; }
   }).join('\n');
 const SHIP_B = {appRaw: APP_RAW, stylesRaw: STYLES_RAW, app: APP, styles: STYLES, picks: PICKS_RAW};
 
