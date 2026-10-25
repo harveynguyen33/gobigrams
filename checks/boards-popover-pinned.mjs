@@ -55,7 +55,9 @@ const strip = s => s
   .replace(/\/\*[\s\S]*?\*\//g, blank)
   .replace(/^[ \t]*\/\/.*$/gm, blank);
 
-const APP_RAW = read('src/App.tsx');
+/* BN-2: the boards popover + clamp moved to src/useBoardsMenu.ts — the harness
+   reads the UNION so the pins follow the code, wherever it lives. */
+const APP_RAW = read('src/App.tsx') + '\n' + read('src/useBoardsMenu.ts');
 const CSS_RAW = read('src/styles.css');
 const APP = strip(APP_RAW);
 const CSS = strip(CSS_RAW);

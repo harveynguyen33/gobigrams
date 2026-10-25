@@ -20,7 +20,8 @@ import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8').split('\n');
-const APP = readFileSync(`${ROOT}/src/App.tsx`, 'utf8').split('\n');
+/* BN-2: the popover clamp moved to src/useBoardsMenu.ts. */
+const APP = (readFileSync(`${ROOT}/src/App.tsx`, 'utf8') + readFileSync(`${ROOT}/src/useBoardsMenu.ts`, 'utf8')).split('\n');
 
 /* ---------------------------------------------------------------------------
    Font metrics. A tiny python probe reads hmtx out of a TTF and prints the

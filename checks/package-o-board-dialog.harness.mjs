@@ -31,7 +31,9 @@ const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
 const PRESETS_SRC = readFileSync(join(ROOT, 'src/presets.ts'), 'utf8');
 const DIALOG_SRC = readFileSync(join(ROOT, 'src/BoardDialog.tsx'), 'utf8');
-const APP_SRC = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* BN-2: createFromTemplate + dialog wiring moved to src/useBoardsMenu.ts. */
+const APP_SRC = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  + readFileSync(join(ROOT, 'src/useBoardsMenu.ts'), 'utf8');
 
 const asserts = [];
 const assert = (id, pass, detail) => {

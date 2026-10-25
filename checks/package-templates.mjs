@@ -926,7 +926,10 @@ console.log('='.repeat(78));
 
 const TG_RAW = readFileSync(`${ROOT}/src/TemplatesGallery.tsx`, 'utf8');
 const TG = stripTs(TG_RAW);
-const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* BN-2: the boards-menu + gallery wiring moved to src/useBoardsMenu.ts —
+   the harness reads the UNION so pins follow the code home. */
+const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
+  + readFileSync(`${ROOT}/src/useBoardsMenu.ts`, 'utf8');
 const UEI_RAW = readFileSync(`${ROOT}/src/useEditorInterface.ts`, 'utf8');
 
 /* The component is EXECUTED, not transcribed. `--jsx=automatic` lets esbuild
