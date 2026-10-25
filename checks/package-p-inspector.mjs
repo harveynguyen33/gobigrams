@@ -22,7 +22,11 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
-const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN-3 PHASE B — the toolbar (duplicate/delete call sites) moved to
+   src/components/Toolbar.tsx; APP reads the UNION so the occurrence budgets
+   keep counting the same surface set. */
+const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
+  + '\n' + readFileSync(`${ROOT}/src/components/Toolbar.tsx`, 'utf8');
 const PICKS_RAW = readFileSync(`${ROOT}/src/InspectorPickers.tsx`, 'utf8');
 const INSP_RAW = readFileSync(`${ROOT}/src/inspector.ts`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
@@ -1158,11 +1162,12 @@ assert('j.no-duplicate-or-delete-in-any-single-target-branch',
   'node / table / label branches carry no duplicate and no delete — §H.6 is a no-op here');
 assert('j.no-editing-gate-was-invented-for-it',
   !/isEditing/.test(APP) && !/data-editing/.test(APP) && countOf(APP, 'holdCommit') === 0
-    && countOf(APP, 'duplicateSelection') === 6 && countOf(APP, 'deleteSelection') === 3,
+    && countOf(APP, 'duplicateSelection') + countOf(APP, 'onDuplicate') === 5 + 4
+    && countOf(APP, 'deleteSelection') + countOf(APP, 'onDelete') === 3 + 3,
   'no `isEditing`/`data-editing` flag was added to App.tsx to hide controls that do not exist, and no '
   + 'part of the hold leaked into the panel. ROUND BD re-anchor: deleteSelection 4 -> 3 because the '
   + 'multi block carried the handler TWICE (a top delete pill + a bottom delete-selected pill); the '
-  + 'redesign leaves exactly ONE destructive button, so one call site died. duplicateSelection stays 6. '
+  + 'redesign leaves exactly ONE destructive button, so one call site died. BN-3 PHASE B: one duplicate + one delete call site moved to Toolbar.tsx as threaded props (onDuplicate/onDelete), so the budget counts both spellings over the union — same call sites, new home. '
   + 'The assertion that matters is (j) above: ZERO of them inside any single-target branch');
 assert('j.control-the-multi-select-branch-is-untouched',
   MULTI.includes('duplicateSelection()') && MULTI.includes('deleteSelection')
