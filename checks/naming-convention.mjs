@@ -2,7 +2,7 @@
 /**
  * checks/naming-convention.mjs — ONE naming rule, enforced by a harness instead
  * of by memory (ROUND NS-1, 2026-10-25, Harvey-approved plan:
- * PLAN-structure-naming.md).
+ * DONE-structure-naming.md).
  *
  * THE RULE (this is the whole contract; nothing else is measured here):
  *   1. `.ts` modules            -> camelCase            (edgeData.ts, boardUtils.ts …)
@@ -38,7 +38,7 @@
  *
  * WHAT THIS CANNOT SEE: whether a name is a GOOD name (a well-cased
  * `thingDoer2.ts` passes), and it says nothing about folder layout — family dirs
- * are a separate, human decision (PLAN-structure-naming.md item 3).
+ * are a separate, human decision (DONE-structure-naming.md item 3).
  *
  * RED-FIRST EVIDENCE: written before the NS-2 renames and run against HEAD
  * 0f08d17, it reported 9 violations (edges/EdgeData.ts + the eight

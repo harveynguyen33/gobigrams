@@ -1,4 +1,50 @@
-# PLAN — Structure & Naming Convention Round (pre-publish, Harvey-approved gate)
+# DONE — Structure & Naming Convention Round (shipped 2026-10-25)
+
+Status: **COMPLETE** 2026-10-25 19:2x. Executed as NS-1…NS-4 on `develop`, one green
+commit per item. The plan as approved is kept verbatim below this header — it is the
+record of what was asked; this block is the record of what happened.
+
+## Completion record
+
+| Item | Commit | What landed |
+| --- | --- | --- |
+| NS-1 | `c4284fd` | `checks/naming-convention.mjs`, AST-based, wired into the sweep — **RED by design**: 9 violations at HEAD `0f08d17` (sweep 79/80) |
+| NS-2 | `13a42a5` | the nine renames, import specifiers re-resolved, harness anchors + budget keys re-pointed |
+| NS-3 | `2f3c579` | `src/export/`, `src/nodes/`, `src/dialogs/` (20 moves, no renames, no logic change) |
+| NS-4 | this commit | docs re-pointed (features/README coverage note, README-PUBLIC layout table) + this file renamed from PLAN- to DONE- |
+
+**Violations: 9 → 0.** The plan estimated "~20" before measuring; the codified rule
+found 9 real breakages, and every example the plan named is among them: `EdgeData.ts`,
+`crowfoot.tsx`, `pickers/art.tsx` (plus rows/section/stepperFlow, settings/controls,
+settings/panes and `pickers/popover.tsx` — a `.tsx` that renders no JSX). The three
+ambiguous modules the plan wanted kept are pinned in the harness allowlist WITH reasons
+(InspectorPickers re-export shell, boardUtils shared kernel, shapes registry), and a
+stale allowlist entry fails the harness, so the list cannot rot.
+
+**src/ root: 75 loose files → 55** (20 moved into family dirs; hooks, the composition
+root and the shared kernel stay, by design).
+
+**Gates at the final commit:** `npx tsc --noEmit` 0 · `vite build` 0 · sweep **80/80**
+(79 harnesses + the new naming check) · `goblin-verify` **22 passed, 0 failed** ·
+`checks/file-size-gate.mjs` PASS (98 files, 2 hard caps) · client JS **934,675 bytes**,
+identical to the pre-round build · `dist/` still emits `exportSvg` as its OWN async
+chunk · dev server 200 and the canvas mounts.
+
+**Deviations from the plan, with reasons:**
+
+1. The plan's item 4 also said "naming rule added to AGENTS.md". Not done: this round is
+   barred from touching AGENTS.md. The rule lives in the harness (which fails builds) and
+   in `features/README.md`; AGENTS.md can cite it in a later, separately-approved edit.
+2. `FeedbackDialog.tsx` stays at `src/` root (the plan hedged with a "?"). It is
+   feature-pinned by `features/feedback.md` and the BG harnesses; moving it would re-anchor
+   a pinned surface for no structural gain.
+3. The plan's item-3 "manualChunks paths updated" was a no-op: `vite.config.ts` has no
+   `manualChunks` entry, chunk naming follows the module basename, and the post-move build
+   produced byte-identical chunk names — the separate lazy chunk is verified, not assumed.
+
+---
+
+# PLAN (as approved, verbatim) — Structure & Naming Convention Round
 
 Status: PROPOSED (2026-10-25). No file has been touched. Execute ONLY after Harvey
 approves — ideally AFTER the CF Pages deploy is live (this round is invisible to users

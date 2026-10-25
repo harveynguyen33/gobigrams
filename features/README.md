@@ -13,8 +13,16 @@ entry paths point at hooks/components/directories — the composition root is Ap
 
 *Coverage note*
 
-The seven files above cover every user-facing FEATURE. The 50-odd remaining modules are
+The seven files above cover every user-facing FEATURE. The ~90 remaining modules are
 plumbing under those umbrellas (palette search, helper lines, table/label nodes, the
 export modal, font manifest, mermaid parser, touch handling...). They are reachable from
 each feature's entry_paths via imports; the file-size-gate harness is the authoritative
 per-file inventory (checks/file-size-gate.mjs prints the full table).
+
+The structure round (NS, 2026-10-25) pulled the plumbing out of the flat src/ root into
+family dirs: `src/export/` (the lazy SVG/PNG/PDF cluster), `src/nodes/` (node renderers +
+the shape registry) and `src/dialogs/` (board, export, templates, tour). Hooks (`use*.ts`),
+the composition root and the shared kernel (colors, layout, palette, theme, boards) stay at
+src/ root on purpose — they are what every family imports. `checks/naming-convention.mjs`
+holds the line on names: `.ts` and non-component `.tsx` are camelCase, component `.tsx` is
+PascalCase, directories are lowercase or camelCase.

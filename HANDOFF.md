@@ -9,6 +9,45 @@
 - When dispatching coders: they work as before, but "push" now means origin develop.
 
 
+## ▶ 2026-10-25 19:2x — ROUND NS: naming convention + family dirs (develop, 4 commits)
+
+**State:** `develop` @ NS-4, gates green. **src/ root went 75 loose files → 55**; nothing a
+user sees changed (no behaviour edit, client JS byte-identical).
+
+**The rule, now enforced instead of remembered** — `checks/naming-convention.mjs` (AST-based,
+wired into the sweep): `.ts` and non-component `.tsx` → camelCase · component `.tsx` →
+PascalCase · dirs → lowercase/camelCase · a `.tsx` must actually render JSX. Three ambiguous
+modules are allowlisted with reasons (InspectorPickers re-export shell, boardUtils shared
+kernel, shapes registry) and a stale allowlist entry fails. **RED-first: 9 violations at
+`0f08d17` → 0.**
+
+- **NS-1 `c4284fd`** the harness, RED by design (sweep 79/80).
+- **NS-2 `13a42a5`** the 9 renames: `edges/EdgeData.ts→edgeData.ts`, `crowfoot.tsx→Crowfoot.tsx`,
+  `pickers/{art,rows,section,stepperFlow}.tsx→{Art,Rows,Section,StepperFlow}.tsx`,
+  `settings/{controls,panes}.tsx→{Controls,Panes}.tsx`, `pickers/popover.tsx→popover.ts`
+  (renders no JSX). Import specifiers re-resolved, not string-patched.
+- **NS-3 `2f3c579`** family dirs, moves only: `src/export/` (exportSvg, exportScene, exportPng,
+  printView, textOutline, textOutlineHb, fontFiles) · `src/nodes/` (DiagramNode, CustomShapeNode,
+  TableNode, LabelNode, shapes, Crowfoot, customShape, flowIcons, Checklist) · `src/dialogs/`
+  (BoardDialog, ExportModal, TemplatesGallery, Tour). **FeedbackDialog.tsx and Settings.tsx stay
+  at src/ root** (feature-pinned / shell), and the shared kernel (colors, layout, palette, theme,
+  boards, edgeBend, edgeLabel…) stays too.
+- **NS-4** docs: `features/README.md` coverage note, `README-PUBLIC.md` layout table rows for
+  `src/nodes/`, `src/dialogs/`, `src/export/`; the plan is now `DONE-structure-naming.md`.
+
+**Gates (verified at the final commit):** tsc 0 · build 0 · sweep **80/80** (79 + the naming
+check) · goblin-verify **22/0** · size-gate 98 files PASS · **934,675 bytes** (unchanged) ·
+`dist/` still has `exportSvg` as a SEPARATE async chunk (`exportSvg-DeBsj9Ye.js`, 21,498 B) ·
+dev server 200 + canvas mounts.
+
+**Gotcha for the next coder:** the sweep LEAKS entry files at the repo root
+(`.rc-entry.ts`, `.ay4-entry.ts`, `.ay4-out.mjs`, `.adv-entry.ts`) and a leftover `.rc-entry.ts`
+makes goblin-verify's FM-02 resolve `src/*` tokens to it and FAIL. Delete them before running
+`goblin-verify`. Also: harnesses read sources by literal path — any move needs `grep -rl 'src/<old>' checks/`
+plus the three dynamic idioms (`'pickers/' + f + '.tsx'`, `['GoblinEdge','EdgeData',…]`,
+`${ROOT}/src/${bare name}`) re-anchored, never weakened.
+
+
 ## ▶ 2026-10-24 19:0x — PUBLIC PUBLISHING — one allowlist script, mirror removed
 
 **The GitHub repo is now fed by ONE path: `.gob/publish-public.sh`.**
