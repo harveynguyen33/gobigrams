@@ -80,8 +80,12 @@ try { SET = blank(read('src/Settings.tsx')); } catch { /* probed below */ }
 try { CSS = read('src/styles.css'); } catch { /* probed below */ }
 /* ROUND BI, ITEM 3 — the help sheet lives in App.tsx, so the harness reads it
    too (blanked: the assertions below are about ELEMENTS and handlers, not
-   comments). */
-try { APP = blank(read('src/App.tsx')); } catch { /* probed below */ }
+   comments).
+   ROUND BN-3 PHASE B — the sheet's JSX moved VERBATIM to
+   src/components/HelpSheet.tsx; `APP` reads the UNION so the sheet's
+   assertions (s23/s24: order + handler tokens) still see the sheet, while
+   the dialog-mount assertion (s25) still sees App. */
+try { APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx')); } catch { /* probed below */ }
 
 if (DLG) {
   assert('bh.s2.focusable-imported-from-settings-one-definition',
@@ -278,8 +282,12 @@ if (APP) {
       : `nothing but whitespace between the tour button and the feedback button (${JSON.stringify(betweenBare)}); the feedback action reuses .help-tour-btn so the two read as one block`);
 
   /* (b) the handler closes the popover FIRST (so focus lands in the dialog,
-     exactly like the tour button) and THEN opens the app-level dialog. */
-  const handler = (fbBlock.match(/onClick=\{([\s\S]*?)\}\s*>/g) || [])[0] || fbBlock;
+     exactly like the tour button) and THEN opens the app-level dialog.
+     ROUND BN-3 PHASE B — the button's onClick is now the `onSendFeedback`
+     prop; the handler body lives in App.tsx's binding, which the union read
+     above still sees. Same assertion, new anchor. */
+  const handler = (APP.match(/onSendFeedback=\{\(\) => \{[\s\S]*?\}\}/) || [])[0]
+    || (fbBlock.match(/onClick=\{([\s\S]*?)\}\s*>/g) || [])[0] || fbBlock;
   assert('bh.s24.help-feedback-handler-closes-help-then-opens-the-dialog',
     /setHelp\(false\)/.test(handler)
       && /setFeedbackOpen\(true\)/.test(handler)

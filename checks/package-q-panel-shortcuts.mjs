@@ -38,7 +38,10 @@ const README = readFileSync(`${ROOT}/README.md`, 'utf8');
 const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ''))
   .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-const APP = stripTs(APP_RAW);
+const APP = stripTs(APP_RAW)
+  /* ROUND BN-3 PHASE B — the ? sheet's rows moved to src/components/HelpSheet.tsx;
+     appended AFTER App so every at()/line-number lookup on APP_RAW is unchanged. */
+  + '\n' + stripTs(readFileSync(`${ROOT}/src/components/HelpSheet.tsx`, 'utf8'));
 const SET = stripTs(SET_RAW);
 
 const APP_L = APP_RAW.split('\n');

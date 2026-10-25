@@ -10,7 +10,7 @@ import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
 import {
   Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
-  LayoutGrid, Plus, Pencil, Save, Waypoints, AlignCenter,
+  LayoutGrid, Plus, Pencil, Save, AlignCenter,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
@@ -18,7 +18,6 @@ import {
   PanelLeftClose, PanelRightClose, Eye,
   LayoutTemplate,
   Settings as SettingsIcon,
-  MessageSquarePlus,
   X,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -108,6 +107,7 @@ import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
+import {HelpSheet} from './components/HelpSheet';
 import Checklist, {type ChecklistTaskId} from './Checklist';
 import Settings from './Settings';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
@@ -4420,67 +4420,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
             Positioned absolute relative to the .react-flow container. */}
         {/* D2: keyboard cheat sheet */}
-        <Tooltip label="Keyboard shortcuts (?)">
-          <button
-            type="button"
-            ref={helpBtnRef}
-            className={`help-btn${help ? ' on' : ''}`}
-            aria-label="Keyboard shortcuts"
-            onClick={() => setHelp(h => !h)}
-          >?</button>
-        </Tooltip>
-        {help && (
-          <div className="help-pop" ref={helpRef}>
-            <h4>Shortcuts</h4>
-            {/* Item 3a: the tour entry point is the FIRST element in the sheet —
-                directly under the title and above the Keyboard group — so it is
-                the most discoverable thing in the popover. Its spacing moved
-                from its top to its bottom (see `.help-tour-btn` in styles.css). */}
-            <button type="button" className="help-tour-btn" onClick={() => { setHelp(false); setTourOpen(true); }}>
-              <Waypoints size={13} /> Take a tour
-            </button>
-            {/* ROUND BI, ITEM 3 — the SECOND action of the same block: the
-                feedback form, one click from the shortcuts sheet. Same
-                .help-tour-btn treatment (its own 8px bottom margin is the gap
-                between the two, so the pair reads as one block and no colour or
-                new class is introduced). The popover closes FIRST, exactly like
-                the tour button, so the dialog's own autofocus lands inside it
-                and Esc hands the caret back to this ? button. */}
-            <button
-              type="button"
-              className="help-tour-btn"
-              data-help-feedback
-              onClick={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
-            >
-              <MessageSquarePlus size={13} /> Send feedback
-            </button>
-            {/* Item 4: this sheet and Settings → Shortcuts must present the
-                SAME information — same two groups, same entries, same order,
-                same wording. Keys render as `kbd` chips; gestures render as
-                plain `.gesture` tokens (never chips), exactly as Settings does. */}
-            <div className="help-group">Keyboard</div>
-            <div className="help-row"><span>Undo</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>Z</kbd></span></div>
-            <div className="help-row"><span>Redo</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>Z</kbd></span></div>
-            <div className="help-row"><span>Delete selection</span><span className="help-keys"><kbd>Del</kbd></span></div>
-            <div className="help-row"><span>Copy / paste / duplicate</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>C</kbd><kbd>V</kbd><kbd>D</kbd></span></div>
-            <div className="help-row"><span>Deselect</span><span className="help-keys"><kbd>Esc</kbd></span></div>
-            <div className="help-row"><span>Fit view to diagram</span><span className="help-keys"><kbd>⇧</kbd><kbd>1</kbd></span></div>
-            <div className="help-row"><span>Toggle read-only review mode</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>
-            {/* the same hint Settings → Shortcuts shows on this row, so the two
-                surfaces carry the same information (item 4), not just the same
-                labels */}
-            <div className="help-row"><span>Nudge selection<span className="help-hint">1px per keypress, 10px with ⇧</span></span><span className="help-keys"><kbd>←↑↓→</kbd></span></div>
-            <div className="help-row"><span>Collapse / expand both panels</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>{'\\'}</kbd></span></div>
-            <div className="help-row"><span>Toggle left panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>[</kbd></span></div>
-            <div className="help-row"><span>Toggle right panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>]</kbd></span></div>
-            <div className="help-group">Mouse &amp; trackpad</div>
-            <div className="help-row"><span>Insert node</span><span className="gesture"><span className="gesture-token">double-click canvas</span></span></div>
-            <div className="help-row"><span>Connect nodes</span><span className="gesture"><span className="gesture-token">drag from a node edge</span></span></div>
-            <div className="help-row"><span>Edit a connection</span><span className="gesture"><span className="gesture-token">click the edge</span></span></div>
-            <div className="help-row"><span>Select multiple</span><span className="gesture"><span className="gesture-token">⌘/Ctrl + click</span></span></div>
-            <div className="help-row"><span>Rename connection</span><span className="gesture"><span className="gesture-token">double-click the label</span></span></div>
-          </div>
-        )}
+        {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
+            (button + popover) lives in src/components/HelpSheet.tsx now;
+            App threads the open state, the two refs and the two openers. */}
+        <HelpSheet
+          btnRef={helpBtnRef}
+          popRef={helpRef}
+          open={help}
+          onToggle={() => setHelp(h => !h)}
+          onTakeTour={() => { setHelp(false); setTourOpen(true); }}
+          onSendFeedback={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
+        />
 
         {/* D1: searchable insert palette */}
         {searchPos && (

@@ -42,7 +42,9 @@ const blank = (src) => src
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 
 const SET = blank(read('src/Settings.tsx'));
-const APP = blank(read('src/App.tsx'));
+/* ROUND BN-3 PHASE B — the ? sheet's JSX moved to src/components/HelpSheet.tsx;
+   `APP` reads the UNION so the help-pop assertions still see the sheet. */
+const APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx'));
 const CSS = read('src/styles.css');
 /* ROUND BH — the outbound anchor now lives in the feedback dialog */
 const DLG = blank(read('src/FeedbackDialog.tsx'));
