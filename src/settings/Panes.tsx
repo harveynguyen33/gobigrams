@@ -209,6 +209,20 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
           </a>
           {' (MIT)'}
         </Row>
+        {/* SUPPORT (2026-10-25) — donate row, Harvey's BMC account exists
+            (buymeacoffee.com/harveynguyen33, live-verified). GitHub Sponsors
+            link already resolves via FUNDING.yml once his profile is
+            approved; both links pinned by checks/round-bg-feedback-entry. */}
+        <Row label="Support">
+          <a
+            className="settings-link"
+            href="https://www.buymeacoffee.com/harveynguyen33"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Buy the goblin a coffee
+          </a>
+        </Row>
       </div>
       {/* PUBLIC LAUNCH — the in-app feedback entry. One quiet line at the very
           bottom of the About pane (LESS intrusive than the ? cheatsheet, whose

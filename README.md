@@ -49,6 +49,7 @@ copy or to move a board between machines. Nothing is uploaded by default.
 - 💬 [GitHub Discussions](https://github.com/harveynguyen33/gobigrams/discussions) — questions, show-and-tell, ideas
 - 🤝 [Contributing](./CONTRIBUTING.md) — yes, it's a solo goblin, but pull requests are welcome
 - 🔒 [Security](./SECURITY.md) — found something sensitive? Start here, not in a public issue
+- ☕ [Buy the goblin a coffee](https://www.buymeacoffee.com/harveynguyen) — donations keep the ruler sharp
 
 ## Tech
 
