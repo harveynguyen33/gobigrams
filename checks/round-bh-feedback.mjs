@@ -85,7 +85,10 @@ try { CSS = read('src/styles.css'); } catch { /* probed below */ }
    src/components/HelpSheet.tsx; `APP` reads the UNION so the sheet's
    assertions (s23/s24: order + handler tokens) still see the sheet, while
    the dialog-mount assertion (s25) still sees App. */
-try { APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx')); } catch { /* probed below */ }
+/* ROUND BN-3 PHASE B — the five modal mounts (incl. <FeedbackDialog>) moved to
+   src/components/ModalMounts.tsx; `APP` reads the UNION so the mount assertions
+   follow the code home. */
+try { APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx') + '\n' + read('src/components/ModalMounts.tsx')); } catch { /* probed below */ }
 
 if (DLG) {
   assert('bh.s2.focusable-imported-from-settings-one-definition',
@@ -301,8 +304,11 @@ if (APP) {
   const settingsMounts = (SET.match(/<FeedbackDialog/g) || []).length;
   assert('bh.s25.one-app-level-dialog-fed-by-both-openers',
     dialogMounts === 1 && settingsMounts === 0
-      && /onOpenFeedback/.test(SET) && /feedbackOpen\s*&&|feedbackOpen\s*\?/.test(APP)
-      && /returnFocusTo=\{feedbackReturn\}/.test(APP),
+      && /onOpenFeedback/.test(SET)
+      /* BN-3 PHASE B: both halves moved with the mount into ModalMounts
+         (in the union above) — the conditional AND the focus-return prop. */
+      && /feedbackOpen\s*&&|feedbackOpen\s*\?/.test(APP)
+      && (/returnFocusTo=\{feedbackReturn\}/.test(APP) || /returnFocusTo=\{p\.feedbackReturn\}/.test(APP)),
     `App mounts <FeedbackDialog> ${dialogMounts}x, Settings ${settingsMounts}x; the About entry reaches it through onOpenFeedback, and the dialog returns focus to whichever opener set feedbackReturn`);
 
   /* (c) token-only styling: the action block reuses .help-tour-btn's rules and

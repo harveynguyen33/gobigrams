@@ -927,9 +927,12 @@ console.log('='.repeat(78));
 const TG_RAW = readFileSync(`${ROOT}/src/TemplatesGallery.tsx`, 'utf8');
 const TG = stripTs(TG_RAW);
 /* BN-2: the boards-menu + gallery wiring moved to src/useBoardsMenu.ts —
-   the harness reads the UNION so pins follow the code home. */
+   the harness reads the UNION so pins follow the code home.
+   BN-3 PHASE B: the modal mounts (BoardDialog + gallery + their glue props)
+   moved to src/components/ModalMounts.tsx — same union rule. */
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
-  + readFileSync(`${ROOT}/src/useBoardsMenu.ts`, 'utf8');
+  + readFileSync(`${ROOT}/src/useBoardsMenu.ts`, 'utf8')
+  + readFileSync(`${ROOT}/src/components/ModalMounts.tsx`, 'utf8');
 const UEI_RAW = readFileSync(`${ROOT}/src/useEditorInterface.ts`, 'utf8');
 
 /* The component is EXECUTED, not transcribed. `--jsx=automatic` lets esbuild
@@ -1089,7 +1092,11 @@ assert('tg6.REANCHOR.App-keeps-the-create-path-and-feeds-it-the-choice',
   createCallSites === 4
     && tg6UseTemplate.test(APP_RAW)
     && /createFromTemplate\(\{\s*name: carried, preset: key\.slice\(0, i\) as PresetId, templateId: key\.slice\(i \+ 1\)\}\)/.test(APP_RAW)
-    && /onUse=\{useTemplate\}/.test(APP_RAW)
+    /* BN-3 PHASE B: the gallery's mount moved to ModalMounts.tsx (in the
+       APP_RAW union); App feeds it `onUseTemplate={useTemplate}`, which the
+       mount forwards as `onUse={p.onUseTemplate}`. Claim unchanged: the
+       gallery's choice still resolves through App's useTemplate. */
+    && (/onUse=\{useTemplate\}/.test(APP_RAW) || /onUse=\{p\.onUseTemplate\}/.test(APP_RAW))
     && /getPreset\(wantPid\)\.templates\?\.find\(x => x\.id === opts\.templateId\)/.test(APP_RAW),
   `RE-ANCHORED TWICE, and the reason is recorded. ROUND 3: the gallery's choice stopped taking the two-step handover (\`setBoardPick(key)\` + \`setBoardDlg('create')\` + \`initialPick\`) and went straight to \`createFromTemplate\`; the key's new spelling was pinned. `
   + `ROUND 6, ITEM 3 then changed that call to carry the TYPED NAME (\`name: carried\`), so the key predicate was re-anchored from \`createFromTemplate({preset: key.slice…\` to \`createFromTemplate({name: carried, preset: key.slice…\`. `
@@ -1180,7 +1187,12 @@ assert('tg11.the-gallery-is-reachable-from-the-boards-menu-and-from-the-dialog',
   /setBoardsOpen\(false\); pendingBoardName\.current = ''; setTgOpen\(true\)/.test(APP_RAW)
     && /<LayoutTemplate size=\{14\} \/> Templates/.test(APP_RAW)
     && !/<LayoutTemplate size=\{14\} \/> Create from Templates/.test(APP_RAW)
-    && /onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+    /* BN-3 PHASE B: that onBrowse handler moved verbatim into App's
+       ModalMounts binding as `onBrowseTemplates={...}`; ModalMounts forwards
+       it to the dialog as `onBrowse={p.onBrowseTemplates}`. */
+    && (/onBrowse=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+      || (/onBrowseTemplates=\{\(name\) => \{ pendingBoardName\.current = name; setBoardDlg\(null\); setTgOpen\(true\); \}\}/.test(APP_RAW)
+        && /onBrowse=\{p\.onBrowseTemplates\}/.test(APP_RAW)))
     && /if \(tgOpen\) return;/.test(APP_RAW)
     && /onBrowse\?: \(name: string\) => void;/.test(DIALOG_RAW)
     && /onClick=\{\(\) => \(row\.key === 'browse' \? onBrowse\?\.\(trimmed\) : submit\(\)\)\}/.test(DIALOG_RAW)
@@ -1296,7 +1308,12 @@ const resolveNameCalls = (APP_RAW.match(/boards\.resolveBoardName\(/g) ?? []).le
 console.log(`  boards.nextUntitledName call sites in App.tsx: ${nextUntitledCalls}; boards.resolveBoardName call sites: ${resolveNameCalls}`);
 assert('r3c.both-create-paths-auto-number-through-the-one-pure-helper',
   nextUntitledCalls === 1 && resolveNameCalls === 1
-    && /defaultName=\{boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\)\}/.test(APP_RAW)
+    /* BN-3 PHASE B: the dialog's mount moved to ModalMounts.tsx (in the union);
+       App computes the value (`nextUntitledName={boards.nextUntitledName(...)}`)
+       and the mount passes it through (`defaultName={p.nextUntitledName}`). */
+    && ((/defaultName=\{boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\)\}/.test(APP_RAW))
+      || (/nextUntitledName=\{boards\.nextUntitledName\(boardList\.map\(b => b\.name\)\)\}/.test(APP_RAW)
+        && /defaultName=\{p\.nextUntitledName\}/.test(APP_RAW)))
     && /const name = boards\.resolveBoardName\(opts\.name, boardList\.map\(b => b\.name\)\);/.test(APP_RAW)
     /* The delegation itself, so "one owner" is not taken on trust: resolveBoardName
        trims, returns the given name when it survives trimming, and otherwise calls

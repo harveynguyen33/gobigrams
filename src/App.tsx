@@ -6,7 +6,7 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
+import {type ExportScope, type ExportFormat} from './ExportModal';
 import {
   Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
@@ -49,7 +49,6 @@ import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNo
 import {edgeTypes} from './GoblinEdge';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
-import BoardDialog from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
@@ -108,13 +107,11 @@ import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import {HelpSheet} from './components/HelpSheet';
+import {ModalMounts} from './components/ModalMounts';
 import Checklist, {type ChecklistTaskId} from './Checklist';
-import Settings from './Settings';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
-import FeedbackDialog from './FeedbackDialog';
-import TemplatesGallery from './TemplatesGallery';
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
 import {layoutDiagram} from './layout';
@@ -4441,105 +4438,62 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* ITEM 6b: the designed board dialog — create / rename / delete. Inside
-            `.canvas-wrap` beside the search palette and Settings, so its scrim
-            covers the canvas column and the two docked panels stay legible. */}
-        {boardDlg && (
-          <BoardDialog
-            mode={boardDlg}
-            boardName={curBoard?.name ?? ''}
-            onCancel={closeBoardDlg}
-            onSubmit={onBoardDialog}
-            returnFocusTo={boardsMenuBtnRef}
-            defaultName={boards.nextUntitledName(boardList.map(b => b.name))}
-            /* ROUND 6, ITEM 3 — the typed name is STASHED here before the gallery
-               opens, and consumed by `useTemplate` when a card is picked. This is
-               the line the defect lived on: it used to be
-               `() => { setBoardDlg(null); setTgOpen(true); }`, which dropped the
-               name on the floor, so `createFromTemplate` auto-numbered. */
-            onBrowse={(name) => { pendingBoardName.current = name; setBoardDlg(null); setTgOpen(true); }}
-          />
-        )}
-
-        {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery. Inside `.canvas-wrap`
-            beside the board dialog and Settings, so its scrim covers the canvas
-            column and the two docked panels stay legible. Mounted AFTER the
-            dialog, and above it via `.tg-overlay`'s z-index: the dialog is never
-            visible through the gallery — the open gallery's scrim covers it —
-            and the dialog is unmounted (not hidden) whenever the gallery is
-            opened from the boards menu, so exactly one of the two creates the
-            board and the other cannot be clicked behind a scrim. */}
-        {tgOpen && (
-          <TemplatesGallery
-            onCancel={closeGallery}
-            onUse={useTemplate}
-            returnFocusTo={boardsMenuBtnRef}
-          />
-        )}
-
-        {/* M2: the Settings dialog — inside .canvas-wrap, so the scrim covers
-            the canvas column only (the palette and inspector stay live). */}
-        <Settings
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          mode={mode}
-          onMode={chooseMode}
-          resolved={theme}
-          noCycles={noCycles}
-          onNoCycles={setNoCycles}
-          oneIn={oneIn}
-          onOneIn={setOneIn}
-          dblConnect={dblConnect}
-          onDblConnect={onDblConnect}
-          dblRange={dblRange}
-          onDblRange={onDblRange}
-          gridSize={gridSize}
-          onGridSize={onGridSize}
-          alignGuides={alignGuides}
-          onAlignGuides={setAlignGuides}
-          animate={animate}
-          onAnimate={toggleAnimate}
-          highlight={highlight}
-          onHighlight={toggleHighlight}
-          marquee={marqueeMode}
-          onMarquee={setMarqueeMode}
-          zOrder={zOrderMode}
-          onZOrder={setZOrderMode}
-          pngScale={pngScale}
-          onPngScale={onPngScale}
-          pngPad={pngPad}
-          onPngPad={onPngPad}
-          autosave={autosave}
-          onAutosave={onAutosave}
-          returnFocusTo={settingsBtnRef}
+        {/* ROUND BN-3 PHASE B: the five modal mounts (BoardDialog, gallery,
+            Settings, FeedbackDialog, ExportModal + the hidden JSON input) live
+            in src/components/ModalMounts.tsx; App computes every prop. */}
+        <ModalMounts
+          boardDlg={boardDlg}
+          curBoardName={curBoard?.name ?? ''}
+          onCancelBoardDlg={closeBoardDlg}
+          onSubmitBoardDlg={onBoardDialog}
+          returnFocusTo={boardsMenuBtnRef}
+          nextUntitledName={boards.nextUntitledName(boardList.map(b => b.name))}
+          onBrowseTemplates={(name) => { pendingBoardName.current = name; setBoardDlg(null); setTgOpen(true); }}
+          tgOpen={tgOpen}
+          onCloseGallery={closeGallery}
+          onUseTemplate={useTemplate}
+          settingsOpen={settingsOpen}
+          onCloseSettings={() => setSettingsOpen(false)}
+          settingsProps={{
+            mode,
+            onMode: chooseMode,
+            resolved: theme,
+            noCycles,
+            onNoCycles: setNoCycles,
+            oneIn,
+            onOneIn: setOneIn,
+            dblConnect,
+            onDblConnect,
+            dblRange,
+            onDblRange,
+            gridSize,
+            onGridSize,
+            alignGuides,
+            onAlignGuides: setAlignGuides,
+            animate,
+            onAnimate: toggleAnimate,
+            highlight,
+            onHighlight: toggleHighlight,
+            marquee: marqueeMode,
+            onMarquee: setMarqueeMode,
+            zOrder: zOrderMode,
+            onZOrder: setZOrderMode,
+            pngScale,
+            onPngScale,
+            pngPad,
+            onPngPad,
+            autosave,
+            onAutosave,
+            returnFocusTo: settingsBtnRef,
+            boardPng: nodes.length ? boardPngForFeedback : null,
+            onOpenFeedback: openFeedback,
+          }}
+          feedbackOpen={feedbackOpen}
+          onCloseFeedback={() => setFeedbackOpen(false)}
+          feedbackReturn={feedbackReturn}
           boardPng={nodes.length ? boardPngForFeedback : null}
-          onOpenFeedback={openFeedback}
-        />
-
-        {/* ROUND BI, ITEM 3 — the app's ONE feedback dialog (see the import and
-            the state above). Rendered here, inside `.canvas-wrap` beside
-            Settings, so its scrim covers the canvas column like every other
-            modal; `.fb-overlay`'s z-index (80) keeps it above the Settings
-            modal (70) and the help sheet (30) whichever opener started it. */}
-        {feedbackOpen && (
-          <FeedbackDialog
-            onCancel={() => setFeedbackOpen(false)}
-            returnFocusTo={feedbackReturn}
-            boardPng={nodes.length ? boardPngForFeedback : null}
-          />
-        )}
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          style={{display: 'none'}}
-          onChange={onImportFile}
-        />
-
-        <ExportModal
-          open={expOpen}
-          onClose={() => setExpOpen(false)}
+          expOpen={expOpen}
+          onCloseExport={() => setExpOpen(false)}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}
@@ -4548,7 +4502,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           buildSvg={buildSvg}
           buildPng={buildPng}
           printPdf={printPdf}
-          onImportJson={() => fileRef.current?.click()}
+          fileRef={fileRef}
+          onImportFile={onImportFile}
         />
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects

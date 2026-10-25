@@ -35,7 +35,7 @@ const NEW_FILE_DEFAULT_BUDGET = 400;
 // Generated from the measured line counts at ROUND BN (HEAD 4402da1); the
 // "now N" comments record the count each budget was derived from.
 const BUDGETS = new Map([
-    ['src/App.tsx', 5720, 'hard'],  // ROUND BN-3 PHASE B: LOWERED again (HelpSheet extraction)
+    ['src/App.tsx', 5675, 'hard'],  // ROUND BN-3 PHASE B: LOWERED again (ModalMounts extraction)
   ['src/useUndoHistory.ts', 132],  // ROUND BN PHASE A (now 121)
   ['src/usePersistence.ts', 272],  // ROUND BN-2 (now 271)
   ['src/useConnections.ts', 298],  // ROUND BN-2
@@ -47,6 +47,7 @@ const BUDGETS = new Map([
   ['src/boardUtils.tsx', 231],  // ROUND BN ITEM 2 (now 210),
   ['src/BoardDialog.tsx', 383],  // now 348,
   ['src/components/HelpSheet.tsx', 96],  // ROUND BN-3 PHASE B (new)
+  ['src/components/ModalMounts.tsx', 143],  // ROUND BN-3 PHASE B (new)
   ['src/Checklist.tsx', 133],  // now 120,
   ['src/ContextMenu.tsx', 136],  // now 123,
   ['src/CustomShapeNode.tsx', 145],  // now 131,

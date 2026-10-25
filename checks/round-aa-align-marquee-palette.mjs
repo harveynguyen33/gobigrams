@@ -26,7 +26,12 @@ import {execFileSync} from 'node:child_process';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
-const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN-3 PHASE B — the ? help sheet moved VERBATIM to
+   src/components/HelpSheet.tsx; the harness reads the UNION so the
+   shortcuts-surface assertions follow the code home (same pattern as
+   round-bh-feedback's APP union). */
+const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
+  + readFileSync(`${ROOT}/src/components/HelpSheet.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const PRESETS_RAW = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
 const SET_RAW = readFileSync(`${ROOT}/src/Settings.tsx`, 'utf8');
@@ -917,11 +922,16 @@ assert('aa2.persistence-follows-the-existing-convention-not-a-new-one',
   + 'one is persisted because Harvey asked for a setting that survives a reload.');
 
 /* THE PROP IS WIRED, AND IT IS THE ONLY PLACE THE ENUM IS DERIVED. */
+/* Re-anchored (ROUND BN-3 PHASE B): the modal mounts moved to
+   src/components/ModalMounts.tsx and Settings now receives its pane props via
+   one settingsProps object built in App (marquee: marqueeMode / onMarquee:
+   setMarqueeMode) spread by ModalMounts — the WIRING is unchanged, only the
+   textual shape. The ReactFlow prop assertion stays as-is (App still owns it). */
 assert('aa2.the-canvas-prop-reads-the-setting-live',
   /const \{mode: marqueeMode, selectionMode, setMode: setMarqueeMode\} = useMarqueeMode\(\)/.test(APP)
     && /selectionMode=\{selectionMode\}/.test(APP)
     && countOf(APP, 'selectionMode={') === 1
-    && /marquee=\{marqueeMode\}/.test(APP) && /onMarquee=\{setMarqueeMode\}/.test(APP),
+    && /marquee: marqueeMode,/.test(APP) && /onMarquee: setMarqueeMode,/.test(APP),
   'one hook owns the value AND the enum, the `<ReactFlow>` prop is `selectionMode={selectionMode}` (exactly '
   + 'one occurrence, so nothing else can map it differently), and the Settings row is handed the live value '
   + 'and its setter — changing the setting re-renders the prop with no reload');

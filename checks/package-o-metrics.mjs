@@ -653,7 +653,10 @@ const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, '')     // block comments
   .replace(/(^|[^:])\/\/[^\n]*/g, '$1'); // line comments (the [^:] keeps `://` in URLs)
 const SRC = {
-  App: stripTs(srcOf('App.tsx')),
+  /* BN-3 PHASE B: the modal mounts (incl. <BoardDialog>) moved to
+     src/components/ModalMounts.tsx — App reads the union so the mount
+     assertions follow the code home. */
+  App: stripTs(srcOf('App.tsx') + '\n' + srcOf('components/ModalMounts.tsx')),
   Diagram: stripTs(srcOf('DiagramNode.tsx')),
   Custom: stripTs(srcOf('CustomShapeNode.tsx')),
   Label: stripTs(srcOf('LabelNode.tsx')),

@@ -43,8 +43,10 @@ const blank = (src) => src
 
 const SET = blank(read('src/Settings.tsx'));
 /* ROUND BN-3 PHASE B — the ? sheet's JSX moved to src/components/HelpSheet.tsx;
-   `APP` reads the UNION so the help-pop assertions still see the sheet. */
-const APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx'));
+   `APP` reads the UNION so the help-pop assertions still see the sheet.
+   The five modal mounts (incl. <FeedbackDialog>) moved to
+   src/components/ModalMounts.tsx in the same round. */
+const APP = blank(read('src/App.tsx') + '\n' + read('src/components/HelpSheet.tsx') + '\n' + read('src/components/ModalMounts.tsx'));
 const CSS = read('src/styles.css');
 /* ROUND BH — the outbound anchor now lives in the feedback dialog */
 const DLG = blank(read('src/FeedbackDialog.tsx'));
