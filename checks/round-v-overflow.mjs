@@ -47,10 +47,10 @@ const read = p => readFileSync(`${ROOT}/${p}`, 'utf8');
 
 const RAW = {
   css: read('src/styles.css'),
-  DiagramNode: read('src/DiagramNode.tsx'),
-  LabelNode: read('src/LabelNode.tsx'),
-  TableNode: read('src/TableNode.tsx'),
-  CustomShapeNode: read('src/CustomShapeNode.tsx'),
+  DiagramNode: read('src/nodes/DiagramNode.tsx'),
+  LabelNode: read('src/nodes/LabelNode.tsx'),
+  TableNode: read('src/nodes/TableNode.tsx'),
+  CustomShapeNode: read('src/nodes/CustomShapeNode.tsx'),
 };
 
 const blank = m => m.replace(/[^\n]/g, ' ');

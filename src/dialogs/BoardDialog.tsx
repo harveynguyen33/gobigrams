@@ -1,4 +1,4 @@
-/* feature-map home: src/BoardDialog.tsx */
+/* feature-map home: src/dialogs/BoardDialog.tsx */
 /* ITEM 6b (2026-09-18) — THE BOARD DIALOG: create / rename / delete as ONE
  * designed component, replacing three `window.prompt` / `window.confirm` calls.
  *
@@ -86,8 +86,8 @@
  */
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {X} from 'lucide-react';
-import type {PresetId} from './presets';
-import {FOCUSABLE} from './Settings';
+import type {PresetId} from '../presets';
+import {FOCUSABLE} from '../Settings';
 
 export type BoardDialogMode = 'create' | 'rename' | 'delete';
 

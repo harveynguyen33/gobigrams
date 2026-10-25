@@ -3,11 +3,11 @@ import {MarkerType, type Edge} from '@xyflow/react';
 import type {EdgeMarkerType} from '@xyflow/system';
 import {COLOR_VAR, type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
-import {type Shape} from '../shapes';
+import {type Shape} from '../nodes/shapes';
 import {gridLayout, layoutDiagram, type LayoutDirection, type LayoutSpacing} from '../layout';
-import {type CrowFoot} from '../Crowfoot';
+import {type CrowFoot} from '../nodes/Crowfoot';
 import {type ThemeName} from '../theme';
-import {type ShowMode} from '../TableNode';
+import {type ShowMode} from '../nodes/TableNode';
 import type {Node} from '@xyflow/react';
 /* ---------------------------------------------------------------------------
    L2 — THE PRESET SPINE.

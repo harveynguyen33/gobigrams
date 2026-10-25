@@ -8,8 +8,8 @@
  *       bundled with the project's OWN esbuild and imported, so the catalog, the
  *       three new templates and `LAYOUTS['layered-tb']` are the shipped objects
  *       and not a transcription of them, or
- *   (2) a TEXT/structural read of `src/BoardDialog.tsx` / `src/styles.css` /
- *       `src/shapes.tsx` with comments blanked first, or
+ *   (2) a TEXT/structural read of `src/dialogs/BoardDialog.tsx` / `src/styles.css` /
+ *       `src/nodes/shapes.tsx` with comments blanked first, or
  *   (3) ARITHMETIC on the returned layout positions.
  * The live painted measurement (tab order, focus, paint) is the orchestrator's
  * browser pass — this file proves nothing about the DOM and says so.
@@ -38,9 +38,9 @@ const PRESETS_TEXT = ['basic', 'flowchart', 'dataStorage', 'architecture', 'inde
 const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
 
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
-const DIALOG_RAW = readFileSync(`${ROOT}/src/BoardDialog.tsx`, 'utf8');
+const DIALOG_RAW = readFileSync(`${ROOT}/src/dialogs/BoardDialog.tsx`, 'utf8');
 const CATALOG_RAW = readFileSync(`${ROOT}/src/templateCatalog.ts`, 'utf8');
-const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
+const SHAPES_RAW = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s
@@ -482,7 +482,7 @@ console.log('\n' + '='.repeat(78));
 console.log('AC 12 — no new colour');
 console.log('='.repeat(78));
 const HEX = (STYLES_RAW.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
-const hexHits = [['src/templateCatalog.ts', CATALOG_RAW], ['src/BoardDialog.tsx', DIALOG_RAW]]
+const hexHits = [['src/templateCatalog.ts', CATALOG_RAW], ['src/dialogs/BoardDialog.tsx', DIALOG_RAW]]
   .map(([name, src]) => ({name, n: (src.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length, rgba: (src.match(/rgba?\(/g) ?? []).length}))
   .filter(r => r.n || r.rgba);
 const bdRowBlocks = (STYLES_RAW.match(/(?:^|\n)\.bd-(?:row|list|row-text|row-name|row-hint)[^{]*\{[^}]*\}/g) ?? []).join('\n');
@@ -495,7 +495,7 @@ assert('12a.the-hex-count-is-unchanged',
 assert('12b.no-colour-literal-in-the-new-module-or-the-dialog',
   hexHits.length === 0,
   hexHits.length === 0
-    ? 'src/templateCatalog.ts and src/BoardDialog.tsx contain no #hex and no rgb()/rgba() literal; every rule the body uses is built from tokens'
+    ? 'src/templateCatalog.ts and src/dialogs/BoardDialog.tsx contain no #hex and no rgb()/rgba() literal; every rule the body uses is built from tokens'
     : hexHits.map(r => `${r.name}: ${r.n} hex, ${r.rgba} rgb()`).join('; '));
 /* RE-ANCHORED TWICE. It first named the `.bd-hd` group-header rule and its
    `--surface` / `--dim` tokens. ROUND 4 deleted the header (and the rule), so the
@@ -920,7 +920,7 @@ assert('pre6.REPLAY-AC22-is-RED-on-both-flagged-labels-and-green-on-the-fix',
 
 /* ===========================================================================
    PASS 2 — THE TEMPLATES GALLERY (§2.5 / §2.6). Everything below reads the REAL
-   `src/TemplatesGallery.tsx`: its card model is EXECUTED (esbuild bundles the
+   `src/dialogs/TemplatesGallery.tsx`: its card model is EXECUTED (esbuild bundles the
    component with `--jsx=automatic`, which pulls React and lucide in — the
    component's own code is what runs), and its source text is read with comments
    blanked. The tier rules are read out of the `.tg-*` block of `src/styles.css`.
@@ -929,7 +929,7 @@ console.log('\n' + '='.repeat(78));
 console.log('PASS 2 — the gallery derives its cards, its previews and its tiers');
 console.log('='.repeat(78));
 
-const TG_RAW = readFileSync(`${ROOT}/src/TemplatesGallery.tsx`, 'utf8');
+const TG_RAW = readFileSync(`${ROOT}/src/dialogs/TemplatesGallery.tsx`, 'utf8');
 const TG = stripTs(TG_RAW);
 /* BN-2: the boards-menu + gallery wiring moved to src/useBoardsMenu.ts —
    the harness reads the UNION so pins follow the code home.
@@ -945,7 +945,7 @@ const UEI_RAW = readFileSync(`${ROOT}/src/useEditorInterface.ts`, 'utf8');
  *  `galleryModel` and `previewGlyphs` below are the component's own functions. */
 const tgEntry = join(dir, 'tg-entry.ts');
 writeFileSync(tgEntry,
-  `export {galleryModel, previewGlyphs, PREVIEW_MAX, PREVIEW_MAX_PHONE} from ${JSON.stringify(join(ROOT, 'src/TemplatesGallery.tsx'))};\n`);
+  `export {galleryModel, previewGlyphs, PREVIEW_MAX, PREVIEW_MAX_PHONE} from ${JSON.stringify(join(ROOT, 'src/dialogs/TemplatesGallery.tsx'))};\n`);
 const tgJs = join(dir, 'tg.mjs');
 writeFileSync(tgJs, execFileSync(ESBUILD, [tgEntry, '--bundle', '--platform=node', '--format=esm', '--jsx=automatic', '--log-level=error'], {encoding: 'utf8'}));
 const TG_MOD = await import(pathToFileURL(tgJs).href);
@@ -1001,7 +1001,7 @@ assert('tg1.the-gallery-card-model-is-the-catalog-family-level-listing',
 const HARDCODED_SHAPE_LIST_NEEDLE = 'flow' + 'chartShapes' + ' =';
 /* The one shape id `previewGlyphs` falls back to, read out of the component's
  *  own text rather than typed here, so the exemption follows the code. */
-const FALLBACK_SHAPE = (/return typeof v === 'string'[\s\S]{0,120}?: '([a-z]+)';/.exec(readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8')) ?? [])[1] ?? 'ABSENT';
+const FALLBACK_SHAPE = (/return typeof v === 'string'[\s\S]{0,120}?: '([a-z]+)';/.exec(readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8')) ?? [])[1] ?? 'ABSENT';
 const perCard = galleryCards.map(c => {
   const entry = byPair.get(c.key);
   const nodes = entry ? entry.t.nodes : [];
@@ -1146,7 +1146,7 @@ assert('tg10.the-gallery-reuses-the-modal-vocabulary-and-the-focus-contract',
   /className="sp-overlay tg-overlay"/.test(TG)
     && /className="sp-card tg-card"/.test(TG)
     && /role="dialog"/.test(TG) && /aria-modal="true"/.test(TG)
-    && /import \{FOCUSABLE\} from '\.\/Settings'/.test(TG_RAW)
+    && /import \{FOCUSABLE\} from '\.\.\/Settings'/.test(TG_RAW)
     && /document\.addEventListener\('keydown', onDocKey, true\)/.test(TG)
     && /e\.stopPropagation\(\)/.test(TG)
     && /returnFocusTo\?\.current\?\.focus\(\)/.test(TG)
@@ -1333,7 +1333,7 @@ assert('r3c.both-create-paths-auto-number-through-the-one-pure-helper',
   `App.tsx names the pure helpers from exactly ${nextUntitledCalls} + ${resolveNameCalls} places: the dialog's \`defaultName\` prop asks \`nextUntitledName\` for `
   + `the auto-numbered starting value, and \`createFromTemplate\` routes through \`resolveBoardName\` (which forwards to \`nextUntitledName\` — the delegation is asserted above, in `
   + `src/boards.ts), so BOTH create paths and the typed-name fix share ONE owner of the rule. It still PASSES the dialog its start value (\`defaultName\`), so in the dialog's `
-  + `CODE (comments blanked; its docblock names the helper in prose only) \`src/BoardDialog.tsx\` calls neither: the dialog still needs no board list`);
+  + `CODE (comments blanked; its docblock names the helper in prose only) \`src/dialogs/BoardDialog.tsx\` calls neither: the dialog still needs no board list`);
 
 /* r3d — EXACTLY ONE function that creates a board from a template, called by BOTH
  *  routes. WHAT IS CHECKED: (1) the create body appears ONCE in App.tsx — its

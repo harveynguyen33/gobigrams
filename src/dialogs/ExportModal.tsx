@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
-import {EXPORT_TOKENS, tokensFor} from './theme';
-import {toMermaid, toMermaidSequence, fromMermaid} from './mermaid';
+import {EXPORT_TOKENS, tokensFor} from '../theme';
+import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';

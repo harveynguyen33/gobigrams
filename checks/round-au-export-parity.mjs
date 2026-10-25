@@ -66,7 +66,7 @@ const bundleAndImport = async () => {
   const entry = join(ROOT, '.au-entry.ts');
   const out = join(ROOT, '.au-out.mjs');
   writeFileSync(entry,
-    `export {exportSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n` +
+    `export {exportSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n` +
     `export {EXPORT_TOKENS} from '${join(ROOT, 'src/theme')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
@@ -86,10 +86,10 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `real src/exportSvg.ts could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `real src/export/exportSvg.ts could not be bundled from this root — ${bundleError}`);
   process.exit(1);
 }
-assert('module', true, 'real src/exportSvg.ts bundled and imported');
+assert('module', true, 'real src/export/exportSvg.ts bundled and imported');
 const {exportSvg} = MOD;
 
 /* --------------------------------------------------------------- fixtures - */

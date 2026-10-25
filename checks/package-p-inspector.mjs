@@ -39,7 +39,7 @@ const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 /* PACKAGE-P PASS 2 (§E) — the Text section's data half, and the in-place editor
    whose blur-commit behaviour (e) and (i) are about. */
 const TS_RAW = readFileSync(`${ROOT}/src/textStyle.ts`, 'utf8');
-const LABEL_RAW = readFileSync(`${ROOT}/src/LabelNode.tsx`, 'utf8');
+const LABEL_RAW = readFileSync(`${ROOT}/src/nodes/LabelNode.tsx`, 'utf8');
 /* PACKAGE-P PASS 3 (§C) — the fold state and its persistence. Read as text for
    the shape/copy assertions and BUNDLED below (after `stripTs` exists) for the
    executed ones. */
@@ -75,11 +75,11 @@ const rendersOf = (text, tag) => (text.match(new RegExp(`<${tag}[\\s>]`, 'g')) ?
    =========================================================================== */
 const insp = await import(`${ROOT}/src/inspector.ts`);
 const {getInspectorSections, hasKicker, hasMetric, hasIcon, FOLDED_BY_DEFAULT} = insp;
-const SHAPES = await import(`${ROOT}/src/shapes.tsx`).catch(() => null);
+const SHAPES = await import(`${ROOT}/src/nodes/shapes.tsx`).catch(() => null);
 /* `shapes.tsx` is JSX, which Node cannot strip — so the 19 ids come from the
    SHAPES table read as text, exactly as `checks/package-o-metrics.mjs:311` does. */
 const SHAPE_IDS = [];
-for (const l of lines(readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8'))) {
+for (const l of lines(readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8'))) {
   const m = /\{id: '([^']+)', label: '([^']+)', hint: '([^']+)'\}/.exec(l);
   if (m) SHAPE_IDS.push(m[1]);
 }
@@ -94,7 +94,7 @@ console.log('='.repeat(78));
 console.log(`inspector.ts predicates at lines: hasKicker=${at(INSP_RAW, 'export const hasKicker')} `
   + `hasMetric=${at(INSP_RAW, 'export const hasMetric')} hasIcon=${at(INSP_RAW, 'export const hasIcon')}`);
 console.log(`getInspectorSections at src/inspector.ts:${at(INSP_RAW, 'export function getInspectorSections')}`);
-console.log(`shapes parsed from src/shapes.tsx: ${SHAPE_IDS.length}  [${SHAPE_IDS.slice(0, 5).join(', ')}, …]`);
+console.log(`shapes parsed from src/nodes/shapes.tsx: ${SHAPE_IDS.length}  [${SHAPE_IDS.slice(0, 5).join(', ')}, …]`);
 
 /* The four named §A.2 cases, quoted with the source line the spec derives them
    from (`DiagramNode.tsx` branches), then executed. */
@@ -573,7 +573,7 @@ assert('c.outside-click-and-escape-close-the-popover',
 assert('c.shape-picker-is-searchable-and-reuses-ShapePreview',
   PICKS.includes('<ShapePreview') && PICKS.includes('Search shapes…')
     && PICKS.includes('${s.label} ${s.hint}'),
-  'ShapePreview (src/shapes.tsx:195) is the item art; the haystack is label + hint, '
+  'ShapePreview (src/nodes/shapes.tsx:195) is the item art; the haystack is label + hint, '
   + 'the same pair the palette row renders');
 assert('c.no-new-npm-dependency',
   (() => {
@@ -710,9 +710,9 @@ assert('d.curvature-picker-writes-no-bend',
   })(),
   'the picker sets edge.type + calls rememberEdgePath and nothing else');
 assert('d.resize-floors-are-still-declared-where-they-live',
-  readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8').includes('NODE_MIN_W')
+  readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8').includes('NODE_MIN_W')
     && countOf(APP, 'NODE_MIN') === 0,
-  'NODE_MIN_W/NODE_MIN_H/CSS_CONTENT_MIN_W remain declared in src/DiagramNode.tsx and App.tsx '
+  'NODE_MIN_W/NODE_MIN_H/CSS_CONTENT_MIN_W remain declared in src/nodes/DiagramNode.tsx and App.tsx '
   + 'declares none of them — this pass touched neither');
 
 /* ===========================================================================
@@ -957,7 +957,7 @@ const labelBranch = (() => {
   const j = APP.indexOf(') : (', i);
   return APP.slice(i, j > i ? j : undefined);
 })();
-console.log(`  App.tsx <textarea> renders: ${appTextareas}   src/LabelNode.tsx: ${labelTextareas}`);
+console.log(`  App.tsx <textarea> renders: ${appTextareas}   src/nodes/LabelNode.tsx: ${labelTextareas}`);
 console.log(`  label branch: App.tsx:${labelBranchAt} (${labelBranch.split('\n').length} lines) `
   + `— registers: ${labelBranch.includes("secBody('text', tsBody)")}`);
 assert('g.the-panel-label-textarea-is-removed',
@@ -967,7 +967,7 @@ assert('g.the-panel-label-textarea-is-removed',
 assert('g.the-in-place-editor-still-exists',
   labelTextareas === 1 && /className="edge-label-input node-label-input nodrag"/.test(LABEL)
     && /onCommitText\?\.\(id, draft\)/.test(LABEL),
-  `src/LabelNode.tsx renders ${labelTextareas} <textarea> — the canvas editor, unchanged`);
+  `src/nodes/LabelNode.tsx renders ${labelTextareas} <textarea> — the canvas editor, unchanged`);
 assert('g.exactly-one-text-editor-remains',
   appTextareas + labelTextareas === 1,
   `${appTextareas} in the panel + ${labelTextareas} in place = ONE writer for a label's text`);
@@ -1055,7 +1055,7 @@ assert('h.defaults-are-per-target-for-align-and-derived-not-hardcoded',
   + 'panel cannot disagree with the sheet on what "default" means — and (w1) below asserts the sheet half');
 assert('h.an-old-board-has-no-textStyle-and-gets-no-write',
   /export type TextStyle = \{/.test(TS)
-    && /textStyle\?: TextStyle;/.test(readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8'))
+    && /textStyle\?: TextStyle;/.test(readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8'))
     && /textStyle\?: TextStyle;/.test(LABEL_RAW)
     && /if \(!ts\) return out;/.test(TS),
   'the field is optional in the stored type on BOTH node kinds, and `textStyleVars(undefined)` returns '
@@ -1067,8 +1067,8 @@ assert('h.an-old-board-has-no-textStyle-and-gets-no-write',
 assert('h.the-renderers-read-textStyle-through-ONE-door',
   (() => {
     for (const [file, src, name] of [
-      ['src/DiagramNode.tsx', readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8'), 'DiagramNode'],
-      ['src/LabelNode.tsx', LABEL_RAW, 'LabelNode'],
+      ['src/nodes/DiagramNode.tsx', readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8'), 'DiagramNode'],
+      ['src/nodes/LabelNode.tsx', LABEL_RAW, 'LabelNode'],
     ]) {
       const s = stripTs(src);
       // EVERY access to the stored object, however it is spelled.

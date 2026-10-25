@@ -239,21 +239,22 @@ section('AM-2 — the edge label gains a TEXT section');
 section('AM-3 — the flow-glyph row is a real glyph row');
 
 {
-  const GLYPHS = read('src/flowIcons.tsx');
+  const GLYPHS = read('src/nodes/flowIcons.tsx');
   /* the module is a leaf: no React Flow, no React component, so the panel can
      read it without dragging the edge renderer in. */
   const leaf = !/from\s+['"]@xyflow\/react['"]/.test(GLYPHS);
   const exported = /export\s+(const|function)\s+FLOW_ICON_PATHS/.test(GLYPHS);
   assert('am3.the-glyph-map-moved-to-a-shared-reactflow-free-module',
     leaf && exported && GLYPHS.length > 500,
-    `\`src/flowIcons.tsx\` (${GLYPHS.length} bytes) exports the map = ${exported} and imports nothing from ` +
+    `\`src/nodes/flowIcons.tsx\` (${GLYPHS.length} bytes) exports the map = ${exported} and imports nothing from ` +
     `@xyflow/react = ${leaf}. It is a LEAF, so the panel and the edge renderer both read it without a cycle — ` +
     `which is what turns AL-6's "reuses the same vocabulary" comment into a structural guarantee.`);
 
-  /* ROUND BN-4 — the renderer moved to src/edges/, so its import of the ONE
-     glyph map is now '../flowIcons' (one directory deeper); same reader. */
-  const edgeReads = /from\s+['"]\.\.?\/flowIcons['"]/.test(EDGE) && EDGE.includes('FLOW_ICON_PATHS');
-  const panelReads = /from\s+['"]\.\/flowIcons['"]/.test(APP) && APP.includes('FLOW_ICON_PATHS');
+  /* ROUND BN-4 — the renderer moved to src/edges/; ROUND NS-3 — the glyph map
+     itself moved to src/nodes/. So the renderer reads '../nodes/flowIcons' and
+     the panel (still at src/App.tsx) reads './nodes/flowIcons'; same readers. */
+  const edgeReads = /from\s+['"]\.\.\/nodes\/flowIcons['"]/.test(EDGE) && EDGE.includes('FLOW_ICON_PATHS');
+  const panelReads = /from\s+['"]\.\/nodes\/flowIcons['"]/.test(APP) && APP.includes('FLOW_ICON_PATHS');
   assert('am3.both-the-edge-renderer-and-the-panel-read-the-ONE-map',
     edgeReads && panelReads,
     `GoblinEdge reads it = ${edgeReads}; App reads it = ${panelReads}. Two readers, one definition, so a glyph ` +

@@ -2,7 +2,7 @@
    verbatim, 2026-10-25 along the section banners the file declares).
    src/InspectorPickers.tsx re-exports the union, so no importer changes. */
 import {useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode} from 'react';
-import {SHAPES, ShapePreview, type Shape} from '../shapes';
+import {SHAPES, ShapePreview, type Shape} from '../nodes/shapes';
 import {COLOR_VAR} from '../colors';
 import {usePopoverPlacement} from './popover';
 import {G} from './Art';
@@ -104,7 +104,7 @@ export function IconPickerRow({value, onChange, options, title, id, rowClass}: {
 
 /* ===========================================================================
    ShapesPicker — §B #11, the 19-shape searchable popover.
-   Reuses `ShapePreview` (`src/shapes.tsx:195`) as the item art — the same
+   Reuses `ShapePreview` (`src/nodes/shapes.tsx:195`) as the item art — the same
    silhouette the palette row and the library search already draw, so the
    inspector cannot drift from them. Searches label + hint with the same
    lowercase-substring haystack the palette uses.

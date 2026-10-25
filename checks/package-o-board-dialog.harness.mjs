@@ -34,7 +34,7 @@ const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
    every count and regex below still measures the same surface the single file had. */
 const PRESETS_SRC = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
   .map(f => readFileSync(join(ROOT, `src/presets/${f}.ts`), 'utf8')).join('\n');
-const DIALOG_SRC = readFileSync(join(ROOT, 'src/BoardDialog.tsx'), 'utf8');
+const DIALOG_SRC = readFileSync(join(ROOT, 'src/dialogs/BoardDialog.tsx'), 'utf8');
 /* BN-2: createFromTemplate + dialog wiring moved to src/useBoardsMenu.ts. */
 const APP_SRC = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
   + readFileSync(join(ROOT, 'src/useBoardsMenu.ts'), 'utf8');

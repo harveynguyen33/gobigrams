@@ -112,7 +112,7 @@ const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent
  *
  * Every case below is the SAME drawing its React sibling renders, expressed as
  * inner markup in the normalised 200×100 frame. `ShapeFrame` consumes this
- * table through `shapeFrameMarkup` (below), so the exporter (src/exportSvg.ts)
+ * table through `shapeFrameMarkup` (below), so the exporter (src/export/exportSvg.ts)
  * and the canvas share ONE source — the file's own "never a second copy free
  * to drift" rule, now enforced rather than aspirational.
  *

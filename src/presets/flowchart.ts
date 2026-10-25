@@ -2,7 +2,7 @@
 import type {Edge, Node} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {PALETTE, type DiagramType, type PaletteCategory, type PaletteItem} from '../palette';
-import {type Shape} from '../shapes';
+import {type Shape} from '../nodes/shapes';
 import {makeEdge, FLOWCHART_EDGES, type EdgeDefaults, type TemplateSpec} from './basic';
 /* ===========================================================================
    L3a — flowchart palette (ISO 5807). `preparation` adapts the gateway hexagon.
@@ -36,7 +36,7 @@ export const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as P
 
    RATIO 2.0 IS NOT A TASTE, IT IS THE FRAME'S OWN RATIO. Every silhouette is
    drawn ONCE in a normalised frame — `viewBox="0 0 200 100"` with
-   `preserveAspectRatio="none"` (`ShapeFrame`, src/shapes.tsx) — so the drawing is
+   `preserveAspectRatio="none"` (`ShapeFrame`, src/nodes/shapes.tsx) — so the drawing is
    STRETCHED to whatever box the node is handed, and 200:100 = 2.0 is the single
    ratio at which each shape paints exactly as drawn. At every other ratio the
    silhouette is distorted: a circle flattens into an ellipse, the terminal's
@@ -49,7 +49,7 @@ export const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as P
 
    WHY 290x145 AND NOT 280x140. 280x140 is the approved size and it has the right
    SHAPE, but 140 is 1px BELOW this app's own resizer floor (`NODE_MIN_H` = 141,
-   src/DiagramNode.tsx). React Flow's resizer does not lift a below-floor node up
+   src/nodes/DiagramNode.tsx). React Flow's resizer does not lift a below-floor node up
    to the floor. Its clamp is
    `getSizeClamp(size, minSize, maxSize) = max(0, minSize - size, size - maxSize)`,
    which returns 1 for a 140-tall node, and a HORIZONTAL drag folds that into the

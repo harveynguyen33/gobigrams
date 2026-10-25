@@ -3,14 +3,14 @@
  * ROUND C — "Outline text" (harfbuzzjs text→paths) + PDF print route.
  * checks/round-c-outline.mjs — the DOM-free contract half.
  *
- * Target modules: src/textOutline.ts (NEW), src/exportSvg.ts (the outline
- * emitter seam), src/ExportModal.tsx (the checkbox), src/App.tsx (wiring).
+ * Target modules: src/export/textOutline.ts (NEW), src/export/exportSvg.ts (the outline
+ * emitter seam), src/dialogs/ExportModal.tsx (the checkbox), src/App.tsx (wiring).
  *
  * Asserted here WITHOUT a browser (the live rasterised floor check is
  * checks/round-c-live.mjs, a probe-board pass):
  *
  *   A. module exists + the emitter carries the outline seam (RED on the
- *      pre-change tree: no src/textOutline.ts → exit 1, the AR pattern).
+ *      pre-change tree: no src/export/textOutline.ts → exit 1, the AR pattern).
  *   B. shapeLine(): a stub shaper yields per-glyph positioned paths —
  *      one <path> per glyph, translate per run, y flipped (harfbuzz y-up
  *      → SVG y-down), letter-spacing folded into the advance BEFORE
@@ -25,7 +25,7 @@
  *      a data-text attribute (typography report §7.4 "Losses").
  *   F. modal: ExportModal source carries an "Outline text" checkbox whose
  *      default is false (grep contract — React behaviour is the live half).
- *   G. print route: a print stylesheet module (src/printView.ts) exists and
+ *   G. print route: a print stylesheet module (src/export/printView.ts) exists and
  *      produces a document with the SVG INLINED (no iframe, no external
  *      asset) and window.print() invoked after mount.
  */
@@ -48,13 +48,13 @@ const assert = (id, pass, detail = '') => {
 console.log('ROUND C — outline text + PDF print route (DOM-free contract)');
 console.log(`  target root: ${ROOT}`);
 
-if (!existsSync(join(ROOT, 'src', 'textOutline.ts'))) {
-  console.log('  FAIL  C-module-exists — src/textOutline.ts does not exist in the target root (pre-change tree: outline mode not implemented)');
+if (!existsSync(join(ROOT, 'src', 'export/textOutline.ts'))) {
+  console.log('  FAIL  C-module-exists — src/export/textOutline.ts does not exist in the target root (pre-change tree: outline mode not implemented)');
   process.exit(1);
 }
 
 /* ---------------------------------------------------------------- bundle -- */
-/* bundle src/textOutline.ts + src/exportSvg.ts (the emitter seam) with the
+/* bundle src/export/textOutline.ts + src/export/exportSvg.ts (the emitter seam) with the
  * SAME esbuild the repo already carries. harfbuzzjs is LAZY (a dynamic
  * import + a ?url wasm asset) so the static bundle never pulls the wasm:
  * the outline module must expose its PURE parts (run layout, path scale)
@@ -62,9 +62,9 @@ if (!existsSync(join(ROOT, 'src', 'textOutline.ts'))) {
 const OUT = join(ROOT, '.rc-out.mjs');
 const ENTRY = join(ROOT, '.rc-entry.ts');
 writeFileSync(ENTRY, `
-export * from '${join(ROOT, 'src/textOutline.ts')}';
-export {emitSvg, emitContent} from '${join(ROOT, 'src/exportSvg.ts')}';
-export {buildSceneSync} from '${join(ROOT, 'src/exportScene.ts')}';
+export * from '${join(ROOT, 'src/export/textOutline.ts')}';
+export {emitSvg, emitContent} from '${join(ROOT, 'src/export/exportSvg.ts')}';
+export {buildSceneSync} from '${join(ROOT, 'src/export/exportScene.ts')}';
 `);
 const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
   ? join(ROOT, 'node_modules/.bin/esbuild')
@@ -110,7 +110,7 @@ void stubOutlineOf;
 
 const run = mod.shapeLineToSvg ? mod : null;
 if (!run || typeof mod.shapeLineToSvg !== 'function') {
-  assert('C-shapeLine-export', false, 'src/textOutline.ts must export shapeLineToSvg(...) — see the harness call shape below');
+  assert('C-shapeLine-export', false, 'src/export/textOutline.ts must export shapeLineToSvg(...) — see the harness call shape below');
 } else {
   assert('C-shapeLine-export', true, 'shapeLineToSvg exported');
 
@@ -206,17 +206,17 @@ if (typeof mod.emitSvg === 'function' && typeof mod.buildSceneSync === 'function
 }
 
 /* ---- F. modal checkbox (grep contract) ---- */
-const modalSrc = readFileSync(join(ROOT, 'src', 'ExportModal.tsx'), 'utf8');
+const modalSrc = readFileSync(join(ROOT, 'src', 'dialogs/ExportModal.tsx'), 'utf8');
 assert('C-modal-checkbox', /Outline text/.test(modalSrc), 'the export modal carries an "Outline text" control');
 assert('C-modal-off-default', /useState<boolean>\(false\)/.test(modalSrc) || /outline[^,;]{0,40}=false/.test(modalSrc),
   'the outline option defaults to false');
 
 /* ---- G. print route ---- */
-if (!existsSync(join(ROOT, 'src', 'printView.ts'))) {
-  assert('C-print-module', false, 'src/printView.ts does not exist (PDF route not implemented)');
+if (!existsSync(join(ROOT, 'src', 'export/printView.ts'))) {
+  assert('C-print-module', false, 'src/export/printView.ts does not exist (PDF route not implemented)');
 } else {
-  const printSrc = readFileSync(join(ROOT, 'src', 'printView.ts'), 'utf8');
-  assert('C-print-module', true, 'src/printView.ts exists');
+  const printSrc = readFileSync(join(ROOT, 'src', 'export/printView.ts'), 'utf8');
+  assert('C-print-module', true, 'src/export/printView.ts exists');
   assert('C-print-inline-svg', /svg/.test(printSrc) && !/<iframe/i.test(printSrc),
     'print view inlines the SVG (no iframe element)');
   assert('C-print-calls-print', /window\.print\(\)/.test(printSrc), 'print view triggers window.print()');

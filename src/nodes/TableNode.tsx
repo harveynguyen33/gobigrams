@@ -1,7 +1,7 @@
 import {memo} from 'react';
 import {Handle, Position, useStore, type NodeProps} from '@xyflow/react';
 import {KeyRound, Link, Table2, ChevronDown, ChevronRight, Eye} from 'lucide-react';
-import {resolveColor, type ColorKey} from './colors';
+import {resolveColor, type ColorKey} from '../colors';
 
 /* ---------------------------------------------------------------------------
    L3c — the ERD `table` node. The one genuinely new node type in the package

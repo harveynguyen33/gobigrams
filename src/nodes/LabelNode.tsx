@@ -1,10 +1,10 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
-import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './textStyle';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
 
-   `src/DiagramNode.tsx` documents the removal in full (its header, and the
+   `src/nodes/DiagramNode.tsx` documents the removal in full (its header, and the
    button-by-button mapping of every action to the route that survives). This
    file now follows it, so all three node kinds behave the same: the floating
    action strip that used to appear above a SELECTED label never renders.
@@ -84,7 +84,7 @@ const INSPECTOR_HOLD_SELECTOR = '.panel.right';
 const LabelNode = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as LabelKind;
   /* PACKAGE-P §E.2 — same custom properties, same one-spread mechanism as
-     `src/DiagramNode.tsx`, so the Text section styles this kind with the same
+     `src/nodes/DiagramNode.tsx`, so the Text section styles this kind with the same
      four writes it uses on a goblin. Empty object when nothing is stored.
 
      A label kind has NO `body`, so its inherited align is the plain one:

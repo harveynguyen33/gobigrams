@@ -13,7 +13,7 @@
  * DELIBERATELY NOT RENAMED (and asserted as such below):
  *   - the `diagram-studio:*` localStorage keys — renaming would wipe every
  *     user's boards/settings on upgrade;
- *   - src/textOutline.ts's SAMPLE string — an internal glyph-width probe,
+ *   - src/export/textOutline.ts's SAMPLE string — an internal glyph-width probe,
  *     never rendered (and its character set is load-bearing);
  *   - code comments/docblocks (styles.css, library.ts) — not user-visible.
  *
@@ -78,7 +78,7 @@ for (const p of walk(SRC_DIR)) {
     const line = s.slice(0, idx).split('\n').length;
     /* textOutline.ts's SAMPLE is the ONE deliberate survivor (bh.n6): an
        internal glyph-width probe, never rendered. */
-    if (rel === 'src/textOutline.ts') continue;
+    if (rel === 'src/export/textOutline.ts') continue;
     leftovers.push(`${rel}:${line}`);
   }
 }
@@ -87,7 +87,7 @@ assert('bh.n1.no-user-visible-diagram-studio-remains-in-src',
   leftovers.length === 0,
   leftovers.length ? `still present: ${leftovers.join(', ')}` : 'zero non-comment occurrences in src/ (comments deliberately keep the history)');
 
-const TOUR = read('src/Tour.tsx');
+const TOUR = read('src/dialogs/Tour.tsx');
 assert('bh.n2.tour-welcomes-gobigrams',
   TOUR.includes("title: 'Welcome to Gobigrams'"),
   'Tour.tsx step 1 title');
@@ -113,7 +113,7 @@ assert('bh.n5.storage-keys-untouched',
   `App.tsx still carries its diagram-studio:* keys (${(APP.match(/diagram-studio:/g) || []).length} in App.tsx alone) — renaming would wipe users' boards`);
 
 assert('bh.n6.textoutline-sample-untouched',
-  read('src/textOutline.ts').includes("const SAMPLE = 'Diagram Studio reads 123 — widths 0123456789'"),
+  read('src/export/textOutline.ts').includes("const SAMPLE = 'Diagram Studio reads 123 — widths 0123456789'"),
   'the internal glyph-width probe string survives (never rendered, character set is load-bearing)');
 
 /* ===========================================================================

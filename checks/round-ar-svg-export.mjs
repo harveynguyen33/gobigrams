@@ -2,7 +2,7 @@
 /**
  * ROUND AR harness — the SVG vector serializer (AR-1), per AMENDMENT 1.
  *
- * No browser, no DOM, no CDP. The REAL `src/exportSvg.ts` is bundled with the
+ * No browser, no DOM, no CDP. The REAL `src/export/exportSvg.ts` is bundled with the
  * project's own esbuild and imported (the `round-ao`/`round-ad` pattern), then
  * every assertion below runs on the exporter's OUTPUT STRING and emitted
  * GEOMETRY, with a deterministic STUB measurer standing in for the browser's
@@ -42,10 +42,10 @@ const OUT = join(ROOT, '.ar5-out.mjs');
 let MOD = null;
 let bundleError = '';
 try {
-  if (!existsSync(join(ROOT, 'src', 'exportSvg.ts'))) {
-    throw new Error('src/exportSvg.ts does not exist in the target root (pre-fix tree: the pure emitter is not there yet)');
+  if (!existsSync(join(ROOT, 'src', 'export/exportSvg.ts'))) {
+    throw new Error('src/export/exportSvg.ts does not exist in the target root (pre-fix tree: the pure emitter is not there yet)');
   }
-  writeFileSync(ENTRY, `export {exportSvg} from './src/exportSvg';\nexport {EXPORT_TOKENS} from './src/theme';\n`);
+  writeFileSync(ENTRY, `export {exportSvg} from './src/export/exportSvg';\nexport {EXPORT_TOKENS} from './src/theme';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
     : join(REAL_ROOT, 'node_modules/.bin/esbuild');
@@ -63,11 +63,11 @@ try {
 }
 
 if (!MOD) {
-  assert('module', false, `src/exportSvg.ts could not be bundled/imported from this root — ${bundleError}`);
+  assert('module', false, `src/export/exportSvg.ts could not be bundled/imported from this root — ${bundleError}`);
   console.log('\nRED — the serializer under test does not exist on this tree (expected for the pre-fix negative control).');
   process.exit(1);
 }
-assert('module', true, `real src/exportSvg.ts bundled and imported (${bundleError ? 'unused err: ' + bundleError : 'clean'})`);
+assert('module', true, `real src/export/exportSvg.ts bundled and imported (${bundleError ? 'unused err: ' + bundleError : 'clean'})`);
 
 const {exportSvg, EXPORT_TOKENS} = MOD;
 

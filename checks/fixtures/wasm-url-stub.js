@@ -1,5 +1,5 @@
 /* The stand-in for `harfbuzzjs/dist/harfbuzz.wasm?url` in NON-vite
- * bundles (the legacy Node harnesses bundle src/exportSvg.ts with plain
+ * bundles (the legacy Node harnesses bundle src/export/exportSvg.ts with plain
  * esbuild, which has no ?url loader). Vite never sees this file; plain
  * esbuild runs alias the ?url specifier here via
  *   --alias:harfbuzzjs/dist/harfbuzz.wasm?url=<this file>

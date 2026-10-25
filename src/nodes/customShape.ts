@@ -12,7 +12,7 @@
  * `./library`, because `./library` imports the `CustomShape` type from here.
  */
 import DOMPurify from 'dompurify';
-import {type ColorKey, isColorKey} from './colors';
+import {type ColorKey, isColorKey} from '../colors';
 
 /* ---------------------------------------------------------------------------
    §8.3 — the FOUR named clamps, plus the default box and the pre-parse cap.

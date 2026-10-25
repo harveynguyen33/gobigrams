@@ -50,10 +50,10 @@ import {edgeTextStyleVars, type TextStyle} from '../textStyle';
    paths lived here, which meant the inspector could not show what the edge
    animates; AL-6's comment that the panel "reuses FLOW_ICON_PATHS' own
    vocabulary" was a promise this module boundary could not keep. They now live
-   in `src/flowIcons.tsx` — React-Flow-free, so the panel can read it — and
+   in `src/nodes/flowIcons.tsx` — React-Flow-free, so the panel can read it — and
    BOTH the renderer (here, below) and `App.tsx` read THAT file. The path data
    is untouched: only its address changed. */
-import {FLOW_ICON_PATHS} from '../flowIcons';
+import {FLOW_ICON_PATHS} from '../nodes/flowIcons';
 import type {EdgeData} from './edgeData';
 import {useFlowPayloads} from './flowPayloads';
 

@@ -33,7 +33,7 @@ const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, blank)
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 
-const DIALOG_RAW = readFileSync(join(ROOT, 'src/BoardDialog.tsx'), 'utf8');
+const DIALOG_RAW = readFileSync(join(ROOT, 'src/dialogs/BoardDialog.tsx'), 'utf8');
 const DIALOG = stripTs(DIALOG_RAW);
 const TOOLTIP_RAW = readFileSync(join(ROOT, 'src/Tooltip.tsx'), 'utf8');
 const TOOLTIP = stripTs(TOOLTIP_RAW);
@@ -50,7 +50,7 @@ const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index
   .map(f => readFileSync(join(ROOT, `src/presets/${f}.ts`), 'utf8')).join('\n');
 const STYLES_RAW = readFileSync(join(ROOT, 'src/styles.css'), 'utf8');
 const SPEC_RAW = readFileSync(join(ROOT, 'PACKAGE-TEMPLATES-SPEC.md'), 'utf8');
-const GALLERY_RAW = readFileSync(join(ROOT, 'src/TemplatesGallery.tsx'), 'utf8');
+const GALLERY_RAW = readFileSync(join(ROOT, 'src/dialogs/TemplatesGallery.tsx'), 'utf8');
 
 const results = [];
 const assert = (id, pass, detail = '') => {
@@ -134,7 +134,7 @@ assert('i1d.the-dead-template-list-is-GONE-from-dialog-and-stylesheet',
 assert('i1e.the-gallery-is-the-ONE-remaining-catalog-reader',
   /import \{templateCatalog/.test(GALLERY_RAW) && /galleryModel\(families: TemplateFamily\[\] = templateCatalog\(\)\)/.test(GALLERY_RAW)
     && /role="dialog"/.test(GALLERY_RAW) && /<h2 className="bd-title" id="tg-title">Templates<\/h2>/.test(GALLERY_RAW),
-  'src/TemplatesGallery.tsx imports and reads `templateCatalog()` and still renders the heading "Templates" — so removing the dialog\'s list moved no ' +
+  'src/dialogs/TemplatesGallery.tsx imports and reads `templateCatalog()` and still renders the heading "Templates" — so removing the dialog\'s list moved no ' +
   'capability away, it left exactly ONE place where a template can be chosen.');
 
 /* ===========================================================================
@@ -291,7 +291,7 @@ console.log(`  hex literals in src/styles.css: ${HEX}`);
 assert('g1.the-token-gate-holds-at-142', HEX === 144,
   `${HEX} hex literals — the count Harvey's brief pins (142) is untouched: this round removes a stylesheet rule and adds none.`);
 
-const SHAPES_RAW = readFileSync(join(ROOT, 'src/shapes.tsx'), 'utf8');
+const SHAPES_RAW = readFileSync(join(ROOT, 'src/nodes/shapes.tsx'), 'utf8');
 const SHAPES = stripTs(SHAPES_RAW);
 const unionBlock = SHAPES.slice(SHAPES.indexOf('export type Shape'), SHAPES.indexOf('export const SHAPES'));
 const unionIds = [...unionBlock.matchAll(/'([a-z]+)'/g)].map(m => m[1]);

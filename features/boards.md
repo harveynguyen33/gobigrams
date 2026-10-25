@@ -2,7 +2,7 @@
 feature: boards
 entry_paths:
   - src/boards.ts
-  - src/BoardDialog.tsx
+  - src/dialogs/BoardDialog.tsx
   - src/useBoardsMenu.ts
   - src/usePersistence.ts
   - src/boardMigrations.ts

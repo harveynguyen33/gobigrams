@@ -119,7 +119,7 @@ ratchet.ceiling: 942000
 # canvas (14x14, markerUnits=strokeWidth). +810 bytes over the previous ceiling.
 # RAISED 2026-10-21, Harvey-approved in session, measured not guessed: 831522 -> 880354.
 # Reason: ROUND AR replaced the SVG export's HTML-in-foreignObject clone with a real vector
-# serializer (src/exportSvg.ts + the per-row measured font path + the note-node measurer),
+# serializer (src/export/exportSvg.ts + the per-row measured font path + the note-node measurer),
 # ROUND AS added the Mermaid round-trip contract, the import-history guard, the boards
 # PUT/bak contract and the explicit canAutosave gate, and ROUND AT added browser-local
 # storage (localStore.ts + the boot probe + the storage-mode UI). Measured at HEAD 338a786:

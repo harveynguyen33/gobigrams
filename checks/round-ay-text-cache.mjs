@@ -49,7 +49,7 @@ const bundleAndImport = async () => {
   }
   writeFileSync(entry,
     `export * from '${join(ROOT, 'src/textMetrics.ts')}';\n` +
-    `export {exportSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n`);
+    `export {exportSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
     : join(REAL_ROOT, 'node_modules/.bin/esbuild');

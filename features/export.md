@@ -2,12 +2,12 @@
 feature: export
 entry_paths:
   - src/useExportActions.ts
-  - src/exportSvg.ts
-  - src/exportScene.ts
-  - src/exportPng.ts
-  - src/printView.ts
-  - src/textOutline.ts
-  - src/fontFiles.ts
+  - src/export/exportSvg.ts
+  - src/export/exportScene.ts
+  - src/export/exportPng.ts
+  - src/export/printView.ts
+  - src/export/textOutline.ts
+  - src/export/fontFiles.ts
 verified: never-driven (created 2026-10-25, ROUND BN-4 Phase D)
 ---
 # export
@@ -23,11 +23,11 @@ The feature's module homes and their roles:
 - `src/useExportActions.ts` — App's call sites: buildSvg/buildPng/printPdf + the Mermaid
   import effect. The dynamic import() thunks LIVE HERE and must stay dynamic
   (round-bn2-hooks asserts zero static export-cluster imports)
-- `src/exportSvg.ts` — the SVG emitter (+ the `__ds_export` probe seam)
-- `src/exportScene.ts` — scene assembly
-- `src/exportPng.ts` / `src/printView.ts` — raster + print routes
-- `src/textOutline.ts` / `src/textOutlineHb.ts` — glyph outlining (harfbuzz)
-- `src/fontFiles.ts` — font embedding CSS
+- `src/export/exportSvg.ts` — the SVG emitter (+ the `__ds_export` probe seam)
+- `src/export/exportScene.ts` — scene assembly
+- `src/export/exportPng.ts` / `src/export/printView.ts` — raster + print routes
+- `src/export/textOutline.ts` / `src/export/textOutlineHb.ts` — glyph outlining (harfbuzz)
+- `src/export/fontFiles.ts` — font embedding CSS
 
 ## How to get to it (user POV)
 

@@ -23,7 +23,7 @@
  * geometry. Everything here is either (1) ARITHMETIC on `src/styles.css` as
  * written, or (2) EXECUTED: `src/inspector.ts`, `src/textStyle.ts` and
  * `src/presets.ts` are bundled with the project's own esbuild and CALLED, and
- * `src/DiagramNode.tsx` is server-rendered through react-dom/server. The
+ * `src/nodes/DiagramNode.tsx` is server-rendered through react-dom/server. The
  * predicate truth tables, the custom-property values and the painter are
  * therefore the SHIPPED code, not a transcription of it.
  *
@@ -39,7 +39,7 @@ const read = f => readFileSync(`${ROOT}/${f}`, 'utf8');
 const APP_RAW = read('src/App.tsx');
 const INSP_RAW = read('src/inspector.ts');
 const STYLES_RAW = read('src/styles.css');
-const NODE_RAW = read('src/DiagramNode.tsx');
+const NODE_RAW = read('src/nodes/DiagramNode.tsx');
 
 const results = [];
 const assert = (id, pass, detail = '') => {
@@ -121,11 +121,11 @@ try {
   INSP = await bundle('export * from "./src/inspector";', 'ai-insp', EXT);
   TS = await bundle('export * from "./src/textStyle";', 'ai-ts', EXT);
   PRESETS = await bundle('export {LIBRARY, FLOWCHART_NODE_SIZE} from "./src/presets";', 'ai-pre', EXT);
-  NODE_MOD = await bundle('export {default as DiagramNode} from "./src/DiagramNode";', 'ai-node', EXT);
+  NODE_MOD = await bundle('export {default as DiagramNode} from "./src/nodes/DiagramNode";', 'ai-node', EXT);
 } catch (e) {
   boot.errors.push(`${e.code ?? e.name}: ${String(e.message).split('\n')[0]}`);
 }
-console.log(`  bundled + executed src/inspector.ts, src/textStyle.ts, src/presets.ts, src/DiagramNode.tsx`
+console.log(`  bundled + executed src/inspector.ts, src/textStyle.ts, src/presets.ts, src/nodes/DiagramNode.tsx`
   + (boot.errors.length ? `  — FAILED: ${boot.errors.join(' | ')}` : ''));
 
 const M = INSP?.mod ?? {NO_SUB_SHAPES: [], hasBody: () => null};
@@ -302,7 +302,7 @@ try {
     ? `server-rendering the shipped painter: a \`process\` shape carrying \`body: 'card'\` still paints \`node-kicker\` + \`node-title\` + \`node-metric\` and the node's own title text (${asCard.length} bytes) — hiding the CONTROL rewrote no DATA, the same rule the \`sub\` fix followed. The \`label-only\` branch paints \`lo-body\` and no metric (${asLabel.length} bytes)`
     : `the painter changed: card branch kicker=${asCard.includes('node-kicker')} metric=${asCard.includes('node-metric')} text=${asCard.includes(CARD)} lo-body=${asCard.includes('lo-body')}; label-only branch lo-body=${asLabel.includes('lo-body')}`;
 } catch (e) {
-  ssr.report = `could not server-render src/DiagramNode.tsx: ${e.code ?? e.name} ${String(e.message).split('\n')[0]}`;
+  ssr.report = `could not server-render src/nodes/DiagramNode.tsx: ${e.code ?? e.name} ${String(e.message).split('\n')[0]}`;
 }
 assert('ai2-6.a-flowchart-node-carrying-card-STILL-paints-as-a-card', ssr.ok, ssr.report);
 
@@ -310,7 +310,7 @@ const bodyTypeKept = /body\??:\s*'card'\s*\|\s*'label-only'/.test(NODE_RAW.repla
   || /body\??:\s*'card'\s*\|\s*'label-only'/.test(read('src/types.ts').replace(/\s+/g, ' '));
 assert('ai2-7.the-body-value-is-still-in-the-DATA-MODEL-and-both-branches-still-paint',
   bodyTypeKept && /d\.body === 'label-only'/.test(NODE_RAW) && /className="node-body lo-body"/.test(NODE_RAW),
-  `the type still declares \`body?: 'card' | 'label-only'\` and src/DiagramNode.tsx still branches on it (the label-only branch at line ${NODE_RAW.slice(0, NODE_RAW.indexOf("d.body === 'label-only'")).split('\n').length}), so the field is hidden at the PANEL and reversible one edit from the sheet — nothing was deleted`);
+  `the type still declares \`body?: 'card' | 'label-only'\` and src/nodes/DiagramNode.tsx still branches on it (the label-only branch at line ${NODE_RAW.slice(0, NODE_RAW.indexOf("d.body === 'label-only'")).split('\n').length}), so the field is hidden at the PANEL and reversible one edit from the sheet — nothing was deleted`);
 
 /* ===========================================================================
    THE GATE + SECTION F — the pre-fix replay.

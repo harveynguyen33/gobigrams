@@ -14,7 +14,7 @@
 import {type Edge, type Node} from '@xyflow/react';
 
 import {type PaletteItem} from './palette';
-import {type CustomShape} from './customShape';
+import {type CustomShape} from './nodes/customShape';
 import {getLibrary as getLibraryLocal, saveLibrary as saveLibraryLocal} from './localStore';
 import {probeServerModeOnce} from './storageMode';
 

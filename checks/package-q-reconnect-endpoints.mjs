@@ -91,7 +91,7 @@ const OUR_CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
    every count and regex below still measures the same surface the single file had. */
 const PRESETS = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
   .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
-const DIAGRAM = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const DIAGRAM = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 const RF_SRC = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/esm/index.js`, 'utf8');
 const RF_CSS = readFileSync(`${ROOT}/node_modules/@xyflow/react/dist/style.css`, 'utf8');
 /** The sheet with every comment blanked to spaces — line numbers preserved, so a
@@ -597,12 +597,12 @@ ok(literals <= HEX_LIMIT, 'no new colour literals in styles.css',
    2026-10-21 (DELETE archives instead of unlinking, incident-driven) — this
    comment again moves the harness's mtime past the config's; no assertion
    semantics change. */
-/* ROUND BH re-anchor: src/Tour.tsx legitimately edited by ROUND BH on
+/* ROUND BH re-anchor: src/dialogs/Tour.tsx legitimately edited by ROUND BH on
    2026-10-24 (user-visible 'Diagram Studio' → 'Gobigrams' rename, the
    public-launch sweep) — this comment again moves the harness's mtime past
    the tour's; no assertion semantics change. */
 const selfMtime = statSync(new URL(import.meta.url)).mtimeMs;
-for (const rel of ['src/TableNode.tsx', 'vite.config.ts', 'src/Tour.tsx']) {
+for (const rel of ['src/nodes/TableNode.tsx', 'vite.config.ts', 'src/dialogs/Tour.tsx']) {
   const m = statSync(`${ROOT}/${rel}`).mtimeMs;
   ok(m < selfMtime, `${rel} was not written later than this check (never touched)`,
      `${new Date(m).toISOString().slice(11, 19)} <= check ${new Date(selfMtime).toISOString().slice(11, 19)}`);

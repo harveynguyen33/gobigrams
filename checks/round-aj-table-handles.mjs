@@ -43,8 +43,8 @@ const ROOT = process.env.DS_ROOT || '/home/harvey/projects/tech-goblin/lab/diagr
 const CSS_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 /** Comments blanked to spaces, line numbers kept — a prose brace is not a rule. */
 const CSS = CSS_RAW.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-const TSX = readFileSync(`${ROOT}/src/TableNode.tsx`, 'utf8');
-const DIAGRAM = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const TSX = readFileSync(`${ROOT}/src/nodes/TableNode.tsx`, 'utf8');
+const DIAGRAM = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 /* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
    index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
    every count and regex below still measures the same surface the single file had. */
@@ -144,7 +144,7 @@ const handleAfterRoot = handles.filter(h => TSX.indexOf(h) > rootDivAt).length;
 const mapped = handles.filter(h => /\{Array\.from|\.map\(/.test(TSX.slice(Math.max(0, TSX.indexOf(h) - 700), TSX.indexOf(h))));
 assert('aj2-4.every-handle-is-rendered-inside-the-card-and-none-outside-it',
   handles.length === insideTnode.length && handleAfterRoot === handles.length && rootDivAt > 0,
-  `${handles.length} <Handle> ELEMENTS in src/TableNode.tsx (one of them, the extra incoming-FK target at ` +
+  `${handles.length} <Handle> ELEMENTS in src/nodes/TableNode.tsx (one of them, the extra incoming-FK target at ` +
   `${mapped.length ? `line ${TSX.slice(0, TSX.indexOf(mapped[0])).split('\n').length}` : 'n/a'}, sits inside a \`Array.from\` map, so it ` +
   `renders once per stacked FK). All ${handles.length} carry the \`tnode-h\` class these rules target, and all ` +
   `${handleAfterRoot} sit after the single root \`tnode\` div — "handlesInsideTnode: ${insideTnode.length}" in the file, ` +

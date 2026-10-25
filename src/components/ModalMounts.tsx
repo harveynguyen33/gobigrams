@@ -12,12 +12,12 @@
  *  the canvas column only. */
 import type * as React from 'react';
 import type {Node, Edge} from '@xyflow/react';
-import BoardDialog from '../BoardDialog';
-import type {BoardDialogMode, BoardDialogResult} from '../BoardDialog';
-import TemplatesGallery from '../TemplatesGallery';
+import BoardDialog from '../dialogs/BoardDialog';
+import type {BoardDialogMode, BoardDialogResult} from '../dialogs/BoardDialog';
+import TemplatesGallery from '../dialogs/TemplatesGallery';
 import Settings from '../Settings';
 import FeedbackDialog from '../FeedbackDialog';
-import ExportModal from '../ExportModal';
+import ExportModal from '../dialogs/ExportModal';
 import type {ThemeName} from '../theme';
 
 type ModalMountsProps = {

@@ -34,7 +34,7 @@ const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const COLORS_RAW = readFileSync(`${ROOT}/src/colors.ts`, 'utf8');
 const THEME_RAW = readFileSync(`${ROOT}/src/theme.ts`, 'utf8');
-const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
+const SHAPES_RAW = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 /** Blank CSS comments, KEEPING byte offsets (so line numbers stay true). */
@@ -532,7 +532,7 @@ const FILL_DECL = "color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transp
 assert('ag15.the-9-percent-fill-is-UNCHANGED',
   SHAPES_RAW.includes(FILL_DECL),
   SHAPES_RAW.includes(FILL_DECL)
-    ? `src/shapes.tsx still declares FILL as the 9% mix, verbatim — Mermaid reached the same conclusion and deletes its background array in dark mode entirely; the STROKE carries the semantics here`
+    ? `src/nodes/shapes.tsx still declares FILL as the 9% mix, verbatim — Mermaid reached the same conclusion and deletes its background array in dark mode entirely; the STROKE carries the semantics here`
     : 'the 9% fill declaration moved or changed — item C says record the number, change nothing');
 
 console.log('  color-mix(in srgb, <token> 9%, transparent) flattened over each theme\'s --bg AND --surface:');

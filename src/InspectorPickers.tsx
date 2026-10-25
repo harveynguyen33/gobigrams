@@ -7,5 +7,5 @@ export {G, ArtWidth, ArtDash, ArtFlow, ArtCurve, ArtArrow, ArtCardinality} from 
 export {IconPickerRow, ShapesPicker, ToggleRow, type PickerOption} from './pickers/Rows';
 export {Stepper, SPEED_MIN, SPEED_MAX, sliderSeconds, storableSeconds, FlowSpeed} from './pickers/StepperFlow';
 export {Section, CardReadout} from './pickers/Section';
-export {SHAPES} from './shapes';
+export {SHAPES} from './nodes/shapes';
 export {COLOR_VAR} from './colors';

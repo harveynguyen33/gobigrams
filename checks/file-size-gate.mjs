@@ -45,16 +45,16 @@ const BUDGETS = new Map([
   ['src/boardConstants.ts', 129],  // ROUND BN ITEM 2 (now 118)
   ['src/boardMigrations.ts', 234],  // ROUND BN ITEM 2 (now 213)
   ['src/boardUtils.tsx', 231],  // ROUND BN ITEM 2 (now 210),
-  ['src/BoardDialog.tsx', 383],  // now 348,
+  ['src/dialogs/BoardDialog.tsx', 383],  // now 348,
   ['src/components/HelpSheet.tsx', 97],  // ROUND BN-3 PHASE B; +1 BN-4 Phase D feature-map home tag
   ['src/components/ModalMounts.tsx', 144],  // ROUND BN-3 PHASE B; +1 BN-4 Phase D feature-map home tag
   ['src/components/CanvasEmptyPanel.tsx', 41],  // ROUND BN-3 PHASE B (new)
   ['src/components/Toolbar.tsx', 173],  // ROUND BN-3 PHASE B (new)
-  ['src/Checklist.tsx', 133],  // now 120,
+  ['src/nodes/Checklist.tsx', 133],  // now 120,
   ['src/ContextMenu.tsx', 136],  // now 123,
-  ['src/CustomShapeNode.tsx', 145],  // now 131,
-  ['src/DiagramNode.tsx', 655],  // now 595,
-  ['src/ExportModal.tsx', 325],  // now 295,
+  ['src/nodes/CustomShapeNode.tsx', 145],  // now 131,
+  ['src/nodes/DiagramNode.tsx', 655],  // now 595,
+  ['src/dialogs/ExportModal.tsx', 325],  // now 295,
   ['src/FeedbackDialog.tsx', 310],  // now 281,
   // ROUND BN-4 — GoblinEdge.tsx (hard 1274) split into src/edges/: the type
   // declaration, the K2 payload machinery and the registry moved out verbatim;
@@ -72,34 +72,34 @@ const BUDGETS = new Map([
   ['src/pickers/Rows.tsx', 300],  // now 288
   ['src/pickers/StepperFlow.tsx', 165],  // now 156
   ['src/pickers/Section.tsx', 110],  // now 103
-  ['src/LabelNode.tsx', 301],  // now 273,
+  ['src/nodes/LabelNode.tsx', 301],  // now 273,
   ['src/SearchPalette.tsx', 124],  // now 112,
   ['src/Settings.tsx', 440],  // ROUND BN-4: panes+helpers split out (now 424)
   ['src/settings/Panes.tsx', 233],  // 198 + By row + React Flow credit row (2026-10-25, Harvey)
   ['src/settings/Controls.tsx', 145],  // now 138 (Row/Toggle/Segmented/etc)
   ['src/settings/shared.ts', 80],  // now 74 (Props)
   ['src/settings/version.ts', 10],  // now 6 (APP_VERSION)
-  ['src/TableNode.tsx', 171],  // now 155,
-  ['src/TemplatesGallery.tsx', 359],  // now 326,
+  ['src/nodes/TableNode.tsx', 171],  // now 155,
+  ['src/dialogs/TemplatesGallery.tsx', 359],  // now 326,
   ['src/ThemePicker.tsx', 248],  // now 225,
   ['src/Tooltip.tsx', 233],  // now 211,
-  ['src/Tour.tsx', 243],  // now 220,
+  ['src/dialogs/Tour.tsx', 243],  // now 220,
   ['src/boardClipboard.ts', 153],  // now 139,
   ['src/boards.ts', 213],  // now 193,
   ['src/categoryState.ts', 185],  // now 168,
   ['src/choreography.ts', 465],  // now 422,
   ['src/colorKeyNote.ts', 116],  // now 105,
   ['src/colors.ts', 118],  // now 107,
-  ['src/Crowfoot.tsx', 137],  // now 124,
-  ['src/customShape.ts', 573],  // now 520,
+  ['src/nodes/Crowfoot.tsx', 137],  // now 124,
+  ['src/nodes/customShape.ts', 573],  // now 520,
   ['src/edgeBend.ts', 409],  // now 371,
   ['src/edgeLabel.ts', 655],  // now 595,
-  ['src/exportPng.ts', 140],  // now 127,
-  ['src/exportScene.ts', 634],  // now 576,
-  ['src/exportSvg.ts', 1074, 'hard'],  // hard cap at current: may NEVER grow,
+  ['src/export/exportPng.ts', 140],  // now 127,
+  ['src/export/exportScene.ts', 634],  // now 576,
+  ['src/export/exportSvg.ts', 1074, 'hard'],  // hard cap at current: may NEVER grow,
   ['src/feedbackIssueUrl.ts', 81],  // now 73,
-  ['src/flowIcons.tsx', 76],  // now 69,
-  ['src/fontFiles.ts', 150],  // now 136,
+  ['src/nodes/flowIcons.tsx', 76],  // now 69,
+  ['src/export/fontFiles.ts', 150],  // now 136,
   ['src/fontManifest.ts', 45],  // now 40,
   ['src/helperLines.ts', 213],  // now 193,
   ['src/inspector.ts', 325],  // now 295,
@@ -122,17 +122,17 @@ const BUDGETS = new Map([
   ['src/presets/dataStorage.ts', 130],  // now 117
   ['src/presets/architecture.ts', 410],  // now 368
   ['src/presets/index.ts', 300],  // now 289
-  ['src/printView.ts', 59],  // now 53,
+  ['src/export/printView.ts', 59],  // now 53,
   ['src/resizeHistory.ts', 109],  // now 99,
   ['src/roadmap.ts', 138],  // now 125,
   ['src/serverBoards.ts', 59],  // now 53,
-  ['src/shapes.tsx', 431],  // now 391,
+  ['src/nodes/shapes.tsx', 431],  // now 391,
   ['src/storageMode.ts', 75],  // now 68,
   ['src/styles.css', 5997],  // now 5451,
   ['src/templateCatalog.ts', 103],  // now 93,
   ['src/textMetrics.ts', 162],  // now 147,
-  ['src/textOutline.ts', 280],  // now 254,
-  ['src/textOutlineHb.ts', 305],  // now 277,
+  ['src/export/textOutline.ts', 280],  // now 254,
+  ['src/export/textOutlineHb.ts', 305],  // now 277,
   ['src/textStyle.ts', 714],  // now 649,
   ['src/theme.ts', 192],  // now 174,
   ['src/touch.ts', 362],  // now 329,

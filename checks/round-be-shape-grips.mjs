@@ -11,7 +11,7 @@
  *       double-click and drag keep working.
  *
  * No browser, no DOM, no CDP. Everything here is (a) EXECUTED against the real
- * `src/customShape.ts` / `src/presets.ts` / `src/exportSvg.ts` via the project's
+ * `src/nodes/customShape.ts` / `src/presets.ts` / `src/export/exportSvg.ts` via the project's
  * own esbuild (the round-af / round-ar pattern), or (b) GEOMETRY parsed out of
  * the shipped source (the circle's bbox vs its frame), or (c) a TEXT read of the
  * render sites / the tile's JSX. The painted proof — a selected node on the live
@@ -35,8 +35,8 @@ import {join} from 'node:path';
 
 const ROOT = process.env.BE_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const REAL_ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
-const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
-const CUSTOMNODE_RAW = readFileSync(`${ROOT}/src/CustomShapeNode.tsx`, 'utf8');
+const SHAPES_RAW = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
+const CUSTOMNODE_RAW = readFileSync(`${ROOT}/src/nodes/CustomShapeNode.tsx`, 'utf8');
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 /* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
@@ -70,8 +70,8 @@ const ENTRY = join(ROOT, '.be-entry.ts');
 const OUT = join(ROOT, '.be-out.mjs');
 writeFileSync(ENTRY,
   `export {LIBRARY, CONNECTOR_NODE_SIZE, FLOWCHART_NODE_SIZE} from './src/presets';\n` +
-  `export {clampShapeSize, defaultShapeSize, SHAPE_DEFAULT_PX, SHAPE_MIN_PX, SHAPE_MAX_PX} from './src/customShape';\n` +
-  `export {exportSvg} from './src/exportSvg';\n`);
+  `export {clampShapeSize, defaultShapeSize, SHAPE_DEFAULT_PX, SHAPE_MIN_PX, SHAPE_MAX_PX} from './src/nodes/customShape';\n` +
+  `export {exportSvg} from './src/export/exportSvg';\n`);
 writeFileSync(OUT, execFileSync(join(REAL_ROOT, 'node_modules/.bin/esbuild'),
   [ENTRY, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
     '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],
@@ -164,7 +164,7 @@ if (cxCase) {
         'the connector block or its wrapper svg was not found in the emitted export');
   } else {
     assert('r2g1.the-exporter-picks-the-frame-per-shape',
-      /asShape\(n\.data\?\.shape\) === 'connector' \? '0 0 100 100' : '0 0 200 100'/.test(readFileSync(`${ROOT}/src/exportSvg.ts`, 'utf8')),
+      /asShape\(n\.data\?\.shape\) === 'connector' \? '0 0 100 100' : '0 0 200 100'/.test(readFileSync(`${ROOT}/src/export/exportSvg.ts`, 'utf8')),
       '(source fallback) the export wrapper picks the square frame for the connector per shape — the live export emit could not be probed headlessly');
   }
 }
@@ -219,7 +219,7 @@ assert('r2g2.the-import-box-aspect-follows-the-viewBox-within-one-grid-step',
   'the grips sit on the art corners. It stays the distortion GUARD for hand-resized boxes (any ratio), not a silent crop.');
 
 assert('r2g2.the-stored-shape-is-unchanged',
-  /aspect:\s*'fixed'/.test(readFileSync(`${ROOT}/src/customShape.ts`, 'utf8')),
+  /aspect:\s*'fixed'/.test(readFileSync(`${ROOT}/src/nodes/customShape.ts`, 'utf8')),
   "the stored CustomShape keeps aspect:'fixed' and the {title,tags,data,w,h,…} store — fix 2 changed ONLY the rendered box, never the data shape.");
 
 assert('r2g3.the-import-default-is-200-not-64',

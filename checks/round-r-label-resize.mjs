@@ -12,9 +12,9 @@
  * is every piece of the mechanism, and each is read from the REAL source that
  * decides it rather than re-implemented:
  *
- *   1. `src/LabelNode.tsx` — parsed as TEXT: is a `NodeResizer` rendered, is it
+ *   1. `src/nodes/LabelNode.tsx` — parsed as TEXT: is a `NodeResizer` rendered, is it
  *      gated on `selected`, and with which class names and floors?
- *   2. `src/DiagramNode.tsx` — parsed the same way, purely to COMPARE the two
+ *   2. `src/nodes/DiagramNode.tsx` — parsed the same way, purely to COMPARE the two
  *      class names. The class names are the fix for a real reported defect
  *      ("2 borders"): `.resize-line { border-width: 0 !important }` in our
  *      sheet is what stops React Flow's own 1px `variant: Line` control
@@ -34,8 +34,8 @@ import {readFileSync} from 'node:fs';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 
-const LABEL_SRC = readFileSync(`${ROOT}/src/LabelNode.tsx`, 'utf8');
-const DIAGRAM_SRC = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const LABEL_SRC = readFileSync(`${ROOT}/src/nodes/LabelNode.tsx`, 'utf8');
+const DIAGRAM_SRC = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 const PALETTE_SRC = readFileSync(`${ROOT}/src/palette.ts`, 'utf8');
 const OUR_CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 
@@ -127,7 +127,7 @@ console.log('ROUND R — THE `label` (Text) NODE KIND IS RESIZABLE');
 console.log('='.repeat(78));
 
 /* ---------- 1. the label kind renders a resizer at all ---------- */
-console.log('\n-- 1. src/LabelNode.tsx --');
+console.log('\n-- 1. src/nodes/LabelNode.tsx --');
 const labelAt = LABEL.indexOf('<NodeResizer');
 const renders = labelAt >= 0;
 console.log(`  renders <NodeResizer>               : ${renders}`);
@@ -168,7 +168,7 @@ console.log('\n-- 3. the floors ----------');
 /* ROUND S: the TWO floors now have to hold an INVARIANT against each other —
    the resizer's floor must never be smaller than the CSS content floor — so
    both are resolved to numbers rather than just printed. The resizer values are
-   EXPRESSIONS in `src/DiagramNode.tsx` (that is the fix: one number is derived
+   EXPRESSIONS in `src/nodes/DiagramNode.tsx` (that is the fix: one number is derived
    from the other), so they are resolved, not assumed to be literals. */
 const DIAG_CONSTS = numConsts(DIAGRAM);
 const minW = +jsxProp(LABEL, 'NodeResizer', 'minWidth');
@@ -246,7 +246,7 @@ console.log(`\n  App.tsx addNodeByLabel: ${sizeLine.trim()}`);
 console.log(`  ...(size ? {style:{width,height}} : null) present: ${spread}`);
 
 /* ---------- 6. ROUND S — the in-place editor on a Text node ---------- */
-console.log('\n-- 6. src/LabelNode.tsx — double-click to type in place (ROUND S) --');
+console.log('\n-- 6. src/nodes/LabelNode.tsx — double-click to type in place (ROUND S) --');
 const APP_SRC_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const APP = strip(APP_SRC_RAW);
 
@@ -338,7 +338,7 @@ const assert = (id, pass, detail) => {
 
 assert('R1 LabelNode renders a NodeResizer',
   renders && jsxHasProp(LABEL, 'NodeResizer', 'minWidth'),
-  renders ? 'parsed from the real component text' : 'no <NodeResizer> in src/LabelNode.tsx');
+  renders ? 'parsed from the real component text' : 'no <NodeResizer> in src/nodes/LabelNode.tsx');
 
 assert('R2 the resizer is gated on `selected` (and null otherwise)',
   gatedOnSelected && hasNullBranch,

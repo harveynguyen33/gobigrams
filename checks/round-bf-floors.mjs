@@ -37,7 +37,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const APP_URL = process.env.BF_APP_URL || process.env.AY_APP_URL || 'http://localhost:5200/';
 
-const NODE_RAW = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const NODE_RAW = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 
 /** Strip comments before any "is this declared?" probe (round-r discipline). */
@@ -86,7 +86,7 @@ const cssPx = (r, prop) => {
 
 /* ===========================================================================
    0 — EXECUTE the shipped module: resizeFloorsFor + the constants.
-   Round-be's esbuild trick: bundle src/DiagramNode.tsx (it imports shapes/colors
+   Round-be's esbuild trick: bundle src/nodes/DiagramNode.tsx (it imports shapes/colors
    — heavier than presets but the same bundler run) and import the exports.
    =========================================================================== */
 console.log('='.repeat(78));
@@ -104,8 +104,8 @@ try {
      Format CJS: DiagramNode's tree pulls a `require('react')` somewhere
      (lucide/choreography helpers), and ESM output would die on it. */
   writeFileSync(ENTRY,
-    `import * as DN from './src/DiagramNode';\n` +
-    `import * as CS from './src/customShape';\n` +
+    `import * as DN from './src/nodes/DiagramNode';\n` +
+    `import * as CS from './src/nodes/customShape';\n` +
     `export const resizeFloorsFor = DN.resizeFloorsFor as any;\n` +
     `export const NODE_MIN_W = DN.NODE_MIN_W, NODE_MIN_H = DN.NODE_MIN_H;\n` +
     `export const CSS_CONTENT_MIN_W = DN.CSS_CONTENT_MIN_W, FLOOR_SLACK_PX = DN.FLOOR_SLACK_PX;\n` +
@@ -120,7 +120,7 @@ try {
   MOD = await import(`${OUT}?t=${Date.now()}`);
   console.log(`  bundled and imported DiagramNode's exports (SHAPE_MIN_PX=${MOD.SHAPE_MIN_PX})`);
 } catch (e) {
-  console.log(`  (could not bundle/execute src/DiagramNode.tsx: ${String(e).split('\n')[0]})`);
+  console.log(`  (could not bundle/execute src/nodes/DiagramNode.tsx: ${String(e).split('\n')[0]})`);
 } finally {
   rmSync(ENTRY, {force: true});
   rmSync(OUT, {force: true});
@@ -136,8 +136,8 @@ console.log('='.repeat(78));
 const HAS_F = typeof MOD?.resizeFloorsFor === 'function';
 assert('bf2.ac5.resizeFloorsFor-exists-and-exported',
   HAS_F && /export function resizeFloorsFor\(/.test(NODE),
-  HAS_F ? 'resizeFloorsFor is exported from src/DiagramNode.tsx and EXECUTED below'
-        : 'resizeFloorsFor is absent from src/DiagramNode.tsx (pre-change tree)');
+  HAS_F ? 'resizeFloorsFor is exported from src/nodes/DiagramNode.tsx and EXECUTED below'
+        : 'resizeFloorsFor is absent from src/nodes/DiagramNode.tsx (pre-change tree)');
 
 if (HAS_F) {
   const cx = MOD.resizeFloorsFor('connector', 290, 145);

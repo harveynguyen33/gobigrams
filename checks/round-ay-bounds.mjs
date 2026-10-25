@@ -43,12 +43,12 @@ console.log(`  target root: ${ROOT}`);
 const bundleAndImport = async () => {
   const entry = join(ROOT, '.ay3-entry.ts');
   const out = join(ROOT, '.ay3-out.mjs');
-  if (!existsSync(join(ROOT, 'src', 'exportScene.ts'))) {
-    throw new Error('src/exportScene.ts does not exist in the target root (pre-change tree: no bboxBounds)');
+  if (!existsSync(join(ROOT, 'src', 'export/exportScene.ts'))) {
+    throw new Error('src/export/exportScene.ts does not exist in the target root (pre-change tree: no bboxBounds)');
   }
   writeFileSync(entry,
-    `export {bboxBounds, buildSceneSync} from '${join(ROOT, 'src/exportScene.ts')}';\n` +
-    `export {emitSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n`);
+    `export {bboxBounds, buildSceneSync} from '${join(ROOT, 'src/export/exportScene.ts')}';\n` +
+    `export {emitSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
     : join(REAL_ROOT, 'node_modules/.bin/esbuild');
@@ -67,11 +67,11 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `src/exportScene.ts could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `src/export/exportScene.ts could not be bundled from this root — ${bundleError}`);
   console.log('\nRED — the scene module under test does not exist on this tree (expected for the pre-change negative control).');
   process.exit(1);
 }
-assert('module', true, 'real src/exportScene.ts bundled and imported');
+assert('module', true, 'real src/export/exportScene.ts bundled and imported');
 const {bboxBounds, buildSceneSync, emitSvg} = MOD;
 
 /* ------------------- assertion 1 — the marker extends the content bounds */
@@ -169,7 +169,7 @@ assert('AY3-emitter-honours-bbox-override',
 
 /* ------------------- source contract — the seam exists for the live path */
 
-const sceneSrc = readFileSync(join(ROOT, 'src', 'exportScene.ts'), 'utf8');
+const sceneSrc = readFileSync(join(ROOT, 'src', 'export/exportScene.ts'), 'utf8');
 assert('AY3-bboxbounds-source-contract',
   /export function bboxBounds/.test(sceneSrc) && /halfStroke/.test(sceneSrc),
   'bboxBounds exports the measured-box + marker + half-stroke union the live mount will feed');

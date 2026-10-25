@@ -1,7 +1,7 @@
 /* PACKAGE-N §8.1–§8.3 pass 4b — THE CUSTOM-SHAPE NODE KIND.
  *
  * A user-imported SVG is a NODE KIND, not a shape. The `Shape` union stays at
- * 19 (`src/shapes.ts`); this file never adds a 20th member to it. React Flow
+ * 19 (`src/nodes/shapes.ts`); this file never adds a 20th member to it. React Flow
  * dispatches on `node.type`, so `customshape` is registered in `nodeTypes`
  * beside `goblin` / `label` / `table` and the node carries its own renderer.
  *
@@ -9,7 +9,7 @@
  * There is no HTML-injection sink anywhere in this file: no element-property
  * assignment, no `dangerously*` React prop, no fragment parsing. The user's SVG
  * reaches the canvas ONLY as `<img src={svgDataUri(d.svg)}>`.
- * `src/customShape.ts` sanitises the markup (DOMPurify SVG profile + its own
+ * `src/nodes/customShape.ts` sanitises the markup (DOMPurify SVG profile + its own
  * scrub pass), and the `data:image/svg+xml,` context is the SECOND line of
  * defence: scripts are disabled and external resources cannot load there. Those
  * are two independent guards, so the markup is never injected as live DOM.
@@ -23,7 +23,7 @@
  * original "imported artwork is not a box to wire up" reasoning is recorded
  * here as history: the node IS a box on the canvas (it resizes like one,
  * exports as one), so the four midpoints are exactly as wireable as a
- * goblin node's. This file now mirrors `NodeHandles` (src/DiagramNode.tsx)
+ * goblin node's. This file now mirrors `NodeHandles` (src/nodes/DiagramNode.tsx)
  * — the same four ids ('left'/'right'/'top'/'bottom'), the same
  * all-SOURCE scheme (so App.tsx's GOBLIN_HANDLE_IDS direction guard and the
  * `gobi:handle-connect` dblclick auto-connect apply to custom shapes too),
@@ -37,7 +37,7 @@
  *
  * ITEM 2b (2026-09-18) — NO AUTO-SHOW ACTION STRIP ON THIS KIND EITHER. The
  * floating strip that used to appear above a selected import is gone, exactly as
- * `src/DiagramNode.tsx` documents it (that file carries the full reasoning and
+ * `src/nodes/DiagramNode.tsx` documents it (that file carries the full reasoning and
  * the button-by-button mapping to the surviving hot keys / context-menu rows).
  * Its only reader here was the `__toolbar` slot, so the slot, the
  * `ToolbarActions` type it was derived from, the `LabelKind` import that fed the
@@ -47,8 +47,8 @@
 import {memo} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
-import {resolveColor} from './colors';
-import type {ColorKey} from './colors';
+import {resolveColor} from '../colors';
+import type {ColorKey} from '../colors';
 
 export type CustomShapeKind = {
   svg: string;          // the sanitised inline SVG markup (CustomShape.data)

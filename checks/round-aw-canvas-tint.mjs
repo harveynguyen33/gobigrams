@@ -5,12 +5,12 @@
  *   Harvey's decision A (2026-10-21): the canvas is the side that is wrong;
  *   the exported SVG is already right. Do not change the exporter's fill.
  *
- *   DEFECT — `shapeFrameMarkup` (src/shapes.tsx, the CANVAS render path)
+ *   DEFECT — `shapeFrameMarkup` (src/nodes/shapes.tsx, the CANVAS render path)
  *   passed `fill: 'transparent'` + `fillOpacity: '0.09'` into the shared
  *   `frameMarkup` table, so every frame primitive in the live DOM carried
  *   `fill="transparent" fill-opacity="0.09"`: opacity × transparent =
  *   transparent. The orphan 0.09 is the fossil of the original intent.
- *   The exporter (src/exportSvg.ts) passes a RESOLVED literal hex, so the
+ *   The exporter (src/export/exportSvg.ts) passes a RESOLVED literal hex, so the
  *   exported SVG is the only surface that shows the tint.
  *
  *   WHY `transparent` WAS THERE — do not repeat it: `var()` is NOT valid
@@ -26,7 +26,7 @@
  *   rgba(r,g,b,op); folding the alpha into `fill` would slip past it and
  *   re-break the PNG tint (measured in round-av).
  *
- *   Asserted DOM-FREE by bundling the real src/shapes.tsx (esbuild, the
+ *   Asserted DOM-FREE by bundling the real src/nodes/shapes.tsx (esbuild, the
  *   round-av pattern) and calling BOTH public entries:
  *     - `shapeFrameMarkup`  = the canvas contract: a real `--nc` fill via
  *       style, 0.09 opacity, and NOT the string `transparent`;
@@ -69,7 +69,7 @@ const bundleAndImport = async () => {
   const entry = join(ROOT, '.aw-entry.ts');
   const out = join(ROOT, '.aw-out.mjs');
   writeFileSync(entry,
-    `export {shapeFrameMarkup, shapeFrameSvg} from '${join(ROOT, 'src/shapes.tsx')}';\n`);
+    `export {shapeFrameMarkup, shapeFrameSvg} from '${join(ROOT, 'src/nodes/shapes.tsx')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
     : join(REAL_ROOT, 'node_modules/.bin/esbuild');
@@ -88,10 +88,10 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `real src/shapes.tsx could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `real src/nodes/shapes.tsx could not be bundled from this root — ${bundleError}`);
   process.exit(1);
 }
-assert('module', true, 'real src/shapes.tsx bundled and imported');
+assert('module', true, 'real src/nodes/shapes.tsx bundled and imported');
 const {shapeFrameMarkup, shapeFrameSvg} = MOD;
 
 /* The `nc` argument EXACTLY as ShapeFrame passes it (the var() chain the
@@ -153,8 +153,8 @@ for (const shape of ['service', 'database', 'external']) {
 
 /* ------------------- AW4 — source contracts that hold the LIVE pair together */
 
-const shapesSrc = readFileSync(join(ROOT, 'src', 'shapes.tsx'), 'utf8');
-const exportSrc = readFileSync(join(ROOT, 'src', 'exportSvg.ts'), 'utf8');
+const shapesSrc = readFileSync(join(ROOT, 'src', 'nodes/shapes.tsx'), 'utf8');
+const exportSrc = readFileSync(join(ROOT, 'src', 'export/exportSvg.ts'), 'utf8');
 
 /* The exporter call site (exportSvg.ts) still speaks LITERALS — nobody
    "simplified" it onto the canvas path. ROUND AY: the call moved into the

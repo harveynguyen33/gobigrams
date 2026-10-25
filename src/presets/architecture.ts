@@ -3,7 +3,7 @@ import {MarkerType, type Edge, Node} from '@xyflow/react';
 import type {Node as _N} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {PALETTE, type PaletteItem, type PaletteCategory, type DiagramType} from '../palette';
-import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../shapes';
+import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';
 import {
   QUEUE_ENABLED, ACTOR_ENABLED, STORAGE_ENABLED, NOTE_ENABLED, LANE_ENABLED, ERD_ENABLED,
   C4_ENABLED, SEQUENCE_ENABLED,

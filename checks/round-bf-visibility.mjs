@@ -41,7 +41,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const APP_URL = process.env.BF_APP_URL || process.env.AY_APP_URL || 'http://192.168.33.200:5200/';
 
-const TSX_RAW = readFileSync(`${ROOT}/src/CustomShapeNode.tsx`, 'utf8');
+const TSX_RAW = readFileSync(`${ROOT}/src/nodes/CustomShapeNode.tsx`, 'utf8');
 const CSS_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 
 /** Strip comments BEFORE any "is this declared?" probe (round-r discipline:
@@ -72,7 +72,7 @@ assert('bf2.ac4.no-ceiling-reference-creeps-back',
   'CustomShapeNode.tsx references neither SHAPE_MAX_PX nor a 512 literal (round-5 7d stays green)');
 
 assert('bf2.ac4.nc-wiring-stays',
-  /import \{resolveColor\} from '\.\/colors'/.test(TSX)
+  /import \{resolveColor\} from '\.\.\/colors'/.test(TSX)
     && /resolveColor\(d\)/.test(TSX)
     && /--nc/.test(TSX),
   "the root div still carries style --nc from resolveColor(d) — the node kind keeps its colourKey wiring (handle hover emphasis reads it)");

@@ -6,7 +6,7 @@
  * Asserted here WITHOUT a browser (the live pixel-diff half is the probe
  * pass, driver checks/round-ay-png-capture.mjs + diff round-ay-png-diff.mjs):
  *
- *   1. RED-first: src/exportPng.ts must not exist on the pre-change tree
+ *   1. RED-first: src/export/exportPng.ts must not exist on the pre-change tree
  *      (this harness is the item's own proof — run against the parent commit
  *      with AR_ROOT it exits 1, proven by round-ay-red-item4.mjs).
  *   2. svgIntrinsicSize: reads the AR root <svg width height>; rejects
@@ -41,15 +41,15 @@ const assert = (id, pass, detail = '') => {
 console.log('ROUND AY item 4 — rasterise (DOM-free contract)');
 console.log(`  target root: ${ROOT}`);
 
-if (!existsSync(join(ROOT, 'src', 'exportPng.ts'))) {
-  console.log('  FAIL  AY4-module-exists — src/exportPng.ts does not exist in the target root (pre-change tree)');
+if (!existsSync(join(ROOT, 'src', 'export/exportPng.ts'))) {
+  console.log('  FAIL  AY4-module-exists — src/export/exportPng.ts does not exist in the target root (pre-change tree)');
   process.exit(1);
 }
 
-/* bundle ONLY src/exportPng.ts (no react, no app imports) */
+/* bundle ONLY src/export/exportPng.ts (no react, no app imports) */
 const entry = join(ROOT, '.ay4-entry.ts');
 const out = join(ROOT, '.ay4-out.mjs');
-writeFileSync(entry, `export * from '${join(ROOT, 'src/exportPng.ts')}';\n`);
+writeFileSync(entry, `export * from '${join(ROOT, 'src/export/exportPng.ts')}';\n`);
 const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
   ? join(ROOT, 'node_modules/.bin/esbuild')
   : join(REAL_ROOT, 'node_modules/.bin/esbuild');

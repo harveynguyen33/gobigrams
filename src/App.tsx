@@ -6,7 +6,7 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {type ExportScope, type ExportFormat} from './ExportModal';
+import {type ExportScope, type ExportFormat} from './dialogs/ExportModal';
 import {
   Copy, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
@@ -41,16 +41,16 @@ import {
    box — see `useEdgeGesture`'s sibling note.) */
 import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './edgeLabel';
 
-import DiagramNode, {type NodeKind} from './DiagramNode';
-import LabelNode, {type LabelKind} from './LabelNode';
+import DiagramNode, {type NodeKind} from './nodes/DiagramNode';
+import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
-import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNode';
+import TableNode, {relHandleId, type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
-import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
+import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './nodes/shapes';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
  * editing surface (canvas render) never needs the emitter at first paint:
  * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
@@ -104,12 +104,12 @@ import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode,
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
-import Tour from './Tour';
+import Tour from './dialogs/Tour';
 import {HelpSheet} from './components/HelpSheet';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
-import Checklist, {type ChecklistTaskId} from './Checklist';
+import Checklist, {type ChecklistTaskId} from './nodes/Checklist';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
@@ -121,8 +121,8 @@ import {layoutDiagram} from './layout';
    vocabulary" structural: the glyph chip row and the travelling chip read the
    same map. The module holds no React Flow, so the panel can read it without
    pulling the canvas in. */
-import {FLOW_ICON_PATHS} from './flowIcons';
-import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './Crowfoot';
+import {FLOW_ICON_PATHS} from './nodes/flowIcons';
+import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './nodes/Crowfoot';
 import {
   useHoverChoreography, useInteractionGuard, useLayoutTransition, useAnimationGating,
   useHoverHighlight,
@@ -156,8 +156,8 @@ import * as library from './library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
  *  library plumbing. `Shape` stays at 19 — `customshape` is a node type. */
-import CustomShapeNode from './CustomShapeNode';
-import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape, type SvgRejectReason} from './customShape';
+import CustomShapeNode from './nodes/CustomShapeNode';
+import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape, type SvgRejectReason} from './nodes/customShape';
 /* ROUND BN, ITEM 2 — the module-level helpers now live in focused modules;
    moved verbatim, imports only. Size budgets: checks/file-size-gate.mjs. */
 import {
@@ -1760,7 +1760,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          byte-for-byte as before: there RF sets the token itself. */
       const nodeClassName = readOnly ? [n.className, NO_PAN].filter(Boolean).join(' ') : n.className;
       /* ROUND S — the `label` kind's in-place editor is rendered by
-         `src/LabelNode.tsx`, and a custom node component receives only its own
+         `src/nodes/LabelNode.tsx`, and a custom node component receives only its own
          `data`. So the commit callback and the review-mode flag travel through
          `data`, per-node — exactly how the edge renderer gets `onCommitLabel`
          and `readOnly` in `rfEdges` above (fix L). Read off the node's OWN
@@ -2964,7 +2964,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *  1. `art` is no longer `null`. It was the whole reason the row rendered as
    *     word-chips: `chipRow`'s glyph form falls back to `o.label`, so six
    *     `art: null` options painted six words. Each now carries its own glyph.
-   *  2. The glyphs come from `FLOW_ICON_PATHS` — moved to `src/flowIcons.tsx`
+   *  2. The glyphs come from `FLOW_ICON_PATHS` — moved to `src/nodes/flowIcons.tsx`
    *     (AM-3) so BOTH readers can reach it. AL-6's comment claimed this reuse;
    *     the module boundary made it a promise. This file and `GoblinEdge.tsx`
    *     now read the SAME map, so a chip cannot drift from the picture the edge
@@ -2982,7 +2982,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
       THE GLYPH PATHS DID NOT CHANGE, and they are not copied either. The six
       figures arrive from `FLOW_ICON_PATHS` — the map AM-3 moved into
-      `src/flowIcons.tsx` so this row and the travelling chip could not drift — and
+      `src/nodes/flowIcons.tsx` so this row and the travelling chip could not drift — and
       are SCALED INSIDE the shared frame instead of being re-drawn for it. The
       scale is read off the two geometries rather than guessed, and the rendered
       pixel arithmetic is stated so the number can be checked:
@@ -5315,7 +5315,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               {/* PACKAGE-P §E.3(a) — THE PANEL'S SECOND TEXT WRITER IS GONE.
                   This branch used to register a 4-row <textarea> as its `text`
                   section, i.e. a SECOND writer for the same `text` the in-place
-                  editor on the canvas writes (`src/LabelNode.tsx`). §E.3 removes
+                  editor on the canvas writes (`src/nodes/LabelNode.tsx`). §E.3 removes
                   it in the same pass that lands its replacement, so the two can
                   never be out of step. `text` now registers the SAME Text
                   section a goblin gets (one body, one writer, two targets), and

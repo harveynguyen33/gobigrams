@@ -60,7 +60,7 @@ const bundleAndImport = async () => {
      pattern). Scratch dirs have no node_modules. */
   const entry = join(ROOT, '.ar-pass3-entry.ts');
   const out = join(ROOT, '.ar-pass3-out.mjs');
-  writeFileSync(entry, `export {exportSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n`);
+  writeFileSync(entry, `export {exportSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
     : join(REAL_ROOT, 'node_modules/.bin/esbuild');
@@ -142,7 +142,7 @@ assert('AR8-no-element-ref-read', !elementRefRead,
 const readsPropsRef = /props\s*as[^;]*\)?\.ref|\bprops\)\.ref/.test(stripComments(tip));
 assert('AR8-ref-from-props', readsPropsRef, 'the chained ref is read from child.props');
 
-const otherRefs = ['src/App.tsx', 'src/GoblinEdge.tsx', 'src/LabelNode.tsx']
+const otherRefs = ['src/App.tsx', 'src/GoblinEdge.tsx', 'src/nodes/LabelNode.tsx']
   .map(p => ({p, hit: /\bas any\)\.ref\b/.test(stripComments(read(p) ?? ''))}))
   .filter(x => x.hit);
 assert('AR8-no-other-element-ref-reads', otherRefs.length === 0,
@@ -153,7 +153,7 @@ assert('AR8-no-other-element-ref-reads', otherRefs.length === 0,
 
 console.log('\nAR-9 — copy: plural helper, American spelling');
 
-const em = read('src/ExportModal.tsx') ?? '';
+const em = read('src/dialogs/ExportModal.tsx') ?? '';
 assert('AR9-no-colours', !/colours/i.test(em), 'no "colours" anywhere in ExportModal.tsx');
 
 const helper = /const\s+count\s*=\s*\(n:\s*number,\s*unit:\s*string\)/.test(em)
@@ -175,9 +175,9 @@ assert('AR9-helper-call-sites', callSites >= 4,
 console.log('\nAR-10 — export wrap parity (fixture: title width > body width)');
 
 if (!MOD) {
-  assert('AR10-emitter-bundled', false, `real src/exportSvg.ts could not be bundled from this root — ${bundleError}`);
+  assert('AR10-emitter-bundled', false, `real src/export/exportSvg.ts could not be bundled from this root — ${bundleError}`);
 } else {
-  assert('AR10-emitter-bundled', true, 'real src/exportSvg.ts bundled and imported');
+  assert('AR10-emitter-bundled', true, 'real src/export/exportSvg.ts bundled and imported');
 
   const tokens = {
     '--fg': '#e8e8ea', '--dim': '#8a8a92', '--surface': '#141417',

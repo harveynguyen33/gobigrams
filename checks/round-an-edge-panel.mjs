@@ -193,7 +193,10 @@ const AN_APP = 'src/App.tsx';
 const AN_EDGE = 'src/GoblinEdge.tsx';
 const AN_PICKS = 'src/InspectorPickers.tsx';
 const AN_STYLES = 'src/styles.css';
-const AN_ICONS = 'src/flowIcons.tsx';
+const AN_ICONS = 'src/nodes/flowIcons.tsx';
+/* ROUND NS-3 moved the glyph map into src/nodes/; the pre-change tree keeps it
+   at the old path, so the byte comparison reads each tree at its own path. */
+const AN_ICONS_PRE = 'src/flowIcons.tsx';
 
 const APP = code(AN_APP);
 const EDGE = code(AN_EDGE);
@@ -258,7 +261,7 @@ section('AN-3 — the flow-glyph row draws in the flow row\'s own frame');
   assert('an3.the-six-glyphs-are-unchanged-and-still-come-from-the-one-map',
     stillUnique && allFromMap && keys.every(k => mapKeys.includes(k)),
     `the row lists six distinct keys [${keys.join(', ')}] = ${stillUnique}, each rendered from ` +
-    `\`FLOW_ICON_PATHS[v]\` = ${allFromMap}, and every one of them is a key of \`src/flowIcons.tsx\` ` +
+    `\`FLOW_ICON_PATHS[v]\` = ${allFromMap}, and every one of them is a key of \`src/nodes/flowIcons.tsx\` ` +
     `[${mapKeys.join(', ')}] = ${keys.every(k => mapKeys.includes(k))}. The glyph PATHS did not change: only the ` +
     `frame and the scale that carry them did, which is the whole item.`);
 
@@ -577,11 +580,11 @@ if (pre) {
   /* the flowIcons module is the same file on both trees — the glyphs were not
    * touched, which is part of AN-3's claim and is cheap to check. */
   const iconsSame = (() => {
-    try { return commitFile(PRE_COMMIT, AN_ICONS) === read(AN_ICONS); } catch { return false; }
+    try { return commitFile(PRE_COMMIT, AN_ICONS_PRE) === read(AN_ICONS); } catch { return false; }
   })();
   assert('replay.the-glyph-paths-themselves-are-untouched-by-this-round',
     iconsSame,
-    `\`src/flowIcons.tsx\` is byte-identical between ${PRE_COMMIT} and the working tree = ${iconsSame}. AN-3 changed ` +
+    `\`src/nodes/flowIcons.tsx\` is byte-identical between ${PRE_COMMIT} and the working tree = ${iconsSame}. AN-3 changed ` +
     `the FRAME, the scale and the stroke that carry the figures; not one \`d\` moved, which is what this compares.`);
 }
 

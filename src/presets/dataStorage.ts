@@ -2,7 +2,7 @@
 import type {Edge, Node} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
-import {type TableColumn} from '../TableNode';
+import {type TableColumn} from '../nodes/TableNode';
 import {makeEdge, ERD_EDGES, type EdgeDefaults, type TemplateSpec} from './basic';
 /* ===========================================================================
    L3c — ERD palette + template.

@@ -45,13 +45,13 @@ const ROOT = join(HERE, '..');
 const REAL_ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const APP_URL = process.env.BG_APP_URL || process.env.BF_APP_URL || 'http://192.168.33.200:5200/';
 
-const TSX_RAW = readFileSync(`${ROOT}/src/CustomShapeNode.tsx`, 'utf8');
-const DIAGRAM_RAW = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const TSX_RAW = readFileSync(`${ROOT}/src/nodes/CustomShapeNode.tsx`, 'utf8');
+const DIAGRAM_RAW = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 /* ROUND BN re-anchor: GOBLIN_HANDLE_IDS moved to src/boardConstants.ts; the
    App.tsx read stays because the live guard call sites live in the App body. */
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
   + readFileSync(`${ROOT}/src/boardConstants.ts`, 'utf8');
-const EXPORT_RAW = readFileSync(`${ROOT}/src/exportSvg.ts`, 'utf8');
+const EXPORT_RAW = readFileSync(`${ROOT}/src/export/exportSvg.ts`, 'utf8');
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const strip = s => s.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/^[ \t]*\/\/.*$/gm, blank);

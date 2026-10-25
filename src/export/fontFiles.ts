@@ -1,4 +1,4 @@
-/* feature-map home: src/fontFiles.ts */
+/* feature-map home: src/export/fontFiles.ts */
 /* ROUND AZ (t_96100cb2) — COMMITTED FONT BYTES: the file-first provider.
  *
  * The card's core change to the outline pipeline: the shaper no longer
@@ -10,7 +10,7 @@
  * at runtime was measured against committing the .ttf twin and the twin
  * costs nothing at runtime and no JS bytes, so the twin is the choice).
  *
- * Everything here is FILE-FIRST: queryLocalFonts stays, in src/textOutline.ts,
+ * Everything here is FILE-FIRST: queryLocalFonts stays, in src/export/textOutline.ts,
  * as the LAST-RESORT fallback for a family this tree does not ship (one of
  * the four opt-in ROUND W faces at a weight we do not commit).
  *
@@ -22,7 +22,7 @@
  * future font swap lawful.
  */
 
-import {fontFileForFamily, SHIPPED_FAMILIES} from './fontManifest';
+import {fontFileForFamily, SHIPPED_FAMILIES} from '../fontManifest';
 
 export type FontBytes = {
   bytes: Uint8Array;

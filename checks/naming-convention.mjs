@@ -59,7 +59,7 @@ const ALLOWLIST = new Map([
     're-export shell: it exports picker COMPONENTS but renders none itself; the plan keeps PascalCase'],
   ['src/boardUtils.tsx',
     'shared geometry/edge kernel of node+edge helpers; TableGlyph is one incidental glyph, not the module'],
-  ['src/shapes.tsx',
+  ['src/nodes/shapes.tsx',
     'the shape REGISTRY (data + SVG string helpers); ShapeFrame/ShapePreview consume it, they are not the module'],
 ]);
 

@@ -14,16 +14,16 @@
  * what makes `checks/round-ar-svg-export.mjs` possible without a DOM.
  *
  * Geometry single-source: shape frames come from `shapeFrameSvg` in
- * `src/shapes.tsx` — the SAME primitive table the live `ShapeFrame` renders.
+ * `src/nodes/shapes.tsx` — the SAME primitive table the live `ShapeFrame` renders.
  * Theme fidelity: the EXPORT_TOKENS block is inlined in a `<style>` element,
  * `data-theme="<theme>"` rides the root svg, and a theme switch changes the
  * output bytes because the resolved token values differ.
  */
 
-import {resolveColor} from './colors';
-import {asShape, shapeFrameSvg} from './shapes';
-import {EXPORT_TOKENS} from './theme';
-import {labelAnchor, type LabelPos} from './edgeLabel';
+import {resolveColor} from '../colors';
+import {asShape, shapeFrameSvg} from '../nodes/shapes';
+import {EXPORT_TOKENS} from '../theme';
+import {labelAnchor, type LabelPos} from '../edgeLabel';
 import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
 import {shapeLineToSvg, type OutlineShaper} from './textOutline';
 
@@ -837,7 +837,7 @@ export const exportSvgOf = exportSvg;
 
 /** Synchronous buildScene for the legacy compose: harness measurers are
  *  DOM-free and deterministic (no fonts await needed). The legacy harnesses
- *  bundle ONLY src/exportSvg.ts (their esbuild entry never imports
+ *  bundle ONLY src/export/exportSvg.ts (their esbuild entry never imports
  *  exportScene.ts), so the scene build must live HERE in that bundle —
  *  delegate through the SAME body the app path uses by importing it
  *  directly (a real import, not the runtime bridge: the bridge exists for
@@ -849,7 +849,7 @@ export function exportSceneOf(input: ExportInput): Scene {
 
 /* ROUND AY items 2+3 — the emitter is a PURE function of (Scene, ctx) (D4):
  * it never touches `document` and never re-reads the DOM or CSS. The Scene
- * arrives fully resolved from `src/exportScene.ts` (absolute coords, literal
+ * arrives fully resolved from `src/export/exportScene.ts` (absolute coords, literal
  * colours, baked baselines, cache-served wrap); `ctx` carries the font seam
  * (`fontEmbedCss` — empty until Harvey's fork decision) and the BOUNDS:
  * either the bbox-derived bounds (spec §3, the live path) or the scene's

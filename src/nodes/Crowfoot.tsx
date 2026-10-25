@@ -24,7 +24,7 @@
    theme switch (no stale marker) while still recolouring.
 --------------------------------------------------------------------------- */
 
-import {COLOR_VAR, type ColorKey} from './colors';
+import {COLOR_VAR, type ColorKey} from '../colors';
 
 export type CrowFoot = 'one' | 'many' | 'zeroOrOne' | 'zeroOrMany';
 

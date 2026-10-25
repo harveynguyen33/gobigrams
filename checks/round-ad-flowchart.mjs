@@ -6,7 +6,7 @@
  * the real `src/presets.ts` (bundled with the project's own esbuild and
  * imported, so `LIBRARY` and the `fc()` rows are the shipped objects, not a
  * transcription), or (2) ARITHMETIC on the frame geometry as written in
- * `src/shapes.tsx`, or (3) a TEXT read of `src/shapes.tsx` / `src/DiagramNode.tsx`
+ * `src/nodes/shapes.tsx`, or (3) a TEXT read of `src/nodes/shapes.tsx` / `src/nodes/DiagramNode.tsx`
  * for the two tables Node cannot strip JSX out of. Nothing here is a painted
  * measurement — that is the orchestrator's live pass.
  *
@@ -18,8 +18,8 @@ import {readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
-const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
-const NODE_RAW = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const SHAPES_RAW = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
+const NODE_RAW = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 /* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
    index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
    every count and regex below still measures the same surface the single file had. */
@@ -336,7 +336,7 @@ assert('ad3.no-shape-tells-the-user-two-different-things',
   drift.length
     ? `${drift.length} disagreeing pair(s): ` + drift.map(r => `${r.label} (inspector "${r.inspector}" vs palette "${r.palette}")`).join('; ')
     : `all ${compareSet.length} shared labels carry ONE hint, in both the palette row (src/presets.ts) and the inspector's shape ` +
-      'picker (src/shapes.tsx). The two strings Harvey was handed — Process and Input / Output — were the visible half of a class of ' +
+      'picker (src/nodes/shapes.tsx). The two strings Harvey was handed — Process and Input / Output — were the visible half of a class of ' +
       'bug; Database, Queue, Actor and Storage were silently the same drift.');
 
 /* HINTS ARE UNIQUE AND SHORT — the invariants `checks/package-o-metrics.mjs`

@@ -165,13 +165,13 @@ console.log(`    --bg = ${token('--bg')}, --sel = ${token('--sel')}`);
 /* ROUND AR — the frame's stroke width lives in `frameMarkup`'s `sw` default:
    `const sw = p.strokeWidth ?? 1.5;` inside the frameMarkup table. */
 console.log('\n-- 4. The shape\'s OWN border --');
-const shapesSrc = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
+const shapesSrc = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
 const swDefault = /const sw = p\.strokeWidth \?\? ([\d.]+);/.exec(shapesSrc)?.[1];
 const frameStrokeW = swDefault
   ?? /stroke-width="([\d.]+)"/.exec(shapesSrc)?.[1]
   ?? /strokeWidth:\s*([\d.]+)/.exec(shapesSrc)?.[1];
 const frameStrokeSrc = /stroke:\s*'([^']+)'/.exec(shapesSrc)?.[1];
-console.log(`  ShapeFrame strokeWidth = ${frameStrokeW}   [src/shapes.tsx, the \`p\` object]`);
+console.log(`  ShapeFrame strokeWidth = ${frameStrokeW}   [src/nodes/shapes.tsx, the \`p\` object]`);
 console.log(`  ShapeFrame stroke      = ${frameStrokeSrc}`);
 const frameSelOverride = /\.shape-frame[^{]*selected/.test(OUR_CSS);
 console.log(`  a \`.selected\` override on the frame stroke exists? ${frameSelOverride ? 'YES' : 'NO'}`);
@@ -250,7 +250,7 @@ stack.push({
   colour: frameStrokeSrc,
   width: +frameStrokeW,
   offset: [0, +frameStrokeW],
-  source: 'ShapeFrame strokeWidth=1.5 / stroke=var(--nc)  [src/shapes.tsx]',
+  source: 'ShapeFrame strokeWidth=1.5 / stroke=var(--nc)  [src/nodes/shapes.tsx]',
   selectionColoured: false,
 });
 

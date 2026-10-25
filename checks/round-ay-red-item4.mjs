@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** ROUND AY item 4 — the RED proof. Archives aaf71fa (pre item-4: no
- * src/exportPng.ts) into a scratch worktree and runs
+ * src/export/exportPng.ts) into a scratch worktree and runs
  * checks/round-ay-png-rasterise.mjs against it; the harness must exit 1
  * (the module does not exist there). RED on the parent commit = the new
  * assertions are live, not born green. */

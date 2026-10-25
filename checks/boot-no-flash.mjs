@@ -23,7 +23,7 @@ const app = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
    (module-level helper extraction). The seed-token count below reads App PLUS
    its new home so 'only on the first-run save path' still means the whole tree. */
 const boardConstants = readFileSync(`${ROOT}/src/boardConstants.ts`, 'utf8');
-const list = readFileSync(`${ROOT}/src/Checklist.tsx`, 'utf8');
+const list = readFileSync(`${ROOT}/src/nodes/Checklist.tsx`, 'utf8');
 
 const fails = [];
 const ok = (name, cond, detail = '') => {

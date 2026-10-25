@@ -1,4 +1,4 @@
-/* ROUND C — the harfbuzzjs LOADER (App-only; src/textOutline.ts stays
+/* ROUND C — the harfbuzzjs LOADER (App-only; src/export/textOutline.ts stays
  * bundler-agnostic pure code the legacy Node harnesses can bundle without
  * a vite-style `?url` loader).
  *
@@ -36,7 +36,7 @@
  * The emscripten surface carries no bundled types — narrow local
  * declarations here (BN-01: no `any`).
  */
-import harfbuzzFactoryUrl from './vendor/harfbuzzjs/harfbuzz.js?url';
+import harfbuzzFactoryUrl from '../vendor/harfbuzzjs/harfbuzz.js?url';
 import wasmUrl from 'harfbuzzjs/dist/harfbuzz.wasm?url';
 import type {OutlineShaper} from './textOutline';
 

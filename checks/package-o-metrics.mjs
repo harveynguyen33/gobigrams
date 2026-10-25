@@ -335,7 +335,7 @@ console.log(`.boards-pop overrides ? position=fixed(inline) z-index=${boardsPop.
 console.log('\n' + '='.repeat(78));
 console.log('ITEM 4 — shape hints');
 console.log('='.repeat(78));
-const shapes = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8').split('\n');
+const shapes = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8').split('\n');
 const SHAPE_HINTS = [];
 for (const l of shapes) {
   const m = /\{id: '([^']+)', label: '([^']+)', hint: '([^']+)'\}/.exec(l);
@@ -662,16 +662,16 @@ const SRC = {
      src/components/ModalMounts.tsx — App reads the union so the mount
      assertions follow the code home. */
   App: stripTs(srcOf('App.tsx') + '\n' + srcOf('components/ModalMounts.tsx')),
-  Diagram: stripTs(srcOf('DiagramNode.tsx')),
-  Custom: stripTs(srcOf('CustomShapeNode.tsx')),
-  Label: stripTs(srcOf('LabelNode.tsx')),
+  Diagram: stripTs(srcOf('nodes/DiagramNode.tsx')),
+  Custom: stripTs(srcOf('nodes/CustomShapeNode.tsx')),
+  Label: stripTs(srcOf('nodes/LabelNode.tsx')),
   Styles: readFileSync(`${ROOT}/src/styles.css`, 'utf8'),
-  Dialog: stripTs(srcOf('BoardDialog.tsx')),
+  Dialog: stripTs(srcOf('dialogs/BoardDialog.tsx')),
 };
 const RAW = {
-  Diagram: srcOf('DiagramNode.tsx'),
-  Custom: srcOf('CustomShapeNode.tsx'),
-  Label: srcOf('LabelNode.tsx'),
+  Diagram: srcOf('nodes/DiagramNode.tsx'),
+  Custom: srcOf('nodes/CustomShapeNode.tsx'),
+  Label: srcOf('nodes/LabelNode.tsx'),
 };
 /** Count real JSX renders of a tag (`<Tag`, `<Tag>`, `<Tag `). */
 const rendersOf = (text, tag) => (text.match(new RegExp(`<${tag}[\\s>]`, 'g')) ?? []).length;
@@ -742,7 +742,7 @@ assert('item6b.dialog-is-a-modal-with-a-label',
   SRC.Dialog.includes('role="dialog"') && SRC.Dialog.includes('aria-modal="true"') && SRC.Dialog.includes('aria-labelledby="bd-title"'),
   'role=dialog + aria-modal + aria-labelledby all present');
 assert('item6b.dialog-reuses-the-apps-focus-vocabulary',
-  SRC.Dialog.includes("from './Settings'") && SRC.Dialog.includes('FOCUSABLE') && SRC.Dialog.includes('returnFocusTo'),
+  SRC.Dialog.includes("from '../Settings'") && SRC.Dialog.includes('FOCUSABLE') && SRC.Dialog.includes('returnFocusTo'),
   'imports FOCUSABLE + takes returnFocusTo from Settings.tsx rather than re-implementing');
 assert('item6b.dialog-wired-into-the-global-key-guard',
   SRC.App.includes('if (boardDlg) return;') && SRC.App.includes('<BoardDialog'),

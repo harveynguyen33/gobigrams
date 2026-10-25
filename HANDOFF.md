@@ -191,7 +191,7 @@ probe boards removed by exact-name file delete (no DELETE HTTP).
   + preload the two first-paint variable woff2 faces (index.html)
 - `5160580` **core** — the outline pipeline is FILE-FIRST:
   `src/fontManifest.ts` (family stack → committed `/fonts/<slug>-variable.ttf`)
-  + `src/fontFiles.ts` (fetch + sfnt parse + **OS/2 fsType licence guard**:
+  + `src/export/fontFiles.ts` (fetch + sfnt parse + **OS/2 fsType licence guard**:
   refuses fsType 0x0002 restricted and the card-named 0x0100 bit, implemented
   in `embeddingRefusal()`) + `textOutlineHb.ts` declares and calls
   **hb_font_set_variations** (wght axis found via hb_ot_var_get_axis_infos,
@@ -285,7 +285,7 @@ pre-existing ROUND C overage (915,768) still awaits Harvey's policy answer.
 (no DELETE HTTP).
 
 **Commits (5, in order):**
-- `38acbe5` RED harness `checks/round-c-outline.mjs` (fails on the pre-change tree: no src/textOutline.ts)
+- `38acbe5` RED harness `checks/round-c-outline.mjs` (fails on the pre-change tree: no src/export/textOutline.ts)
 - `55dc05b` harfbuzzjs@1.6.3 dependency (Harvey-approved in-card, 2026-10-21 "ok 1")
 - `c3e5283` outline-text mode + PDF print route (run 186's main landing)
 - `e84b0df` fix 1 — minimal harfbuzzjs WRAPPER replacing the package's helper layer (measured:
@@ -341,9 +341,9 @@ and removed by direct file delete of its own server-minted id (no DELETE HTTP ca
 
 **Commits (one item per commit, per the spec):**
 - `77264d4` item 1 — persisted text-metrics cache (`src/textMetrics.ts`, fonts-epoch guard)
-- `33863d5` items 2+3 — `src/exportScene.ts` (buildScene) + `emitSvg` (pure emitter) + getBBox bounds seam
+- `33863d5` items 2+3 — `src/export/exportScene.ts` (buildScene) + `emitSvg` (pure emitter) + getBBox bounds seam
 - `aaf71fa` item 3 — bounds harness (10 assertions, RED on 77264d4)
-- `d370fbe` item 4 — PNG = rasterise(svgString) (`src/exportPng.ts`, the buildPng flip, the pixel gate)
+- `d370fbe` item 4 — PNG = rasterise(svgString) (`src/export/exportPng.ts`, the buildPng flip, the pixel gate)
 - `0e61f0b` item 5 — demolition: html-to-image dep + toPng import + collectCss deleted
 - `1678994` item 6 — font-fork annex (REPORT ONLY)
 
@@ -589,7 +589,7 @@ Read this block first. Everything below is history.
 dev server `:5200` HTTP 200.
 
 **ROUND AR — Harvey's two defects, plus everything the round grew into**
-- SVG export is REAL VECTOR now (`src/exportSvg.ts`, no `foreignObject`). Measured on a live export: the preview
+- SVG export is REAL VECTOR now (`src/export/exportSvg.ts`, no `foreignObject`). Measured on a live export: the preview
   canvas went from **0 to 20,668 of 64,922** pixels differing from the background; the file opened as an image
   document went from **2 colours to 945**; the file shrank 20,773 → 1,867 bytes; all five themes produce different
   output; PNG is untouched (2× the viewBox).
@@ -642,7 +642,7 @@ never push; the orchestrator pushes after measuring.
 ## ▶ ROUND AR PASS 2 (coder, 2026-10-19) — AR-1 landed at e0fb1d0; ONE ORCHESTRATOR ACTION OPEN
 
 AR-1 (SVG vector serializer) is COMMITTED at `e0fb1d0` (local, not pushed):
-`src/exportSvg.ts` new (React-free pure emitter, injected measurer), `src/shapes.tsx`
+`src/export/exportSvg.ts` new (React-free pure emitter, injected measurer), `src/nodes/shapes.tsx`
 geometry lifted into one data table (ShapeFrame renders it), `src/App.tsx` buildSvg is a
 thin wrapper. Gates measured: tsc 0 · vite build 0 · goblin-verify 22 passed / 0 failed ·
 client_js_bytes 866161.
@@ -762,7 +762,7 @@ resizer's static floor `NODE_MIN_H` (141, the ROUND-S worst-case across ALL
 shapes — queue) applied to every node, while a fresh database drop sits at its
 grown natural height (131). Shrink could never go below 141.
 
-Fix (`src/DiagramNode.tsx`): `naturalHRef` records the node's measured natural
+Fix (`src/nodes/DiagramNode.tsx`): `naturalHRef` records the node's measured natural
 height — written by the grow-check when content fits (wrapper.offsetHeight) and
 after each grow (target). `minHFloor = min(NODE_MIN_H, naturalH)` when measured
 (else 141) feeds `NodeResizer minHeight`. Text spill stays impossible: shrink
@@ -836,7 +836,7 @@ spec → built overnight for Harvey's morning review.
 - **Sequence · Protocol** (complex) — alt fragment, queue lifeline, dividers.
 
 **What was built:**
-- `src/shapes.tsx`: 3 new shapes — `lifeline` (head box + dashed stem in ONE
+- `src/nodes/shapes.tsx`: 3 new shapes — `lifeline` (head box + dashed stem in ONE
   frame; stretch the node → longer lifeline), `activation` (thin bar),
   `fragment` (UML 2.5 frame + pentagon label tab; kind lives in the kicker).
   Both ShapeFrame and ShapePreview drawn.
@@ -1893,7 +1893,7 @@ property and paints the identical bytes. **The `600` fallback is the load-bearin
 falls back to `400`, so copying that would have silently lightened every existing edge label.
 
 **AM-3 — the flow-glyph row draws its glyphs.** `FLOW_ICON_PATHS` MOVED out of `GoblinEdge.tsx` into
-`src/flowIcons.tsx`, a React-Flow-free leaf read by BOTH the edge renderer and the panel — AL-6's "reuses
+`src/nodes/flowIcons.tsx`, a React-Flow-free leaf read by BOTH the edge renderer and the panel — AL-6's "reuses
 the same vocabulary" comment is now structural. `FLOW_ICON_OPTS` no longer passes `art: null`: the six
 chips are 30×30 squares carrying the glyph that will actually travel the line. No glyph path was touched.
 
@@ -2121,7 +2121,7 @@ longer exists. Do **not** recreate it; do **not** treat its absence as data loss
 a clean board instead (3 nodes / 2 edges, no `theme` key) against whatever board is current.
 
 **No harness reads `boards/` any more** (verified 2026-09-20): `checks/package-q-reconnect-endpoints.mjs`
-derives its fixture from `src/presets.ts` / `src/DiagramNode.tsx` constants (ROUND AJ removed the live
+derives its fixture from `src/presets.ts` / `src/nodes/DiagramNode.tsx` constants (ROUND AJ removed the live
 coupling) and `checks/round-ag2-copy-sub-swatch.mjs` only *mentions* `boards/` in a report line.
 **All harnesses exit 0 with the folder emptied** — re-measured after the deletion. The templates arc added
 three files (`package-templates`, `round-4-dialog-tooltip-approval`, `round-5-resize-undo`) taking the total
@@ -2779,7 +2779,7 @@ live-board coupling, so it is now `ALL GREEN`. **All 25 harnesses are green — 
 harness any more.**
 > **CLEARED IN ROUND AJ (2026-09-20).** The file was INVERTED, not deleted: it now asserts ROUND T's real
 > behaviour and every rewritten assertion prints the OLD claim beside the NEW one. It no longer reads `boards/`
-> at all — the geometry fixture is derived from `src/presets.ts` / `src/DiagramNode.tsx` constants, so Harvey
+> at all — the geometry fixture is derived from `src/presets.ts` / `src/nodes/DiagramNode.tsx` constants, so Harvey
 > editing his own board can never redden it again. Before 16 failures, after ALL GREEN. The pre-ROUND-T sheet
 > is the negative control and still fails exactly the 11 inverted assertions.
 
@@ -3024,8 +3024,8 @@ revisions; Revision 3 is the current design and SUPERSEDES parts of 1/v2 (read �
 | 2b | The panel renders the ONE library; `src/categoryState.ts` (NEW) persists category folding under **`diagram-studio:categories`**; **insert became IDENTITY-KEYED** — the drag payload and `SearchPalette.onInsert` now carry the item **label** and resolve through `addNodeByLabel(label, pos)` (`LIBRARY.find`). This replaced an INDEX-based path that would have silently inserted the WRONG shape once the panel could filter (verified: filter C4 + row 5 → correct `Container: database` node). | ✅ done |
 | 3 | Favourites (§6) + `/api/library` (§7) + **the atomic-write bug fix**. `Favourite = {id, name?, created, nodes, edges}` storing the **result of `make()`** with a `__label` marker and a symbolic `colorKey` (so a theme switch recolours it). Store = `boards/library.json` singleton, atomic temp+`renameSync`, ONE `.bak` generation, tolerant read, `version` migration-on-read. **The existing `writeFileSync` truncate-first bug is FIXED at BOTH boards call sites (POST create + PUT save)** via `writeJsonAtomic`. Verified: PUT leaves no `.tmp`, `.bak` is exactly one generation behind, star toggle round-trips. | ✅ done |
 | 2c | **Revision 3 — the type chips and the per-row badges were REMOVED and a SEARCH field added.** Measured reason: 33 of the 34 elements belong to exactly ONE type, so the badge just restated the row's category and the 6-chip row cost 77px / 3 wrapped rows. `types[]` STAYS in the data — only the rendering went. Panel = **search → Favourites → 8 collapsible categories**, all 8 always present (sum 34). Search matches `label`+`hint`+`aliases`+`geometry`; a hit in a COLLAPSED category renders **dimmed (opacity .45), never hidden**. Verified: `0` chips, `0` badges, `init`→Preparation, `cyl`→Database, `diamond`→Decision, `subproc`→Predefined process, gibberish→0 rows. | ✅ done |
-| 4a | **Custom-shape sanitise pipeline (spec §8.1–§8.3).** NEW `src/customShape.ts` (513 lines): `CustomShape` type, `sanitizeSvgMarkup` (size cap → XML parse → single root `<svg>` → positive `viewBox` → declared size → **DOMPurify SVG profile** + fragment scrub → root rewrite → `XMLSerializer`), `svgDataUri`, DOM-free `quantisePx`/`clampShapeSize`/`defaultShapeSize`, `newCustomShape`, `parseCustomShapeEntry` (untrusted-on-read). `src/library.ts` type-aligned: `shapes: Record<string, unknown>[]` → `shapes: CustomShape[]` (2 lines + 1 import, no behaviour change). `dompurify@3.4.15` added to `package.json` (Harvey-approved runtime dep). **No import UI yet — that is pass 4b.** | ✅ done |
-| 4b | **Custom-shape node kind + library plumbing.** NEW `src/CustomShapeNode.tsx` — the import is a NODE KIND, not a shape: the `Shape` union stays at **19** and `customshape` is registered in `nodeTypes` beside `goblin` / `label` / `table`. The markup is NEVER handed to the DOM as HTML — it reaches the canvas ONLY as `<img src={svgDataUri(d.svg)}>`, with `src/customShape.ts`'s DOMPurify scrub as the first guard and the `data:image/svg+xml,` context (scripts disabled, external resources unable to load) as the second, independent one. No `ShapeFrame` (the user's SVG *is* the artwork; a frame would show through any transparent area) and no connection handles. `src/library.ts` carries the `shapes` write path to `/api/library`, re-validated through `parseCustomShapeEntry` on every read. | ✅ done |
+| 4a | **Custom-shape sanitise pipeline (spec §8.1–§8.3).** NEW `src/nodes/customShape.ts` (513 lines): `CustomShape` type, `sanitizeSvgMarkup` (size cap → XML parse → single root `<svg>` → positive `viewBox` → declared size → **DOMPurify SVG profile** + fragment scrub → root rewrite → `XMLSerializer`), `svgDataUri`, DOM-free `quantisePx`/`clampShapeSize`/`defaultShapeSize`, `newCustomShape`, `parseCustomShapeEntry` (untrusted-on-read). `src/library.ts` type-aligned: `shapes: Record<string, unknown>[]` → `shapes: CustomShape[]` (2 lines + 1 import, no behaviour change). `dompurify@3.4.15` added to `package.json` (Harvey-approved runtime dep). **No import UI yet — that is pass 4b.** | ✅ done |
+| 4b | **Custom-shape node kind + library plumbing.** NEW `src/nodes/CustomShapeNode.tsx` — the import is a NODE KIND, not a shape: the `Shape` union stays at **19** and `customshape` is registered in `nodeTypes` beside `goblin` / `label` / `table`. The markup is NEVER handed to the DOM as HTML — it reaches the canvas ONLY as `<img src={svgDataUri(d.svg)}>`, with `src/nodes/customShape.ts`'s DOMPurify scrub as the first guard and the `data:image/svg+xml,` context (scripts disabled, external resources unable to load) as the second, independent one. No `ShapeFrame` (the user's SVG *is* the artwork; a frame would show through any transparent area) and no connection handles. `src/library.ts` carries the `shapes` write path to `/api/library`, re-validated through `parseCustomShapeEntry` on every read. | ✅ done |
 | 4c | **Import UI + panel section + error surfaces.** The left panel gained the import affordance (file picker + drop-on-panel), the custom-shape tiles (click or drag to place, `×` to remove) and `newCustomShape`'s `SvgRejectReason` as user-facing text — the §8.1 table: not an `.svg`, over 512 KB, no viewBox, no size / bad size, each message naming the fix ("Re-export it with a viewBox and a size"). **See the measured record below — this pass found and fixed a real persistence race.** | ✅ done |
 
 ### PACKAGE N pass 4a — orchestrator verification record (2026-09-17)
@@ -3033,7 +3033,7 @@ revisions; Revision 3 is the current design and SUPERSEDES parts of 1/v2 (read �
 `npx tsc --noEmit` = **0** · `npx vite build` = **0** (2084 modules, 2.58 s) — both re-run by the
 ORCHESTRATOR, not taken from the coder's report.
 
-Browser probe of the REAL module (imported `/src/customShape.ts` through the running Vite server, 43
+Browser probe of the REAL module (imported `/src/nodes/customShape.ts` through the running Vite server, 43
 assertions, **42 pass / 1 fail**):
 
 - **Rejection branches all correct**: `too-large` (>512 KiB, checked before parsing), `not-xml`,
@@ -3372,7 +3372,7 @@ KEPT because the inspector still uses it for the C4 kicker chip.
 `right: 0` anchoring). Fixed with `min-width: 0` on `.boards-pop`, which cancels BOTH floors so `left: 0; right: 0`
 alone decides the width. Verified live: popup 199px = button width, overflow 0 both sides, not clipped by the panel.
 
-**(6b) `window.prompt` / `window.confirm` are gone — replaced by `src/BoardDialog.tsx`** (295 lines), ONE modal used
+**(6b) `window.prompt` / `window.confirm` are gone — replaced by `src/dialogs/BoardDialog.tsx`** (295 lines), ONE modal used
 for create / rename / delete. Create shows the name field plus the template choices as selectable cards with
 descriptions and an explicit "start empty", rather than the old prompt→confirm chain. Reuses the app's existing
 vocabulary (`.sp-card` scrim/card from SearchPalette, `FOCUSABLE`/`returnFocusTo` focus handling from Settings)
@@ -3596,7 +3596,7 @@ Selecting a node paints an outer 2-layer `box-shadow` ring (`.node.selected`, st
 shape's own `1.5px var(--nc)` border. Harvey saw exactly that: blue ring → dark gap → orange border.
 
 **The rule meant to unify them never ran.** `.node.selected .shape-frame { stroke-width: 2.5 }` (~920) targets
-the parent `<svg>`; the `<rect>` in `src/shapes.tsx` carries `strokeWidth={1.5}` as a React SVG
+the parent `<svg>`; the `<rect>` in `src/nodes/shapes.tsx` carries `strokeWidth={1.5}` as a React SVG
 **presentation attribute**, and a presentation attribute on the element beats a value **inherited** from a CSS
 rule on an ancestor. Measured: `<svg>` computed `2.5px` while the `<rect>` rendered `1.5px`. So the "thicken
 on select" intent had never been visible — there were simply two static borders.
@@ -3936,8 +3936,8 @@ Vault: ADR-031 §"PACKAGE-M follow-up" + a 2026-09-15 Change Log row (via pkm, v
 `npx tsc --noEmit` = 0 · `npx vite build` = 0. Boards = `["Kafka rebalance"]` only, clean 3 nodes / 2 edges.
 
 **Gói H (onboarding)** — `PACKAGE-H-SPEC.md`
-- `src/Tour.tsx` — guided tour, 8 steps, dim + spotlight, Back/Next/Skip + Replay, keyboard.
-- `src/Checklist.tsx` — getting-started checklist, 6 tasks that self-tick, dismissible.
+- `src/dialogs/Tour.tsx` — guided tour, 8 steps, dim + spotlight, Back/Next/Skip + Replay, keyboard.
+- `src/nodes/Checklist.tsx` — getting-started checklist, 6 tasks that self-tick, dismissible.
 - Auto-runs once (`diagram-studio:tour-seen`), relaunchable from the `?` popover.
 - Verified: tsc=0, build=0, spotlight dim measured `rgba(0,0,0,.55) 9999px` in computed style
   (pixel check: canvas `(4,4,5)` dimmed vs palette `(26,27,31)` lit), checklist ticked
@@ -3950,8 +3950,8 @@ Nothing.
 Spec: `PACKAGE-L-SPEC.md`. Design reference: `/home/harvey/diagram-studio-research/mockup-L.html` (approved).
 
 **New files:** `src/theme.ts` (theme controller), `src/colors.ts` (symbolic colour layer),
-`src/presets.ts` (the preset spine + the 3 real presets), `src/TableNode.tsx` (ERD `table` node),
-`src/Crowfoot.tsx` (crow's-foot markers).
+`src/presets.ts` (the preset spine + the 3 real presets), `src/nodes/TableNode.tsx` (ERD `table` node),
+`src/nodes/Crowfoot.tsx` (crow's-foot markers).
 
 | # | What shipped | Measured browser evidence |
 |---|---|---|
@@ -4057,7 +4057,7 @@ It was stopped. A LOOP-BREAK rule now lives in the orchestrator's
 3. Keep it generic: no Harvey/company content baked in; it will be shared.
 
 ## Cosmetic note — FIXED 2026-09-14
-`src/DiagramNode.tsx` — the stale comment above `RESIZABLE` ("every shape except free-form notes")
+`src/nodes/DiagramNode.tsx` — the stale comment above `RESIZABLE` ("every shape except free-form notes")
 was corrected to state that all 9 shapes are resizable. Behaviour unchanged.
 
 ## Orchestrator re-verification of PACKAGE-K (2026-09-14, fresh session)

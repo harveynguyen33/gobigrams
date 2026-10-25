@@ -6,8 +6,8 @@
  *  TableGlyph is a component. */
 import {MarkerType, type Edge, type Node} from '@xyflow/react';
 import {COLOR_VAR, isColorKey, keyForHex, resolveColor, resolveColorKey, type ColorKey} from './colors';
-import {asShape, SHAPE_IDS, ShapePreview, type Shape} from './shapes';
-import {isCrowFoot, markerIdFor} from './Crowfoot';
+import {asShape, SHAPE_IDS, ShapePreview, type Shape} from './nodes/shapes';
+import {isCrowFoot, markerIdFor} from './nodes/Crowfoot';
 import {applyDrag, drawnMid, isSide4, type BendGeo, type Pt, type Side4} from './edgeBend';
 import {LIBRARY, DEFAULT_PRESET_ID, getPreset} from './presets';
 import * as library from './library';

@@ -3,7 +3,7 @@
  * ROUND AR harness — export-modal stability (AR-2/AR-3/AR-4 source assertions).
  *
  * No browser, no DOM, no CDP. Everything below is a TEXT read of
- * `src/ExportModal.tsx` and `src/App.tsx` (bundling nothing, executing
+ * `src/dialogs/ExportModal.tsx` and `src/App.tsx` (bundling nothing, executing
  * nothing). Nothing here is a painted measurement — the BEHAVIOURAL proof
  * (12/12 `.em-seg button` markers surviving a Theme click at 0 ms and 600 ms,
  * the primary button's label staying constant under a MutationObserver for
@@ -23,7 +23,7 @@ import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
 const ROOT = process.env.AR_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
-const MODAL_RAW = readFileSync(join(ROOT, 'src/ExportModal.tsx'), 'utf8');
+const MODAL_RAW = readFileSync(join(ROOT, 'src/dialogs/ExportModal.tsx'), 'utf8');
 const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
 /* ROUND BN-2 — buildSvg/buildPng moved VERBATIM into src/useExportActions.ts;
    the identity-stability probes read the hook source, the prop-passing probe
@@ -84,7 +84,7 @@ console.log(`  target root: ${ROOT}`);
   assert('ar2.seg-at-module-scope',
     declIdx !== -1 && (inBodyDecl ? inBodyDecl.index < bodyStart || inBodyDecl.index > bodyEnd : true) && !insideBody,
     declIdx === -1
-      ? 'no module-scope `function Seg` declaration found in src/ExportModal.tsx'
+      ? 'no module-scope `function Seg` declaration found in src/dialogs/ExportModal.tsx'
       : insideBody
         ? `a component declaration for Seg sits INSIDE the ExportModal body (line ${lineOf(MODAL, inBodyDecl.index)}) — new type identity every render, whole .em-seg subtree remounts on every state change`
         : `module-scope Seg at line ${lineOf(MODAL, declIdx)}; the ExportModal body (lines ${lineOf(MODAL, bodyStart)}–${lineOf(MODAL, bodyEnd)}) declares none`);
@@ -125,7 +125,7 @@ console.log(`  target root: ${ROOT}`);
   assert('ar3.primary-button-reads-exportBusy-only',
     btnMatch && labelUsesExport && disabledClean && labelClean,
     !btnMatch
-      ? 'primary export button (className em-go, onClick doExport) not found in src/ExportModal.tsx'
+      ? 'primary export button (className em-go, onClick doExport) not found in src/dialogs/ExportModal.tsx'
       : `disabled={${disabledExpr.trim()}} / label reads ${labelExpr.trim().slice(0, 60)}`);
 
   assert('ar3.preview-effect-does-not-drive-the-label',

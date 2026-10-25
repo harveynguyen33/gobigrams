@@ -1,6 +1,6 @@
 /* ROUND BN-4 — one slice of the former `src/GoblinEdge.tsx` (split verbatim, 2026-10-25). src/edges/index.ts re-exports the component and the type registry, so `import ... from './GoblinEdge'` is unchanged. */
 import {useMemo} from 'react';
-import {FLOW_ICON_PATHS} from '../flowIcons';
+import {FLOW_ICON_PATHS} from '../nodes/flowIcons';
 
 /* K2 (ROUND BN-4) — the animated payload machinery, verbatim from
    GoblinEdge.tsx: the random start offset, the stagger and the SMIL subtree.

@@ -1,6 +1,6 @@
-import {type NodeKind} from './DiagramNode';
-import {type LabelKind} from './LabelNode';
-import {type Shape} from './shapes';
+import {type NodeKind} from './nodes/DiagramNode';
+import {type LabelKind} from './nodes/LabelNode';
+import {type Shape} from './nodes/shapes';
 import {type ColorKey} from './colors';
 
 /* The symbolic-colour layer lives in colors.ts (no imports → no cycle). */

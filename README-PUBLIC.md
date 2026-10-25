@@ -73,9 +73,9 @@ and per-family module directories.
 | `src/settings/` | Settings panes and controls |
 | `src/pickers/` | Inspector pickers (popovers, rows, sections) |
 | `src/components/` | Shared chrome — toolbar, help sheet, modal mounts, empty panel |
-| `src/*Node.tsx`, `src/TableNode.tsx`, … | Node renderers (terminal, process, table, label, custom SVG…) |
+| `src/*Node.tsx`, `src/nodes/TableNode.tsx`, … | Node renderers (terminal, process, table, label, custom SVG…) |
 | `src/boards.ts`, `src/localStore.ts`, `src/boardMigrations.ts` | Board storage: data layer, IndexedDB fallback, on-read migrations |
-| `src/export*.ts`, `src/printView.ts` | The lazy export cluster — SVG / PNG / PDF / scene assembly |
+| `src/export*.ts`, `src/export/printView.ts` | The lazy export cluster — SVG / PNG / PDF / scene assembly |
 | `src/FeedbackDialog.tsx`, `src/feedbackIssueUrl.ts`, `src/boardClipboard.ts` | Token-free feedback: prefilled GitHub issue + clipboard PNG |
 | `public/` | Static assets served as-is (brand marks, favicons, manifest) |
 | `index.html` | Vite entry point |

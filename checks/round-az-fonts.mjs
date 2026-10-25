@@ -46,9 +46,9 @@ const html = read('index.html');
 /* ROUND BN-2 — the export builders (font embed, outline note) moved VERBATIM
    into src/useExportActions.ts; `app` covers both files. */
 const app = read('src/App.tsx') + '\n' + read('src/useExportActions.ts');
-const outlineSrc = read('src/textOutline.ts');
-const hbSrc = read('src/textOutlineHb.ts');
-const exportSvgSrc = read('src/exportSvg.ts');
+const outlineSrc = read('src/export/textOutline.ts');
+const hbSrc = read('src/export/textOutlineHb.ts');
+const exportSvgSrc = read('src/export/exportSvg.ts');
 
 /* AZ-1 provenance -------------------------------------------------------- */
 const manifestPath = join(REPO, 'public/fonts/SHA256S.txt');

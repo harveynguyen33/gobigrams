@@ -13,7 +13,7 @@
    14.5, `.node-sub` 11.5, `.node-metric` 20 — i.e. the node's hierarchy IS the
    size ladder. A single px value would flatten all four to one number, destroy
    that hierarchy, and push the worst-case content (`queue`, 199x131, the
-   number `src/DiagramNode.tsx`'s `NODE_MIN_H` is derived from) past the resizer
+   number `src/nodes/DiagramNode.tsx`'s `NODE_MIN_H` is derived from) past the resizer
    floor this repo asserts. So the control emits a MULTIPLIER, it lands as ONE
    custom property (`--ts-scale`) on the node root, and every text rule in the
    sheet multiplies its own size by it: one write, whole block, and an unset

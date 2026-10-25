@@ -2,7 +2,7 @@
 import type {Edge} from '@xyflow/react';
 import type {TextStyle} from '../textStyle';
 import type {ColorKey} from '../colors';
-import type {CrowFoot} from '../Crowfoot';
+import type {CrowFoot} from '../nodes/Crowfoot';
 import type {Pt, BendPhase} from '../edgeBend';
 import type {LabelWrite} from '../edgeLabel';
 

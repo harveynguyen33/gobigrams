@@ -24,7 +24,7 @@
  *
  *   DEFECT 2 (PNG, MAJOR) — the node FILL tint vanishes from the PNG export.
  *   Canvas frames paint `color-mix(in srgb, var(--nc) 9%, transparent)`
- *   (src/shapes.tsx FILL). The SVG exporter resolves it (accent at
+ *   (src/nodes/shapes.tsx FILL). The SVG exporter resolves it (accent at
  *   fill-opacity 0.09); the PNG clone rasterised by html-to-image shows a
  *   PLAIN background interior — the detached clone cannot resolve
  *   `color-mix()` there (measured live: all three node interiors = bg, zero
@@ -65,7 +65,7 @@ const bundleAndImport = async () => {
   const entry = join(ROOT, '.av-entry.ts');
   const out = join(ROOT, '.av-out.mjs');
   writeFileSync(entry,
-    `export {exportSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n` +
+    `export {exportSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n` +
     `export {EXPORT_TOKENS} from '${join(ROOT, 'src/theme')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
@@ -85,10 +85,10 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `real src/exportSvg.ts could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `real src/export/exportSvg.ts could not be bundled from this root — ${bundleError}`);
   process.exit(1);
 }
-assert('module', true, 'real src/exportSvg.ts bundled and imported');
+assert('module', true, 'real src/export/exportSvg.ts bundled and imported');
 const {exportSvg} = MOD;
 
 /* --------------------------------------------------------------- fixtures - */
@@ -176,7 +176,7 @@ assert('AV1-no-icon-no-primitives',
 
 /* the measurer hook must be REAL in the shipped domMeasurer (the live half's
    source contract): it queries the clone for the icon svg + its computed ink */
-const exportSvgSrc = readFileSync(join(ROOT, 'src', 'exportSvg.ts'), 'utf8');
+const exportSvgSrc = readFileSync(join(ROOT, 'src', 'export/exportSvg.ts'), 'utf8');
 const domMeasurerHasIcon = /node-ico|icon\(/.test(exportSvgSrc);
 assert('AV1-dommeasurer-finds-node-ico', domMeasurerHasIcon,
   'domMeasurer reads the icon ink/geometry off the clone (.node-ico svg + getComputedStyle), so the LIVE export measures the real glyph');

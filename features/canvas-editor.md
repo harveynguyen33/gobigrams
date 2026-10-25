@@ -2,7 +2,7 @@
 feature: canvas-editor
 entry_paths:
   - src/App.tsx
-  - src/DiagramNode.tsx
+  - src/nodes/DiagramNode.tsx
   - src/edges/GoblinEdge.tsx
   - src/useConnections.ts
   - src/useCanvasTools.ts
@@ -32,7 +32,7 @@ connections. Selecting a node or edge opens the inspector panel on the right.
 - `src/edges/` — the edge family: `GoblinEdge.tsx` (the ONE live component, all 5 type
   ids), `edgeData.ts` (typed data block), `flowPayloads.tsx` (the K2 payload memo),
   `index.ts` (the type registry)
-- `src/DiagramNode.tsx` — the node component (resize floors, measure)
+- `src/nodes/DiagramNode.tsx` — the node component (resize floors, measure)
 
 ## How to get to it (user POV)
 

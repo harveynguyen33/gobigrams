@@ -15,13 +15,13 @@
    answered, it belongs here, not in the render.
 
    SOURCE OF THE PREDICATES (§A.2), i.e. WHY the three shapes below are special:
-   `src/DiagramNode.tsx` renders a DIFFERENT field set per shape — the note
+   `src/nodes/DiagramNode.tsx` renders a DIFFERENT field set per shape — the note
    branch (`:239-258`) has no metric and no `IconGlyph`, the group branch
    (`:260-276`) has neither kicker nor metric, and `body: 'label-only'`
    (`:309-318`) collapses back to icon + title + sub. "All 19 shapes show the
    same Content panel" was precisely the gap this package closes. */
 
-import type {Shape} from './shapes';
+import type {Shape} from './nodes/shapes';
 
 /** ROUND AK, AK-8 — `presetId` WAS A FIELD HERE, AND IT IS GONE.
 
@@ -47,7 +47,7 @@ export type InspectorTarget =
       /** ROUND AK, AK-8 — THE CARDINALITY GATE, READ FROM THE EDGE ITSELF.
        *  `true` when the edge carries a crow's-foot marker on EITHER end. The
        *  predicate is computed by the caller from the selected edge's own
-       *  `markerStart` / `markerEnd` (`isCrowFoot()` in `src/Crowfoot.tsx`), so a
+       *  `markerStart` / `markerEnd` (`isCrowFoot()` in `src/nodes/Crowfoot.tsx`), so a
        *  section can no longer appear or vanish because of the board's preset.
        *
        *  THE CONSEQUENCE IS DELIBERATE (spec §2): a plain C4 board whose edge has
@@ -125,7 +125,7 @@ export const hasIcon = (t: InspectorTarget) =>
    The shape is the only key that answers the question for every palette.
 
    WHY THE LIST IS DECLARED HERE RATHER THAN IMPORTED. `FLOWCHART_EXTRA_SHAPES`
-   lives in `src/shapes.tsx`, which is JSX: a `.ts` module cannot import it under
+   lives in `src/nodes/shapes.tsx`, which is JSX: a `.ts` module cannot import it under
    Node's type-stripping, and importing a `.tsx` module from `.ts` needs
    `allowImportingTsExtensions`, which this project's tsconfig does not set. This
    module already names its special shapes as literals for exactly this reason
@@ -136,7 +136,7 @@ export const hasIcon = (t: InspectorTarget) =>
 
    THE DATA IS UNTOUCHED. This hides a FIELD; it does not remove `sub` from the
    node data model or from the renderer. A board that already carries a `sub` on
-   a flowchart node still paints it (both branches of `src/DiagramNode.tsx`) —
+   a flowchart node still paints it (both branches of `src/nodes/DiagramNode.tsx`) —
    asserted by server-rendering the shipped painter in the round's harness. */
 export const NO_SUB_SHAPES: Shape[] = [
   /* the ten ISO 5807 shapes */
@@ -158,7 +158,7 @@ export const hasSub = (t: InspectorTarget) =>
  *  THE DATA IS UNTOUCHED, exactly as `hasSub` leaves `sub` alone. This hides a
  *  FIELD; it does not remove `body` from the node model or from the painter. A
  *  flowchart node that already carries `body: 'card'` still paints as a card —
- *  `src/DiagramNode.tsx`'s two branches are unchanged — asserted in
+ *  `src/nodes/DiagramNode.tsx`'s two branches are unchanged — asserted in
  *  `checks/round-ai-body-valign.mjs` (ai2-6) by server-rendering the shipped
  *  painter, so hiding the control cannot rewrite the value.
  *
@@ -229,7 +229,7 @@ const sec = (id: SectionId): InspectorSection => ({id, collapsedDefault: COLLAPS
 
    A LABEL'S `text` SECTION IS NOW THE SAME SECTION, not a namesake. It used to
    be the `label` branch's 4-row `<textarea>` — a SECOND writer for the `text`
-   the in-place editor on the canvas writes (`src/LabelNode.tsx`). §E.3 removes
+   the in-place editor on the canvas writes (`src/nodes/LabelNode.tsx`). §E.3 removes
    that textarea in the same pass that lands its replacement, so a label target
    renders size / weight / colour / align here and has exactly ONE text editor:
    the in-place one. It is still NOT `kind: 'goblin'`, so it is never asked for

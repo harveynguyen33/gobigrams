@@ -5,7 +5,7 @@
  * The exporter used to hard-code a monospace FONT_STACK in three places (the
  * wrap measurer, the <style> block and every <text>), so the exported file
  * wrapped and painted in a DIFFERENT typeface than the canvas. This harness
- * drives the REAL `src/exportSvg.ts` (project esbuild bundle, DOM-free) with
+ * drives the REAL `src/export/exportSvg.ts` (project esbuild bundle, DOM-free) with
  * a stub measurer that supplies a per-row font FAMILY, and asserts:
  *   - every emitted <text> carries the row's own family (no hard-coded one),
  *   - the inline <style> no longer forces one family on all text,
@@ -48,7 +48,7 @@ const bundleAndImport = async () => {
   const entry = join(ROOT, '.ar11-entry.ts');
   const out = join(ROOT, '.ar11-out.mjs');
   writeFileSync(entry,
-    `export {exportSvg} from '${join(ROOT, 'src/exportSvg.ts')}';\n` +
+    `export {exportSvg} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n` +
     `export {EXPORT_TOKENS} from '${join(ROOT, 'src/theme')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
@@ -69,10 +69,10 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `real src/exportSvg.ts could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `real src/export/exportSvg.ts could not be bundled from this root — ${bundleError}`);
   process.exit(1);
 }
-assert('module', true, 'real src/exportSvg.ts bundled and imported');
+assert('module', true, 'real src/export/exportSvg.ts bundled and imported');
 const {exportSvg, EXPORT_TOKENS} = MOD;
 
 /* --------------------------------------------------------------- fixtures - */
@@ -306,11 +306,11 @@ console.log('\nF6 — source carries no font-stack literal');
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
   let src = '';
-  try { src = readFileSync(join(ROOT, 'src', 'exportSvg.ts'), 'utf8'); } catch { /* missing */ }
+  try { src = readFileSync(join(ROOT, 'src', 'export/exportSvg.ts'), 'utf8'); } catch { /* missing */ }
   const hits = ['ui-monospace', 'Menlo', 'Consolas', 'monospace'].filter(t => strip(src).includes(t));
   assert('F6-source-no-font-stack-literal', src !== '' && hits.length === 0,
-    src === '' ? 'src/exportSvg.ts unreadable' :
-      hits.length ? `comment-stripped source still contains: ${hits.join(', ')}` : 'comment-stripped src/exportSvg.ts contains no font-stack literal (families come from the measurer only)');
+    src === '' ? 'src/export/exportSvg.ts unreadable' :
+      hits.length ? `comment-stripped source still contains: ${hits.join(', ')}` : 'comment-stripped src/export/exportSvg.ts contains no font-stack literal (families come from the measurer only)');
 }
 
 /* ------------------------------------------------------------------ report */

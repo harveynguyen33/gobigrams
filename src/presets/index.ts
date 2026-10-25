@@ -6,7 +6,7 @@
 import {MarkerType, type Edge, type Node} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
-import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../shapes';
+import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';
 import {
   SEQUENCE_ENABLED, ERD_ENABLED, FLOWCHART_EDGES, ERD_EDGES,
   type PresetId, type DiagramPreset, type TemplateSpec,
@@ -29,7 +29,7 @@ export const FLOWCHART_PRESET: DiagramPreset = {
   hint: 'steps · decisions · lanes',
   palette: libraryFor('flowchart'),
   /* ROUND AD — ONE SHAPE LIST. These two arrays used to repeat the ten ids
-     literally in this file AND in `FLOWCHART_EXTRA_SHAPES` in `src/shapes.tsx`,
+     literally in this file AND in `FLOWCHART_EXTRA_SHAPES` in `src/nodes/shapes.tsx`,
      so adding a shape meant editing three lists and a miss was silent (the
      round-AD additions landed in `shapes.tsx` first and left both copies at
      ten). They now REFERENCE the one array, so a shape added for the flowchart

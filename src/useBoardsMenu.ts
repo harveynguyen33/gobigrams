@@ -16,8 +16,8 @@ import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import {getPreset} from './presets';
 import type {PresetId} from './presets';
-import type {BoardDialogResult} from './BoardDialog';
-import type {ShowMode} from './TableNode';
+import type {BoardDialogResult} from './dialogs/BoardDialog';
+import type {ShowMode} from './nodes/TableNode';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useBoardsMenu(

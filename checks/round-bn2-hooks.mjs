@@ -80,7 +80,9 @@ for (const [name, path] of HOOKS) {
 /* The lazy export cluster: these module specifiers may appear in
  * useExportActions ONLY inside dynamic import() (or erased type imports).
  * Remove type imports and every import(...) call, then none may remain. */
-const CLUSTER = ['exportSvg', 'textOutline', 'textOutlineHb', 'exportPng', 'printView', 'fontFiles'];
+/* ROUND NS-3: the export cluster lives in src/export/, so the specifiers the
+   thunks use are './export/<name>' — the claims are unchanged. */
+const CLUSTER = ['export/exportSvg', 'export/textOutline', 'export/textOutlineHb', 'export/exportPng', 'export/printView', 'export/fontFiles'];
 const uxaPath = join(REPO, 'src/useExportActions.ts');
 if (!existsSync(uxaPath)) {
   ok('useExportActions has NO static export-cluster import', false, 'src/useExportActions.ts is missing');

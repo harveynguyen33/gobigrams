@@ -9,7 +9,7 @@
  *   (2) EXECUTED against the shipped `@xyflow/system` resize arithmetic, whose
  *       function sources are sliced VERBATIM out of its bundle and compiled, so
  *       the floor numbers are the library's own maths, or
- *   (3) ARITHMETIC on the frame geometry as written in `src/shapes.tsx`.
+ *   (3) ARITHMETIC on the frame geometry as written in `src/nodes/shapes.tsx`.
  *
  * Nothing here is a painted measurement — that is the orchestrator's live pass.
  *
@@ -27,8 +27,8 @@ const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
    every count and regex below still measures the same surface the single file had. */
 const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
   .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
-const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
-const NODE_RAW = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
+const SHAPES_RAW = readFileSync(`${ROOT}/src/nodes/shapes.tsx`, 'utf8');
+const NODE_RAW = readFileSync(`${ROOT}/src/nodes/DiagramNode.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 

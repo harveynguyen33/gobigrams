@@ -34,11 +34,11 @@
 */
 import {useEffect, useMemo, useRef} from 'react';
 import {X} from 'lucide-react';
-import {COLOR_VAR, resolveColorKey, type Colored} from './colors';
-import {asShape, ShapePreview, type Shape} from './shapes';
-import {FOCUSABLE} from './Settings';
-import {templateCatalog, type TemplateFamily} from './templateCatalog';
-import type {PresetId, TemplateLevel} from './presets';
+import {COLOR_VAR, resolveColorKey, type Colored} from '../colors';
+import {asShape, ShapePreview, type Shape} from '../nodes/shapes';
+import {FOCUSABLE} from '../Settings';
+import {templateCatalog, type TemplateFamily} from '../templateCatalog';
+import type {PresetId, TemplateLevel} from '../presets';
 
 /* How many distinct glyphs a card shows. TWO numbers, and neither is a
    breakpoint: they are COUNTS of preview glyphs. The wide one is what the

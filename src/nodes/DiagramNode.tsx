@@ -1,9 +1,9 @@
 import {memo, useCallback, useEffect, useRef} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
-import {lucideByName} from './lucideIcons';
+import {lucideByName} from '../lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
-import {resolveColor, type ColorKey} from './colors';
-import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from './textStyle';
+import {resolveColor, type ColorKey} from '../colors';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
 import {SHAPE_MIN_PX} from './customShape';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in

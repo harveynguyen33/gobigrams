@@ -16,17 +16,17 @@ import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';
 import {readToken, tokensFor, EXPORT_TOKENS} from './theme';
 import {mermaidToGraph} from './mermaid';
-import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './exportSvg';
-import type {OutlineShaper} from './textOutline';
+import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './export/exportSvg';
+import type {OutlineShaper} from './export/textOutline';
 
 /* Lazy thunks, verbatim from App.tsx's module scope — dynamic imports ONLY
    (ROUND BJ; the round-ay harnesses assert no static import appears). */
-const exportSvgLazy = (): Promise<typeof import('./exportSvg')> => import('./exportSvg');
-const exportPngLazy = (): Promise<typeof import('./exportPng')> => import('./exportPng');
-const textOutlineLazy = (): Promise<typeof import('./textOutline')> => import('./textOutline');
-const textOutlineHbLazy = (): Promise<typeof import('./textOutlineHb')> => import('./textOutlineHb');
-const fontFilesLazy = (): Promise<typeof import('./fontFiles')> => import('./fontFiles');
-const printViewLazy = (): Promise<typeof import('./printView')> => import('./printView');
+const exportSvgLazy = (): Promise<typeof import('./export/exportSvg')> => import('./export/exportSvg');
+const exportPngLazy = (): Promise<typeof import('./export/exportPng')> => import('./export/exportPng');
+const textOutlineLazy = (): Promise<typeof import('./export/textOutline')> => import('./export/textOutline');
+const textOutlineHbLazy = (): Promise<typeof import('./export/textOutlineHb')> => import('./export/textOutlineHb');
+const fontFilesLazy = (): Promise<typeof import('./export/fontFiles')> => import('./export/fontFiles');
+const printViewLazy = (): Promise<typeof import('./export/printView')> => import('./export/printView');
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useExportActions(
@@ -77,7 +77,7 @@ export function useExportActions(
 
   /* AQ21 — parametrised builders. The modal and the one-click menu buttons
      share THESE; the difference is only defaults (live theme, full board). */
-  /* ROUND AR, AR-1 — buildSvg is now a THIN WRAPPER around `src/exportSvg.ts`:
+  /* ROUND AR, AR-1 — buildSvg is now a THIN WRAPPER around `src/export/exportSvg.ts`:
      it mounts the themed offscreen clone ONLY to take measurements (text
      boxes, edge routes, the clone→model origin shift), resolves the token
      map for the target theme, and hands everything to the pure emitter.
@@ -91,7 +91,7 @@ export function useExportActions(
    * family has no resolvable bytes (no permission, non-matching stack)
    * keep <text> per row — the emitter's per-row fallback.
    * ROUND AZ — FILE-FIRST: bytes come from the committed subsets
-   * (src/fontFiles.ts -> public/fonts/<slug>-variable.ttf), the variable
+   * (src/export/fontFiles.ts -> public/fonts/<slug>-variable.ttf), the variable
    * wght axis is instantiated per weight, and queryLocalFonts drops to a
    * LAST-RESORT for families the tree does not ship. The unresolved
    * families are RETURNED so the caller can surface a visible note (never

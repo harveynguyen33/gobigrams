@@ -31,7 +31,7 @@
  *   (reviewer finding, MAJOR). Asserted here: after a full run of that
  *   harness in a temp copy, no `.as-boards-out-*` file remains.
  *
- * Drives the REAL `src/exportSvg.ts` and the REAL measurer source the same
+ * Drives the REAL `src/export/exportSvg.ts` and the REAL measurer source the same
  * way round-ar-font-parity.mjs does (project esbuild bundle). RED proof:
  * every assertion below was shown RED on the pre-fix tree (5d79bd8) — the
  * run is recorded in HANDOFF.md and the card report.
@@ -61,7 +61,7 @@ const bundleAndImport = async () => {
   const entry = join(ROOT, '.ar2-entry.ts');
   const out = join(ROOT, '.ar2-out.mjs');
   writeFileSync(entry,
-    `export {exportSvg, domMeasurer} from '${join(ROOT, 'src/exportSvg.ts')}';\n` +
+    `export {exportSvg, domMeasurer} from '${join(ROOT, 'src/export/exportSvg.ts')}';\n` +
     `export {EXPORT_TOKENS} from '${join(ROOT, 'src/theme')}';\n`);
   const esbuild = existsSync(join(ROOT, 'node_modules/.bin/esbuild'))
     ? join(ROOT, 'node_modules/.bin/esbuild')
@@ -82,10 +82,10 @@ let MOD = null;
 let bundleError = '';
 try { MOD = await bundleAndImport(); } catch (e) { bundleError = String(e?.message ?? e); }
 if (!MOD) {
-  assert('module', false, `real src/exportSvg.ts could not be bundled from this root — ${bundleError}`);
+  assert('module', false, `real src/export/exportSvg.ts could not be bundled from this root — ${bundleError}`);
   process.exit(1);
 }
-assert('module', true, 'real src/exportSvg.ts bundled and imported');
+assert('module', true, 'real src/export/exportSvg.ts bundled and imported');
 const {exportSvg} = MOD;
 
 /* --------------------------------------------------------------- fixtures - */

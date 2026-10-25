@@ -1,4 +1,4 @@
-/* feature-map home: src/textOutline.ts */
+/* feature-map home: src/export/textOutline.ts */
 /* ROUND C (t_a5c17861) — "Outline text": text -> glyph outline paths.
  *
  * Harvey-approved design (card comment, 2026-10-21 "ok 1"):
@@ -157,7 +157,7 @@ export function shapeLineToSvg(
   return `<g ${attrs}>${glyphs}</g>`;
 }
 
-/* The harfbuzzjs loader (makeShaper) lives in src/textOutlineHb.ts —
+/* The harfbuzzjs loader (makeShaper) lives in src/export/textOutlineHb.ts —
  * App-only, because it carries the vite `?url` wasm-asset import the
  * legacy Node harnesses' plain-esbuild bundles cannot resolve. The pure
  * contract above (layoutRun / shapeLineToSvg) has no such dependency. */

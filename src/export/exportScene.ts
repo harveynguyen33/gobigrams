@@ -1,4 +1,4 @@
-/* ROUND AY items 2+3 — the resolved SCENE (src/exportScene.ts).
+/* ROUND AY items 2+3 — the resolved SCENE (src/export/exportScene.ts).
  *
  * OPTION B's spine: ONE function turns (nodes, edges, theme, tokens,
  * measurer) into a fully-resolved Scene — absolute coordinates, literal
@@ -32,14 +32,14 @@
  * (runs/baselineTops).
  */
 
-import {resolveColor} from './colors';
-import {asShape} from './shapes';
-import {labelAnchor, type LabelPos} from './edgeLabel';
+import {resolveColor} from '../colors';
+import {asShape} from '../nodes/shapes';
+import {labelAnchor, type LabelPos} from '../edgeLabel';
 import {
   type ExportNode, type ExportEdge, type ExportInput,
   type TextRect,
 } from './exportSvg';
-import {getTextMetrics, getTextAscent, type TextWidthFn, type TextAscentFn} from './textMetrics';
+import {getTextMetrics, getTextAscent, type TextWidthFn, type TextAscentFn} from '../textMetrics';
 
 /* ------------------------------------------------------------------ types */
 

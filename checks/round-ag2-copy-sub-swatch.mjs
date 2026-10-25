@@ -6,7 +6,7 @@
  * NO BROWSER, NO CDP, NO HEADLESS CHROME. The orchestrator measures the live
  * geometry; every number this file prints is either
  *   (1) ARITHMETIC on `src/styles.css` / `src/App.tsx` as written, or
- *   (2) EXECUTED — `src/inspector.ts` is imported and CALLED, `src/DiagramNode.tsx`
+ *   (2) EXECUTED — `src/inspector.ts` is imported and CALLED, `src/nodes/DiagramNode.tsx`
  *       is server-rendered through react-dom/server, and `src/presets.ts` is
  *       bundled with the project's own esbuild and walked. The predicate truth
  *       table, the node painter and the library data are therefore the SHIPPED
@@ -33,9 +33,9 @@ const blankTs = s => s
 const APP_RAW = read('src/App.tsx');
 const INSP_RAW = read('src/inspector.ts');
 const NOTE_RAW = read('src/colorKeyNote.ts');
-const TOUR_RAW = read('src/Tour.tsx');
-const SHAPES_RAW = read('src/shapes.tsx');
-const NODE_RAW = read('src/DiagramNode.tsx');
+const TOUR_RAW = read('src/dialogs/Tour.tsx');
+const SHAPES_RAW = read('src/nodes/shapes.tsx');
+const NODE_RAW = read('src/nodes/DiagramNode.tsx');
 const STYLES_RAW = read('src/styles.css');
 const COLORS_RAW = read('src/colors.ts');
 const SETTINGS_RAW = read('src/Settings.tsx');
@@ -107,7 +107,7 @@ function renderedFieldNames(bodySrc) {
   return [...out];
 }
 
-/** The flowchart vocabulary, parsed from `src/shapes.tsx` (it cannot be imported:
+/** The flowchart vocabulary, parsed from `src/nodes/shapes.tsx` (it cannot be imported:
  *  Node refuses the `.tsx` extension). Its length is asserted below, so the parse
  *  cannot silently come back empty. */
 const FLOW_EXTRA = (() => {
@@ -209,7 +209,7 @@ const SSR_ENTRY = `${ROOT}/.ag2-entry.tsx`;
 const SSR_OUT = `${ROOT}/.ag2-out.mjs`;
 let ssr = {ok: false, report: 'not run'};
 try {
-  writeFileSync(SSR_ENTRY, 'export {default as DiagramNode} from "./src/DiagramNode";\n');
+  writeFileSync(SSR_ENTRY, 'export {default as DiagramNode} from "./src/nodes/DiagramNode";\n');
   await (await import('esbuild')).build({
     entryPoints: [SSR_ENTRY], bundle: true, format: 'esm', platform: 'node',
     outfile: SSR_OUT, logLevel: 'error', external: ['react', 'react-dom', '@xyflow/react'],
@@ -243,7 +243,7 @@ try {
     : `the painter lost the sub: label-only-with-sub lo-sub=${withSub.includes('lo-sub')} text=${withSub.includes(SUB)}; ` +
       `label-only-empty lo-sub=${noSub.includes('lo-sub')}; card node-sub=${cardSub.includes('node-sub')}`;
 } catch (e) {
-  ssr.report = `could not server-render src/DiagramNode.tsx: ${e.code ?? e.name} ${String(e.message).split('\n')[0]}`;
+  ssr.report = `could not server-render src/nodes/DiagramNode.tsx: ${e.code ?? e.name} ${String(e.message).split('\n')[0]}`;
 } finally {
   for (const f of [SSR_ENTRY, SSR_OUT]) { try { rmSync(f, {force: true}); } catch { /* gone */ } }
 }
@@ -253,7 +253,7 @@ assert('ag2-10.the-sub-is-still-in-the-DATA-MODEL-and-in-BOTH-renderer-branches'
   /sub\?: string;/.test(NODE_RAW)
     && NODE.includes('{d.sub && <div className="node-sub">{d.sub}</div>}')
     && NODE.includes('{d.sub && <div className="lo-sub">{d.sub}</div>}'),
-  `NodeKind still declares \`sub?: string\` and src/DiagramNode.tsx still paints it in BOTH branches — the ` +
+  `NodeKind still declares \`sub?: string\` and src/nodes/DiagramNode.tsx still paints it in BOTH branches — the ` +
   `card's .node-sub (line ${lineOf('{d.sub && <div className="node-sub">', NODE_RAW)}) and the label-only ` +
   `.lo-sub (line ${lineOf('{d.sub && <div className="lo-sub">', NODE_RAW)})`);
 
@@ -319,11 +319,11 @@ console.log('\n=== B. ITEM 2 — American spelling in user-visible copy ===');
    `>` that begins a multi-line docblock at the end of a JSX line cannot pull the
    comment prose into the string. */
 const VISIBLE_FILES = [
-  'src/App.tsx', 'src/Tour.tsx', 'src/colorKeyNote.ts', 'src/Settings.tsx', 'src/BoardDialog.tsx',
+  'src/App.tsx', 'src/dialogs/Tour.tsx', 'src/colorKeyNote.ts', 'src/Settings.tsx', 'src/dialogs/BoardDialog.tsx',
   'src/InspectorPickers.tsx', 'src/IconPicker.tsx', 'src/SearchPalette.tsx', 'src/ContextMenu.tsx',
-  'src/TableNode.tsx', 'src/LabelNode.tsx', 'src/CustomShapeNode.tsx', 'src/ThemePicker.tsx',
+  'src/nodes/TableNode.tsx', 'src/nodes/LabelNode.tsx', 'src/nodes/CustomShapeNode.tsx', 'src/ThemePicker.tsx',
   'src/edges/GoblinEdge.tsx', 'src/edges/edgeData.ts', 'src/edges/flowPayloads.tsx', 'src/edges/index.ts',
-  'src/Checklist.tsx', 'src/Tooltip.tsx', 'src/DiagramNode.tsx',
+  'src/nodes/Checklist.tsx', 'src/Tooltip.tsx', 'src/nodes/DiagramNode.tsx',
 ];
 const ATTRS = ['title', 'aria-label', 'placeholder', 'label'];
 const BRITISH = /colour/i;
@@ -433,7 +433,7 @@ const PREFIX_COPY_SUBST = [
   ['src/App.tsx', '<label>text color</label>', '<label>text colour</label>'],
   ['src/colorKeyNote.ts', "export const KEY_NOTE_TEXT = 'Color = our grouping, not ISO.';",
     "export const KEY_NOTE_TEXT = 'Colour = our grouping, not ISO.';"],
-  ['src/Tour.tsx', 'Select a node to edit its text, icon and color.',
+  ['src/dialogs/Tour.tsx', 'Select a node to edit its text, icon and color.',
     'Select a node to edit its text, icon and colour.'],
 ];
 const prefixVisible = (() => {

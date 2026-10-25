@@ -70,9 +70,9 @@ const blankComments = (s) =>
     .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 const APP = blankComments(APP_RAW);
 
-const DIAGRAM = readFileSync(join(ROOT, 'src/DiagramNode.tsx'), 'utf8');
-const LABEL = readFileSync(join(ROOT, 'src/LabelNode.tsx'), 'utf8');
-const CUSTOM = readFileSync(join(ROOT, 'src/CustomShapeNode.tsx'), 'utf8');
+const DIAGRAM = readFileSync(join(ROOT, 'src/nodes/DiagramNode.tsx'), 'utf8');
+const LABEL = readFileSync(join(ROOT, 'src/nodes/LabelNode.tsx'), 'utf8');
+const CUSTOM = readFileSync(join(ROOT, 'src/nodes/CustomShapeNode.tsx'), 'utf8');
 const PKG = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const RF_CHANGES_DTS = readFileSync(
   join(ROOT, 'node_modules/@xyflow/system/dist/esm/types/changes.d.ts'),

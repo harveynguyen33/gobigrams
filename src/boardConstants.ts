@@ -3,7 +3,7 @@
  *  keyword and this file's imports). Size budgets: checks/file-size-gate.mjs. */
 import type {Edge, Node} from '@xyflow/react';
 import {PRESETS, makeEdge} from './presets';
-import type {SvgRejectReason} from './customShape';
+import type {SvgRejectReason} from './nodes/customShape';
 
 /* PACKAGE-N §8.1 — the import rejection table, verbatim from the spec.
    Every message names the FIX where one exists: `no-viewbox`, `no-size` and
@@ -98,7 +98,7 @@ export const DBL_STRAIGHT_GAP = 160;
 
 
 
-/** G — the four connection points of the goblin node (src/DiagramNode.tsx
+/** G — the four connection points of the goblin node (src/nodes/DiagramNode.tsx
  *  NodeHandles). The onConnect direction guard is scoped to these: an ERD
  *  column handle is NOT in the set, so a relationship drag is never re-aimed. */
 export const GOBLIN_HANDLE_IDS: ReadonlySet<string> = new Set(['left', 'right', 'top', 'bottom']);
