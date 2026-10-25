@@ -49,8 +49,9 @@ ALLOW=(
   src                     # the application itself
 )
 
-git checkout public-main
-git reset --hard public-main
+SNAP="public-${SRC_BRANCH:-main}"
+git checkout "$SNAP" 2>/dev/null || git checkout -b "$SNAP"  # first run creates it
+git reset --hard "$SNAP"
 git clean -qfd
 
 # stage ONLY the allowlisted paths from main
@@ -99,8 +100,8 @@ cut -d/ -f1 <(git diff --cached --name-only) | sort -u | sed 's/^/    /'
 
 if [ "${1:-}" = "--push" ]; then
   git commit -q -m "public: refresh snapshot from ${SRC_BRANCH:-main}" || echo "nothing to commit"
-  git push github-mirror public-main:main --force
-  echo "pushed -> github.com/harveynguyen33/gobigrams"
+  git push github-mirror "$SNAP":"${GH_TARGET:-$( [ "${SRC_BRANCH:-main}" = main ] && echo main || echo develop )}" --force
+  echo "pushed -> github.com/harveynguyen33/gobigrams ($SNAP -> ${GH_TARGET:-main})"
 else
   echo "dry run — inspect with: git diff --cached --stat"
   exit 0
