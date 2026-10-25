@@ -1,3 +1,4 @@
+/* feature-map home: src/boards.ts */
 import type {Node, Edge} from '@xyflow/react';
 import {type PresetId, type TemplateSpec, getPreset, asPreset} from './presets';
 import {type ThemeName} from './theme';

@@ -1,3 +1,4 @@
+/* feature-map home: src/exportPng.ts */
 /* ROUND AY item 4 — exportPng.ts (pure rasterise(svgString) module).
  *
  * Spec §4: PNG = rasterise(SVG). One painter per pixel class: the SVG emitter

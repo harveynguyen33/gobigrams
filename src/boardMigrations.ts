@@ -2,7 +2,8 @@
  *  of App.tsx verbatim (L1 legacy-hex, the 4-point EDGE_HANDLE_REMAP, the orphan
  *  `animated` fold, flow:'event' folding, label folding, __editAt folding, and
  *  the B1 end re-aim). Behaviour-neutral: the code is byte-identical; only the
- *  `export` keywords and this file's imports are new. */
+ *  `export` keywords and this file's imports are new.  (feature-map home: src/src/boardMigrations.ts)
+ */
 import type {Edge, Node} from '@xyflow/react';
 import {type BoardDoc} from './boards';
 import {COLOR_VAR, isColorKey, keyForHex, type ColorKey} from './colors';

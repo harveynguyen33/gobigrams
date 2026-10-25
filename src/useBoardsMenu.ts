@@ -7,7 +7,8 @@
  *  boardList, curBoard, presetId and their setters stay in App (shared with
  *  the persistence hook and the JSX popover) and pass down positionally —
  *  no context. boardsBtnRef and boardsMenuBtnRef come back out because the
- *  JSX (still in App) attaches them. */
+ *  JSX (still in App) attaches them.  (feature-map home: src/src/useBoardsMenu.ts)
+ */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type * as React from 'react';
 import type {Node, Edge} from '@xyflow/react';

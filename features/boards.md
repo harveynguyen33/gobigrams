@@ -3,7 +3,11 @@ feature: boards
 entry_paths:
   - src/boards.ts
   - src/BoardDialog.tsx
-verified: never-driven (2026-10-12)
+  - src/useBoardsMenu.ts
+  - src/usePersistence.ts
+  - src/boardMigrations.ts
+  - src/components/ModalMounts.tsx
+verified: never-driven (2026-10-12; homes re-pointed 2026-10-25, ROUND BN-4 Phase D)
 ---
 # boards
 
@@ -33,3 +37,15 @@ end: create a board, save, reload the page, assert the board reopens with the sa
 - Stale persisted UI state is CLEARED + re-initialised, never migrated (house rule).
 - The demo board `boards/mu01q1ue3a854b81.json` must stay byte-identical — round harnesses
   restore it after mutating tests.
+
+
+*Module homes (after the BN decomposition)*
+
+- `src/useBoardsMenu.ts` — board dialog state, create-from-template + gallery handover,
+  rename/duplicate/delete, popover clamp, openBoard
+- `src/usePersistence.ts` — save/load/autosave/canAutosave, storage-mode + quota readouts,
+  first-run bootstrap (last-board restore)
+- `src/boardMigrations.ts` — the on-read migrations (edge handle remap, animated-flag
+  folding, flow:'event' folding, label folding, __editAt folding)
+- `src/components/ModalMounts.tsx` — where the BoardDialog + TemplatesGallery mount
+- `src/boards.ts` — the data layer itself (unchanged)

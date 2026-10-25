@@ -4,7 +4,8 @@
  *  align/distribute). Behaviour-neutral: bodies are byte-identical; only
  *  this wrapper, its parameter list and the return tuple are new. The
  *  nodes/edges state, absNodes, animateLayout and zOrderMode stay in App
- *  and pass down positionally — no context. */
+ *  and pass down positionally — no context.  (feature-map home: src/src/useCanvasTools.ts)
+ */
 import {useCallback} from 'react';
 import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';

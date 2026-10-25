@@ -1,3 +1,4 @@
+/* feature-map home: src/boardClipboard.ts */
 /**
  * ROUND BI — the feedback screenshot helper's ONE brain, PURE AND REACT-FREE
  * (a `feedbackIssueUrl.ts` / `roadmap.ts` peer, so the harness can bundle and

@@ -1,6 +1,7 @@
 /* ROUND BN-4 — panes split out of the former src/Settings.tsx (verbatim,
    2026-10-25). src/Settings.tsx keeps the shell and imports these back,
-   so the mounted UI is unchanged. */
+   so the mounted UI is unchanged.  (feature-map home: src/src/settings/panes.tsx)
+ */
 import {useRef} from 'react';
 import {MARQUEE_OPTS} from '../marqueeMode';
 import {ZORDER_OPTS} from '../zOrderMode';

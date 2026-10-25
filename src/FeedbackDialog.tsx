@@ -1,3 +1,4 @@
+/* feature-map home: src/FeedbackDialog.tsx */
 /**
  * ROUND BH, ITEM 1 (public launch, 2026-10-24) — THE FEEDBACK DIALOG.
  *

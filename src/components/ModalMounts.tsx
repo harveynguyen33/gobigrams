@@ -1,3 +1,4 @@
+/* feature-map home: src/components/ModalMounts.tsx */
 /* ModalMounts.tsx — ROUND BN-3 PHASE B: the five top-level modal mounts, lifted
  *  from App()'s return (BoardDialog, TemplatesGallery, Settings, FeedbackDialog,
  *  ExportModal + the hidden JSON file input). The mounted components are

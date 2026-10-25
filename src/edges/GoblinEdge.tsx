@@ -1,3 +1,4 @@
+/* feature-map home: src/edges/GoblinEdge.tsx — the ONE live edge component (all 5 type ids) */
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   BaseEdge, EdgeLabelRenderer,

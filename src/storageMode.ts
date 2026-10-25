@@ -1,3 +1,4 @@
+/* feature-map home: src/storageMode.ts */
 /* ROUND BJ (bundle hygiene) — the AT-1 boot probe, EXTRACTED from boards.ts
  * into a leaf module so src/library.ts can read the memoised decision without
  * statically importing boards.ts (which drags presets → @xyflow/react into

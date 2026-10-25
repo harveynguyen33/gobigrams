@@ -1,3 +1,4 @@
+/* feature-map home: src/BoardDialog.tsx */
 /* ITEM 6b (2026-09-18) — THE BOARD DIALOG: create / rename / delete as ONE
  * designed component, replacing three `window.prompt` / `window.confirm` calls.
  *

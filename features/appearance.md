@@ -4,7 +4,9 @@ entry_paths:
   - src/ThemePicker.tsx
   - src/colors.ts
   - src/styles.css
-verified: never-driven (2026-10-12)
+  - src/settings/panes.tsx
+  - src/components/ModalMounts.tsx
+verified: never-driven (2026-10-12; homes re-pointed 2026-10-25, ROUND BN-4 Phase D)
 ---
 # appearance
 
@@ -38,3 +40,10 @@ colour-grid geometry.
 - Zero new hex in component CSS is a hard rule — the harnesses ratchet the count (ceiling 160).
 - Theme previews must NOT follow the current pick: the System card previews the OS theme
   via matchMedia, the fixed cards preview their own tokens.
+
+
+*Module homes (after the BN decomposition)*
+
+- `src/settings/` — the Settings panes: `panes.tsx` (the five panes incl. Appearance),
+  `controls.tsx`, `shared.ts`, `version.ts`; `src/Settings.tsx` is the 424-line shell
+- `src/components/ModalMounts.tsx` — Settings mounts there, fed by App's settingsProps object

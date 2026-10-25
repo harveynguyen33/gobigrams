@@ -1,3 +1,4 @@
+/* feature-map home: src/components/HelpSheet.tsx */
 /* HelpSheet.tsx — ROUND BN-3 PHASE B: the `?` cheat-sheet popover, lifted
  *  verbatim from App()'s return (App.tsx ~4483). The block is fully presentational:
  *  App owns `help` (open state), the outside-click refs and the two openers

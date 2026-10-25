@@ -38,7 +38,7 @@ const BUDGETS = new Map([
     ['src/App.tsx', 5571, 'hard'],  // ROUND BN-3 PHASE B: LOWERED again (Toolbar extraction)
   ['src/useUndoHistory.ts', 132],  // ROUND BN PHASE A (now 121)
   ['src/usePersistence.ts', 272],  // ROUND BN-2 (now 271)
-  ['src/useConnections.ts', 298],  // ROUND BN-2
+  ['src/useConnections.ts', 299],  // ROUND BN-2; +1 BN-4 Phase D feature-map home tag
   ['src/useExportActions.ts', 500],  // ROUND BN-2
   ['src/useCanvasTools.ts', 182],  // ROUND BN-2
   ['src/useBoardsMenu.ts', 429],  // ROUND BN-2
@@ -46,8 +46,8 @@ const BUDGETS = new Map([
   ['src/boardMigrations.ts', 234],  // ROUND BN ITEM 2 (now 213)
   ['src/boardUtils.tsx', 231],  // ROUND BN ITEM 2 (now 210),
   ['src/BoardDialog.tsx', 383],  // now 348,
-  ['src/components/HelpSheet.tsx', 96],  // ROUND BN-3 PHASE B (new)
-  ['src/components/ModalMounts.tsx', 143],  // ROUND BN-3 PHASE B (new)
+  ['src/components/HelpSheet.tsx', 97],  // ROUND BN-3 PHASE B; +1 BN-4 Phase D feature-map home tag
+  ['src/components/ModalMounts.tsx', 144],  // ROUND BN-3 PHASE B; +1 BN-4 Phase D feature-map home tag
   ['src/components/CanvasEmptyPanel.tsx', 41],  // ROUND BN-3 PHASE B (new)
   ['src/components/Toolbar.tsx', 173],  // ROUND BN-3 PHASE B (new)
   ['src/Checklist.tsx', 133],  // now 120,

@@ -1,3 +1,4 @@
+/* feature-map home: src/textOutline.ts */
 /* ROUND C (t_a5c17861) — "Outline text": text -> glyph outline paths.
  *
  * Harvey-approved design (card comment, 2026-10-21 "ok 1"):
