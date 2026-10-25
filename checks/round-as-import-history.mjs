@@ -24,6 +24,9 @@ const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
    read App PLUS the hook (concatenated source keeps the brace-span working). */
 let HOOK_RAW = '';
 try { HOOK_RAW = readFileSync(join(ROOT, 'src/useUndoHistory.ts'), 'utf8'); } catch {}
+/* ROUND BN-2 — the Mermaid-import effect moved VERBATIM into
+   src/useExportActions.ts; concatenate it too (same replay-free pattern). */
+try { HOOK_RAW += '\n' + readFileSync(join(ROOT, 'src/useExportActions.ts'), 'utf8'); } catch {}
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s
@@ -51,6 +54,9 @@ console.log(`  target root: ${ROOT}`);
 
 /* the gobi:mermaid-import handler: its brace span starts at the listener
    registration and covers the whole handler effect */
+/* ROUND BN-2 — see the HOOK_RAW note above: the handler now lives in the
+   concatenated useExportActions.ts source. The anchor indexes APP (the
+   concatenation), not HOOK_RAW, so the span math stays consistent. */
 const anchor = APP.indexOf("window.addEventListener('gobi:mermaid-import'");
 const H0 = APP.lastIndexOf('useEffect', anchor);
 const H = APP.slice(...braceSpan(APP, H0));

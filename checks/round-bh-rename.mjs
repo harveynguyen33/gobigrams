@@ -99,9 +99,12 @@ assert('bh.n3.brand-bar-wordmark-is-gobigrams',
   APP.includes('<img className="brand-mark" src="/brand/icon-g.svg"') && /aria-hidden="true" \/>\s*Gobigrams/.test(APP),
   'App.tsx palette brand bar');
 
+/* ROUND BN-2 — the printPdf builder moved VERBATIM into useExportActions.ts. */
+let EXP_HOOK = '';
+try { EXP_HOOK = read('src/useExportActions.ts'); } catch {}
 assert('bh.n4.pdf-fallback-title-is-gobigrams',
-  APP.includes("curBoard?.name || 'Gobigrams'"),
-  'App.tsx printSvgAsPdf fallback title');
+  EXP_HOOK.includes("curBoard?.name || 'Gobigrams'"),
+  'useExportActions.ts printSvgAsPdf fallback title');
 
 /* the NOT-renamed invariants */
 assert('bh.n5.storage-keys-untouched',

@@ -41,6 +41,9 @@ const persistenceSource = () => readFileSync(join(ROOT, 'src/usePersistence.ts')
    probes fall through to an empty string and read RED — exactly what the
    replay needs. */
 const PERS_SOURCE = (() => { try { return persistenceSource(); } catch { return ''; } })();
+/* ROUND BN-2 — the export builders live in useExportActions.ts (same replay
+   guard as above). */
+const EXP_SOURCE = (() => { try { return readFileSync(join(ROOT, 'src/useExportActions.ts'), 'utf8'); } catch { return ''; } })();
 const settingsSource = () => readFileSync(join(ROOT, 'src/Settings.tsx'), 'utf8');
 const prefsSource = () => readFileSync(join(ROOT, 'src/prefs.ts'), 'utf8');
 
@@ -157,8 +160,9 @@ assert('S2.png-scale — exportPng consumes the stored scale (pixelRatio) and th
      persisted prefs still drive the raster — but through the new seam: the scale goes to
      `rasterise({scale: pngScale})` and the padding is applied to the scene bounds in `buildSvg`
      (`pad: pngPad`). Assert the new wiring, not the deleted one. */
-  (app.includes('scale: pngScale') && app.includes('rasterise(svg'))
-    && (app.includes('pad: pngPad') || app.includes('const pad = pngPad')),
+  /* ROUND BN-2 — buildPng/buildSvg moved VERBATIM into useExportActions.ts. */
+  (EXP_SOURCE.includes('scale: pngScale') && EXP_SOURCE.includes('rasterise(svg'))
+    && (EXP_SOURCE.includes('pad: pngPad') || EXP_SOURCE.includes('const pad = pngPad')),
   'the two hard-coded values (scale 2, pad 48) must read the persisted state');
 
 {

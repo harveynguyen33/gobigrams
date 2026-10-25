@@ -43,7 +43,9 @@ const read = (p) => { try { return readFileSync(join(REPO, p), 'utf8'); } catch 
 
 const css = read('src/styles.css');
 const html = read('index.html');
-const app = read('src/App.tsx');
+/* ROUND BN-2 — the export builders (font embed, outline note) moved VERBATIM
+   into src/useExportActions.ts; `app` covers both files. */
+const app = read('src/App.tsx') + '\n' + read('src/useExportActions.ts');
 const outlineSrc = read('src/textOutline.ts');
 const hbSrc = read('src/textOutlineHb.ts');
 const exportSvgSrc = read('src/exportSvg.ts');

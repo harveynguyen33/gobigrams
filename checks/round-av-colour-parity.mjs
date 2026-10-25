@@ -183,7 +183,9 @@ assert('AV1-dommeasurer-finds-node-ico', domMeasurerHasIcon,
 
 /* ------------------------- DEFECT 2 — the PNG clone resolves its own paint - */
 
-const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
+/* ROUND BN-2 — buildPng moved VERBATIM into useExportActions.ts. */
+const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src', 'useExportActions.ts'), 'utf8');
 const pngStart = app.indexOf('const buildPng');
 const pngEnd = app.indexOf('\n  // ---- import JSON ----', pngStart);
 const pngBody = pngStart >= 0 && pngEnd > pngStart ? app.slice(pngStart, pngEnd) : '';

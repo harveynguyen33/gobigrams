@@ -44,7 +44,9 @@ const assert = (id, pass, detail = '') => {
 console.log('ROUND BA — SUPERSEDED by ROUND AY item 4 (the rasterise flip)');
 console.log(`  target root: ${ROOT}`);
 
-const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
+/* ROUND BN-2 — buildPng moved VERBATIM into useExportActions.ts. */
+const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src', 'useExportActions.ts'), 'utf8');
 const pngStart = app.indexOf('const buildPng');
 const pngEnd = app.indexOf('\n  // ---- import JSON ----', pngStart);
 const pngBody = pngStart >= 0 && pngEnd > pngStart ? app.slice(pngStart, pngEnd) : '';

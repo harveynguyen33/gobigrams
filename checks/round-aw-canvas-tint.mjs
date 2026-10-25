@@ -181,7 +181,9 @@ assert('aw4-shapeframemarkup-signature-unchanged',
    buildScene (the emitter writes fill=<accent literal> fill-opacity="0.09"),
    and buildPng just rasterises that svgString. The new-form assertion: the
    builder delegates to the scene path and contains no fill rewriting. */
-const appSrc = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
+/* ROUND BN-2 — buildPng moved VERBATIM into useExportActions.ts. */
+const appSrc = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src', 'useExportActions.ts'), 'utf8');
 const pngStart = appSrc.indexOf('const buildPng');
 const pngEnd = appSrc.indexOf('\n  // ---- import JSON ----', pngStart);
 const pngBody = pngStart >= 0 && pngEnd > pngStart ? appSrc.slice(pngStart, pngEnd) : '';

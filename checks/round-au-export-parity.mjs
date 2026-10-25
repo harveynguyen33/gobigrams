@@ -218,7 +218,10 @@ assert('AU3-edge-stroke-width-parity',
    The rasterised-pixels half is the card's live pass (0 selection-blue px,
    round-ay-png-diff). */
 
-const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
+/* ROUND BN-2 — buildPng/mountThemed moved VERBATIM into
+   src/useExportActions.ts; the probes read the hook source. */
+const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src', 'useExportActions.ts'), 'utf8');
 /* isolate buildPng's body (from its declaration to the next builder) */
 const pngStart = app.indexOf('const buildPng');
 const pngEnd = app.indexOf('\n  // ---- import JSON ----', pngStart);

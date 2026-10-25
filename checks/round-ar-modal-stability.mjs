@@ -25,6 +25,10 @@ import {join} from 'node:path';
 const ROOT = process.env.AR_ROOT || '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const MODAL_RAW = readFileSync(join(ROOT, 'src/ExportModal.tsx'), 'utf8');
 const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* ROUND BN-2 — buildSvg/buildPng moved VERBATIM into src/useExportActions.ts;
+   the identity-stability probes read the hook source, the prop-passing probe
+   still reads App.tsx (that is where the JSX lives). */
+const EXP_RAW = readFileSync(join(ROOT, 'src/useExportActions.ts'), 'utf8');
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s
@@ -32,6 +36,7 @@ const stripTs = s => s
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 const MODAL = stripTs(MODAL_RAW);
 const APP = stripTs(APP_RAW);
+const EXP = stripTs(EXP_RAW); /* ROUND BN-2 — see EXP_RAW note. */
 
 const lineOf = (src, idx) => src.slice(0, idx).split('\n').length;
 
@@ -141,10 +146,14 @@ console.log(`  target root: ${ROOT}`);
     const m = APP.match(re);
     return m ? {ok: true, line: lineOf(APP, m.index)} : {ok: false, line: 0};
   };
-  const svg = stable(/\bconst buildSvg = useCallback\(/);
-  const png = stable(/\bconst buildPng = useCallback\(/);
-  const svgRef = stable(/\bconst buildSvg = useRef\(/);
-  const pngRef = stable(/\bconst buildPng = useRef\(/);
+  const stableExp = re => {
+    const m = EXP.match(re);
+    return m ? {ok: true, line: lineOf(EXP, m.index)} : {ok: false, line: 0};
+  };
+  const svg = stableExp(/\bconst buildSvg = useCallback\(/);
+  const png = stableExp(/\bconst buildPng = useCallback\(/);
+  const svgRef = stableExp(/\bconst buildSvg = useRef\(/);
+  const pngRef = stableExp(/\bconst buildPng = useRef\(/);
   const svgStable = svg.ok || svgRef.ok;
   const pngStable = png.ok || pngRef.ok;
 
