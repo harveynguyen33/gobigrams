@@ -31,6 +31,9 @@ import {
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const SYS_SRC = readFileSync(`${ROOT}/node_modules/@xyflow/system/dist/esm/index.mjs`, 'utf8');
 const APP_SRC = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN-2 — onReconnect moved VERBATIM into src/useConnections.ts; the
+   (h) CLEAR section reads the hook source. */
+const CONN_SRC = readFileSync(`${ROOT}/src/useConnections.ts`, 'utf8');
 const EDGE_SRC = readFileSync(`${ROOT}/src/GoblinEdge.tsx`, 'utf8');
 const CSS_SRC = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const SYS_LINES = SYS_SRC.split('\n');
@@ -533,9 +536,9 @@ head('(g) DEGENERATE SAFETY — freePath never emits NaN or an empty path');
    so both keys must go. This reads the SHIPPED handler, not a model of it. */
 head('(h) CLEAR — reconnect drops bendX and bendY');
 {
-  const i = lineOf(APP_SRC, 'const onReconnect = useCallback');
-  console.log(`     src/App.tsx:${i}  the reconnect handler`);
-  const body = APP_SRC.slice(APP_SRC.indexOf('const onReconnect = useCallback'), APP_SRC.indexOf('const onReconnect = useCallback') + 1400);
+  const i = lineOf(CONN_SRC, 'const onReconnect = useCallback');
+  console.log(`     src/useConnections.ts:${i}  the reconnect handler`);
+  const body = CONN_SRC.slice(CONN_SRC.indexOf('const onReconnect = useCallback'), CONN_SRC.indexOf('const onReconnect = useCallback') + 1400);
   ok(/reconnectEdge\(oldEdge/.test(body), 'it still routes through reconnectEdge (type, style, label survive)');
   for (const k of ['bend', 'bendX', 'bendY']) {
     ok(new RegExp(`delete data\\.${k}\\b`).test(body), `src/App.tsx deletes \`${k}\` on reconnect`);

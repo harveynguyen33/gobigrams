@@ -35,9 +35,10 @@ const NEW_FILE_DEFAULT_BUDGET = 400;
 // Generated from the measured line counts at ROUND BN (HEAD 4402da1); the
 // "now N" comments record the count each budget was derived from.
 const BUDGETS = new Map([
-    ['src/App.tsx', 6964, 'hard'],  // ROUND BN-2: hard cap LOWERED from 7185 (usePersistence extraction)
+    ['src/App.tsx', 6725, 'hard'],  // ROUND BN-2: LOWERED again (useConnections extraction)
   ['src/useUndoHistory.ts', 132],  // ROUND BN PHASE A (now 121)
   ['src/usePersistence.ts', 272],  // ROUND BN-2 (now 271)
+  ['src/useConnections.ts', 298],  // ROUND BN-2
   ['src/boardConstants.ts', 129],  // ROUND BN ITEM 2 (now 118)
   ['src/boardMigrations.ts', 234],  // ROUND BN ITEM 2 (now 213)
   ['src/boardUtils.tsx', 231],  // ROUND BN ITEM 2 (now 210),
