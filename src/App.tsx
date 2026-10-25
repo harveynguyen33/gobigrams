@@ -1,14 +1,12 @@
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel, addEdge, useNodesState, useEdgesState,
+  ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-const exportPngLazy = (): Promise<typeof import('./exportPng')> => import('./exportPng');
 import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
-import {mermaidToGraph} from './mermaid';
 import {
   Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
@@ -52,11 +50,10 @@ import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNo
 import {edgeTypes} from './GoblinEdge';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
-import BoardDialog, {type BoardDialogResult} from './BoardDialog';
+import BoardDialog from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
-import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './exportSvg';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
  * editing surface (canvas render) never needs the emitter at first paint:
  * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
@@ -67,16 +64,10 @@ import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './exportSvg
  * (~150-200 KB raw, ~40 KB gz) that used to sit in the boot bundle.
  * The whole cluster is closed over App.tsx (no other app module imports
  * these by value), so the seam here is the only door. */
-const exportSvgLazy = (): Promise<typeof import('./exportSvg')> => import('./exportSvg');
 /* ROUND BJ — same lazy seam as exportSvg above: the shaper stack and the
  * print route only run inside export handlers. One memoised promise per
  * module, so the first export pays the chunk once and every later export
  * reuses it. Types stay static (erased). */
-const textOutlineLazy = (): Promise<typeof import('./textOutline')> => import('./textOutline');
-const textOutlineHbLazy = (): Promise<typeof import('./textOutlineHb')> => import('./textOutlineHb');
-import type {OutlineShaper} from './textOutline';
-const fontFilesLazy = (): Promise<typeof import('./fontFiles')> => import('./fontFiles');
-const printViewLazy = (): Promise<typeof import('./printView')> => import('./printView');
 
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
@@ -103,8 +94,8 @@ import {
   type TextVAlign,
 } from './textStyle';
 import {
-  PRESETS, getPreset, asPreset, isPresetId, makeEdge, edgeColorPatch, edgeColorLiteralPatch,
-  LAYOUTS, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
+  PRESETS, getPreset, asPreset, isPresetId, edgeColorPatch, edgeColorLiteralPatch,
+  C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset, type PathId,
 } from './presets';
 import {type PaletteItem} from './palette';
@@ -112,10 +103,9 @@ import {type PaletteItem} from './palette';
    (Option B's condition: the key must be labelled where the user looks, and the
    label must be dismissible so it does not become permanent furniture). */
 import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from './colorKeyNote';
-import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, readToken, tokensFor, EXPORT_TOKENS, type Mode, type ThemeName} from './theme';
+import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, type Mode, type ThemeName} from './theme';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
-import {isQuotaError, QUOTA_MESSAGE, isVolatile} from './localStore';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
 import Checklist, {type ChecklistTaskId} from './Checklist';
@@ -174,15 +164,19 @@ import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES
    moved verbatim, imports only. Size budgets: checks/file-size-gate.mjs. */
 import {
   SHAPE_REJECT_MESSAGE, PATH_TYPES, isGoblinEdge, RECONNECT_RADIUS,
-  DOUBLE_CLICK_CONNECT_RANGE, DBL_STRAIGHT_GAP, GOBLIN_HANDLE_IDS,
-  initialNodes, initialEdges, type PathType,
+  type PathType,
 } from './boardConstants';
 import {migrateNode, migrateEdge, migrateDoc} from './boardMigrations';
 import {useUndoHistory, type Snap} from './useUndoHistory';
+import {usePersistence} from './usePersistence';
+import {useConnections} from './useConnections';
+import {useExportActions} from './useExportActions';
+import {useCanvasTools} from './useCanvasTools';
+import {useBoardsMenu} from './useBoardsMenu';
 import {
   edgeMarkerUrl, edgeStrokeKeyOf, hasCrow, isEditable, nodeW, nodeH,
   edgeGeo, edgeDrawnMid, TableGlyph, dashArray, favouritePreview, markerFor,
-  edgeStroke, edgeStrokeKey, bootTheme, wouldCycle,
+  edgeStroke, edgeStrokeKey, bootTheme,
 } from './boardUtils';
 
 const nodeTypes = {goblin: DiagramNode, label: LabelNode, table: TableNode, customshape: CustomShapeNode};
@@ -746,30 +740,6 @@ export default function App() {
     suggestTheme(p.theme.suggested);
   }, [suggestTheme]);
 
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  /* AT-1 — the storage-mode readout for the boards popup header. Resolved from
-     the same memoised boot probe the data layer uses (boards.storageModeLabel);
-     refreshed when the popup opens, so it can never contradict the backend a
-     save just went to. */
-  const [modeLabel, setModeLabel] = useState('');
-  /* AT-4 #2 — the storage readout: "X MB used of ~Y MB — persistent | best-
-     effort" sentence. Local mode only (in server mode the browser's quota is
-     not where the boards live, so an estimate would be a non-sequitur). */
-  const [storageEstimate, setStorageEstimate] = useState('');
-  const [localMode, setLocalMode] = useState(false);
-  /* PACKAGE-S §S-3 — with autosave OFF this flips true on the first unflushed
-     change and false on flush; with autosave ON it is always false (never shown). */
-  const [dirty, setDirty] = useState(false);
-  /** Mirror of curBoard for save paths (I6): flushSave reads through this ref
-   *  so it does not need curBoard in its dependency array. */
-  const curBoardRef = useRef<BoardDoc | null>(curBoard);
-  curBoardRef.current = curBoard;
-  const saveTimer = useRef<number | undefined>(undefined);
-  const saveSeq = useRef(0);
-  /** Set by applyBoard; the next autosave effect run(s) are skipped so
-   *  loading a board doesn't immediately write it back to disk. */
-  const skipAutosave = useRef(0);
-
   const applyBoard = useCallback((doc0: BoardDoc) => {
     // Load a board's nodes/edges, reset history/selection, fit view.
     // Two effect runs will fire (nodes then edges state updates) — skip both.
@@ -822,591 +792,28 @@ export default function App() {
     });
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
 
-  /* AS-5 — THE SAVE GATE, stated once and named. A save (debounced autosave
-     scheduled, or a flush writing) runs only when BOTH hold:
-       (a) a board document has been LOADED — `boardLoaded` is the loader's
-           explicit flag (first boot with no last-board keeps it false until
-           the bootstrap resolves one way or the other; a failed load re-arms
-           nothing), and
-       (b) the id the LOADER applied (`boardLoadedDocId`, set by applyBoard
-           and cleared on board switch) EQUALS the id of the doc currently in
-           memory (`curBoardRef`) — so a flush landing while the next board is
-           still loading, a debounce firing mid-load, or any stale-doc window
-           writes nothing.
-     This replaces the old implicit `boardId`/`skipAutosave` combination.
-     HARDENING, not a fix for a proven race: the 2026-10-19 data-loss incident
-     is UNDETERMINED (see ROUND-AS-SPEC Amendment 1); this gate removes the
-     unproven candidates' shared precondition — a save running when the
-     in-memory doc is not the loaded doc. */
-  const canAutosave = boardLoaded && boardLoadedDocId !== null && boardLoadedDocId === curBoardRef.current?.id;
+  /* ROUND BN-2 — the save/load cluster now lives in usePersistence.ts
+     (moved verbatim). applyBoard stays HERE (it owns the module-level idc
+     bump and the undo/selection reset) and is passed in; saveTimer and
+     skipAutosave come back out because two later App sites still write them
+     (the board-switch cancel and the beforeunload fast flush). */
+  const [saveState, modeLabel, storageEstimate, localMode, dirty,
+    flushSave, refreshBoards, saveTimer, skipAutosave] = usePersistence(
+    nodes, edges, nodesRef, edgesRef, curBoard, presetId, mode, autosave,
+    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard);
 
-  /* AS-4 — the board list refresher, declared BEFORE flushSave so the 404
-     branch can call it (and name it in deps) without a TDZ ordering problem. */
-  const refreshBoards = useCallback(async () => {
-    try {
-      setBoardList(await boards.listBoards());
-    } catch (err) {
-      flash(`Boards API error: ${err?.message ?? 'unknown'}`);
-    }
-    /* AT-1 — keep the mode line in step with the backend the list came from. */
-    boards.storageModeLabel().then(label => {
-      setModeLabel(label);
-      /* AT-4 #2 — the estimate readout exists only for local mode. */
-      const isLocal = label === 'Saved in this browser';
-      setLocalMode(isLocal);
-      if (isLocal) {
-        void navigator?.storage?.estimate?.().then(est => {
-          const used = est.usage != null ? (est.usage / (1024 * 1024)).toFixed(1) : '?';
-          const quota = est.quota != null ? `~${Math.round(est.quota / (1024 * 1024))}` : '?';
-          void navigator?.storage?.persisted?.().then(persisted => {
-            setStorageEstimate(`${used} MB used of ${quota} MB — ${persisted
-              ? 'Storage is persistent'
-              : 'Best-effort storage — the browser may clear it under disk pressure. Export JSON to keep a durable copy.'}`);
-          }).catch(() => { /* no readout rather than a wrong one */ });
-        }).catch(() => { /* ditto */ });
-      } else {
-        setStorageEstimate('');
-      }
-    }).catch(() => { /* line stays as-is */ });
-    /* AT-2 — the volatile last resort: IndexedDB itself unavailable (storage
-       disabled). One-time flash; the board list still renders.
-       ROUND BJ: was a dead dynamic import (localStore is also statically
-       imported — vite warned); the flag is a live module binding, read
-       directly. Zero behavior change. */
-    if (isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
-  }, [flash]);
+  /* ROUND BN-2 — the boards menu cluster now lives in useBoardsMenu.ts
+     (moved verbatim). boardsOpen/boardList/curBoard/presetId stay here
+     (shared with usePersistence and the popover JSX) and pass down. */
+  const [boardDlg, setBoardDlg, tgOpen, setTgOpen, pendingBoardName,
+    closeBoardDlg, newBoard, createFromTemplate, useTemplate, closeGallery,
+    boardsMenuBtnRef, boardsPopPos, boardsPopClamp, switchPreset, openBoard,
+    renameBoard, doRenameBoard, doDuplicateBoard, deleteBoard, doDeleteBoard,
+    onBoardDialog, boardsBtnRef] = useBoardsMenu(
+    nodesRef, edgesRef, boardList, setBoardList, boardsOpen, setBoardsOpen,
+    curBoard, setCurBoard, presetId, setPresetId, setShowMode, setNoCycles,
+    setOneIn, suggestTheme, flushSave, saveTimer, applyBoard, flash, tickTask);
 
-  const flushSave = useCallback(async () => {
-    setDirty(false); /* PACKAGE-S §S-3 */
-    const board = curBoardRef.current;
-    /* AS-5 — the explicit save gate: no write unless a board doc is LOADED and
-       its id matches the in-memory doc. (The old guard was just `!board`.) */
-    if (!canAutosave || !board) return;
-    window.clearTimeout(saveTimer.current);
-    saveTimer.current = undefined;
-    const seq = ++saveSeq.current;
-    setSaveState('saving');
-    /* AUDIT-8b — retry with backoff: the dev server can blip (restart, network)
-       mid-edit; a transient fetch failure used to surface as "save failed" and
-       stayed failed. Two retries (1s, 3s) absorb a blip; a persistent failure
-       still surfaces. Each attempt rebuilds the payload from the REFS so the
-       retry carries the user's LATEST work, not a stale copy. */
-    const payload = () => ({
-      id: board.id, name: board.name,
-      nodes: nodesRef.current.map(n => ({...n, selected: false})),
-      /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
-     Every current edge writer replaces `data` wholesale, so the alias was
-     harmless; the copy makes that invariant ENFORCED rather than implicit —
-     a future in-place patch of edge.data can no longer rewrite history. */
-      edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-      preset: presetId,
-      // The `legend` key is PERSISTED data (`BoardDoc.legend`) even though the
-      // on-canvas renderer is gone: it is written back from the loaded doc so a
-      // board that carries the key still round-trips instead of losing it.
-      legend: board.legend,
-    });
-    let saved: Awaited<ReturnType<typeof boards.saveBoard>> | undefined;
-    try {
-      for (let attempt = 0; ; attempt++) {
-        try {
-          saved = await boards.saveBoard(payload());
-          break;
-        } catch (err) {
-          /* AS-4 — a 4xx is FINAL: a deleted board is not transient, so no
-             retry (the old loop would burn 1s+3s re-PUTting a corpse and the
-             old server would have resurrected it). Only transient failures
-             (network blips, 5xx) get the backoff. */
-          const status = (err as Error & {status?: number})?.status;
-          if (status !== undefined && status >= 400 && status < 500) throw err;
-          if (attempt >= 2 || seq !== saveSeq.current) throw err;
-          await new Promise(r => setTimeout(r, attempt === 0 ? 1000 : 3000));
-        }
-      }
-      if (seq !== saveSeq.current) return; // a newer save superseded this one
-      // I6: do NOT setCurBoard here from the autosave path — writing updatedAt
-      // back into state re-created flushSave and re-ran the autosave effect,
-      // causing a ~30-PUTs-in-25s loop. Keep the local copy in sync via the
-      // ref instead (no re-render, no effect re-run).
-      curBoardRef.current = {...board, name: saved.name, updatedAt: saved.updatedAt};
-      setSaveState('saved');
-      setBoardList(l => l.map(b => b.id === saved.id
-        ? {...b, updatedAt: saved.updatedAt, nodeCount: saved.nodes.length, edgeCount: saved.edges.length}
-        : b));
-      window.setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2000);
-    } catch (err) {
-      setSaveState('error');
-      /* AT-4 #3 — quota is NOT transient and not a 4xx: the adapter tags it,
-         and the flash names the remedy instead of retrying into a full disk. */
-      if (isQuotaError(err)) {
-        flash(QUOTA_MESSAGE);
-      } else {
-        /* AS-4 — name the deleted-board case: a 404 means the board is gone
-           (deleted here or in another tab). The tab keeps its pixels (the
-           user can still export), but the write is final and the board list
-           is refreshed so it stops offering the corpse. */
-        const status = (err as Error & {status?: number})?.status;
-        if (status === 404) {
-          flash('Save failed: this board was deleted');
-          void refreshBoards();
-        } else {
-          flash(`Save failed: ${err?.message ?? 'unknown error'}`);
-        }
-      }
-    }
-  }, [flash, presetId, mode, refreshBoards, canAutosave]);
-
-  // Debounced autosave whenever nodes/edges change (and a board is loaded).
-  // I6: depend only on the board id (via ref) + nodes/edges so the effect does
-  // not re-run when the board doc object changes; and only show "saving" when
-  // the debounced save actually fires, not on every keystroke/drag tick.
-  const boardId = curBoard?.id;
-  useEffect(() => {
-    /* AS-5 — the explicit save gate REPLACES the old bare `if (!boardId)`
-       check: nothing is scheduled unless a doc is LOADED and the loaded id
-       matches the in-memory doc (a debounce firing during a board switch or
-       mid-load used to pass the old check and write the WRONG — or empty —
-       graph to the PREVIOUS board's file). */
-    if (!canAutosave) return;
-    /* PACKAGE-S §S-3 — autosave OFF: nothing is scheduled; the change is DIRTY
-       until Save / Cmd+S flushes. The dirty marker is the only signal. */
-    if (!autosave) {
-      setDirty(true);
-      return;
-    }
-    setDirty(false);
-    if (skipAutosave.current > 0) {
-      skipAutosave.current -= 1;
-      return;
-    }
-    window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => { void flushSave(); }, 800);
-    return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, boardId, flushSave, autosave, canAutosave]);
-
-  // First load: open the last board, or the newest, or seed one from the
-  // current in-memory starter diagram. Guarded against StrictMode's
-  // double-mounted effect so we never seed two boards.
-  const bootstrapped = useRef(false);
-  useEffect(() => {
-    if (bootstrapped.current) return;
-    bootstrapped.current = true;
-    (async () => {
-      try {
-        let list = await boards.listBoards();
-        let target: BoardDoc | null = null;
-        const lastId = boards.lastBoardId();
-        if (list.length === 0) {
-          const doc = await boards.createBoard('My first board');
-          target = {...doc, nodes: initialNodes, edges: initialEdges};
-          try {
-            const saved = await boards.saveBoard({id: doc.id, name: doc.name, nodes: initialNodes, edges: initialEdges});
-            target = {...target, updatedAt: saved.updatedAt};
-          } catch { /* keep in-memory copy */ }
-          list = await boards.listBoards();
-        } else {
-          const want = list.find(b => b.id === lastId) ?? list[0];
-          target = await boards.getBoard(want.id).catch(async (e) => {
-            // stale/missing last-open board — fall back to the newest board
-            if (list.length > 1) return boards.getBoard(list[0].id);
-            throw e;
-          });
-        }
-        if (!target) return;
-        setBoardList(list);
-        applyBoard(target);
-      } catch (err) {
-        // The load failed (no boards API, bad payload). There is no board to
-        // render, so release the canvas: `boardLoaded` lets the empty-state panel
-        // back in, which is the honest thing to show for a canvas with no board.
-        flash(`Boards API error: ${err?.message ?? 'unknown'}`);
-      } finally {
-        // ITEM 2 — the FIRST time the canvas is handed to the user, by every
-        // exit path (loaded / failed / no target). Before this, the canvas is
-        // deliberately empty and silent rather than showing a seed that is about
-        // to be replaced.
-        setBoardLoaded(true);
-      }
-    })();
-  }, []);
-
-  /** ITEM 6b — the board dialog. `null` = closed. The MODE is the state: a
-   *  `create` / `rename` / `delete` request each just sets it, and all the async
-   *  work happens in `onBoardDialog`, so the dialog itself never touches the
-   *  boards API. */
-  const [boardDlg, setBoardDlg] = useState<BoardDialogResult['kind'] | null>(null);
-
-  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the Templates gallery. `false` = closed.
-   *
-   *  TWO SEPARATE PIECES OF STATE, ON PURPOSE, and they can be TRUE AT THE SAME
-   *  TIME: the "Browse all templates…" row lives INSIDE the board dialog, so
-   *  opening the gallery from there leaves that dialog mounted underneath (the
-   *  gallery's scrim is above it — see `.tg-overlay`'s z-index). The alternative —
-   *  one enum, `'create' | 'rename' | 'delete' | 'gallery'` — would UNMOUNT the
-   *  dialog and lose the half-typed board name, which is exactly the work the user
-   *  was doing when they went browsing. `boardDlg` answers "is a board dialog
-   *  open, and in which mode"; `tgOpen` answers "is the gallery open". */
-  const [tgOpen, setTgOpen] = useState(false);
-  /** ROUND 4, ITEM 1 — `boardPick` and its `setBoardPick` are GONE, with the
-   *  dialog's `initialPick` prop they existed to feed. ROUND 3 had already
-   *  removed their only non-null writer (the gallery creates the board itself),
-   *  leaving four `setBoardPick(null)` resets guarding a value nothing could
-   *  set; ROUND 4 removed the last reader (the dialog's row-matching), so the
-   *  state was carrying nothing at all. Deleting it is the honest end of that
-   *  history — no behaviour changed: every write was already a reset to `null`. */
-  /** The dialog's close path for all three of its modes. Focus restore is left
-   *  to `BoardDialog`'s own unmount contract (`returnFocusTo`), which is what the
-   *  boards-menu route has always used.
-   *
-   *  ROUND 6, ITEM 3 — this is also where an ABANDONED typed name is dropped:
-   *  every exit that is not a create (Cancel, the ✕, Escape, the scrim, a rename
-   *  or delete submitting) goes through here, and a name the user walked away
-   *  from must not name a board they create later. The two exits that DO carry a
-   *  name — the "Blank" row and "Use template" — do not use this path: the first
-   *  hands the name to `onBoardDialog` and the second stashes it for the
-   *  gallery. */
-  const closeBoardDlg = useCallback(() => {
-    pendingBoardName.current = '';
-    setBoardDlg(null);
-  }, []);
-
-  /** L2 — New board. Opens the designed dialog (item 6b); the work moved to
-   *  `onBoardDialog`, where the name arrives as data instead of through a
-   *  blocking native browser prompt + confirm chain. */
-  const newBoard = useCallback(() => { setBoardDlg('create'); }, []);
-
-  /** ROUND 6, ITEM 3 — THE NAME TYPED IN THE DIALOG, CARRIED ACROSS THE HOP.
-   *
-   *  Harvey, verbatim: "khi đổi tên và ấn chọn use template => thì nó lại ra là
-   *  untitled X chứ k phải tên đã ghi trong New board". Type a name, press "Use
-   *  template", and the board came out `Untitled N`.
-   *
-   *  WHY A REF AND NOT STATE. The dialog's `onBrowse` row does two things at once
-   *  — it closes the dialog and opens the gallery — and the name has to survive
-   *  that handover without re-rendering for it. A `useState` would be a render
-   *  for a value nothing PAINTS; a ref is the value's real shape: written once on
-   *  the row press, read once when the gallery's card is chosen, and cleared
-   *  again at every point where it would otherwise go stale.
-   *
-   *  THE STALE-NAME RULE (each clear site, and why it is there):
-   *    - opening the gallery from the BOARDS MENU row (`Templates`; it read
-   *      `Create from Templates` until ITEM B, 2026-10-22, shortened so the
-   *      row never wraps at the popover's 360px)
-   *      starts an EMPTY stash, because that route has no typed name and the
-   *      board must auto-number — without this clear, a name abandoned in an
-   *      earlier dialog would silently name a later, unrelated board;
-   *    - `useTemplate` consumes it and clears it, so a second pick from a
-   *      re-opened gallery cannot reuse the first board's name;
-   *    - cancelling the dialog clears it, so abandoning a typed name is not a
-   *      deferred naming of the next board either.
-   *
-   *  DECLARED ABOVE `createFromTemplate` deliberately: both `useTemplate` and
-   *  `onBoardDialog` are `useCallback`s that close over it, and a `useCallback`
-   *  cannot reference a `const` that has not been initialised yet. */
-  const pendingBoardName = useRef<string>('');
-
-  /** ROUND 3 — THE ONE OWNER OF "CREATE A BOARD FROM A TEMPLATE".
-   *
-   *  BOTH routes call this and NEITHER keeps a copy of the body: the gallery's
-   *  "Use template" (which now creates the board in ONE step, no dialog) and
-   *  `Boards → New board` → Create with a row chosen. Before this round the body
-   *  lived inline in `onBoardDialog`'s create branch; it was lifted here so the
-   *  two paths cannot drift and there is a single owner of the seed + the save.
-   *
-   *  `preset`/`templateId` name the seed; both absent means "start empty", which
-   *  is a real option and not a failure. The name is OPTIONAL: a caller may hand
-   *  one over (the dialog's field) or omit it, in which case it is auto-numbered
-   *  from the CURRENT board list — that is what makes the gallery path zero
-   *  clicks while still producing `Untitled`, `Untitled 2`, `Untitled 3`, …
-   *
-   *  The `preset` string is only ever the SEED's own preset, never `custom`
-   *  unless nothing seeded the board: a C4 template must not land under Mixed's
-   *  edge defaults (the old hard-coded-`custom` defect the dialog fixed).
-   *
-   *  ORDERING MATTERS: this is declared ABOVE `useTemplate` because a
-   *  `useCallback` cannot close over a `const` that has not been initialised
-   *  yet — the same TDZ constraint `onBoardDialog` documents below. */
-  const createFromTemplate = useCallback((opts: {name?: string; preset?: PresetId; templateId?: string} = {}) => {
-    const wantPid: PresetId = opts.preset ?? 'custom';
-    const t = opts.templateId ? getPreset(wantPid).templates?.find(x => x.id === opts.templateId) : undefined;
-    const pid: PresetId = t ? wantPid : 'custom';
-    /* ROUND 6, ITEM 3 — the name rule is the pure `boards.resolveBoardName`, not
-       an inline ternary: the same decision is asserted by executing the shipped
-       function, and there is one place where "a typed name wins over the
-       auto-numbered default" is spelled. */
-    const name = boards.resolveBoardName(opts.name, boardList.map(b => b.name));
-    void (async () => {
-      try {
-        await flushSave();
-        const doc = await boards.createBoard(name);
-        const nodes = t ? t.nodes.map(n => ({...n})) : [];
-        const edges = t ? t.edges.map(e => ({...e})) : [];
-        if (t) await boards.saveBoard({id: doc.id, name, nodes, edges, preset: pid});
-        setBoardList(await boards.listBoards());
-        applyBoard({...doc, nodes, edges, preset: pid});
-        tickTask('board');
-        flash(`Created ${getPreset(pid).label} board “${name}”`);
-      } catch (err) {
-        flash(`New board failed: ${err?.message ?? 'unknown'}`);
-      }
-    })();
-  }, [boardList, flushSave, applyBoard, flash, tickTask]);
-
-  /** ROUND 3 — "Use template" CREATES THE BOARD, in ONE step.
-   *
-   *  Harvey, verbatim: "thấy hơi mất công khi tôi ấn Templates... xong hiện modal
-   *  và tôi chọn use template thì nó qua create newboard". The old route cost an
-   *  extra stop: gallery → Use template → New board dialog → press Create. Now the
-   *  gallery's `key` (`${preset}:${templateId}`) is RESOLVED here and handed to
-   *  `createFromTemplate`, which is the same function the dialog's create branch
-   *  calls — so there is still exactly ONE owner of "create a board from a
-   *  template", and this route has no name prompt and no dialog.
-   *
-   *  THE NAME IS OPTIONAL BY DESIGN: none is passed, so `createFromTemplate`
-   *  auto-numbers it from the current board list (`Untitled`, `Untitled 2`, …).
-   *  A user who wants a specific name still has the dialog route
-   *  (`Boards → New board`), which carries a name field.
-   *
-   *  `key` is parsed at the FIRST `:` because a template id never contains one;
-   *  a malformed key (no `:`) is left to create an UNSEEDED board rather than
-   *  inventing a preset — `defaultTemplate`-style guessing is what the dialog
-   *  path deliberately avoids.
-   *
-   *  ROUND 6, ITEM 3 — `pendingBoardName` is consumed HERE, and consumed means
-   *  CLEARED AT THE SAME INSTANT it is read, before the key is even parsed. That
-   *  is the whole fix: the dialog's "Use template" row stashes the typed name
-   *  before it opens this gallery, and the pick that follows carries it into
-   *  `createFromTemplate`. An EMPTY stash (the boards-menu route) arrives as an
-   *  empty string, which `resolveBoardName` turns into the auto-numbered default
-   *  — the two routes differ by the stash alone, not by two branches.
-   *
-   *  READ-AND-CLEAR IN ONE STEP, NOT `finally`: a malformed key returns from the
-   *  middle of this callback, and a name left behind would silently name whatever
-   *  board the NEXT pick creates. Clearing before the early return makes that
-   *  impossible by construction, so no exit path can leak the value. */
-  const useTemplate = useCallback((key: string) => {
-    setTgOpen(false);
-    const carried = pendingBoardName.current;
-    pendingBoardName.current = '';
-    const i = key.indexOf(':');
-    if (i < 0) { createFromTemplate({name: carried}); return; }
-    createFromTemplate({name: carried, preset: key.slice(0, i) as PresetId, templateId: key.slice(i + 1)});
-  }, [createFromTemplate]);
-
-  /** The gallery's own close path. The caret goes back to the Boards button —
-   *  which is the one trigger that still exists on either route into the gallery
-   *  (the boards-menu row unmounts with the menu; the dialog's "Browse all
-   *  templates…" row unmounts with the dialog, since opening the gallery closes
-   *  it — §2.3). Focusing a null ref is a no-op, so the two rules cannot fight. */
-  const closeGallery = useCallback(() => { setTgOpen(false); }, []);
-  /** ITEM 6b — the dialog's focus-restore target. The Boards menu button is the
-   *  one trigger that still exists when the dialog closes: the menu row that was
-   *  actually pressed lives inside the popup, which unmounts the moment the row
-   *  is chosen. Focusing a null ref is a no-op, so a menu row ref would silently
-   *  drop focus on `<body>` and the next Tab would start from the top of the page. */
-  const boardsMenuBtnRef = useRef<HTMLButtonElement>(null);
-
-  /* ITEM B (2026-10-22) — the boards popover is a FIXED PORTAL, anchored to
-   * the live button rect. Measured defect it replaces: the popup hung off
-   * `.panel-head` with `left: 0; right: 0`, and `.panel` is `overflow: hidden`
-   * at 232px — a wider redesign is CLIPPED, not scrolled, so the width could
-   * never grow inside the head. Portal'd to `document.body` (the
-   * `Tooltip.tsx` precedent) it escapes that clip; the anchor is the button's
-   * own rect (`left: btn.right + 6`, top pinned to the button top) so the
-   * popup opens to the RIGHT of the control and the `max-width` clamp keeps
-   * it inside the viewport on narrow hosts. Recomputed while open so a
-   * viewport resize re-anchors instead of leaving the popup floating.
-   * SHORT VIEWPORTS: below 420px of viewport height the phone tier puts a
-   * `transform` on `.app`'s subtree — a `position: fixed` descendant then
-   * resolves against `.app` (the transformed ancestor), not the viewport,
-   * which is ACCEPTED here, not fought: the clamp loop below measures the
-   * button rect AFTER that resolution (getBoundingClientRect already reports
-   * post-transform geometry), so the popup lands beside the sheet either way;
-   * `boardsPopClamp` asserts it. */
-  const [boardsPopPos, setBoardsPopPos] = useState<{left: number; top: number; maxW: number} | null>(null);
-  const boardsPopClamp = useCallback(() => {
-    if (!boardsOpen) { setBoardsPopPos(null); return; }
-    const r = boardsMenuBtnRef.current?.getBoundingClientRect();
-    if (!r) { setBoardsPopPos(null); return; }
-    const left = r.right + 6;
-    const top = r.top;
-    /* ITEM B — the clamp has NO floor, by design: a floor would push the popup
-       past a narrow window's right edge (measured in the harness model: a 232px
-       floor overflows a 360px window by 94px). max-width = 100vw − anchorX − 8;
-       a degenerate sliver of a window squeezes the popup instead of overflowing. */
-    const maxW = Math.max(0, window.innerWidth - left - 8);
-    setBoardsPopPos({left, top, maxW});
-  }, [boardsOpen]);
-  useEffect(() => {
-    if (!boardsOpen) { setBoardsPopPos(null); return; }
-    boardsPopClamp();
-    window.addEventListener('resize', boardsPopClamp);
-    return () => window.removeEventListener('resize', boardsPopClamp);
-  }, [boardsOpen, boardsPopClamp]);
-
-  /** L2 — applies a preset to the CURRENT board. NO UI CALLS THIS any more:
-   *  the user-facing picker was removed on 2026-09-17, so this is now the
-   *  unreachable-but-authoritative helper for a preset swap (kept on purpose).
-   *  A swap never rewrites existing nodes; it changes the show-mode, the edge
-   *  defaults, the auto-layout, the declared caps and the suggested theme. */
-  const switchPreset = useCallback((id: PresetId) => {
-    if (id === presetId) return;
-    const p = getPreset(id);
-    setPresetId(id);
-    setShowMode(p.showMode ?? 'ALL_FIELDS');
-    // L2 switch point 8 — a preset's caps apply to the EXISTING toggles (there is
-    // no second toolbar). `architecture` declares today's defaults, so this is a
-    // no-op for the default preset.
-    if (p.caps) {
-      if (p.caps.cyclePrevention !== undefined) setNoCycles(p.caps.cyclePrevention);
-      if (p.caps.oneInput !== undefined) setOneIn(p.caps.oneInput);
-    }
-    // A preset's suggested theme is a SUGGESTION, not an explicit user choice:
-    // it must never overwrite a stored 'system' preference. Render-only, and
-    // skipped entirely once the user has chosen (`suggestTheme` guards that).
-    suggestTheme(p.theme.suggested);
-    setCurBoard(c => c ? {...c, preset: id} : c);
-    flushSave();
-    flash(`${p.label} preset — palette, edge defaults and layout changed. Existing elements kept.`);
-  }, [presetId, flushSave, flash, suggestTheme]);
-
-  const openBoard = useCallback(async (id: string) => {
-    if (id === curBoard?.id) { setBoardsOpen(false); return; }
-    try {
-      await flushSave();
-      const doc = await boards.getBoard(id);
-      setBoardsOpen(false);
-      applyBoard(doc);
-      flash(`Opened “${doc.name}”`);
-    } catch (err) {
-      flash(`Open board failed: ${err?.message ?? 'unknown'}`);
-    }
-  }, [curBoard, flushSave, applyBoard, flash]);
-
-  /** ITEM 6b — opens the designed rename dialog. The name arrives from
-   *  `onBoardDialog`; this callback keeps the save body verbatim. */
-  const renameBoard = useCallback(() => { setBoardDlg('rename'); }, []);
-
-  const doRenameBoard = useCallback(async (name: string) => {
-    if (!curBoard || !name || name === curBoard.name) return;
-    try {
-      await flushSave();
-      const saved = await boards.saveBoard({
-        id: curBoard.id, name,
-        nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
-       Every current edge writer replaces `data` wholesale, so the alias was
-       harmless; the copy makes that invariant ENFORCED rather than implicit —
-       a future in-place patch of edge.data can no longer rewrite history. */
-    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-        preset: presetId, legend: curBoard.legend,
-      });
-      setCurBoard(c => c ? {...c, name: saved.name, updatedAt: saved.updatedAt} : c);
-      setBoardList(l => l.map(b => b.id === curBoard.id ? {...b, name: saved.name, updatedAt: saved.updatedAt} : b));
-      flash(`Renamed to “${name}”`);
-    } catch (err) {
-      flash(`Rename failed: ${err?.message ?? 'unknown'}`);
-    }
-  }, [curBoard, flushSave, flash, presetId]);
-
-  const doDuplicateBoard = useCallback(async () => {
-    if (!curBoard) return;
-    const name = `${curBoard.name} (copy)`;
-    try {
-      await flushSave();
-      const doc = await boards.createBoard(name);
-      const saved = await boards.saveBoard({
-        id: doc.id, name,
-        nodes: nodesRef.current.map(n => ({...n, selected: false})),
-        /* AUDIT-8 — copy edge `data` one level, matching the node branch above.
-       Every current edge writer replaces `data` wholesale, so the alias was
-       harmless; the copy makes that invariant ENFORCED rather than implicit —
-       a future in-place patch of edge.data can no longer rewrite history. */
-    edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-        preset: presetId, legend: curBoard.legend,
-      });
-      setBoardList(await boards.listBoards());
-      applyBoard(saved);
-      flash(`Duplicated to “${name}”`);
-    } catch (err) {
-      flash(`Duplicate failed: ${err?.message ?? 'unknown'}`);
-    }
-  }, [curBoard, flushSave, applyBoard, flash]);
-
-  /** ITEM 6b — opens the designed destructive confirm. */
-  const deleteBoard = useCallback(() => { setBoardDlg('delete'); }, []);
-
-  const doDeleteBoard = useCallback(async (confirmed?: boolean) => {
-    if (!curBoard || !confirmed) return;
-    try {
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = undefined;
-      await boards.deleteBoard(curBoard.id);
-      const list = await boards.listBoards();
-      setBoardList(list);
-      if (list.length) {
-        const doc = await boards.getBoard(list[0].id);
-        applyBoard(doc);
-      } else {
-        const doc = await boards.createBoard('Untitled');
-        setBoardList(await boards.listBoards());
-        applyBoard({...doc, nodes: [], edges: []});
-      }
-      flash('Board deleted');
-    } catch (err) {
-      flash(`Delete failed: ${err?.message ?? 'unknown'}`);
-    }
-  }, [curBoard, applyBoard, flash]);
-
-  /** ITEM 6b — the dialog's ONE submit path for all THREE modes. Each branch is
-   *  the body of the native prompt / confirm it replaces, verbatim apart from
-   *  where its inputs now come from. Declared here (below the three workers)
-   *  because it calls two of them — a `useCallback` cannot reference a `const`
-   *  that has not been initialised yet, not even inside its dep array.
-   *
-   *  ROUND 3 — the CREATE branch is now a CALL, not a body: it hands the name and
-   *  the (preset, templateId) seed to `createFromTemplate`, which is the single
-   *  owner of board creation from a template. Both `r.seed` and the name are
-   *  optional there, so this path and the gallery path run the same code.
-   *
-   *  ROUND 4 — this branch can ONLY be reached from the dialog's "Blank" row, so
-   *  `r.seed` is always `null` in practice and the board comes out `custom`. The
-   *  seeded form is what the gallery's route passes. */
-  const onBoardDialog = useCallback((r: BoardDialogResult) => {
-    setBoardDlg(null);
-    if (r.kind === 'rename') { void doRenameBoard(r.name); return; }
-    if (r.kind === 'delete') { void doDeleteBoard(true); return; }
-
-    /* CREATE. 2026-09-17 — the type PICKER is gone; the neutral `Mixed` preset is
-       the default. The stored `preset` string is still DATA: it drives edge
-       defaults, auto-layout, the ERD table node and the C4 legend, so boards
-       written before this change keep behaving exactly as they did.
-
-       A chosen TEMPLATE decides the preset: the result carries a
-       (preset, templateId) PAIR because a template BELONGS to a preset. Seeding
-       a C4 template into a `custom` board would give it C4 nodes under Mixed's
-       edge defaults. "Blank" carries no seed at all. (The old code hard-coded
-       `custom` and then asked about `custom.templates[0]` — which does not exist,
-       so the template question was unreachable and always answered "no".) */
-    createFromTemplate({name: r.name, preset: r.seed?.preset, templateId: r.seed?.templateId});
-  }, [createFromTemplate, doRenameBoard, doDeleteBoard]);
-
-  // Close the boards popover on outside click / Escape.
-  const boardsBtnRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!boardsOpen) return;
-    const onDown = (e: MouseEvent) => {
-      /* CONFIG-FIX (2026-10-22) — the popover is PORTAL'D to document.body, so
-         it is NOT inside boardsBtnRef any more: a click inside it landed here,
-         read as "outside", and closed the menu BEFORE the row's onClick ran —
-         every row (open board, New board, Templates, Rename…) appeared dead.
-         Exclude the portal'd popup itself from the outside test. */
-      const t = e.target as Element | null;
-      if (t?.closest?.('.boards-pop')) return;
-      if (boardsBtnRef.current && !boardsBtnRef.current.contains(e.target as any)) setBoardsOpen(false);
-    };
-    window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
-  }, [boardsOpen]);
 
   // Item 3b: the `?` helper closes on an outside click too — the same pattern as
   // the boards menu above. The `?` button is EXCLUDED from the outside test so a
@@ -1508,10 +915,7 @@ export default function App() {
     setEdges(es => es.filter(e => !ids.has(e.source) && !ids.has(e.target)));
   }, [pushHistory, setNodes, setEdges]);
 
-  // ---- F7 helpers: cycle detection on the current edge set ----
-  /** Would adding source→target create a directed cycle? */
-  const createsCycle = useCallback((source: string, target: string): boolean =>
-    wouldCycle(source, target, edgesRef.current), [edgesRef]);
+
 
   // ---- F2: context menu actions ----
   /** Absolute flow position of a node (parent-relative resolved up the tree). */
@@ -1653,6 +1057,15 @@ export default function App() {
     });
     return map;
   }, [absPos]);
+  /* ROUND BN-2 — the connection cluster now lives in useConnections.ts
+     (moved verbatim; the three id-mint sites call nextId = () => idc++
+     because App owns the module-level counter). pendingDrop, connectOrigin,
+     readOnlyRef and shiftDown stay here — onConnectStart (the JSX) and the
+     keyboard effect still write them — and pass down positionally. */
+  const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules] = useConnections(
+    nodesRef, edgesRef, setEdges, setGuides, pushHistory, tickTask, flash, rf, wrap,
+    readOnlyRef, pendingDrop, connectOrigin, shiftDown, absNodes, noCycles, oneIn,
+    dblConnect, dblRange, preset, defaultPath, () => idc++);
 
   const onNodeDrag = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     const ns = nodesRef.current;
@@ -1766,278 +1179,13 @@ export default function App() {
     pushHistory();
   }, [pushHistory]);
 
-  // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
-  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
-    /* AUDIT-follow-up — a rewire can create a cycle too: drop the end on a node
-       upstream and A→B→A is live. Checked against the edge set MINUS this edge
-       (the old end is being replaced, not added). */
-    if (noCycles && wouldCycle(newConnection.source, newConnection.target,
-        edgesRef.current.filter(e => e.id !== oldEdge.id))) {
-      flash('Blocked: this rewiring would create a cycle (A→B→A)');
-      return;
-    }
-    pushHistory();
-    // ROUND S: a waypoint measured against the OLD endpoints is nonsense the
-    // moment an end moves, so all three bend keys go with it. Nothing else on
-    // the edge's data is touched — type, styling, label and flow survive.
-    setEdges(es => reconnectEdge(oldEdge, newConnection, es).map(e => {
-      if (e.id !== oldEdge.id) return e;
-      const data = {...((e.data ?? {}) as EdgeData)};
-      delete data.bend; delete data.bendX; delete data.bendY;
-      return {...e, data};
-    }));
-  }, [noCycles, pushHistory, setEdges]);
 
-  // ---- Part C: connect on drop over a NODE ------------------------------
-  // Dropping a connection drag on EMPTY canvas used to insert a fresh node at
-  // the drop point and wire it up. That is gone on purpose: a missed drop
-  // silently added a shape nobody asked for. Only a drop that lands ON an
-  // existing node still connects.
-  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
-    /* AUDIT-16 — a connection drag in flight when readOnly is toggled must not
-       complete: the drop still fires, so bail before any target search. */
-    if (readOnlyRef.current) { pendingDrop.current = null; return; }
-    const c = pendingDrop.current;
-    pendingDrop.current = null;
-    setGuides({vertical: null, horizontal: null});
-    /* AUDIT-13 — no coordinates, no hit-test: a TouchEvent with an empty
-       changedTouches list used to fall back to (0,0), hit-testing the viewport
-       corner and possibly mis-connecting to a node parked there. Bail instead —
-       the gesture just ends without a target, which is what a dropped touch is. */
-    const hasPoint = 'clientX' in event
-      || (event as TouchEvent).changedTouches?.length
-    if (!hasPoint) return;
-    const clientX = 'clientX' in event ? event.clientX : (event as TouchEvent).changedTouches[0].clientX;
-    const clientY = 'clientY' in event ? event.clientY : (event as TouchEvent).changedTouches[0].clientY;
-    // Only when the drop was NOT on a valid handle and we know the source.
-    if (!c || !rf || !wrap.current) return;
-    if (connectionState?.isValid) return;
-    const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    if (el?.closest('.react-flow__handle')) return;
-    /* AUDIT-7 — raw client coords (see the ctx addNode note above). */
-    const p = rf.screenToFlowPosition({x: clientX, y: clientY});
-    // pick target: a node under the drop point — there is no longer a fallback
-    // branch, so no node is ever created from a drop.
-    const ns = nodesRef.current;
-    const absMap = absNodes(ns);
-    let targetId: string | null = null;
-    for (const v of absMap.values()) {
-      if (v.n.id === c.source) continue;
-      if (p.x >= v.x && p.x <= v.x + v.w && p.y >= v.y && p.y <= v.y + v.h) { targetId = v.n.id; break; }
-    }
-    // Nothing under the drop point: this is a no-op. No node is inserted, no
-    // edge is created, and pushHistory() is deliberately NOT called — a
-    // cancelled gesture must not leave a phantom step on the undo stack. The
-    // user sees nothing (silence, not a flash): a message would be noise for a
-    // gesture that was simply released in the wrong place.
-    if (!targetId) return;
-    const src = c.source;
-    /* AUDIT-follow-up — the Prevent-cycles setting now reaches THIS path too
-       (it previously only gated the inspector's onConnect, so a connection drag
-       dropped straight on a node could create a cycle A→B→A). */
-    if (noCycles && wouldCycle(src, targetId, edgesRef.current)) {
-      flash('Blocked: this connection would create a cycle (A→B→A)');
-      return;
-    }
-    const newId = `e${idc++}`;
-    // The target node already exists in state, so the edge can be added
-    // directly — the old `setTimeout` deferral only existed to wait for the
-    // node this path used to insert.
-    pushHistory();
-    setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
-  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath]);
+  /* ROUND BN-2 — the canvas tool cluster (auto-layout, z-order, align/
+     distribute) now lives in useCanvasTools.ts, moved verbatim. */
+  const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
+    nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
+    rf, sel, zOrderMode, preset);
 
-  /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
-     DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
-     owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
-     centre-to-centre), cycle-checked like every other creation path. The CLICKED
-     handle stays the source; the target side is whichever side of that shape is
-     closest to the handle's midpoint. Too far = ignored (Harvey: "xa quá bỏ qua"). */
-  useEffect(() => {
-    if (!dblConnect) return;
-    const onHandleConnect = (ev: Event) => {
-      /* SELF-REVIEW (item 13) — read-only boards must not auto-connect, exactly
-         like a manual connection drag (AUDIT-16's guard). */
-      if (readOnlyRef.current) { flash('Read-only: connect disabled'); return; }
-      const {nodeId, handleId} = (ev as CustomEvent<{nodeId: string; handleId: string}>).detail;
-      const ns = nodesRef.current;
-      const me = absNodes(ns).get(nodeId);
-      if (!me) return;
-      const cx = me.x + me.w / 2, cy = me.y + me.h / 2;
-      /* HARVEY — if the nearest shape is ALREADY connected to this node, keep
-         walking: pick the nearest shape that is NOT connected yet. Only when
-         every candidate inside the range is exhausted does it report back. */
-      const connectedTo = (other: string) => edgesRef.current.some(e =>
-        (e.source === nodeId && e.target === other) || (e.source === other && e.target === nodeId));
-      let best: {id: string; d: number} | null = null;
-      let alreadyN = 0;
-      absNodes(ns).forEach((v, k) => {
-        if (k === nodeId || v.n.parentId) return;
-        const d = Math.hypot(cx - (v.x + v.w / 2), cy - (v.y + v.h / 2));
-        if (d > dblRange) return;
-        if (connectedTo(k)) { alreadyN++; return; }
-        if (!best || d < best.d) best = {id: k, d};
-      });
-      if (!best) {
-        flash(alreadyN > 0
-          ? `All ${alreadyN} nearby shape${alreadyN > 1 ? 's' : ''} already connected`
-          : `No shape within ${dblRange}px — nothing connected`);
-        return;
-      }
-      const targetId = (best as {id: string; d: number}).id;
-      if (noCycles && wouldCycle(nodeId, targetId, edgesRef.current)) {
-        flash('Blocked: this connection would create a cycle (A→B→A)');
-        return;
-      }
-      /* SELF-REVIEW — One input per node gates the auto-connect too: a target
-         that already has an incoming edge stays single-input. */
-      if (oneIn && edgesRef.current.some(e => e.target === targetId)) {
-        flash('Blocked: that shape already has an input (One input per node)');
-        return;
-      }
-      /* HARVEY's clarification — the CLICKED handle is the SOURCE, verbatim. Only
-         the TARGET side is computed: whichever side of the nearest shape is
-         closest to the clicked handle's midpoint. */
-      const other = absNodes(ns).get(targetId)!;
-      const px = handleId === 'left' ? me.x : handleId === 'right' ? me.x + me.w : me.x + me.w / 2;
-      const py = handleId === 'top' ? me.y : handleId === 'bottom' ? me.y + me.h : me.y + me.h / 2;
-      /* AQ4b — measure from the HANDLE POINT to the CLOSEST POINT ON EACH SIDE
-         SEGMENT (projection clamped into the segment), not to the side's line.
-         The line metric let a diagonal placement pick the BOTTOM side: B's bottom
-         line ran "62px" from the handle even though the handle faces B's left.
-         Harvey's screenshot: right-handle dblconnect landed on B's bottom. */
-      const seg = (hx: number, hy: number, x1: number, y1: number, x2: number, y2: number) => {
-        const t = Math.max(0, Math.min(1, ((hx - x1) * (x2 - x1) + (hy - y1) * (y2 - y1)) / ((x2 - x1) ** 2 + (y2 - y1) ** 2)));
-        return Math.hypot(hx - (x1 + t * (x2 - x1)), hy - (y1 + t * (y2 - y1)));
-      };
-      const sides: [number, string][] = [
-        [seg(px, py, other.x, other.y, other.x, other.y + other.h), 'left'],
-        [seg(px, py, other.x + other.w, other.y, other.x + other.w, other.y + other.h), 'right'],
-        [seg(px, py, other.x, other.y, other.x + other.w, other.y), 'top'],
-        [seg(px, py, other.x, other.y + other.h, other.x + other.w, other.y + other.h), 'bottom'],
-      ];
-      sides.sort((p, q) => p[0] - q[0]);
-      pushHistory();
-      /* HARVEY (batch #3) — NO KINK AT SMALL DISTANCE: when the facing gap is
-         tiny, a smoothstep elbow renders as an ugly zig-zag. Below
-         DBL_STRAIGHT_GAP px of facing gap the edge is a plain STRAIGHT line —
-         the arrowhead keeps its normal small size (it is the marker, not the
-         path). */
-      const facing = sides[0][0];
-      const ne = makeEdge(nodeId, targetId, {...preset.edges, path: facing < DBL_STRAIGHT_GAP ? 'straight' : defaultPath}, `e${idc++}`, {
-        sourceHandle: handleId, targetHandle: sides[0][1],
-      });
-      setEdges(es => addEdge(ne, es));
-      flash(facing < DBL_STRAIGHT_GAP ? 'Connected (straight — shapes are close)' : 'Connected to the nearest shape');
-    };
-    window.addEventListener('gobi:handle-connect', onHandleConnect);
-    return () => window.removeEventListener('gobi:handle-connect', onHandleConnect);
-  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath]);
-
-  // ---- connect ---- (new edges use the editable goblinEdge type)
-  // D4: a second connection between the same ordered pair of nodes is not a
-  // duplicate edge — it bumps a "×N" count on the existing one instead.
-  const onConnect = useCallback((c: Connection) => {
-    /* AUDIT-16 — readOnly may have flipped after this gesture began. */
-    if (readOnlyRef.current) { flash('Read-only: connection dropped'); return; }
-    // G — direction guard. The 4-point scheme makes every handle a SOURCE, so
-    // React Flow already builds the connection the way the user drew it; this
-    // normalises it anyway, because the one thing that must never come back is
-    // the arrowhead landing on the node the drag STARTED from. The origin is
-    // `connectOrigin`, written by onConnectStart (the same params.nodeId
-    // pendingDrop records) and cleared here — pendingDrop itself is left to
-    // onConnectEnd, which needs it to decide whether to insert a node on drop.
-    //
-    // SCOPED to the four goblin handles on purpose. Dragging from an ERD column
-    // handle ALSO records an origin (TableNode renders that node's own handles,
-    // and its `left_rel_*` ends are genuine TARGETS), and there the reversal is
-    // the CORRECT relationship direction — the node you land on is the
-    // referencing one. Swapping those would invert the FK silently, so the
-    // guard only fires when the drag began on one of the ids this pass owns.
-    const origin = connectOrigin.current;
-    connectOrigin.current = null;
-    if (origin && GOBLIN_HANDLE_IDS.has(origin.handleId ?? '') && c.target === origin.nodeId) {
-      c = {
-        ...c,
-        source: origin.nodeId,
-        target: c.source,
-        sourceHandle: c.targetHandle,
-        targetHandle: c.sourceHandle,
-      };
-    }
-    tickTask('edge');
-    /* AUDIT-2 + AUDIT-3 — the twin check, pushHistory and the id mint all moved
-       OUT of the setEdges updater. Two reasons, both measured:
-       (a) AUDIT-2: the twin-bump branch never pushed history, so Ctrl+Z after a
-           ×N bump skipped the whole gesture;
-       (b) AUDIT-3: an updater must be pure — React StrictMode double-invokes it
-           in dev, and pushHistory + idc++ inside it produced TWO history entries
-           and two burnt ids per connection. All three now run once, here, from
-           edgesRef (the live pre-mutation state), like every other writer. */
-    const twin = edgesRef.current.find(e =>
-      e.source === c.source && e.target === c.target &&
-      !(e.sourceHandle || e.targetHandle));
-    pushHistory();
-    if (twin) {
-      const cur = ((twin.data as any)?.parallel ?? 1) as number;
-      const next = cur + 1;
-      setEdges(es => es.map(e => e.id === twin.id
-        ? {...e, data: {...((e.data ?? {}) as EdgeData), parallel: next}, label: `×${next}`}
-        : e));
-      return;
-    }
-    // L3c: on an ERD board a connection between two columns is a relationship
-    // between those columns — carry the handles through.
-    const newId = `e${idc++}`;
-    setEdges(es => addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, newId, {
-      sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
-    }), es));
-  }, [tickTask, pushHistory, setEdges, preset, defaultPath]);
-
-  // ---- F7: connection rules applied to every new connection ----
-  const onConnectRules = useCallback((c: Connection) => {
-    if (c.source === c.target) return;
-    if (noCycles && createsCycle(c.source, c.target)) {
-      flash('Blocked: this connection would create a cycle (A→B→A)');
-      return;
-    }
-    if (oneIn && !shiftDown.current) {
-      const has = edgesRef.current.some(e => e.target === c.target);
-      if (has) {
-        flash('Blocked: target already has an incoming connection — hold Shift to allow more');
-        return;
-      }
-    }
-    onConnect(c);
-  }, [noCycles, oneIn, createsCycle, onConnect, flash]);
-
-  // ---- F8: auto-layout with an eased move ----
-  // K3: the easing is owned by the CSS transition (`.ds-animating-layout
-  // .react-flow__node { transition: transform .35s … }`), wrapped by
-  // animateLayout() which adds the class first and strips it 400ms later — i.e.
-  // after the transition, so it can never interfere with a user drag. Positions
-  // are written once (React Flow owns `transform`), so undo restores the
-  // pre-layout positions in a single step.
-  const autoLayout = useCallback(() => {
-    if (!nodes.length) return;
-    // L2: the engine is a preset field. L3a: a flowchart runs top-to-bottom and
-    // freezes its pool / lane bands; L3c: the ERD packer is a table grid.
-    const fn = LAYOUTS[preset.layout.engine];
-    const target = fn(nodes, edges, preset.layout);
-    if (!target.size) return;
-    pushHistory();
-    animateLayout(() => {
-      setNodes(ns => ns.map(n => {
-        const to = target.get(n.id);
-        if (!to) return n;   // children of a group / frozen bands follow their parent
-        return {...n, position: {x: Math.round(to.x), y: Math.round(to.y)}};
-      }));
-      /* AQ11 — fit the result: the engine lays out from (0,0) and a rearranged
-         board regularly lands partly off-viewport, which reads as "the button
-         did nothing" (measured: y -340..756 on a 9-node board). */
-      requestAnimationFrame(() => rf?.fitView({padding: 0.25, duration: 300}));
-    });
-  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset]);
 
   const selected = nodes.find(n => n.id === sel);
   const selectedEdge = edges.find(e => e.id === selEdgeId) ?? null;
@@ -3340,130 +2488,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     onEdgesChange(changes);
   }, [onEdgesChange, noteRemove]);
 
-/* ROUND BD, ITEM 1 — THE Z-ORDER PRIMITIVES. The app had NONE: a grep for
-   zIndex / bringToFront / sendToBack across src/ found only React Flow's own
-   internals, and draw order is simply the array order of `nodes`. So ordering
-   is now written the only way the controlled `nodes` array offers — a `zIndex`
-   field on each node, written through `setNodes` behind ONE `pushHistory()`,
-   the same discipline as `align`/`distribute` above (undo restores the exact
-   pre-click array; a second undo changes nothing).
-
-   WHY MAX, NOT MAX+1. Nudging past the live maximum leaves every future
-   re-order to keep climbing; normalising onto [max-N+1 .. max] keeps the
-   numbers bounded forever. Equal values keep the relative array order, so a
-   group brought forward stays internally ordered — Figma semantics.
-
-   THE READBACK ALSO REORDERS THE ARRAY. A `zIndex` alone repaints correctly
-   (React Flow sorts by zIndex internally), but `snapshot()` history and any
-   future array-order reader would disagree with what is on screen. Sorting the
-   written array by the new zIndex makes the array the truth, once.
-
-   HONEST SCOPE NOTE (flagged, not hidden): only top-level siblings race here —
-   a parent group always paints above a node outside it in React Flow, and
-   these writes do not change that. Matches `align`/`distribute`, which also
-   treat the selection as one plane. */
-const reorderSelection = useCallback((to: 'front' | 'back') => {
-  const selNodes = nodesRef.current.filter(n => n.selected);
-  if (selNodes.length < 2) return;
-  pushHistory();
-  setNodes(ns => {
-    /* BUGFIX 2 (2026-10-23) + CONFIG ROUND — pivots on `sel` (the last-clicked
-       node): pivot lands ON the band extreme; the rest stacks contiguously.
-       With zOrderMode 'wysiwyg' (the default) the paint order IS the stored z,
-       so no selection-clearing is needed — the selection survives the Arrange,
-       which is friendlier than Figma's drop-on-reorder. Under the opt-in
-       'lift' mode (basic), RF paints selected nodes at rawZ + 1000, which
-       would mask the band; there the selection IS cleared in the same write,
-       exactly as the first cut did. */
-    const zs = ns.map(n => n.zIndex ?? 0);
-    const bound = to === 'front' ? Math.max(...zs) : Math.min(...zs);
-    const pivot = sel ? selNodes.findIndex(n => n.id === sel) : -1;
-    // pivot first (it takes the extreme), then the remaining selection in order
-    const ordered = pivot >= 0
-      ? [selNodes[pivot], ...selNodes.filter((_, i) => i !== pivot)]
-      : selNodes;
-    const band = new Map<string, number>();
-    ordered.forEach((n, i) => band.set(n.id, to === 'front'
-      ? bound - i                          // pivot lands ON the extreme (top)
-      : bound + i));                        // pivot lands ON the extreme (bottom)
-    const keepSelection = zOrderMode === 'lift';
-    return ns
-      .map(n => band.has(n.id) ? {...n, zIndex: band.get(n.id), selected: keepSelection} : n)
-      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
-  });
-}, [pushHistory, setNodes, sel, zOrderMode]);
-
-
-  // ---- align / distribute ----
-  /* AQ11 — BOTH functions now work in ABSOLUTE coordinates. The old versions
-     read `n.position` directly, which is PARENT-RELATIVE for a group child: one
-     child in the selection poisoned the min/max with a tiny local offset and
-     the whole alignment jumped to the group's frame (measured live: align-left
-     on 8 top-levels + 1 child teleported the board ~250px left). Bounds are
-     computed over absolute rects; the write converts the absolute target back
-     to the node's own parent-relative position. */
-  const align = useCallback((kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => {
-    const selNodes = nodesRef.current.filter(n => n.selected);
-    if (selNodes.length < 2) return;
-    const abs = absNodes(nodesRef.current);
-    const rects = selNodes.map(n => {
-      const r = abs.get(n.id)!;
-      return {id: n.id, x: r.x, y: r.y, w: r.w, h: r.h, node: n};
-    });
-    pushHistory();
-    const minL = Math.min(...rects.map(r => r.x));
-    const maxR = Math.max(...rects.map(r => r.x + r.w));
-    const minT = Math.min(...rects.map(r => r.y));
-    const maxB = Math.max(...rects.map(r => r.y + r.h));
-    const cx = (minL + maxR) / 2;
-    const cy = (minT + maxB) / 2;
-    const targets = new Map<string, {x: number; y: number}>();
-    for (const r of rects) {
-      let ax = r.x, ay = r.y;
-      if (kind === 'left') ax = minL;
-      else if (kind === 'right') ax = maxR - r.w;
-      else if (kind === 'hcenter') ax = cx - r.w / 2;
-      else if (kind === 'top') ay = minT;
-      else if (kind === 'bottom') ay = maxB - r.h;
-      else if (kind === 'vcenter') ay = cy - r.h / 2;
-      // absolute -> parent-relative: keep the frame offset the node already has
-      targets.set(r.id, {x: Math.round(ax - (r.x - r.node.position.x)), y: Math.round(ay - (r.y - r.node.position.y))});
-    }
-    setNodes(ns => ns.map(n => targets.has(n.id) ? {...n, position: targets.get(n.id)!} : n));
-  }, [absNodes, pushHistory, setNodes]);
-
-  const distribute = useCallback((axis: 'h' | 'v') => {
-    const selNodes = nodesRef.current.filter(n => n.selected);
-    if (selNodes.length < 3) return;
-    /* AQ11 — absolute-space distribution (see the align note above): mixed
-       parent-relative frames poisoned the sort order and the span. */
-    const abs = absNodes(nodesRef.current);
-    const rects = selNodes.map(n => {
-      const r = abs.get(n.id)!;
-      return {id: n.id, x: r.x, y: r.y, w: r.w, h: r.h, node: n};
-    });
-    pushHistory();
-    const sorted = [...rects].sort((a, b) => axis === 'h' ? a.x - b.x : a.y - b.y);
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    const start = axis === 'h' ? first.x : first.y;
-    const end = axis === 'h' ? last.x + last.w : last.y + last.h;
-    const total = sorted.reduce((s2, r) => s2 + (axis === 'h' ? r.w : r.h), 0);
-    const gap = (end - start - total) / (sorted.length - 1);
-    const targets = new Map<string, {x: number; y: number}>();
-    let cursor = start;
-    for (const r of sorted) {
-      const v = Math.round(cursor);
-      const absX = axis === 'h' ? v : r.x;
-      const absY = axis === 'h' ? r.y : v;
-      targets.set(r.id, {
-        x: Math.round(absX - (r.x - r.node.position.x)),
-        y: Math.round(absY - (r.y - r.node.position.y)),
-      });
-      cursor += (axis === 'h' ? r.w : r.h) + gap;
-    }
-    setNodes(ns => ns.map(n => targets.has(n.id) ? {...n, position: targets.get(n.id)!} : n));
-  }, [absNodes, pushHistory, setNodes]);
 
   // Part B — ONE source of truth for the read-only review toggle. The toolbar
   // button and the Shift+2 shortcut both call this, so the two triggers can
@@ -3729,453 +2753,15 @@ const reorderSelection = useCallback((to: 'front' | 'back') => {
     }, 4000); // give Safari time to start the download before revoking
   };
 
-  /* AQ21-H — RE-THEME IN THE DOCUMENT. Serializing tokens can't fully
-     reproduce a theme switch: some styles (text colour mixers, shadows,
-     pseudo-elements, theme-scoped rules) resolve at paint time against the
-     LIVE document theme. So both builders now mount the clone OFFSCREEN under
-     `data-theme=<target>` and let the real stylesheet style it — identical
-     mechanics to switching Appearance, without touching the visible board. */
-  /* AR-4 — identity-stable so the export modal's preview effect does not
-     re-fire on unrelated App re-renders: the builders used to be plain consts
-     re-created every render (and passed inline to <ExportModal>), so ANY App
-     re-render invalidated the effect deps [.., buildSvg, buildPng, ..] and
-     rebuilt the preview. Every function these builders read is itself a
-     useCallback now, so their deps are the honest reactive set. */
-  const mountThemed = useCallback((source: HTMLElement, themeName: string): {host: HTMLDivElement; clone: HTMLElement; done: () => void} => {
-    const host = document.createElement('div');
-    host.setAttribute('data-theme', themeName);
-    host.className = 'react-flow ds-flow-wrap';
-    host.style.cssText = 'position:fixed;left:-100000px;top:0;width:1600px;height:1200px;overflow:hidden;pointer-events:none;';
-    const clone = source.cloneNode(true) as HTMLElement;
-    clone.style.transform = 'none';
-    host.appendChild(clone);
-    document.body.appendChild(host);
-    return {
-      host, clone,
-      done: () => host.remove(),
-    };
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  /* ROUND BN-2 — the export cluster now lives in useExportActions.ts
+     (moved verbatim; the lazy thunks moved with it and stay DYNAMIC inside
+     the hook). The Mermaid import mints ids through readNextId/setNextId
+     because App owns the module-level idc counter. */
+  const [buildSvg, buildPng, boardPngForFeedback, printPdf, fileRef] = useExportActions(
+    wrap, rf, theme, nodes, edges, pngScale, pngPad, curBoard,
+    pushHistory, setNodes, setEdges, bumpHist, flash, tickTask,
+    () => idc, (n: number) => { idc = n; });
 
-  /* AQ21 — parametrised builders. The modal and the one-click menu buttons
-     share THESE; the difference is only defaults (live theme, full board). */
-  /* ROUND AR, AR-1 — buildSvg is now a THIN WRAPPER around `src/exportSvg.ts`:
-     it mounts the themed offscreen clone ONLY to take measurements (text
-     boxes, edge routes, the clone→model origin shift), resolves the token
-     map for the target theme, and hands everything to the pure emitter.
-     The emitted file is real SVG primitives — no foreignObject, no HTML —
-     so image-context consumers (<img>, Quick Look, Figma, Illustrator)
-     actually paint it. */
-  /* ROUND C — the outline shapers for one export. The canvas paints rows in
-   * TWO families (mono rows + sans rows); ONE harfbuzzjs face per distinct
-   * resolved family, keyed by the EXACT family string the rows carry, so
-   * the emitter's rowMarkup lookup is the row's own family. Rows whose
-   * family has no resolvable bytes (no permission, non-matching stack)
-   * keep <text> per row — the emitter's per-row fallback.
-   * ROUND AZ — FILE-FIRST: bytes come from the committed subsets
-   * (src/fontFiles.ts -> public/fonts/<slug>-variable.ttf), the variable
-   * wght axis is instantiated per weight, and queryLocalFonts drops to a
-   * LAST-RESORT for families the tree does not ship. The unresolved
-   * families are RETURNED so the caller can surface a visible note (never
-   * a silent no-op). */
-  const buildOutlineShaper = useCallback(async (
-    nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
-  ): Promise<{ctx: NonNullable<ExportInput['outline']> | null; unresolved: string[]}> => {
-    void edges;
-    /* edge LABEL rows too: collect pairs off the nodes AND the measured
-     * edge label fonts (ROUND-AR-DEFECT-1's portalled rows). */
-    const pairs = new Map<string, {family: string; weight: number}>();
-    let defaultFamily = measure.defaultFamily?.() ?? '';
-    const collect = (fam: string | undefined, weight: number | undefined) => {
-      const f = fam ?? defaultFamily;
-      if (!f) return;
-      const key = `${f}|${weight ?? 500}`;
-      if (!pairs.has(key)) pairs.set(key, {family: f, weight: weight ?? 500});
-    };
-    for (const n of nodes) {
-      const t = measure.text(n.el);
-      collect(t?.family, t?.weight ?? 650);
-      /* table column rows (t.rows.tcol) and the other measured rows carry
-       * their own families — collect every distinct one */
-      if (t?.rows) {
-        for (const rf of Object.values(t.rows)) {
-          if (rf?.family) collect(rf.family, rf.weight);
-        }
-      }
-    }
-    for (const e of edges) {
-      const lf = measure.edgeLabelFont?.(e.id);
-      collect(lf?.family, lf?.weight);
-    }
-    if (!pairs.size) return {ctx: null, unresolved: []};
-    const shapers = new Map<string, OutlineShaper>();
-    const unresolved = new Set<string>();
-    /* one resolved face per (family, weight): the committed variable twins
-     * cover every weight (instantiated per weight via set_variations), so
-     * the cache key carries the weight. */
-    const resolvedAt = new Map<string, OutlineShaper>(); // family|weight -> shaper
-    const register = (k: string, shaper: OutlineShaper) => {
-      if (k && !shapers.has(k)) shapers.set(k, shaper);
-      const squeezed = k.replace(/\s+/g, ' ').trim();
-      if (squeezed && !shapers.has(squeezed)) shapers.set(squeezed, shaper);
-      const squeezedQuotes = squeezed.replace(/"/g, '');
-      if (squeezedQuotes && !shapers.has(squeezedQuotes)) shapers.set(squeezedQuotes, shaper);
-    };
-    /* ROUND BJ — the shaper stack lives behind the lazy export chunk: fetch
-     * the modules ONCE here, then use them synchronously below. */
-    const [{makeShaper}, {localFontBytes}, {committedFontBytes}] = await Promise.all([
-      textOutlineHbLazy(), textOutlineLazy(), fontFilesLazy(),
-    ]);
-    for (const {family, weight} of pairs.values()) {
-      const pairKey = `${family}|${weight}`;
-      const already = resolvedAt.get(pairKey);
-      if (already) { register(family, already); continue; }
-      /* FILE-FIRST: the committed variable subset */
-      const committed = await committedFontBytes(family);
-      let shaper: OutlineShaper | null = null;
-      if (committed) {
-        const key = `${committed.name}@${weight}`;
-        shaper = await makeShaper(committed.bytes, key, weight);
-      }
-      /* LAST-RESORT: the queryLocalFonts API for a family the tree does
-       * not ship (an opt-in ROUND W face at an unshipped weight) */
-      if (!shaper) {
-        const hit = await localFontBytes(family, weight);
-        if (hit) shaper = await makeShaper(hit.bytes, `${hit.name}@${weight}`);
-      }
-      if (shaper) {
-        resolvedAt.set(pairKey, shaper);
-        register(family, shaper);
-        const parts = family.split(',');
-        for (let i = 2; i <= parts.length; i++) {
-          register(parts.slice(0, i).join(',').trimEnd().replace(/,\s*$/, ''), shaper);
-        }
-        /* register the concrete family name itself too (a row measured
-         * AFTER the font resolved can carry the concrete name) */
-        register(committed?.name ?? '', shaper);
-      } else {
-        unresolved.add(family);
-      }
-    }
-    if (!shapers.size) return {ctx: null, unresolved: [...unresolved]};
-    /* the default face: the measurer's defaultFamily when IT resolved */
-    const defaultShaper = defaultFamily ? shapers.get(defaultFamily) : undefined;
-    return {ctx: {shapers, defaultShaper}, unresolved: [...unresolved]};
-  }, []);
-
-  /* ROUND AZ — the font-embed builder (§4): base64 woff2 @font-face inside
-   * the exported SVG's <defs><style>, ONLY the families/weights the exported
-   * scene paints, ONLY faces whose OS/2 fsType permits embedding (the guard
-   * in fontFiles.ts — implemented, not assumed). The embedded faces are the
-   * committed VARIABLE woff2 twins (one per family — a variable face with a
-   * `font-weight: 100 900` descriptor covers every painted weight, so the
-   * browser instantiates rather than us shipping per-weight base64 blobs).
-   * The rows already carry their font-family/font-weight attributes, so the
-   * SVG's own paint code needs NO change to consume the embed. */
-  const buildFontEmbedCss = useCallback(async (
-    nodes: ExportNode[], edges: ExportEdge[], measure: SvgMeasurer,
-  ): Promise<{css?: string; bytes: number; refusals: string[]}> => {
-    void edges; void nodes;
-    /* ROUND BJ — fontFiles is behind the lazy export chunk. */
-    const {committedFontBytes, embeddingRefusal} = await fontFilesLazy();
-    /* the same pair-collection the outline shaper does (defaultFamily covers
-     * both stacks once the AZ swap landed) — but here only the FAMILY set
-     * matters: the variable face embeds once per family. */
-    const families = new Set<string>();
-    const defaultFamily = measure.defaultFamily?.() ?? '';
-    const collectFam = (fam: string | undefined) => {
-      const f = fam ?? defaultFamily;
-      if (f) families.add(f);
-    };
-    for (const n of nodes) {
-      const t = measure.text(n.el);
-      collectFam(t?.family);
-      if (t?.rows) for (const rf of Object.values(t.rows)) collectFam(rf?.family);
-    }
-    collectFam(undefined); /* the document default paints the unmeasured rows */
-    const blocks: string[] = [];
-    const refusals: string[] = [];
-    let bytes = 0;
-    /* de-duplicate families down to the SHIPPED faces (one embed per face) */
-    const embedded = new Set<string>();
-    for (const stack of families) {
-      const committed = await committedFontBytes(stack);
-      if (!committed || embedded.has(committed.name)) continue;
-      embedded.add(committed.name);
-      const refusal = embeddingRefusal(committed.fsType);
-      if (refusal) { refusals.push(`${committed.name}: ${refusal}`); continue; }
-      /* the WOFF2 twin (same subset, smaller): fetch + base64 */
-      const woff2Url = stack.includes('JetBrains') && !stack.includes('Inter')
-        ? '/fonts/jetbrains-mono-variable.woff2'
-        : '/fonts/inter-variable.woff2';
-      const face = committed.name.includes('JetBrains') ? 'JetBrains Mono' : 'Inter';
-      if (embedded.has(`css:${face}`)) continue;
-      embedded.add(`css:${face}`);
-      try {
-        const r = await fetch(woff2Url);
-        if (!r.ok) { refusals.push(`${face}: woff2 fetch failed (${r.status})`); continue; }
-        const buf = new Uint8Array(await r.arrayBuffer());
-        bytes += buf.byteLength;
-        let bin = '';
-        const CHUNK = 0x8000;
-        for (let i = 0; i < buf.length; i += CHUNK) {
-          bin += String.fromCharCode(...buf.subarray(i, i + CHUNK));
-        }
-        const b64 = btoa(bin);
-        blocks.push(
-          `@font-face { font-family: '${face}'; font-style: normal; font-weight: 100 900; ` +
-          `src: url(data:font/woff2;base64,${b64}) format('woff2-variations'); }`);
-      } catch (e) {
-        console.error('[fontEmbed] fetch failed:', woff2Url, e);
-        refusals.push(`${face}: woff2 fetch threw`);
-      }
-    }
-    if (!blocks.length) return {css: undefined, bytes, refusals};
-    return {css: blocks.join('\n'), bytes, refusals};
-  }, []);
-
-  /* Dev note (measured under automation): the ROW families are stacks
-   * ('ui-monospace, SFMono-Regular, …'). localFontBytes matches stack
-   * parts against queryLocalFonts' response; on this Linux box the sans
-   * stack's 'Roboto' part resolves (Roboto-Black etc.) while generic
-   * keywords (ui-*, system-ui, monospace, sans-serif) correctly never
-   * name a face. A stack that matches nothing keeps <text> per row. */
-
-  const buildSvg = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}): Promise<string> => {
-    const el = wrap.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!el || !rf) return '';
-    const b = (rf as any).getNodesBounds(o.nodes) as {x: number; y: number; width: number; height: number};
-    const pad = pngPad;
-    void b; void pad; /* bounds + pad are derived inside the emitter from the node boxes */
-    const eff = o.theme || theme;
-    const pre = mountThemed(el, eff);
-    try {
-      const clone = pre.clone;
-      /* scope: keep only the requested nodes + their edge children */
-      const keep = new Set(o.nodes.map(n => n.id));
-      const modelById = new Map(o.nodes.map(n => [n.id, n]));
-      const cloneNodes = [...clone.querySelectorAll<HTMLElement>('.react-flow__node')];
-      const exportNodes: ExportNode[] = [];
-      for (const cn of cloneNodes) {
-        const id = cn.getAttribute('data-id') ?? '';
-        const model = modelById.get(id);
-        if (!model) continue;
-        const me = (model as any).measured;
-        const st = (model as any).style;
-        exportNodes.push({
-          id,
-          type: (model as any).type,
-          position: {x: (model as any).position.x, y: (model as any).position.y},
-          measured: me ?? null,
-          style: st ?? null,
-          data: ((model as any).data ?? null) as Record<string, unknown> | null,
-          parentId: (model as any).parentId ?? null,
-          el: cn,
-        });
-      }
-      const modelEdges = new Map(o.edges.map(e => [e.id, e]));
-      const exportEdges: ExportEdge[] = [];
-      /* ROUND AR-2 — buildSvg must CARRY the label: the export pipeline
-         reads `e.label` (the one storage), and this push is where the
-         model edge becomes the export edge. Asserted live: without the
-         field both painted labels vanished from the real export. */
-      /* ROUND AU — the edge's LIVE clone element must ride along: the emitter's
-         measurer (`edgePath`) reads the MEASURED route off
-         `.react-flow__edge-path` inside the clone. `m.el` is always undefined
-         on a model Edge (React Flow never sets it), so before this every edge
-         fell to `stubEdgePath` — a straight centre-to-centre segment (the
-         live smoothstep exported as `M 380,431 L 750,440.5`, all bends
-         discarded). The clone element is looked up by the same data-id the
-         nodes use. */
-      const cloneEdgeById = new Map(
-        [...clone.querySelectorAll<HTMLElement>('.react-flow__edge')]
-          .map(ce => [ce.getAttribute('data-id') ?? '', ce]),
-      );
-      const exportEdgeOf = (model: unknown): ExportEdge => {
-        const m = model as {id: string; source: string; target: string; label?: unknown; data?: Record<string, unknown> | null; el?: unknown};
-        return {
-          id: m.id, source: m.source, target: m.target,
-          label: typeof m.label === 'string' && m.label ? m.label : undefined,
-          data: m.data ?? null,
-          /* the CLONE's edge element (never the model's): its path is drawn in
-             flow coordinates, which is exactly the emitter's edge space. */
-          el: cloneEdgeById.get(m.id) ?? undefined,
-        };
-      };
-      for (const ce of clone.querySelectorAll<HTMLElement>('.react-flow__edge')) {
-        const id = ce.getAttribute('data-id') ?? '';
-        const model = modelEdges.get(id);
-        if (!model) continue;
-        exportEdges.push(exportEdgeOf(model));
-      }
-      /* let the real stylesheet apply to the offscreen mount before measuring */
-      await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
-      const tokens = eff === theme
-        ? Object.fromEntries(EXPORT_TOKENS.map(t => [t, readToken(t, '#888')]))
-        : tokensFor(eff, EXPORT_TOKENS);
-      /* DEFECT-2: one measurer per export, with measureText for the wrap —
-         disposed in the finally so the hidden measuring <svg> never leaks.
-         ROUND-AR-DEFECT-1: the measurer gets the CLONE ROOT so it can read
-         the portalled `.edge-label[data-edge-id]` rows the EdgeLabelRenderer
-         paints outside each edge's own element. */
-      /* ROUND BJ — domMeasurer comes with the lazy export chunk. */
-      const {domMeasurer} = await exportSvgLazy();
-      const measure = domMeasurer(() => clone);
-      try {
-        /* ROUND C — outline mode: when requested, build the outline shaper
-         * ONCE per export from the rows' own families and hand it to the
-         * emitter through ctx. ROUND AZ — FILE-FIRST (committed subsets,
-         * no permission): an unresolvable family is surfaced VISIBLY via
-         * the gobi:export-note event + __ds_outline_note — never a silent
-         * no-op preview. */
-        let outlineCtx: NonNullable<ExportInput['outline']> | undefined;
-        if (o.outline) {
-          const built = await buildOutlineShaper(exportNodes, exportEdges, measure);
-          outlineCtx = built.ctx ?? undefined;
-          (window as unknown as Record<string, unknown>).__ds_outline_map = outlineCtx?.shapers ?? null;
-          (window as unknown as Record<string, unknown>).__ds_outline_note = outlineCtx
-            ? (built.unresolved.length
-              ? `outlined every family except: ${built.unresolved.join('; ')} (no committed bytes, no local-font match)`
-              : undefined)
-            : 'no font bytes available for any text family (no committed subset matched, no local-font match)';
-          if (built.unresolved.length || !outlineCtx) {
-            window.dispatchEvent(new CustomEvent('gobi:export-note', {
-              detail: outlineCtx
-                ? `Outline text: some families kept selectable text — ${built.unresolved.join('; ')}`
-                : 'Outline text: no font bytes available for any text family — text stayed selectable.',
-            }));
-          }
-        }
-        /* ROUND AZ fix (orchestrator, measured live) — the embed belongs to the TEXT path, not the
-         * outline path. Outlined glyphs ARE paths: they need no font at all, so embedding there only
-         * bloated the file (measured: 318,713 B outlined with an embed against ~78 KB it needs).
-         * Meanwhile the default export — the one Harvey sends to clients — carried NO @font-face, so a
-         * viewer without Inter saw substitution, which is the exact problem ROUTE 1 exists to solve.
-         * Embed only when text stays text, only the families the scene paints, only faces whose fsType
-         * permits it. */
-        const embed = o.outline
-          ? {css: undefined as string | undefined, bytes: 0, refusals: [] as string[]}
-          : await buildFontEmbedCss(exportNodes, exportEdges, measure);
-        (window as unknown as Record<string, unknown>).__ds_embed_bytes = embed.bytes;
-        (window as unknown as Record<string, unknown>).__ds_embed_css = embed.css;
-        if (embed.refusals.length) {
-          (window as unknown as Record<string, unknown>).__ds_embed_refusals = embed.refusals;
-          window.dispatchEvent(new CustomEvent('gobi:export-note', {
-            detail: `Font embed: skipped — ${embed.refusals.join('; ')}`,
-          }));
-        }
-        /* ROUND BJ — exportSvgOf comes with the lazy export chunk (same
-         * module the measurer came from; the promise is memoised by the
-         * dynamic-import machinery, so this second await is free). */
-        return (await exportSvgLazy()).exportSvgOf({
-          nodes: exportNodes,
-          edges: exportEdges,
-          theme: eff,
-          tokens,
-          measurer: measure,
-          pad: pngPad,
-          outline: outlineCtx,
-          fontEmbedCss: embed.css,
-        });
-      } finally {
-        measure.dispose?.();
-      }
-    } finally {
-      pre.done();
-    }
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [rf, theme, pngPad, mountThemed]);
-
-  /* ROUND AY item 4 (OPTION B, spec §4) — buildPng is now TWO LINES: build the
-     SVG (the same string the .svg download gets) and rasterise it. ONE painter
-     per pixel class: the scene/emitter is the single source of the picture and
-     the canvas merely scales it. The old DOM-clone path (themed clone + the
-     AU-1 chrome strip + the AV fill fold + the AV icon inline + the BA paint
-     walk + html-to-image's toPng) is REPLACED, not patched — chrome cannot
-     appear because the scene never contains editor affordances, and every
-     paint value arrives in the svgString as a literal. The pixel-diff gate
-     (checks/fixtures/round-ay-png-before vs the new path) is the proof. */
-  const buildPng = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string}): Promise<string> => {
-    const svg = await buildSvg(o);
-    if (!svg) return '';
-    const eff = o.theme || theme;
-    const bg = eff === theme
-      ? readToken('--bg', '#0b0b0d')
-      : tokensFor(eff, ['--bg'])['--bg'];
-    /* ROUND BJ — rasterise comes with the lazy export chunk. */
-    const {rasterise} = await exportPngLazy();
-    return rasterise(svg, {scale: pngScale, bg});
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [theme, pngScale, buildSvg]);
-
-  /* ROUND BI — the feedback dialog's screenshot helper reuses THIS export path
-     verbatim (SVG emitter → rasterise, the same string the .png download gets):
-     one painter per pixel class, no second renderer. It resolves a DATA URL and
-     the pure clipboard module turns it into a Blob; App passes null when the
-     board is empty, which is what makes the helper row disappear. */
-  const boardPngForFeedback = useCallback(
-    () => buildPng({nodes, edges, theme}),
-    [buildPng, nodes, edges, theme],
-  );
-
-  /* ROUND C — the print PDF route (Harvey-approved route (i)): build the
-   * SAME svg string the .svg download gets (theme/scope already baked by
-   * the caller; outline rides `outline: true` — the modal's checkbox
-   * reaches the print view through this flag), inline it in a print
-   * window with a print stylesheet, and open the browser's dialog. */
-  const printPdf = useCallback(async (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}): Promise<void> => {
-    /* ORCHESTRATOR FIX (2026-10-22, Harvey: "dù không chọn Outline, PDF vẫn ra như khi chọn outline") —
-     * this call hardcoded `outline: true`, so the print route ALWAYS outlined: the PDF carried glyph
-     * paths and the text was never selectable, regardless of the checkbox. The checkbox is the only
-     * thing that decides; the print view inherits whatever the modal shows. */
-    const svg = await buildSvg({nodes: o.nodes, edges: o.edges, theme: o.theme, outline: !!o.outline});
-    if (!svg) return;
-    /* ROUND BJ — the print route comes with the lazy export chunk. */
-    const {printSvgAsPdf} = await printViewLazy();
-    printSvgAsPdf(svg, curBoard?.name || 'Gobigrams');
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [buildSvg, curBoard]);
-
-  /* ROUND C — the probe seam: the harness drives the app's OWN build
-   * path (not a re-implementation) to measure the outlined vs text
-   * exports. Dev/test only; it reads nothing beyond the builders. */
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__ds_export =
-      async (o: {board?: string; theme: string; outline: boolean}) => {
-        try {
-          const svg = await buildSvg({nodes, edges, theme: o.theme, outline: o.outline});
-          return {svg, note: o.outline ? (window as unknown as {__ds_outline_note?: string}).__ds_outline_note : undefined};
-        } catch (e) {
-          return {error: String(e)};
-        }
-      };
-    return () => { delete (window as unknown as Record<string, unknown>).__ds_export; };
-  }, [buildSvg, nodes, edges]);
-
-  // ---- import JSON ----
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  /* AQ21 — the export modal's Mermaid import lands here. Fresh ids, grid
-     layout. AS-3: the import is ADDITIVE (setNodes/setEdges append), so it is
-     ONE undo entry: pushHistory() snapshots the pre-import graph (and clears
-     `future`, the redo contract) BEFORE the append — a single Cmd+Z removes
-     exactly the import, redo restores it. (The old code wiped history here,
-     which was copied from the JSON import — but that path REPLACES the
-     board; this one appends, so the reset destroyed undoable work.) */
-  useEffect(() => {
-    const h = (ev: Event) => {
-      const parsed = (ev as CustomEvent).detail;
-      if (!parsed) return;
-      const {nodes: mmNodes, edges: mmEdges, nextId} = mermaidToGraph(parsed, idc);
-      idc = nextId;
-      pushHistory();
-      setNodes(ns => [...ns, ...mmNodes]);
-      setEdges(es => [...es, ...mmEdges]);
-      bumpHist(v => v + 1);
-      flash(`Imported ${mmNodes.length} nodes · ${mmEdges.length} edges from Mermaid`);
-    };
-    window.addEventListener('gobi:mermaid-import', h);
-    return () => window.removeEventListener('gobi:mermaid-import', h);
-  }, [flash, tickTask]);
 
   const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
