@@ -33,7 +33,11 @@ const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
   + readFileSync(`${ROOT}/src/components/HelpSheet.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
-const PRESETS_RAW = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 const SET_RAW = readFileSync(`${ROOT}/src/Settings.tsx`, 'utf8');
 
 /** Strip block + line comments; blanking keeps byte offsets (and line numbers). */
@@ -769,7 +773,7 @@ console.log('='.repeat(78));
 
 const dir = mkdtempSync(join(tmpdir(), 'ds-aa-'));
 const entry = join(dir, 'lib-entry.ts');
-writeFileSync(entry, `import {LIBRARY} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`
+writeFileSync(entry, `import {LIBRARY} from ${JSON.stringify(join(ROOT, 'src/presets/index.ts'))};\n`
   + `console.log(JSON.stringify(LIBRARY.map(p => ({label: p.label, category: p.category, types: p.types, `
   + `shape: p.shape, hint: p.hint, aliases: p.aliases ?? [], geometry: p.geometry ?? ''}))));\n`);
 const outJs = execFileSync(ESBUILD, [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'});

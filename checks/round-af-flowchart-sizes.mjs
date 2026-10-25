@@ -22,7 +22,11 @@ import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
-const PRESETS_RAW = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
 const NODE_RAW = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
@@ -337,10 +341,17 @@ const FC_RECT_ROWS = FC_SOURCE_ROWS.filter(r => r.tail.includes('FLOWCHART_NODE_
 const FC_CX_ROWS = FC_SOURCE_ROWS.filter(r => r.tail.includes('CONNECTOR_NODE_SIZE')).length;
 const FC_SEEDS_TOTAL = SEED_NODES.length;
 const FC_RECT_SEEDS = FC_SEEDS_TOTAL - connectorSeeds.length;
-const FC_CONST_DECLS = [...(PRESETS.match(/FLOWCHART_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
-const FC_CONST_USE = [...PRESETS.matchAll(/FLOWCHART_NODE_SIZE/g)].length;
-const CX_CONST_DECLS = [...(PRESETS.match(/CONNECTOR_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
-const CX_CONST_USE = [...PRESETS.matchAll(/CONNECTOR_NODE_SIZE/g)].length;
+/* ROUND BN-4 — presets.ts split into src/presets/ slices: the slices that USE
+   a size constant now also IMPORT it (wiring lines the single file never had).
+   The count below therefore runs on the union WITH IMPORT LINES REMOVED, so it
+   still counts exactly the declarations + palette rows + seeds it always did —
+   same call sites, new homes. Not weakened: an import that stops naming the
+   constant fails tsc, and a call-site change still shows in this count. */
+const PRESETS_CODE = PRESETS.replace(/^import[^;]*?;/gms, '\n');
+const FC_CONST_DECLS = [...(PRESETS_CODE.match(/FLOWCHART_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
+const FC_CONST_USE = [...PRESETS_CODE.matchAll(/FLOWCHART_NODE_SIZE/g)].length;
+const CX_CONST_DECLS = [...(PRESETS_CODE.match(/CONNECTOR_NODE_SIZE\s*=\s*\{[^}]*\}/g) ?? [])];
+const CX_CONST_USE = [...PRESETS_CODE.matchAll(/CONNECTOR_NODE_SIZE/g)].length;
 console.log(`  FLOWCHART_NODE_SIZE: ${FC_CONST_DECLS.length} declaration(s), ${FC_CONST_USE} references (expect ${FC_RECT_ROWS} rect rows + ${FC_RECT_SEEDS} rect seeds + 1)`);
 console.log(`  CONNECTOR_NODE_SIZE: ${CX_CONST_DECLS.length} declaration(s), ${CX_CONST_USE} references (expect 1 row + ${connectorSeeds.length} seeds + 1)`);
 assert('af4.each-shared-size-is-declared-once-and-used-by-its-own-rows',
@@ -350,7 +361,7 @@ assert('af4.each-shared-size-is-declared-once-and-used-by-its-own-rows',
   `FLOWCHART_NODE_SIZE: one declaration, ${FC_CONST_USE} references (the ${FC_RECT_ROWS} rect palette rows, the ${FC_RECT_SEEDS} rect seeds and the ` +
   `declaration). CONNECTOR_NODE_SIZE: one declaration, ${CX_CONST_USE} references (the ${FC_CX_ROWS} connector palette row, its ${connectorSeeds.length} template seeds ` +
   'and the declaration). ROUND BE re-anchored the old single-constant 16+48+1 count into these two per-constant counts — a row or seed that ' +
-  'changes constant shows up as a wrong number here.');
+  'changes constant shows up as a wrong number here. BN-4: counted over the presets union minus import wiring — same call sites, new homes.');
 
 
 /* ===========================================================================

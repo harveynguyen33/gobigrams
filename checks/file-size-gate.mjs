@@ -99,7 +99,13 @@ const BUDGETS = new Map([
   ['src/paletteSearch.ts', 94],  // now 85,
   ['src/panelCollapse.ts', 139],  // now 126,
   ['src/prefs.ts', 41],  // now 37,
-  ['src/presets.ts', 1431, 'hard'],  // hard cap at current: may NEVER grow,
+  // ROUND BN-4 — presets.ts (hard 1431) split into src/presets/: the LIFT the
+  // split buys. Verbatim data moves; index.ts re-exports the union.
+  ['src/presets/basic.ts', 380],  // now 374 (spine + factory + edge defaults)
+  ['src/presets/flowchart.ts', 340],  // now 332
+  ['src/presets/dataStorage.ts', 130],  // now 117
+  ['src/presets/architecture.ts', 410],  // now 368
+  ['src/presets/index.ts', 300],  // now 289
   ['src/printView.ts', 59],  // now 53,
   ['src/resizeHistory.ts', 109],  // now 99,
   ['src/roadmap.ts', 138],  // now 125,

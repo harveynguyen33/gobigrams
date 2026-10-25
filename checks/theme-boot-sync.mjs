@@ -19,7 +19,11 @@ import {readFileSync} from 'node:fs';
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const html = readFileSync(`${ROOT}/index.html`, 'utf8');
 const theme = readFileSync(`${ROOT}/src/theme.ts`, 'utf8');
-const presets = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const presets = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 const app = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 
 const fails = [];

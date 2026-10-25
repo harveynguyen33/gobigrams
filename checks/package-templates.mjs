@@ -30,6 +30,11 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 const ROOT = process.env.DS_ROOT ?? '/home/harvey/projects/tech-goblin/lab/diagram-studio';
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_TEXT = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
 
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
@@ -74,7 +79,7 @@ const dir = mkdtempSync(join(tmpdir(), 'ds-pt-'));
 const entry = join(dir, 'entry.ts');
 writeFileSync(entry,
   `export {templateCatalog, TEMPLATE_LEVEL_ORDER} from ${JSON.stringify(join(ROOT, 'src/templateCatalog.ts'))};\n` +
-  `export {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`);
+  `export {PRESETS, FLOWCHART_PRESET, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, TEMPLATE_LEVELS, LAYOUTS} from ${JSON.stringify(join(ROOT, 'src/presets/index.ts'))};\n`);
 const out = join(dir, 'out.mjs');
 writeFileSync(out, execFileSync(ESBUILD, [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'}));
 const M = await import(pathToFileURL(out).href);
@@ -222,7 +227,7 @@ assert('4.the-remaining-legacy-templates-are-in-the-catalog-and-still-resolve',
    `true` restores the "Data model" family; this assertion records the hide. */
 const erdIds = (PRESETS.erd.templates ?? []).map(t => t.id);
 const erdReachable = ['commerce'].filter(id => byPair.get(`erd:${id}`) || appResolve('erd', id));
-const erdFlagSpread = /ERD_ENABLED \? \{templates: \[erdTemplate\]\}/.test(readFileSync(`${ROOT}/src/presets.ts`, 'utf8'));
+const erdFlagSpread = /ERD_ENABLED \? \{templates: \[erdTemplate\]\}/.test(PRESETS_TEXT);
 console.log(`  erd family now ships: [${erdIds.join(', ')}] (catalog rows reachable: [${erdReachable.join(', ')}])`);
 assert('4c6.erd-template-is-flag-gated-not-deleted',
   erdIds.length === 0 && erdReachable.length === 0 && erdFlagSpread,
@@ -253,7 +258,7 @@ assert('4b.approval-is-gone-from-both-the-catalog-and-the-preset',
    restores the family; this assertion is the one that records the hide. */
 const c4Ids = (PRESETS.c4.templates ?? []).map(t => t.id);
 const c4Reachable = ['c4-context', 'c4-container'].filter(id => byPair.get(`c4:${id}`) || appResolve('c4', id));
-const presetsSrc = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+const presetsSrc = PRESETS_TEXT;
 const flagSpread = /C4_ENABLED \? \{templates: \[c4ContextTemplate, c4ContainerTemplate\]\}/.test(presetsSrc);
 console.log(`  c4 family now ships: [${c4Ids.join(', ')}] (catalog rows reachable: [${c4Reachable.join(', ')}])`);
 assert('4c4.c4-templates-are-flag-gated-not-deleted',
@@ -775,7 +780,7 @@ const preFlowTemplates = [PRE_APPROVAL];
    from memory — so the replay still measures the tree WITH c4 present, which is
    the tree the original AC 1/AC 2 ran against. If the flag's spread line is
    edited, this fixture must be updated beside it. */
-const C4_SPREAD = /C4_ENABLED \? \{templates: \[c4ContextTemplate, c4ContainerTemplate\]\}/.test(readFileSync(`${ROOT}/src/presets.ts`, 'utf8'));
+const C4_SPREAD = /C4_ENABLED \? \{templates: \[c4ContextTemplate, c4ContainerTemplate\]\}/.test(PRESETS_TEXT);
 const preC4Templates = C4_SPREAD
   ? [{id: 'c4-context'}, {id: 'c4-container'}]
   : (PRESETS.c4.templates ?? []);
@@ -786,7 +791,7 @@ const preC4Templates = C4_SPREAD
    keeping the replay measuring the tree WITH erd present, which is the tree
    the original AC 1/AC 2 ran against. If the flag's spread line is edited,
    this fixture must be updated beside it (same contract as C4_SPREAD). */
-const ERD_SPREAD = /ERD_ENABLED \? \{templates: \[erdTemplate\]\}/.test(readFileSync(`${ROOT}/src/presets.ts`, 'utf8'));
+const ERD_SPREAD = /ERD_ENABLED \? \{templates: \[erdTemplate\]\}/.test(PRESETS_TEXT);
 const preErdTemplates = ERD_SPREAD ? [{id: 'commerce'}] : (PRESETS.erd.templates ?? []);
 const prePresets = JSON.parse(JSON.stringify({
   flowchart: {...FLOWCHART_PRESET, templates: preFlowTemplates},

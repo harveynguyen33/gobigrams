@@ -29,7 +29,11 @@ import {pathToFileURL} from 'node:url';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
 const ESBUILD = join(ROOT, 'node_modules/.bin/esbuild');
-const PRESETS_SRC = readFileSync(join(ROOT, 'src/presets.ts'), 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_SRC = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(join(ROOT, `src/presets/${f}.ts`), 'utf8')).join('\n');
 const DIALOG_SRC = readFileSync(join(ROOT, 'src/BoardDialog.tsx'), 'utf8');
 /* BN-2: createFromTemplate + dialog wiring moved to src/useBoardsMenu.ts. */
 const APP_SRC = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
@@ -54,7 +58,7 @@ const DIALOG_CODE = blankComments(DIALOG_SRC);
 /* ---------- 1. Bundle presets.ts so the real PRESETS table can be read ------ */
 const dir = mkdtempSync(join(tmpdir(), 'ds-o2-'));
 const presetEntry = join(dir, 'presets-entry.ts');
-writeFileSync(presetEntry, `import {PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\nconsole.log(JSON.stringify(Object.fromEntries(Object.entries(PRESETS).map(([k,p]) => [k, {label: p.label, templateIds: (p.templates ?? []).map(t => t.id)}]))));\n`);
+writeFileSync(presetEntry, `import {PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets/index.ts'))};\nconsole.log(JSON.stringify(Object.fromEntries(Object.entries(PRESETS).map(([k,p]) => [k, {label: p.label, templateIds: (p.templates ?? []).map(t => t.id)}]))));\n`);
 const presetOut = execFileSync(ESBUILD, [presetEntry, '--bundle', '--platform=node', '--format=esm', '--log-level=error'], {encoding: 'utf8'});
 const presetsJs = join(dir, 'presets.mjs');
 writeFileSync(presetsJs, presetOut);

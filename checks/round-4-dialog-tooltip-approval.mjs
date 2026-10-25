@@ -43,7 +43,11 @@ const TOOLTIP = stripTs(TOOLTIP_RAW);
 const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
   + '\n' + readFileSync(join(ROOT, 'src/components/ModalMounts.tsx'), 'utf8');
 const APP = stripTs(APP_RAW);
-const PRESETS_RAW = readFileSync(join(ROOT, 'src/presets.ts'), 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(join(ROOT, `src/presets/${f}.ts`), 'utf8')).join('\n');
 const STYLES_RAW = readFileSync(join(ROOT, 'src/styles.css'), 'utf8');
 const SPEC_RAW = readFileSync(join(ROOT, 'PACKAGE-TEMPLATES-SPEC.md'), 'utf8');
 const GALLERY_RAW = readFileSync(join(ROOT, 'src/TemplatesGallery.tsx'), 'utf8');
@@ -235,7 +239,7 @@ console.log('ITEM 4 — `approval` is gone from the flowchart family (executed)'
 console.log('='.repeat(78));
 
 const presetsJs = bundle(
-  `export {PRESETS, FLOWCHART_PRESET} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`,
+  `export {PRESETS, FLOWCHART_PRESET} from ${JSON.stringify(join(ROOT, 'src/presets/index.ts'))};\n`,
   'presets');
 const {PRESETS, FLOWCHART_PRESET} = await import(pathToFileURL(presetsJs).href);
 const flowIds = FLOWCHART_PRESET.templates.map(t => t.id);

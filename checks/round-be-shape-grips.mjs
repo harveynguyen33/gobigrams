@@ -39,7 +39,11 @@ const SHAPES_RAW = readFileSync(`${ROOT}/src/shapes.tsx`, 'utf8');
 const CUSTOMNODE_RAW = readFileSync(`${ROOT}/src/CustomShapeNode.tsx`, 'utf8');
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
 const STYLES_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
-const PRESETS_RAW = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_RAW = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s

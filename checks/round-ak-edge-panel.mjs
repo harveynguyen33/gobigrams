@@ -72,10 +72,18 @@ const FILES = ['src/App.tsx', 'src/GoblinEdge.tsx', 'src/inspector.ts',
 
 /** Read one file from the working tree (default) or from `commit` via git.
  *  A comment-blanked copy is attached, so a probe can choose. */
+/* ROUND BN-4 — presets.ts split into src/presets/ (five slices, index.ts
+   re-exports the union). A WORKING-TREE read of 'src/presets.ts' returns the
+   FIVE SLICES CONCATENATED so `b.presets` keeps measuring the same surface;
+   a `git show` read keeps the single file, which is what every pinned commit
+   has — the REPLAY semantics are unchanged. */
 function readOne(path, commit) {
   const raw = commit
     ? execFileSync('git', ['show', `${commit}:${path}`], {cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28})
-    : readFileSync(`${ROOT}/${path}`, 'utf8');
+    : path === 'src/presets.ts'
+      ? ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+          .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n')
+      : readFileSync(`${ROOT}/${path}`, 'utf8');
   return {raw, code: blankComments(raw)};
 }
 

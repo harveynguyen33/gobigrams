@@ -45,7 +45,11 @@ const CSS_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 const CSS = CSS_RAW.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
 const TSX = readFileSync(`${ROOT}/src/TableNode.tsx`, 'utf8');
 const DIAGRAM = readFileSync(`${ROOT}/src/DiagramNode.tsx`, 'utf8');
-const PRESETS = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 
 let failures = 0;
 const assert = (id, cond, detail) => {

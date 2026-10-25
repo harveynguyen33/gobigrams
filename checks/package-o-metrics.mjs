@@ -19,6 +19,11 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 const ROOT = '/home/harvey/projects/tech-goblin/lab/diagram-studio';
+/* ROUND BN-4 — src/presets.ts split into src/presets/{basic,flowchart,dataStorage,architecture,index}.ts (verbatim data moves;
+   index.ts re-exports the union). This reads the FIVE SLICES CONCATENATED in that order, so
+   every count and regex below still measures the same surface the single file had. */
+const PRESETS_TEXT = ['basic', 'flowchart', 'dataStorage', 'architecture', 'index']
+  .map(f => readFileSync(`${ROOT}/src/presets/${f}.ts`, 'utf8')).join('\n');
 const CSS = readFileSync(`${ROOT}/src/styles.css`, 'utf8').split('\n');
 /* BN-2: the popover clamp moved to src/useBoardsMenu.ts.
    BN-3 PHASE B: the ? help sheet moved to src/components/HelpSheet.tsx (its
@@ -379,7 +384,7 @@ function pushItem(o) { libItems.push(o); }
 }
 /** `fc(...)` rows + the Lane / Table / Note (enum) object literals. */
 {
-  const lines = readFileSync(`${ROOT}/src/presets.ts`, 'utf8').split('\n');
+  const lines = PRESETS_TEXT.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const fc = /fc\('([^']*)', '([^']*)',/.exec(lines[i]);
     if (fc) {
@@ -404,7 +409,7 @@ function pushItem(o) { libItems.push(o); }
 }
 /** The C4 map. Label comes from `kicker` the same way `c4PaletteItem` does. */
 {
-  const lines = readFileSync(`${ROOT}/src/presets.ts`, 'utf8').split('\n');
+  const lines = PRESETS_TEXT.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const m = /^\s*(\w+):\s*\{level:.*kicker: '([^']*)',.*hint: '([^']*)'/.exec(lines[i]);
     if (!m) continue;
@@ -569,7 +574,7 @@ assert('item4.search-coverage-preserved', coverageGaps.length === 0,
    src/presets.ts and `PALETTE` still CONTAINS the item — so the first-run seed
    (`PRESETS.architecture.palette[2]`, pinned byte-identical by
    checks/boot-no-flash.mjs) and every stored board keep their Queue. */
-const presetsSrcQ = readFileSync(`${ROOT}/src/presets.ts`, 'utf8');
+const presetsSrcQ = PRESETS_TEXT;
 const queueFilterSpread = /QUEUE_ENABLED \|\| p\.label !== 'Queue'/.test(presetsSrcQ);
 const queueInPalette = /label: 'Queue',/.test(readFileSync(`${ROOT}/src/palette.ts`, 'utf8'));
 /** The EXECUTED module, not the text: esbuild-bundle src/presets.ts the way
@@ -585,7 +590,7 @@ const bundlePresets = async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'aoq-'));
   const entry = join(tmp, 'entry.ts');
   const out = join(tmp, 'out.mjs');
-  writeFileSync(entry, `export {LIBRARY, PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets.ts'))};\n`);
+  writeFileSync(entry, `export {LIBRARY, PRESETS} from ${JSON.stringify(join(ROOT, 'src/presets/index.ts'))};\n`);
   const bundled = execFileSync(`${ROOT}/node_modules/.bin/esbuild`,
     [entry, '--bundle', '--platform=node', '--format=esm', '--log-level=error',
       '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:@xyflow/react'],
