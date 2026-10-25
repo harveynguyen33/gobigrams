@@ -9,7 +9,10 @@
 # This is an ALLOWLIST, deliberately. A denylist leaks the next new artifact
 # someone invents; an allowlist only ever ships what is named here.
 #
-# Usage:  .gob/publish-public.sh [--push]
+# The SOURCE branch is ${SRC_BRANCH:-main}. With the develop workflow:
+#   work lands on develop (the workshop trunk) and only when Harvey says
+#   "release" does main get fast-forwarded to develop and published.
+# Usage:  .gob/publish-public.sh [--push]          (reads $SRC_BRANCH, default main)
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
@@ -51,7 +54,7 @@ git reset --hard public-main
 git clean -qfd
 
 # stage ONLY the allowlisted paths from main
-git checkout main -- "${ALLOW[@]}"
+git checkout "${SRC_BRANCH:-main}" -- "${ALLOW[@]}"
 
 # ---- the other half of an allowlist: DELETE everything tracked that is not allowed ----
 # (the snapshot inherits whatever an earlier publish left behind, so without this a
@@ -70,11 +73,11 @@ fi
 # README: the public one is purpose-built, not the workshop README.
 # It lives on `main` only, so it must be read from there — the working tree on
 # this branch does not have the file (that silently shipped the stale one once).
-if git cat-file -e main:README-PUBLIC.md 2>/dev/null; then
-  git show main:README-PUBLIC.md > README.md
+if git cat-file -e "${SRC_BRANCH:-main}":README-PUBLIC.md 2>/dev/null; then
+  git show "${SRC_BRANCH:-main}":README-PUBLIC.md > README.md
   git add README.md
 else
-  echo "WARNING: README-PUBLIC.md is missing on main — shipping the workshop README" >&2
+  echo "WARNING: README-PUBLIC.md is missing on the source branch — shipping the workshop README" >&2
 fi
 
 # ---- leak gate: refuse to publish if infrastructure identifiers slipped through ----
@@ -95,7 +98,7 @@ echo "--- staged public tree ($(git diff --cached --name-only | wc -l) files):"
 cut -d/ -f1 <(git diff --cached --name-only) | sort -u | sed 's/^/    /'
 
 if [ "${1:-}" = "--push" ]; then
-  git commit -q -m "public: refresh snapshot from main" || echo "nothing to commit"
+  git commit -q -m "public: refresh snapshot from ${SRC_BRANCH:-main}" || echo "nothing to commit"
   git push github-mirror public-main:main --force
   echo "pushed -> github.com/harveynguyen33/gobigrams"
 else
