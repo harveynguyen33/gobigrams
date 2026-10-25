@@ -67,6 +67,18 @@
          REQUIRED even for same-origin font preloads (the fetch is CORS-mode). -->
     <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/jetbrains-mono-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- ANALYTICS (2026-10-25) — self-hosted Umami (analytics.tech-goblin.com,
+         cookieless, MIT; dashboard is Cloudflare-Access-gated, tracker is public).
+         Fires ONLY on the production origin so LAN/dev usage never pollutes stats. -->
+    <script>
+      if (location.hostname === 'gobigrams.tech-goblin.com') {
+        var um = document.createElement('script');
+        um.async = true;
+        um.src = 'https://analytics.tech-goblin.com/script.js';
+        um.setAttribute('data-website-id', 'ee9cefdb-9ecb-4d2e-8aaf-a56d44b0420a');
+        document.head.appendChild(um);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
