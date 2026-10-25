@@ -25,5 +25,6 @@
   },
   "description": "Gobigrams \u2014 draw diagrams in your browser. Flowcharts, architecture and ER diagrams with real vector export.",
   "homepage": "https://gobigrams.tech-goblin.com",
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)"
 }
