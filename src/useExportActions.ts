@@ -1,3 +1,4 @@
+/* feature-map home: src/useExportActions.ts — App's lazy export call sites (buildSvg/buildPng/printPdf + Mermaid import) */
 /* useExportActions.ts — ROUND BN-2: the export cluster moved out of App()
  *  verbatim (mountThemed, the ROUND BJ/AZ/AY export builders, the ROUND C
  *  probe seam effect and the AQ21 Mermaid-import effect). Behaviour-neutral:

@@ -1,3 +1,4 @@
+/* feature-map home: src/fontFiles.ts */
 /* ROUND AZ (t_96100cb2) — COMMITTED FONT BYTES: the file-first provider.
  *
  * The card's core change to the outline pipeline: the shaper no longer

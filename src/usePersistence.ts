@@ -6,7 +6,8 @@
  *  byte-identical; only this wrapper, its parameter list and the return tuple
  *  are new. applyBoard STAYS in App() (it owns the module-level idc bump and
  *  the undo/selection reset) and is passed in; nodes/edges and the board
- *  doc state stay in App and pass down positionally — no context. */
+ *  doc state stay in App and pass down positionally — no context.  (feature-map home: src/src/usePersistence.ts)
+ */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type * as React from 'react';
 import type {Edge, Node} from '@xyflow/react';

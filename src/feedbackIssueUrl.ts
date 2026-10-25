@@ -1,3 +1,4 @@
+/* feature-map home: src/feedbackIssueUrl.ts */
 /**
  * ROUND BH, ITEM 1 (public launch, 2026-10-24) — the feedback issue-URL
  * builder, PURE AND REACT-FREE on purpose.

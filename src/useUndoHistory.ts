@@ -3,7 +3,8 @@
  *  selection-preserving restore, undo/redo, canUndo/canRedo). Behaviour-neutral:
  *  bodies are byte-identical; only this wrapper, its parameter destructuring and
  *  the return object are new. The nodes/edges state itself STAYS in App (it is
- *  shared with every other cluster) and passes down explicitly — no context. */
+ *  shared with every other cluster) and passes down explicitly — no context.  (feature-map home: src/src/useUndoHistory.ts)
+ */
 import {useCallback, useRef, useState} from 'react';
 import type * as React from 'react';
 import type {Edge, Node, NodeChange} from '@xyflow/react';

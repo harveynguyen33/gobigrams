@@ -1,3 +1,4 @@
+/* feature-map home: src/localStore.ts */
 /**
  * ROUND AT — AT-2/AT-3/AT-4: the browser-LOCAL storage backend (IndexedDB).
  *

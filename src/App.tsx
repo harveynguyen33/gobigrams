@@ -6,19 +6,17 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import ExportModal, {type ExportScope, type ExportFormat} from './ExportModal';
+import {type ExportScope, type ExportFormat} from './ExportModal';
 import {
-  Undo2, Redo2, Maximize, Magnet, Copy, Upload, Download,
+  Copy, Download,
   Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
-  LayoutGrid, Plus, Pencil, Save, Waypoints, AlignCenter,
+  LayoutGrid, Plus, Pencil, Save,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   BringToFront, SendToBack,
-  PanelLeftClose, PanelRightClose, Eye,
+  PanelLeftClose, PanelRightClose,
   LayoutTemplate,
-  Settings as SettingsIcon,
-  MessageSquarePlus,
   X,
 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -47,10 +45,9 @@ import DiagramNode, {type NodeKind} from './DiagramNode';
 import LabelNode, {type LabelKind} from './LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
 import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNode';
-import {edgeTypes} from './GoblinEdge';
+import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
-import BoardDialog from './BoardDialog';
 import Tooltip from './Tooltip';
 import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
 import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
@@ -108,13 +105,14 @@ import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './Tour';
+import {HelpSheet} from './components/HelpSheet';
+import {ModalMounts} from './components/ModalMounts';
+import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
+import {Toolbar} from './components/Toolbar';
 import Checklist, {type ChecklistTaskId} from './Checklist';
-import Settings from './Settings';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
-import FeedbackDialog from './FeedbackDialog';
-import TemplatesGallery from './TemplatesGallery';
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
 import {layoutDiagram} from './layout';
@@ -4268,125 +4266,36 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ref={wrap}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}>
-        <div className="toolbar">
-          <Tooltip label="Undo — Cmd/Ctrl+Z">
-            <button className="tbtn-icon" aria-label="Undo" disabled={!canUndo} onClick={undo}><Undo2 size={15} /></button>
-          </Tooltip>
-          <Tooltip label="Redo — Cmd/Ctrl+Shift+Z">
-            <button className="tbtn-icon" aria-label="Redo" disabled={!canRedo} onClick={redo}><Redo2 size={15} /></button>
-          </Tooltip>
-          {sep()}
-          <Tooltip label="Fit view to diagram — Shift+1">
-            <button className="tbtn-icon" aria-label="Fit view" onClick={() => rf?.fitView({padding: 0.25})}><Maximize size={15} /></button>
-          </Tooltip>
-          {/* Part B — read-only review mode. Sits with the other VIEW toggles
-              (fit view / alignment guides / snap), not in the export group: it
-              is a way of looking at the board, not an output. */}
-          <Tooltip label={readOnly ? 'Read-only review: ON — drag and scroll to pan, nothing can be selected or moved — Shift+2' : 'Read-only review: OFF — Shift+2'}>
-            <button
-              className={`tbtn-icon${readOnly ? ' on' : ''}`}
-              aria-label="Read-only review"
-              aria-pressed={readOnly}
-              onClick={toggleReadOnly}
-            ><Eye size={15} /></button>
-          </Tooltip>
-          <Tooltip label={alignGuides ? 'Alignment guides: ON — a NEARBY node that lines up gets a dashed guide and the node snaps to it' : 'Alignment guides: OFF — drag freely, no auto-align'}>
-            <button
-              className={`tbtn-icon${alignGuides ? ' on' : ''}`}
-              aria-label="Alignment guides"
-              aria-pressed={alignGuides}
-              onClick={() => {
-                const next = !alignGuides;
-                setAlignGuides(next);
-                if (!next) setGuides({vertical: null, horizontal: null});
-              }}
-            ><AlignCenter size={15} /></button>
-          </Tooltip>
-          <Tooltip label={snap ? `Snap to grid: ON — nodes align to ${gridSize}px` : 'Snap to grid: OFF — free drag'}>
-            <button
-              className={`tbtn-icon${snap ? ' on' : ''}`}
-              aria-label="Snap to grid"
-              aria-pressed={snap}
-              onClick={() => {
-                const next = !snap;
-                setSnap(next);
-                // when turning snap ON, round existing nodes onto the grid so the
-                // whole diagram aligns; turning it OFF returns to free dragging.
-                if (next) {
-                  pushHistory();
-                  setNodes(ns => ns.map(n => ({
-                    ...n,
-                    position: {
-                      x: Math.round(n.position.x / gridSize) * gridSize,
-                      y: Math.round(n.position.y / gridSize) * gridSize,
-                    },
-                  })));
-                }
-              }}
-            ><Magnet size={15} /></button>
-          </Tooltip>
-          <Tooltip label="Duplicate selection — Cmd/Ctrl+D">
-            <button className="tbtn-icon" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={15} /></button>
-          </Tooltip>
-          {sep()}
-          <Tooltip label="Auto-arrange the diagram into clean layers (animated, undoable)">
-            <button className="tbtn-icon" aria-label="Auto-layout diagram" onClick={autoLayout}><LayoutGrid size={15} /></button>
-          </Tooltip>
-          {sep()}
-
-          <div style={{position: 'relative'}}>
-            <Tooltip label="Export / Import — scope, format, theme and a live preview">
-              <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => setExpOpen(true)}>
-                <Upload size={13} style={{verticalAlign: -2}} /> Export
-              </button>
-            </Tooltip>
-          </div>
-
-          {sep()}
-          <button
-            type="button"
-            ref={settingsBtnRef}
-            className="tbtn-dd settings-btn"
-            data-settings-btn
-            aria-label="Settings"
-            aria-haspopup="dialog"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen(true)}
-          ><SettingsIcon size={14} /> Settings</button>
-
-          {/* AQ12 — align/distribute moved OFF the toolbar: they only mean
-              something WITH a selection, so they live on the selection bar
-              below (the toolbar kept duplicate, export, settings...). */}
-        </div>
-
-        {/* floating action bar for a 2+ node selection. AQ13 — redesigned:
-            ONE icon language (lucide at 15px everywhere — the old mix of
-            oversized Copy/Trash + skinny unicode arrows ⇤↔⇥ read as three
-            different bars glued together), a single-line count chip, and an
-            even gap rhythm from the flex container instead of ad-hoc seps. */}
-        {selCount >= 2 && (
-          <div className="sel-bar">
-            <span className="sel-count">{selCount}</span>
-            <span className="sel-count-label">selected</span>
-            {sep()}
-            <Tooltip label="Duplicate — Cmd/Ctrl+D">
-              <button className="tbtn-icon" aria-label="Duplicate selection" onClick={() => duplicateSelection()}><Copy size={15} /></button>
-            </Tooltip>
-            <Tooltip label="Delete — Del">
-              <button className="tbtn-icon" aria-label="Delete selection" onClick={deleteSelection}><Trash2 size={15} /></button>
-            </Tooltip>
-            {sep()}
-            <Tooltip label="Align left edges"><button className="tbtn-icon" aria-label="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align horizontal centers"><button className="tbtn-icon" aria-label="Align horizontal centers" onClick={() => align('hcenter')}><AlignCenterVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align right edges"><button className="tbtn-icon" aria-label="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button></Tooltip>
-            <Tooltip label="Align top edges"><button className="tbtn-icon" aria-label="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button></Tooltip>
-            <Tooltip label="Align vertical middles"><button className="tbtn-icon" aria-label="Align vertical middles" onClick={() => align('vcenter')}><AlignCenterHorizontal size={15} /></button></Tooltip>
-            <Tooltip label="Align bottom edges"><button className="tbtn-icon" aria-label="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button></Tooltip>
-            {sep()}
-            <Tooltip label="Distribute horizontally"><button className="tbtn-icon" aria-label="Distribute horizontally" onClick={() => distribute('h')}><AlignHorizontalSpaceAround size={15} /></button></Tooltip>
-            <Tooltip label="Distribute vertically"><button className="tbtn-icon" aria-label="Distribute vertically" onClick={() => distribute('v')}><AlignVerticalSpaceAround size={15} /></button></Tooltip>
-          </div>
-        )}
+        {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
+            in src/components/Toolbar.tsx; App threads every state/handler. */}
+        <Toolbar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
+          onFitView={() => rf?.fitView({padding: 0.25})}
+          readOnly={readOnly}
+          onToggleReadOnly={toggleReadOnly}
+          alignGuides={alignGuides}
+          onSetAlignGuides={setAlignGuides}
+          onSetGuides={setGuides}
+          snap={snap}
+          onSetSnap={setSnap}
+          onPushHistory={pushHistory}
+          onSetNodes={setNodes}
+          gridSize={gridSize}
+          onDuplicate={() => duplicateSelection()}
+          onAutoLayout={autoLayout}
+          onOpenExport={setExpOpen}
+          settingsOpen={settingsOpen}
+          onOpenSettings={setSettingsOpen}
+          settingsBtnRef={settingsBtnRef}
+          selCount={selCount}
+          onAlign={align}
+          onDistribute={distribute}
+          onDelete={deleteSelection}
+          sep={sep}
+        />
 
         {notice && <div className="toast">{notice}</div>}
 
@@ -4420,67 +4329,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
             Positioned absolute relative to the .react-flow container. */}
         {/* D2: keyboard cheat sheet */}
-        <Tooltip label="Keyboard shortcuts (?)">
-          <button
-            type="button"
-            ref={helpBtnRef}
-            className={`help-btn${help ? ' on' : ''}`}
-            aria-label="Keyboard shortcuts"
-            onClick={() => setHelp(h => !h)}
-          >?</button>
-        </Tooltip>
-        {help && (
-          <div className="help-pop" ref={helpRef}>
-            <h4>Shortcuts</h4>
-            {/* Item 3a: the tour entry point is the FIRST element in the sheet —
-                directly under the title and above the Keyboard group — so it is
-                the most discoverable thing in the popover. Its spacing moved
-                from its top to its bottom (see `.help-tour-btn` in styles.css). */}
-            <button type="button" className="help-tour-btn" onClick={() => { setHelp(false); setTourOpen(true); }}>
-              <Waypoints size={13} /> Take a tour
-            </button>
-            {/* ROUND BI, ITEM 3 — the SECOND action of the same block: the
-                feedback form, one click from the shortcuts sheet. Same
-                .help-tour-btn treatment (its own 8px bottom margin is the gap
-                between the two, so the pair reads as one block and no colour or
-                new class is introduced). The popover closes FIRST, exactly like
-                the tour button, so the dialog's own autofocus lands inside it
-                and Esc hands the caret back to this ? button. */}
-            <button
-              type="button"
-              className="help-tour-btn"
-              data-help-feedback
-              onClick={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
-            >
-              <MessageSquarePlus size={13} /> Send feedback
-            </button>
-            {/* Item 4: this sheet and Settings → Shortcuts must present the
-                SAME information — same two groups, same entries, same order,
-                same wording. Keys render as `kbd` chips; gestures render as
-                plain `.gesture` tokens (never chips), exactly as Settings does. */}
-            <div className="help-group">Keyboard</div>
-            <div className="help-row"><span>Undo</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>Z</kbd></span></div>
-            <div className="help-row"><span>Redo</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>Z</kbd></span></div>
-            <div className="help-row"><span>Delete selection</span><span className="help-keys"><kbd>Del</kbd></span></div>
-            <div className="help-row"><span>Copy / paste / duplicate</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>C</kbd><kbd>V</kbd><kbd>D</kbd></span></div>
-            <div className="help-row"><span>Deselect</span><span className="help-keys"><kbd>Esc</kbd></span></div>
-            <div className="help-row"><span>Fit view to diagram</span><span className="help-keys"><kbd>⇧</kbd><kbd>1</kbd></span></div>
-            <div className="help-row"><span>Toggle read-only review mode</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>
-            {/* the same hint Settings → Shortcuts shows on this row, so the two
-                surfaces carry the same information (item 4), not just the same
-                labels */}
-            <div className="help-row"><span>Nudge selection<span className="help-hint">1px per keypress, 10px with ⇧</span></span><span className="help-keys"><kbd>←↑↓→</kbd></span></div>
-            <div className="help-row"><span>Collapse / expand both panels</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>{'\\'}</kbd></span></div>
-            <div className="help-row"><span>Toggle left panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>[</kbd></span></div>
-            <div className="help-row"><span>Toggle right panel</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⌃</kbd><kbd>⇧</kbd><kbd>]</kbd></span></div>
-            <div className="help-group">Mouse &amp; trackpad</div>
-            <div className="help-row"><span>Insert node</span><span className="gesture"><span className="gesture-token">double-click canvas</span></span></div>
-            <div className="help-row"><span>Connect nodes</span><span className="gesture"><span className="gesture-token">drag from a node edge</span></span></div>
-            <div className="help-row"><span>Edit a connection</span><span className="gesture"><span className="gesture-token">click the edge</span></span></div>
-            <div className="help-row"><span>Select multiple</span><span className="gesture"><span className="gesture-token">⌘/Ctrl + click</span></span></div>
-            <div className="help-row"><span>Rename connection</span><span className="gesture"><span className="gesture-token">double-click the label</span></span></div>
-          </div>
-        )}
+        {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
+            (button + popover) lives in src/components/HelpSheet.tsx now;
+            App threads the open state, the two refs and the two openers. */}
+        <HelpSheet
+          btnRef={helpBtnRef}
+          popRef={helpRef}
+          open={help}
+          onToggle={() => setHelp(h => !h)}
+          onTakeTour={() => { setHelp(false); setTourOpen(true); }}
+          onSendFeedback={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
+        />
 
         {/* D1: searchable insert palette */}
         {searchPos && (
@@ -4491,105 +4350,62 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* ITEM 6b: the designed board dialog — create / rename / delete. Inside
-            `.canvas-wrap` beside the search palette and Settings, so its scrim
-            covers the canvas column and the two docked panels stay legible. */}
-        {boardDlg && (
-          <BoardDialog
-            mode={boardDlg}
-            boardName={curBoard?.name ?? ''}
-            onCancel={closeBoardDlg}
-            onSubmit={onBoardDialog}
-            returnFocusTo={boardsMenuBtnRef}
-            defaultName={boards.nextUntitledName(boardList.map(b => b.name))}
-            /* ROUND 6, ITEM 3 — the typed name is STASHED here before the gallery
-               opens, and consumed by `useTemplate` when a card is picked. This is
-               the line the defect lived on: it used to be
-               `() => { setBoardDlg(null); setTgOpen(true); }`, which dropped the
-               name on the floor, so `createFromTemplate` auto-numbered. */
-            onBrowse={(name) => { pendingBoardName.current = name; setBoardDlg(null); setTgOpen(true); }}
-          />
-        )}
-
-        {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery. Inside `.canvas-wrap`
-            beside the board dialog and Settings, so its scrim covers the canvas
-            column and the two docked panels stay legible. Mounted AFTER the
-            dialog, and above it via `.tg-overlay`'s z-index: the dialog is never
-            visible through the gallery — the open gallery's scrim covers it —
-            and the dialog is unmounted (not hidden) whenever the gallery is
-            opened from the boards menu, so exactly one of the two creates the
-            board and the other cannot be clicked behind a scrim. */}
-        {tgOpen && (
-          <TemplatesGallery
-            onCancel={closeGallery}
-            onUse={useTemplate}
-            returnFocusTo={boardsMenuBtnRef}
-          />
-        )}
-
-        {/* M2: the Settings dialog — inside .canvas-wrap, so the scrim covers
-            the canvas column only (the palette and inspector stay live). */}
-        <Settings
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          mode={mode}
-          onMode={chooseMode}
-          resolved={theme}
-          noCycles={noCycles}
-          onNoCycles={setNoCycles}
-          oneIn={oneIn}
-          onOneIn={setOneIn}
-          dblConnect={dblConnect}
-          onDblConnect={onDblConnect}
-          dblRange={dblRange}
-          onDblRange={onDblRange}
-          gridSize={gridSize}
-          onGridSize={onGridSize}
-          alignGuides={alignGuides}
-          onAlignGuides={setAlignGuides}
-          animate={animate}
-          onAnimate={toggleAnimate}
-          highlight={highlight}
-          onHighlight={toggleHighlight}
-          marquee={marqueeMode}
-          onMarquee={setMarqueeMode}
-          zOrder={zOrderMode}
-          onZOrder={setZOrderMode}
-          pngScale={pngScale}
-          onPngScale={onPngScale}
-          pngPad={pngPad}
-          onPngPad={onPngPad}
-          autosave={autosave}
-          onAutosave={onAutosave}
-          returnFocusTo={settingsBtnRef}
+        {/* ROUND BN-3 PHASE B: the five modal mounts (BoardDialog, gallery,
+            Settings, FeedbackDialog, ExportModal + the hidden JSON input) live
+            in src/components/ModalMounts.tsx; App computes every prop. */}
+        <ModalMounts
+          boardDlg={boardDlg}
+          curBoardName={curBoard?.name ?? ''}
+          onCancelBoardDlg={closeBoardDlg}
+          onSubmitBoardDlg={onBoardDialog}
+          returnFocusTo={boardsMenuBtnRef}
+          nextUntitledName={boards.nextUntitledName(boardList.map(b => b.name))}
+          onBrowseTemplates={(name) => { pendingBoardName.current = name; setBoardDlg(null); setTgOpen(true); }}
+          tgOpen={tgOpen}
+          onCloseGallery={closeGallery}
+          onUseTemplate={useTemplate}
+          settingsOpen={settingsOpen}
+          onCloseSettings={() => setSettingsOpen(false)}
+          settingsProps={{
+            mode,
+            onMode: chooseMode,
+            resolved: theme,
+            noCycles,
+            onNoCycles: setNoCycles,
+            oneIn,
+            onOneIn: setOneIn,
+            dblConnect,
+            onDblConnect,
+            dblRange,
+            onDblRange,
+            gridSize,
+            onGridSize,
+            alignGuides,
+            onAlignGuides: setAlignGuides,
+            animate,
+            onAnimate: toggleAnimate,
+            highlight,
+            onHighlight: toggleHighlight,
+            marquee: marqueeMode,
+            onMarquee: setMarqueeMode,
+            zOrder: zOrderMode,
+            onZOrder: setZOrderMode,
+            pngScale,
+            onPngScale,
+            pngPad,
+            onPngPad,
+            autosave,
+            onAutosave,
+            returnFocusTo: settingsBtnRef,
+            boardPng: nodes.length ? boardPngForFeedback : null,
+            onOpenFeedback: openFeedback,
+          }}
+          feedbackOpen={feedbackOpen}
+          onCloseFeedback={() => setFeedbackOpen(false)}
+          feedbackReturn={feedbackReturn}
           boardPng={nodes.length ? boardPngForFeedback : null}
-          onOpenFeedback={openFeedback}
-        />
-
-        {/* ROUND BI, ITEM 3 — the app's ONE feedback dialog (see the import and
-            the state above). Rendered here, inside `.canvas-wrap` beside
-            Settings, so its scrim covers the canvas column like every other
-            modal; `.fb-overlay`'s z-index (80) keeps it above the Settings
-            modal (70) and the help sheet (30) whichever opener started it. */}
-        {feedbackOpen && (
-          <FeedbackDialog
-            onCancel={() => setFeedbackOpen(false)}
-            returnFocusTo={feedbackReturn}
-            boardPng={nodes.length ? boardPngForFeedback : null}
-          />
-        )}
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          style={{display: 'none'}}
-          onChange={onImportFile}
-        />
-
-        <ExportModal
-          open={expOpen}
-          onClose={() => setExpOpen(false)}
+          expOpen={expOpen}
+          onCloseExport={() => setExpOpen(false)}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}
@@ -4598,7 +4414,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           buildSvg={buildSvg}
           buildPng={buildPng}
           printPdf={printPdf}
-          onImportJson={() => fileRef.current?.click()}
+          fileRef={fileRef}
+          onImportFile={onImportFile}
         />
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects
@@ -4825,30 +4642,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               and the board really has no nodes. `boardLoaded` is what stops a
               load in flight from claiming "This board is empty" over a canvas
               whose content is merely still on its way. */}
-          {boardLoaded && nodes.length === 0 && (
-            <Panel
-              position="top-center"
-              className="canvas-empty"
-              style={{marginTop: '12vh'}}
-            >
-              <div className="ce-title">
-                {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
-                    natural header, above the "This board is empty" title
-                    (.ce-logo, 240px hero, aspect-true 657:406, tokens only). pointer-events:none is
-                    inherited from .canvas-empty. */}
-                <img className="ce-logo" src="/brand/logo-mark.svg?v=2" alt="Gobigrams" width={240} height={148} />
-                This board is empty
-              </div>
-              <div className="ce-sub">
-                Drag a shape from the left panel onto the canvas, or
-                <br />
-                <b>double-click anywhere</b> to search and insert one.
-              </div>
-              <div className="ce-hint">
-                Then drag from a node's edge handle to connect · press <kbd>?</kbd> for shortcuts
-              </div>
-            </Panel>
-          )}
+          {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
+              and the board really has no nodes. `boardLoaded` is what stops a
+              load in flight from claiming "This board is empty" over a canvas
+              whose content is merely still on its way.
+              ROUND BN-3 PHASE B: the panel body lives in
+              src/components/CanvasEmptyPanel.tsx; the GATE stays here
+              (boot-no-flash pins it to App.tsx). */}
+          <CanvasEmptyPanel show={boardLoaded && nodes.length === 0} />
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}

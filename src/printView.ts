@@ -1,3 +1,4 @@
+/* feature-map home: src/printView.ts — the PDF print route (lazy chunk) */
 /* ROUND C — print route (Harvey-approved route (i)): a print stylesheet +
  * window.print(). Zero dependency; the BROWSER's own PDF engine embeds the
  * fonts properly and keeps the text selectable. This is a print VIEW the

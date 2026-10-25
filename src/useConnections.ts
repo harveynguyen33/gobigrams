@@ -6,7 +6,8 @@
  *  three id-mint sites, which call the `nextId` parameter instead of the
  *  App-module-level `idc` counter (App owns the counter and passes
  *  `() => idc++`); pendingDrop/connectOrigin/readOnlyRef/shiftDown refs and
- *  the edges/node state stay in App and pass down positionally — no context. */
+ *  the edges/node state stay in App and pass down positionally — no context.  (feature-map home: src/src/useConnections.ts)
+ */
 import {useCallback, useEffect} from 'react';
 import type * as React from 'react';
 import {addEdge, reconnectEdge} from '@xyflow/react';
