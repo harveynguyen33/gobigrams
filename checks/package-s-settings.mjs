@@ -33,6 +33,14 @@ const assert = (name, cond, detail = '') => {
 const css = () => readFileSync(join(ROOT, 'src/styles.css'), 'utf8');
 import {readFileSync} from 'node:fs';
 const appSource = () => readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* ROUND BN-2 — the autosave effect and flushSave moved VERBATIM from App.tsx
+   into src/usePersistence.ts; the S3 probes read the hook file. */
+const persistenceSource = () => readFileSync(join(ROOT, 'src/usePersistence.ts'), 'utf8');
+/* ROUND BN-2 REPLAY GUARD: usePersistence.ts exists only on the new tree. On
+   the pre-change replay worktree the file is absent, so S3's persistence
+   probes fall through to an empty string and read RED — exactly what the
+   replay needs. */
+const PERS_SOURCE = (() => { try { return persistenceSource(); } catch { return ''; } })();
 const settingsSource = () => readFileSync(join(ROOT, 'src/Settings.tsx'), 'utf8');
 const prefsSource = () => readFileSync(join(ROOT, 'src/prefs.ts'), 'utf8');
 
@@ -173,8 +181,9 @@ assert('S2.defaults-are-todays — the defaults are scale 2 and pad 48 (unchange
 {
   // blank comment before the probe
 }
+const pers = PERS_SOURCE;
 assert('S3.autosave-gate — the debounced effect returns early when autosave is off',
-  app.includes('if (!autosave) {') && app.includes('setDirty(true);') && app.includes('}, [nodes, edges, boardId, flushSave, autosave, canAutosave]);'),
+  pers.includes('if (!autosave) {') && pers.includes('setDirty(true);') && pers.includes('}, [nodes, edges, boardId, flushSave, autosave, canAutosave]);'),
   'the effect must gate on the persisted flag and mark the board dirty instead (dep array extended by ROUND AS AS-5: the explicit save gate re-runs the effect so a gate transition cannot strand a pending autosave)');
 
 {
@@ -188,7 +197,7 @@ assert('S3.dirty-marker — the save indicator renders an unsaved state while au
   // blank comment before the probe
 }
 assert('S3.flush-clears — flushSave clears the dirty flag',
-  /const flushSave = useCallback\(async \(\) => \{\s*\n\s*setDirty\(false\);/.test(app),
+  /const flushSave = useCallback\(async \(\) => \{\s*\n\s*setDirty\(false\);/.test(pers),
   'a flush (Save / Cmd+S / autosave) must resolve the marker');
 
 {

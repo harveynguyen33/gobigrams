@@ -52,13 +52,18 @@ ok('useEdgesState is seeded empty',
 //    Any other reference is a route by which the seed can paint mid-load.
 //    Count TOKENS, not lines: `nodes: initialNodes, edges: initialEdges` is one
 //    line but two references.
-const withoutSeedDecls = (appCode + stripComments(boardConstants)).replace(
+/* ROUND BN-2 — the first-run save path moved VERBATIM from App.tsx into
+   src/usePersistence.ts, so the seed-token census covers the hook too. */
+const persistence = readFileSync(`${ROOT}/src/usePersistence.ts`, 'utf8');
+const withoutSeedDecls = (appCode + stripComments(persistence) + stripComments(boardConstants)).replace(
   /(?:export )?const initialNodes: Node\[\][\s\S]*?\n\];\n(?:export )?const initialEdges: Edge\[\][\s\S]*?\n\];/, '');
 const seedUses = count(withoutSeedDecls, /initialNodes|initialEdges/g);
 const onFirstRunPath = count(withoutSeedDecls, /nodes: initialNodes, edges: initialEdges/g) * 2;
 ok('seed referenced only by the first-run save path',
   /* ROUND BN: +2 = the export declaration names in boardConstants' import
-     statement inside App.tsx — the seed's only remaining references. */
+     statement inside App.tsx — the seed's only remaining references.
+     ROUND BN-2: the first-run save path lives in usePersistence.ts now; the
+     +2 is its import statement's names instead — the census is unchanged. */
   seedUses === 6 && onFirstRunPath === 4 && seedUses - onFirstRunPath === 2,
   `${seedUses} uses outside the declarations, ${onFirstRunPath} of them on the create-board path`);
 
@@ -78,7 +83,7 @@ ok('seed still reads the architecture palette + edge factory',
 // d) The canvas is released on EVERY exit path of the bootstrap, so a load that
 //    fails does not leave a permanently blank board with no explanation.
 ok('boardLoaded exists and starts false', /const \[boardLoaded, setBoardLoaded\] = useState\(false\)/.test(app));
-const finallyBlock = /finally \{[\s\S]{0,400}?setBoardLoaded\(true\)/.test(app);
+const finallyBlock = /finally \{[\s\S]{0,400}?setBoardLoaded\(true\)/.test(persistence);
 ok('bootstrap releases the canvas in a finally', finallyBlock);
 
 // e) The empty-state panel is gated so a load in flight never shows it.

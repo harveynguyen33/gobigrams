@@ -198,11 +198,17 @@ assert('as6.b4.no-bak-on-missing-id', bakAfter === false,
  * through the spec's four cases (extracted from App.tsx source).
  * =========================================================================== */
 const APP_RAW = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+/* ROUND BN-2 — canAutosave, the autosave effect and flushSave moved VERBATIM
+   from App.tsx into src/usePersistence.ts; the as5 c1-c4/c6/c7 predicates are
+   probed against the hook source, applyBoard (c5) STAYS in App.tsx. */
+const PERS_RAW = (() => { try { return readFileSync(join(ROOT, 'src/usePersistence.ts'), 'utf8'); } catch { return ''; } })();
 const blank = m => m.replace(/[^\n]/g, ' ');
 const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, blank)
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 const APP = stripTs(APP_RAW);
+/* ROUND BN-2 — see PERS_RAW note above: empty on the pre-change replay tree. */
+const PERS = stripTs(PERS_RAW);
 const braceSpan = (src, start) => {
   let depth = 0, began = -1;
   for (let i = start; i < src.length; i++) {
@@ -212,27 +218,27 @@ const braceSpan = (src, start) => {
   return [began, src.length - 1];
 };
 
-const gateAnchor = APP.search(/const\s+canAutosave\s*=/);
-const gateSpan = gateAnchor >= 0 ? APP.slice(gateAnchor, gateAnchor + 400) : '';
+const gateAnchor = PERS.search(/const\s+canAutosave\s*=/);
+const gateSpan = gateAnchor >= 0 ? PERS.slice(gateAnchor, gateAnchor + 400) : '';
 assert('as5.c1.predicate-exists-and-is-named',
   gateAnchor >= 0 && /^const\s+canAutosave\s*=/.test(gateSpan),
-  gateAnchor >= 0 ? 'an explicit named predicate `canAutosave` is declared in App.tsx'
-                  : 'no named save-gate predicate found in App.tsx');
+  gateAnchor >= 0 ? 'an explicit named predicate `canAutosave` is declared in usePersistence.ts'
+                  : 'no named save-gate predicate found in usePersistence.ts');
 /* the gate is the LOADED FLAG + ID MATCH pair, stated once */
 assert('as5.c2.predicate-covers-loaded-and-id-match',
   /boardLoaded/.test(gateSpan) && /boardLoadedDocId/.test(gateSpan) && /curBoardRef\.current\?\.id/.test(gateSpan),
   'the predicate reads the loaded flag (boardLoaded), the loaded id (boardLoadedDocId) and the in-memory doc id');
 /* the implicit combination is replaced at the consumers */
-const effectAnchor = APP.indexOf("useEffect(() => {\n    /* AS-5");
-const effectSpan = effectAnchor >= 0 ? APP.slice(effectAnchor, effectAnchor + 900)
-  : APP.indexOf('if (!canAutosave) return;') >= 0
-    ? APP.slice(APP.indexOf('if (!canAutosave) return;') - 400, APP.indexOf('if (!canAutosave) return;') + 700)
+const effectAnchor = PERS.indexOf("useEffect(() => {\n    /* AS-5");
+const effectSpan = effectAnchor >= 0 ? PERS.slice(effectAnchor, effectAnchor + 900)
+  : PERS.indexOf('if (!canAutosave) return;') >= 0
+    ? PERS.slice(PERS.indexOf('if (!canAutosave) return;') - 400, PERS.indexOf('if (!canAutosave) return;') + 700)
     : '';
 assert('as5.c3.autosave-effect-uses-the-predicate',
-  APP.indexOf('if (!canAutosave) return;') >= 0 && effectSpan.includes('canAutosave') && effectSpan.includes('useEffect'),
+  PERS.indexOf('if (!canAutosave) return;') >= 0 && effectSpan.includes('canAutosave') && effectSpan.includes('useEffect'),
   'the autosave effect gates its schedule on `canAutosave` (not the bare boardId)');
-const flushAnchor = APP.indexOf('const flushSave = useCallback');
-const flushSpan = APP.slice(...braceSpan(APP, flushAnchor));
+const flushAnchor = PERS.indexOf('const flushSave = useCallback');
+const flushSpan = PERS.slice(...braceSpan(PERS, flushAnchor));
 assert('as5.c4.flushSave-uses-the-predicate',
   flushSpan.includes('canAutosave') || flushSpan.includes('boardLoadedDocId'),
   'flushSave gates the write on the loaded state, not just on a truthy curBoard');

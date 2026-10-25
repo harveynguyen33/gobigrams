@@ -1062,8 +1062,13 @@ assert('tg5.the-gallery-contains-no-board-mutation-call',
    create branch). The claim this assertion can honestly make is that the
    gallery added NO FIFTH — and the number is pinned here so a future round that
    adds one has to come and change it deliberately. */
-const createCallSites = (APP_RAW.match(/boards\.createBoard\(/g) ?? []).length;
-console.log(`  boards.createBoard call sites in App.tsx: ${createCallSites} (4 before this round: bootstrap / duplicate / delete-fallback / the dialog's create branch)`);
+/* ROUND BN-2 — the bootstrap's first-run create moved VERBATIM into
+   src/usePersistence.ts, so the census counts App.tsx + the hook together;
+   the pinned total stays 4. */
+const PERS_RAW = readFileSync(`${ROOT}/src/usePersistence.ts`, 'utf8');
+const createCallSites = ((APP_RAW.match(/boards\.createBoard\(/g) ?? []).length
+  + (PERS_RAW.match(/boards\.createBoard\(/g) ?? []).length);
+console.log(`  boards.createBoard call sites in App.tsx+usePersistence.ts: ${createCallSites} (4 before this round: bootstrap / duplicate / delete-fallback / the dialog's create branch)`);
 /* RE-ANCHORED, NOT DELETED — ROUND 3, and the reason is recorded. The old form
  *  of this assertion pinned the TWO-STEP handover: `useTemplate` set `boardPick`
  *  and opened the dialog, and the dialog received `initialPick={boardPick ?? ...}`.
