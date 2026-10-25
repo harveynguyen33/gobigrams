@@ -712,8 +712,12 @@ assert('item5.badge.preset-KEPT-because-shared',
   `still used by ${badgePresetUsers} element(s) in App.tsx (the inspector's C4 kicker chip) — rule kept on purpose`);
 /* The preset DATA must survive: behaviour drivers, not display. */
 const BEHAVIOUR = ['preset.edges', 'preset.layout', 'preset.id ===', "preset.id === 'erd'", 'preset.note'];
-const missing = BEHAVIOUR.filter(k => !SRC.App.includes(k));
-console.log(`preset BEHAVIOUR drivers still referenced: ${BEHAVIOUR.filter(k => SRC.App.includes(k)).join(', ')}`);
+/* ROUND BN-2 — the preset-driven handlers fanned out into the extracted
+   hooks (useConnections reads preset.edges, useCanvasTools reads
+   preset.layout); the census covers App + the hooks it spawned. */
+const ALL_SRC = SRC.App + '\n' + readFileSync(join(ROOT, 'src/useConnections.ts'), 'utf8') + '\n' + readFileSync(join(ROOT, 'src/useCanvasTools.ts'), 'utf8') + '\n' + readFileSync(join(ROOT, 'src/useExportActions.ts'), 'utf8') + '\n' + readFileSync(join(ROOT, 'src/usePersistence.ts'), 'utf8');
+const missing = BEHAVIOUR.filter(k => !ALL_SRC.includes(k));
+console.log(`preset BEHAVIOUR drivers still referenced: ${BEHAVIOUR.filter(k => ALL_SRC.includes(k)).join(', ')}`);
 assert('item5.preset-data-still-drives-behaviour', missing.length === 0,
   missing.length ? `MISSING: ${missing.join(', ')}` : `${BEHAVIOUR.length}/${BEHAVIOUR.length} drivers intact (edges, layout, erd, flowchart, c4 switches)`);
 

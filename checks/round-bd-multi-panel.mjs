@@ -36,13 +36,18 @@ import {fileURLToPath} from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const APP_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8');
+/* ROUND BN-2 — reorderSelection moved VERBATIM into src/useCanvasTools.ts;
+   the PASS 1 z-order count and the PASS 2 extraction read App + the hook
+   (concatenated), everything else (the JSX branches) stays on App alone. */
+const APP_CT_RAW = readFileSync(`${ROOT}/src/App.tsx`, 'utf8')
+  + '\n' + readFileSync(`${ROOT}/src/useCanvasTools.ts`, 'utf8');
 const CSS_RAW = readFileSync(`${ROOT}/src/styles.css`, 'utf8');
 
 /** Strip block + line comments. `[^:]` keeps `https://`. */
 const stripTs = s => s
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-const APP = stripTs(APP_RAW);
+const APP = stripTs(APP_CT_RAW); /* ROUND BN-2 — App + useCanvasTools (see APP_CT_RAW note) */
 
 const results = [];
 const assert = (id, pass, detail = '') => {
@@ -178,7 +183,10 @@ assert('bd1.no-stray-z-order-writes',
   'exactly ONE zIndex write (the band), three read-defaults, and only the zOrderMode plumbing — no second writer');
 
 /* --- (h) NEGATIVE CONTROL: single-node branches untouched ---------------- */
-const SINGLE = APP.slice(MULTI_END);
+/* ROUND BN-2 — SINGLE must stay a slice of App.tsx ALONE: the concatenated
+   APP now trails with useCanvasTools.ts, whose reorderSelection would be a
+   false "leak" into the single-node branches. */
+const SINGLE = stripTs(APP_RAW).slice(MULTI_END);
 assert('bd1.single-node-branches-no-multi-controls',
   countOf(SINGLE, 'reorderSelection') === 0 && countOf(SINGLE, 'multi-grid3') === 0
     && countOf(SINGLE, 'multi-grid2') === 0 && countOf(SINGLE, 'multi-danger') === 0,
