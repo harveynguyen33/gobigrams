@@ -41,7 +41,16 @@ function assert(name, ok, detail = '') {
 }
 function skipProbe(name, why) { skipped++; console.log(`  SKIP  ${name} — ${why}`); }
 
-const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+/* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
+   src/edges/GoblinEdge.tsx; the EdgeData type, the K2 flow-payload machinery and
+   the type registry moved to EdgeData.ts / flowPayloads.tsx / index.ts, verbatim).
+   Working-tree reads of the component now read the FOUR SLICES CONCATENATED so
+   every regex below still measures the same surface. Git reads (PRE_COMMIT)
+   keep the single file, which every pinned commit has. */
+const src = (p) => p === 'src/GoblinEdge.tsx'
+  ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
+      .map(f => readFileSync(resolve(ROOT, `src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`), 'utf8')).join('\n')
+  : readFileSync(resolve(ROOT, p), 'utf8');
 
 /* Comments are stripped before any CSS probe. `indexOf('.swatches {')` finds an
    occurrence INSIDE a comment this sheet legitimately quotes (`.swatches { display:

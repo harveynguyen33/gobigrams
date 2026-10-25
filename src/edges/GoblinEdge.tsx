@@ -8,7 +8,7 @@ import {
   type EdgeProps,
   type EdgeMarkerType,
 } from '@xyflow/react';
-import {COLOR_VAR, type ColorKey} from './colors';
+import {COLOR_VAR, type ColorKey} from '../colors';
 import {
   // ROUND T — the midpoint drag. A STORED waypoint routes through our own path
   // for the edge's own kind (they all read both coordinates); no waypoint routes
@@ -23,7 +23,7 @@ import {
   bendDraggable4, bendAxisFor, drawnMid, freePath, isFreeBendKind, needsCustom,
   bezierPath, straightPath,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
-} from './edgeBend';
+} from '../edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules, all pure, all executed by the
    harness: the anchor + its 2-D offset (AK-10), the three plate states (AK-12)
    and the reverse mirror (AK-15). ROUND AL's AL-2 deleted the rails that the
@@ -33,17 +33,17 @@ import {
   HANDLE_CLEAR_PX, LABEL_HALF_H_PX, anchorWrite, labelAnchor, labelBgClass,
   CENTRED, labelDragLockPx, movedBy, nudgeAlongPath, pathPoints,
   type LabelWrite,
-} from './edgeLabel';
+} from '../edgeLabel';
 /* ROUND AK, PASS 2 — ONE gesture for both affordances on this edge. See the
    file: it is the machinery `onBendDown` already owned (ROUND S/T/U), factored
    out so the bend handle and the label can never both start from one
    pointerdown. `GestureDown` is the shape a `claim`ed handler receives. */
-import {beginGesture, useEdgeGesture, type GestureDown} from './useEdgeGesture';
+import {beginGesture, useEdgeGesture, type GestureDown} from '../useEdgeGesture';
 /* ROUND AM, AM-2 — the label's TEXT STYLE, through the ONE emitter. `TextStyle`
    is the stored shape (`data.labelStyle`) and `edgeTextStyleVars` is the
    edge-label subset of `textStyleVars` — the same module the node path uses, so
    the label's Text section cannot become a second text vocabulary. */
-import {edgeTextStyleVars, type TextStyle} from './textStyle';
+import {edgeTextStyleVars, type TextStyle} from '../textStyle';
 
 /* ROUND AM, AM-3 — THE GLYPHS MOVED OUT, AND THIS FILE IS THE REASON. The six
    paths lived here, which meant the inspector could not show what the edge
@@ -52,7 +52,9 @@ import {edgeTextStyleVars, type TextStyle} from './textStyle';
    in `src/flowIcons.tsx` — React-Flow-free, so the panel can read it — and
    BOTH the renderer (here, below) and `App.tsx` read THAT file. The path data
    is untouched: only its address changed. */
-import {FLOW_ICON_PATHS} from './flowIcons';
+import {FLOW_ICON_PATHS} from '../flowIcons';
+import type {EdgeData} from './EdgeData';
+import {useFlowPayloads} from './flowPayloads';
 
 /**
  * ROUND T — how far the pointer must travel before the drag's axis is locked.
@@ -162,153 +164,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  the anchor follows the geometry, the zoom and the stored offset. */
   const anchorRef = useRef<Pt | null>(null);
 
-  const d = (data ?? {}) as {
-    shape?: string;
-    /* PACKAGE-SEQ — the UML message kind. Overrides the arrowhead + dash so a
-       sequence edge ALWAYS renders with the notation's semantics, whatever the
-       board defaults were: sync = solid + closed head, async = solid + open,
-       return/self = dashed + open. Colour follows the edge's own stroke. */
-    seqMsg?: 'sync' | 'async' | 'return' | 'self';
-    offset?: 'center' | 'start' | 'end';
-    flow?: 'none' | 'dots' | 'dash' | 'pulse' | 'icon';
-    flowIcon?: 'mail' | 'package' | 'file' | 'zap' | 'settings' | 'database';
-    flowCount?: number;
-    flowDuration?: number;
-    /** L1: symbolic stroke key — resolved per theme. */
-    strokeKey?: ColorKey;
-    /** L1: literal user-typed hex fallback. */
-    color?: string;
-    /** L3b: C4 relationship technology, rendered dim after the label. */
-    techn?: string;
-    /** ROUND AM, AM-2 — the label's TEXT STYLE (size / weight / font), the same
-     *  `TextStyle` a node stores on `data.textStyle`. ABSENT is the normal state
-     *  and the one every existing board is in: `edgeTextStyleVars` returns `{}`,
-     *  no custom property is emitted, and the sheet's own fallbacks paint the
-     *  11px / 600 / `var(--mono)` the label has always used. The edge's text
-     *  COLOUR is deliberately not part of it — that is `labelTextKey` below. */
-    labelStyle?: TextStyle;
-    onCommitLabel?: (id: string, v: string) => void;
-    /** F2: timestamp signal from the context menu to open the label editor */
-    __edit?: number;
-    /** FB-L: review mode, threaded through per-edge data exactly like `__type`.
-     *  The label stays readable; its editor must stay shut. */
-    readOnly?: boolean;
-    /** STEP 1 (2026-09-18): the step's cross-bar position, the fraction
-     *  `getSmoothStepPath` calls `stepPosition` (0..1). READ-ONLY LEGACY as of
-     *  ROUND T — the slider that wrote it was removed, and nothing writes it any
-     *  more; it is read only so an old board's fraction still renders exactly as
-     *  it did. ABSENT (not 0.5) is the default on purpose: `stepPosition:
-     *  undefined` resolves to React Flow's own 0.5 inside the generator, so a
-     *  board that never carried a `bend` renders byte-identical. */
-    bend?: number;
-    /** ROUND S/T (2026-09-18): the ABSOLUTE 2-D point the midpoint was dragged
-     *  to, one key per axis. Both are meaningful: `freePath` reads `W.x` and
-     *  `W.y`, and a drag on one axis preserves the other key
-     *  (`edgeBend.applyDrag`). Absent means "never dragged". */
-    bendX?: number;
-    bendY?: number;
-    /** ROUND S/T: the drag callback, threaded per-edge exactly like
-     *  `onCommitLabel` — the handler lives in `App` because it writes `edges`
-     *  state; this component only reports where the pointer went AND which way it
-     *  is travelling (`dx`/`dy` in flow units), because the axis decision is
-     *  draw.io's pointer rule and the handler owns the writer. */
-    __onBend?: (id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => void;
-    /** ROUND AK, AK-10 — the FREE 2-D label position, in RELATIVE flow px,
-     *  applied ADDITIVELY to the anchor `labelAnchor` derives. ABSENT (not
-     *  `{0,0}`) is the default on purpose: a board that never moved its label
-     *  carries no key and renders exactly as it did.
-     *
-     *  RELATIVE, not absolute. Sirius Web and Aleph both store the ABSOLUTE
-     *  point and re-derive the fraction; ours is relative because the anchor is
-     *  already derived here (from the path generator's own label), so a relative
-     *  offset is the only shape that survives a node move, a re-route or a
-     *  resize without a rewrite. That is a design judgement, recorded as such in
-     *  the round's research (§7). */
-    labelOffset?: {x: number; y: number};
-    /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While FALSY the label
-     *  auto-centres exactly as it always did; once true, `labelOffset` wins.
-     *  Written by the drag, cleared by `Reset label position` (AK-14.1) and by
-     *  the snap-to-centre rail (AK-14.2) — which is why the snap and the reset
-     *  land on the SAME state instead of two that merely look alike. */
-    labelPinned?: boolean;
-    /** ROUND AM, AM-1 — THE POINT the stored `labelOffset` was measured
-     *  against, in flow coordinates: `App` writes it from the write's own
-     *  `labelAnchor` and it exists so the offset can be REBASED when that point
-     *  moves (a node dragged mid-gesture, or any geometry change that shifts the
-     *  anchor). ABSENT is the normal state for a board written before this round
-     *  and for a centred label — and an absent anchor simply means "nothing to
-     *  rebase against", which is why NO board migrates: the renderer never reads
-     *  this key, it only stores it. */
-    labelAnchor?: {x: number; y: number};
-    /** ROUND AK, AK-12 — the label plate, THREE STORED STATES (`None` is a real
-     *  value, not the absence of one). Rendered as a CLASS on `.edge-label`,
-     *  never as an inline SVG fill: React Flow's own `labelBgStyle` is an
-     *  SVG-`<rect>` API and this label is a DOM `<div>` through
-     *  `EdgeLabelRenderer`, so copying that prop verbatim would be wrong. */
-    labelBg?: 'none' | 'surface' | 'outline';
-    /** ROUND AL, AL-3 — the label's TEXT colour, as a symbolic key. Resolved
-     *  through `COLOR_VAR` like `strokeKey`, so a theme change repaints it for
-     *  free. ABSENT is the default and falls back to the sheet's `var(--fg)`,
-     *  which is the colour `.edge-label` has always used — so a board that never
-     *  carried the key renders exactly as it did. */
-    labelTextKey?: ColorKey;
-    /** ROUND AL, AL-3 — the label PLATE's colour, as a symbolic key. Only
-     *  MEANINGFUL while `labelBg` is not `none`: at `none` there is no plate for
-     *  it to paint, which is why the PANEL hides the row in that state. ABSENT
-     *  leaves the plate to the class (the three-state `.lb-*` rules), so nothing
-     *  changes for a board that never carried it. */
-    labelBgKey?: ColorKey;
-    /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
-     *  `__onBend`, and its shape follows `__onBend`'s own lesson: the writer
-     *  takes the RESULT, not the pointer.
-     *
-     *  `__onBend` is handed the pointer's flow position and `App` re-derives the
-     *  rest, because the bend lives in the STORED keys and `App` owns them. The
-     *  label cannot work that way: what the label stores is `labelOffset` —
-     *  relative to the ANCHOR — and the anchor comes from the path generator's
-     *  own label, which only this component has. So the WRITE is computed here,
-     *  because this is the only side that holds the resolved anchor; `App`
-     *  receives the finished pair and merges it. That keeps ONE derivation of the
-     *  geometry instead of a second, divergent copy in `App`.
-     *
-     *  ROUND AM, AM-1 — THE FORM IT IS COMPUTED IN. The gesture's write is
-     *  `anchorWrite` (a DELTA: the pointer's displacement from the reference
-     *  point, plus the `labelAnchor` frame it was measured in). `labelWrite`
-     *  survives as the ABSOLUTE form and is reached from only two places, both of
-     *  which mean the centred state — this component's `onStart` and its
-     *  create-on-double-click commit. See `src/edgeLabel.ts` for which caller
-     *  uses which and why. */
-    __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
-    /** ROUND AK, AK-13 — the double-click-on-the-PATH signal, threaded per-edge
-     *  like `__edit` above but carrying a POSITION: a fresh timestamp AND the
-     *  flow point the click landed on. A double-click on a line with no label
-     *  has nothing to edit yet, so the editor has to be opened here (the element
-     *  does not exist yet) and the committed text has to know WHERE it was
-     *  created. `__edit` keeps its own meaning — the context menu's "Edit
-     *  label" on an EXISTING label — and is not overloaded.
-     *
-     *  ROUND AN, AN-1 — IT IS A ONE-SHOT, AND EVERY EXIT CONSUMES IT. See the
-     *  long note on `commit`/`cancel` below: the key was written by exactly one
-     *  place and deleted by none, so it stayed on the edge forever and every
-     *  later RENAME re-entered the create branch and re-centred the label. */
-    __editAt?: {at: Pt; t: number};
-    /** ROUND AN, AN-1 — CONSUME THE CREATE SIGNAL, one per-edge callback for
-     *  BOTH exits of the editor (commit and cancel).
-     *
-     *  WHY A CALLBACK RATHER THAN CLEARING IT HERE. The signal lives in the
-     *  edge's own `data`, and this component does not own `edges` state — the
-     *  same reason `__onLabelWrite` and `onCommitLabel` are threaded in from
-     *  `App`. It is deliberately NOT a second writer of `__editAt` either: the
-     *  renderer never writes the key, it only tells `App` the moment is over,
-     *  so `openLabelAt` stays the signal's only writer and the deletion has one
-     *  home.
-     *
-     *  IT IS SEPARATE FROM `__onLabelWrite` ON PURPOSE. Cancel writes NOTHING —
-     *  a double-click whose editor is dismissed with Escape must leave the
-     *  document untouched — so it cannot reach the consume through the write
-     *  path. One named operation, two exits, no sentinel write form. */
-    __consumeEditAt?: (id: string) => void;
-  };
+  const d = (data ?? {}) as EdgeData;
 
   /** FB-L: one reader for the mode, used by both editor entry points. */
   const ro = !!d.readOnly;
@@ -898,86 +754,11 @@ const GoblinEdge = memo((props: EdgeProps) => {
   const flowCount = Math.max(1, Math.min(6, d.flowCount ?? 3));
   const flowDur = Math.max(0.6, Math.min(8, d.flowDuration ?? 2.4));
 
-  // K2: each edge gets its own random 0–1s start offset so parallel edges do
-  // not animate in lockstep. Stable for the lifetime of the edge.
-  const randomDelay = useMemo(() => Math.random(), []);
+  /* ROUND BN-4 — the K2 payload machinery now lives in ./flowPayloads.tsx
+     (useFlowPayloads); the call below is the same memo the renderer body
+     always ran, verbatim arguments. */
+  const payloads = useFlowPayloads({path, id, flow, flowCount, flowDur, stroke, flowIcon: d.flowIcon});
 
-  /* ROUND AK, AK-13 — DOUBLE-CLICKING THE LINE ITSELF is handled at the EDGE
-     GROUP, by React Flow's own `onEdgeDoubleClick` (see `App`). It is NOT wired
-     here, and the reason is structural rather than an omission:
-
-       * React Flow renders ONE `<g class="react-flow__edge">` per edge and puts
-         the double-click handler on it, so the library already covers the whole
-         edge — the authored stroke, and the 26px `interactionWidth` band
-         `BaseEdge` draws above it that a finger actually lands on. A handler on
-         the authored `<path>` alone would sit UNDER that band and, being painted
-         first, would rarely receive the event at all.
-       * The `pointer-events: visibleStroke` test on that group IS the hit-test
-         AK-13 asks for ("hit-test the double-click position against the edge's
-         own resolved path"). Re-deriving it in JS would be a second, divergent
-         copy of a rule the library owns and this app already depends on.
-       * The "inside an existing label's box" exclusion is done by the DOM, not
-         by arithmetic: the label is painted by `EdgeLabelRenderer` into
-         `.react-flow__edgelabel-renderer`, a SIBLING of the edge layer, so its
-         own `onDoubleClick` (above) catches that case and the event never
-         reaches the edge group. That is exactly the exclusion draw.io makes
-         before creating a new label.
-
-     What this component contributes is the OTHER half of AK-13: the editor that
-     the group's double-click opens (`__editAt` above), and the position the
-     commit stores when the label is created and left empty. */
-
-  /** K2: stagger `i` of `n` payloads — random edge offset + even spacing. */
-  const begin = (i: number) => `${(randomDelay + (flowDur / flowCount) * i).toFixed(3)}s`;
-
-  // K2: the SMIL subtree is rebuilt only when the geometry or the flow props
-  // actually change (React Flow re-runs the edge body on every pan/zoom tick).
-  const payloads = useMemo(() => {
-    if (flow !== 'dots' && flow !== 'icon') return null;
-
-    /* ROUND AK, AK-16 — THE `event` BRANCH IS DELETED, AND SO IS ITS ENVELOPE.
-       `flow:'event'` drew this 16×12 envelope while `flow:'icon'` with the
-       `mail` glyph drew a 24×20 chip carrying... an envelope. Two names, one
-       picture. The option is gone from the panel and `migrateEdge` folds a
-       stored `event` onto `icon` + `mail` on READ, so the old envelope is now
-       drawn by the `icon` branch's `FLOW_ICON_PATHS.mail` glyph and needs no
-       code of its own here. Dead code left "just in case" is how a removed
-       option comes back. */
-
-    return Array.from({length: flowCount}).map((_, i) => {
-      const motion = (
-        // `dur` MUST be a SMIL time string — a bare number is parsed as seconds.
-        <animateMotion
-          dur={`${flowDur}s`}
-          repeatCount="indefinite"
-          path={path}
-          begin={begin(i)}
-          rotate={flow === 'dots' ? 'auto' : '0'}
-        />
-      );
-      if (flow === 'dots') {
-        return (
-          <g key={i} className="edge-flow-dot"
-            style={{filter: `drop-shadow(0 0 4px ${stroke})`}}>
-            {motion}
-            <circle r={3} fill={stroke} />
-          </g>
-        );
-      }
-      return (
-        <g key={i} className="edge-flow-icon">
-          {motion}
-          {/* a small chip carrying an icon glyph — "a message being delivered" */}
-          <rect x={-12} y={-10} width={24} height={20} rx={5}
-            fill="var(--elevated)" stroke={stroke} strokeWidth={1.6} />
-          <g transform="translate(-7,-7) scale(0.6)" fill="none"
-            stroke={stroke} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            {FLOW_ICON_PATHS[d.flowIcon ?? 'mail']}
-          </g>
-        </g>
-      );
-    });
-  }, [path, id, flow, flowCount, flowDur, stroke, randomDelay, d.flowIcon]);
 
   /* PACKAGE-SEQ — derive the message-kind overrides once per render. The head
      type values mirror what makeEdge builds for plain markers: sync gets the
@@ -1257,18 +1038,5 @@ const GoblinEdge = memo((props: EdgeProps) => {
 });
 
 GoblinEdge.displayName = 'GoblinEdge';
-
-/** Registry injected into ReactFlow. The four conventional path ids all render the
- *  same editable component, so switching curvature never loses the styled label. */
-export const edgeTypes = {
-  goblinEdge: GoblinEdge,
-  bezier: GoblinEdge,
-  smoothstep: GoblinEdge,
-  step: GoblinEdge,
-  straight: GoblinEdge,
-};
-
-/** Every edge type this app registers. */
-export const EDGE_TYPES = ['goblinEdge', 'bezier', 'smoothstep', 'step', 'straight'] as const;
 
 export default GoblinEdge;

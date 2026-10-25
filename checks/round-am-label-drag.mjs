@@ -54,7 +54,16 @@ const f2 = n => (Number.isFinite(n) ? n.toFixed(4) : String(n));
 const M = await import(`${ROOT}/src/edgeLabel.ts`);
 
 /* ---------- the source texts ---------- */
-const read = p => readFileSync(`${ROOT}/${p}`, 'utf8');
+/* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
+   src/edges/GoblinEdge.tsx; the EdgeData type, the K2 flow-payload machinery and
+   the type registry moved to EdgeData.ts / flowPayloads.tsx / index.ts, verbatim).
+   Working-tree reads of the component now read the FOUR SLICES CONCATENATED so
+   every regex below still measures the same surface. Git reads (PRE_COMMIT)
+   keep the single file, which every pinned commit has. */
+const read = p => p === 'src/GoblinEdge.tsx'
+  ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
+      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+  : readFileSync(`${ROOT}/${p}`, 'utf8');
 const APP = read('src/App.tsx');
 const EDGE = read('src/GoblinEdge.tsx');
 const LIB_SRC = read('src/edgeLabel.ts');

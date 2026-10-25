@@ -39,7 +39,16 @@ const stripComments = (src) =>
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
     .replace(/^[ \t]*\{?\/\*[\s\S]*?\*\/\}?[ \t]*$/gm, '');
 
+/* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/; a working-tree read
+   of the component returns the FOUR SLICES CONCATENATED so the AR8 element.ref
+   probe still covers the whole renderer surface. */
 const read = (p) => {
+  if (p === 'src/GoblinEdge.tsx') {
+    try {
+      return ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
+        .map(f => readFileSync(join(ROOT, `src/edges/${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`), 'utf8')).join('\n');
+    } catch { return null; }
+  }
   try { return readFileSync(join(ROOT, p), 'utf8'); } catch { return null; }
 };
 

@@ -64,7 +64,15 @@ const blankComments = src => src
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
 
-const read = p => readFileSync(`${ROOT}/${p}`, 'utf8');
+/* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
+   src/edges/GoblinEdge.tsx; EdgeData type, K2 payload machinery and the type
+   registry moved out verbatim). Working-tree reads of the component read the
+   FOUR SLICES CONCATENATED; git reads (codeAt/PRE_COMMIT) keep the single
+   file every pinned commit has. */
+const read = p => p === 'src/GoblinEdge.tsx'
+  ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
+      .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+  : readFileSync(`${ROOT}/${p}`, 'utf8');
 /* ROUND BN PHASE A re-anchor: the AN-5 undo/redo cluster moved to
    src/useUndoHistory.ts; the probes below read App PLUS the hook. */
 const readHook = p => { try { return read(p); } catch { return ''; }; };

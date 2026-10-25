@@ -45,7 +45,7 @@ import DiagramNode, {type NodeKind} from './DiagramNode';
 import LabelNode, {type LabelKind} from './LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
 import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNode';
-import {edgeTypes} from './GoblinEdge';
+import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
 import Tooltip from './Tooltip';

@@ -35,9 +35,17 @@ const blankComments = s => s
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
 
+/* ROUND BN-4 — src/GoblinEdge.tsx split into src/edges/ (component moved to
+   src/edges/GoblinEdge.tsx; EdgeData type, K2 payload machinery and the type
+   registry moved out verbatim). Working-tree reads of the component read the
+   FOUR SLICES CONCATENATED; git reads keep the single file every pinned
+   commit has. */
 const readAt = (rel, commit) => commit
   ? execFileSync('git', ['show', `${commit}:${rel}`], {cwd: ROOT, encoding: 'utf8'})
-  : readFileSync(`${ROOT}/${rel}`, 'utf8');
+  : rel === 'src/GoblinEdge.tsx'
+    ? ['GoblinEdge', 'EdgeData', 'flowPayloads', 'index']
+        .map(f => readFileSync(`${ROOT}/src/edges/${f}${f === 'EdgeData' || f === 'index' ? '.ts' : '.tsx'}`, 'utf8')).join('\n')
+    : readFileSync(`${ROOT}/${rel}`, 'utf8');
 const safeReadAt = (rel, commit) => {
   try { return readAt(rel, commit); } catch { return ''; }
 };

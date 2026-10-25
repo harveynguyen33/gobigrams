@@ -56,7 +56,14 @@ const BUDGETS = new Map([
   ['src/DiagramNode.tsx', 655],  // now 595,
   ['src/ExportModal.tsx', 325],  // now 295,
   ['src/FeedbackDialog.tsx', 310],  // now 281,
-  ['src/GoblinEdge.tsx', 1274, 'hard'],  // hard cap at current: may NEVER grow,
+  // ROUND BN-4 — GoblinEdge.tsx (hard 1274) split into src/edges/: the type
+  // declaration, the K2 payload machinery and the registry moved out verbatim;
+  // the component itself (the part a dozen harnesses pin spellings inside)
+  // moved to src/edges/GoblinEdge.tsx.
+  ['src/edges/GoblinEdge.tsx', 1050],  // now 1042
+  ['src/edges/EdgeData.ts', 165],  // now 158
+  ['src/edges/flowPayloads.tsx', 100],  // now 95
+  ['src/edges/index.ts', 30],  // now 20
   ['src/HelperLinesView.tsx', 58],  // now 52,
   ['src/IconPicker.tsx', 129],  // now 117,
   ['src/InspectorPickers.tsx', 930],  // now 845,
