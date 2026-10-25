@@ -155,4 +155,28 @@ not a rule dump — the rules live in one executable place, and facts beat requi
 - **The referenced standard**, if configured, is named by `practice:` in the gob block.
   Read it before starting work; this repo carries no copy of it.
 
+## Code structure rules
+
+These rules exist to stop the god-file pattern. Research basis: ESLint `max-lines`
+guidance (100–500 lines/file is the industry norm), bulletproof-react's layered
+`src/` structure, and Robin Wieruch's split-when-reusable rule.
+
+- **No file under `src/` may exceed its file-size-gate budget.** The SOURCE OF
+  TRUTH for every budget is the `BUDGETS` map in `checks/file-size-gate.mjs` —
+  if this section and that table disagree, the table wins.
+- **New files default to a 400-line budget**; unbudgeted files fail the gate.
+- **Budgets ratchet DOWN over time.** Each extraction round lowers its target's
+  budget to the new measured size. The four hard-capped files (`App.tsx`,
+  `presets.ts`, `GoblinEdge.tsx`, `exportSvg.ts`) may NEVER grow — not one line.
+- **`App.tsx` must shrink each round that touches it.** Long-term target: domain
+  hooks (`useUndoHistory`, `usePersistence`, `useConnections`, `useExportActions`,
+  `useCanvasTools`, `useBoardsMenu`…), then the big JSX panels into component
+  files, prop-threading explicit (no context/store). ROUND BN extracted the
+  module-level helpers (`boardConstants.ts`, `boardMigrations.ts`, `boardUtils.tsx`)
+  plus `useUndoHistory`; later phases continue.
+- **A component becomes its own file when it is reused OR when its parent file
+  exceeds budget** (Robin Wieruch's rule).
+- **Don't split for taste.** Splitting must improve reuse, reading, or stay
+  within budget — otherwise the file stays as it is.
+
 One thing this repo does not do: it does not write outside its own tree.
