@@ -104,6 +104,7 @@ import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
 import Tour from './dialogs/Tour';
 import {HelpSheet} from './components/HelpSheet';
+import {RotateInternalsBridge} from './components/RotateInternalsBridge';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
@@ -844,8 +845,12 @@ export default function App() {
     nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
 
   /* ROUND ROTATE — the rotation write cluster (grip gesture + selection
-     chord; one undo entry per gesture — see src/useRotation.ts). */
-  const [onRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory);
+     chord; one undo entry per gesture — see src/useRotation.ts).
+     ROUND ROTATE-FIX — the edge re-measure: updateNodeInternals reads the
+     React Flow store from CONTEXT and would throw above <ReactFlow>, so the
+     bridge (rendered inside it) fills this ref and useRotation owns WHEN. */
+  const rotateInternals = useRef<((ids: string | string[]) => void) | null>(null);
+  const [onRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory, rotateInternals);
 
   // ---- clipboard (copy / paste / duplicate) ----
   const clipboard = useRef<Snap | null>(null);
@@ -4680,6 +4685,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               src/components/CanvasEmptyPanel.tsx; the GATE stays here
               (boot-no-flash pins it to App.tsx). */}
           <CanvasEmptyPanel show={boardLoaded && nodes.length === 0} />
+          {/* ROTATE-FIX: hands the store's updateNodeInternals up (the hook
+              needs a provider ancestor; App is above <ReactFlow>). */}
+          <RotateInternalsBridge onReady={u => { rotateInternals.current = u; }} />
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}

@@ -185,3 +185,36 @@ export function snapRotation(deg: number, snap: boolean, step: number): number {
   if (!snap) return deg;
   return norm180(Math.round(deg / step) * step);
 }
+
+/* ROTATE-FIX — THE GRIP GESTURE AS PURE MATH.
+ *
+ * The pre-fix grip computed its start bearing inside an object literal that was
+ * evaluated BEFORE it was assigned:
+ *     live.current = {startAngle: bearing(x, y), moved: false, ...c}
+ * so `bearing()` read the PREVIOUS live.current — cx/cy = 0 on the first
+ * gesture — and the grab angle was measured around the CANVAS ORIGIN while
+ * every later frame was measured around the node centre. That one ordering bug
+ * is both reported symptoms: a tiny drag jumped by a chunk and the content
+ * flipped ~180-360°. Taking the centre as an ARGUMENT makes the ordering
+ * impossible to get wrong, and makes the whole gesture a golden. */
+
+/** Gesture anchor: the node CENTRE (flow space) + the pointer's bearing at grab. */
+export type RotateBegin = {cx: number; cy: number; bearing: number};
+
+/** The pointer's bearing around `(cx, cy)`, in degrees (atan2 convention:
+ *  0° = east, 90° = south — screen y grows down, the CSS/SVG sense). */
+export function bearingTo(cx: number, cy: number, px: number, py: number): number {
+  return (Math.atan2(py - cy, px - cx) * 180) / Math.PI;
+}
+
+/** Anchor a grip gesture: the CENTRE first (an argument, never a stored
+ *  field), then the grab bearing. */
+export function beginRotate(cx: number, cy: number, px: number, py: number): RotateBegin {
+  return {cx, cy, bearing: bearingTo(cx, cy, px, py)};
+}
+
+/** The TOTAL angle from the grab point to `(px, py)`, wrapped the SHORT way —
+ *  a move across the ±180° seam is a small delta, never ∓180. */
+export function rotateDelta(b: RotateBegin, px: number, py: number): number {
+  return norm180(bearingTo(b.cx, b.cy, px, py) - b.bearing);
+}

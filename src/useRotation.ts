@@ -20,6 +20,7 @@
 import {useCallback, useRef} from 'react';
 import type * as React from 'react';
 import type {Node} from '@xyflow/react';
+import type {UpdateInternals} from './components/RotateInternalsBridge';
 import {
   newRotateGuard, recordRotateGesture, rotateMembersAround, norm180,
   type RotateGuard,
@@ -31,10 +32,23 @@ export function useRotation(
   nodesRef: React.MutableRefObject<Node[]>,
   setNodes: SetNodes,
   pushHistory: () => void,
+  /** ROTATE-FIX — the updater from RotateInternalsBridge: the hook needs a
+   *  ReactFlowProvider ancestor and this hook is called ABOVE `<ReactFlow>`,
+   *  so App owns the ref and the bridge (a `<ReactFlow>` child) fills it. */
+  internals: React.MutableRefObject<UpdateInternals | null>,
 ) {
   const guard = useRef<RotateGuard>(newRotateGuard());
   /** gesture-start geometry per node id (rotation + position for cancel). */
   const start = useRef<Map<string, {rotation: number; x: number; y: number}>>(new Map());
+  /* ROTATE-FIX — EDGES FOLLOW THE SHAPE. A rotation is a `data` change, and a
+   * data change does NOT re-measure a node's handle bounds: React Flow keeps
+   * the old `handleBounds` and every edge keeps its old endpoint coordinates.
+   * The store only rewrites them through updateNodeInternals({force:true}),
+   * reached via the bridge's hook (it measures inside a requestAnimationFrame,
+   * i.e. AFTER React has painted the new transform, so calling it right after
+   * the state write is the correct order). One call, one policy: every write
+   * below goes through here. */
+  const updateNodeInternals = (ids: string | string[]) => internals.current?.(ids);
 
   /** Write one node's rotation; 0 DELETES the field so untouched boards stay
    *  byte-identical (no `rotation: 0` in saved JSON). */
@@ -42,6 +56,7 @@ export function useRotation(
     setNodes(ns => ns.map(n => n.id === id
       ? {...n, data: {...(n.data as Record<string, unknown>), rotation: rotation || undefined}}
       : n));
+    updateNodeInternals(id);
   };
 
   /** The GRIP gesture writer. `delta` is the TOTAL angle since gesture
@@ -63,15 +78,21 @@ export function useRotation(
       return;
     }
     /* end | cancel: cancel restores the pre-gesture geometry (the history
-     * entry stays — same contract as a cancelled resize); both re-arm. */
+     * entry stays — same contract as a cancelled resize); both re-arm.
+     * ROTATE-FIX — the per-frame re-measure races the React commit of the
+     * LAST delta (the rAF can run before the final transform is painted), so
+     * the gesture measured the final frame again here: a fresh rAF scheduled
+     * from pointerup lands after that commit. Measured live: without this the
+     * edges stopped ~9° short of a 57° drag. */
     if (phase === 'cancel') {
       setNodes(ns => ns.map(n => n.id === id
         ? {...n, position: {x: s0.x, y: s0.y},
            data: {...(n.data as Record<string, unknown>), rotation: s0.rotation || undefined}}
         : n));
     }
+    updateNodeInternals(id);
     recordRotateGesture(guard.current, {end: true});
-  }, [nodesRef, setNodes, pushHistory]);
+  }, [nodesRef, setNodes, pushHistory, internals]);
 
   /** The CHORD writer: ±`deg` on the selection. ONE node = its own rotation
    *  delta; MANY = each member keeps its own rotation delta while its centre
@@ -99,7 +120,10 @@ export function useRotation(
       return {...n, position: {x: m.x, y: m.y},
         data: {...(n.data as Record<string, unknown>), rotation: m.rotation || undefined}};
     }));
-  }, [nodesRef, setNodes, pushHistory]);
+    /* ROTATE-FIX — once per MEMBER: every rotated node's handle bounds moved,
+       so every edge touching one of them must re-resolve. */
+    updateNodeInternals(next.map(m => m.id));
+  }, [nodesRef, setNodes, pushHistory, internals]);
 
   return [onRotateGesture, rotateSelection] as const;
 }

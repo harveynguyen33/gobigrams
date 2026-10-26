@@ -514,9 +514,11 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      and the CSS `rotate` property would compose before the wrapper's
      translate and orbit the canvas origin). null at 0° keeps the style key
      off untouched nodes entirely. The four NodeHandles are DOM children, so
-     their client rects rotate with this transform and React Flow re-resolves
-     edges at the rotated port sites (updateNodeInternals fires on the
-     data-driven re-render through useNodeObserver's effect). */
+     their client rects rotate with this transform — but a DATA change never
+     re-measures them, so App's rotation writer (useRotation) calls React
+     Flow's updateNodeInternals after every write; without that call the
+     handleBounds (and therefore every edge endpoint) stay at the unrotated
+     port, which is exactly the "arrow does not follow the rotation" report. */
   /* ROUND ROTATE — the transform rides the SAME style object tsVars fills
      (extending the door's result, not adding a second read), so the exact
      `style={{'--nc': nc, ...tsVars}` literal every renderer uses is kept. */

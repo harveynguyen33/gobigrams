@@ -20,7 +20,8 @@
  */
 import {useRef} from 'react';
 import {useReactFlow} from '@xyflow/react';
-import {snapRotation, ROTATE_SNAP_DEG} from '../rotation';
+import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../rotation';
+import type {RotateBegin} from '../rotation';
 
 type Props = {
   nodeId: string;
@@ -32,7 +33,11 @@ type Props = {
 
 export function RotateGrip({nodeId, rotation, onGesture}: Props) {
   const rf = useReactFlow();
-  const live = useRef({startAngle: 0, moved: false, cx: 0, cy: 0});
+  /* ROTATE-FIX — a NULLABLE anchor, never a zero-filled one: the pre-fix ref
+     started as {startAngle: 0, cx: 0, cy: 0} and its first gesture measured the
+     grab angle around the canvas ORIGIN (see the object-literal trap in the
+     gesture comment below). */
+  const live = useRef<{begin: RotateBegin; moved: boolean} | null>(null);
 
   const centre = () => {
     const n = rf.getNodes().find(m => m.id === nodeId);
@@ -41,10 +46,8 @@ export function RotateGrip({nodeId, rotation, onGesture}: Props) {
     return {cx: n.position.x + w / 2, cy: n.position.y + h / 2};
   };
 
-  const bearing = (clientX: number, clientY: number) => {
-    const p = rf.screenToFlowPosition({x: clientX, y: clientY});
-    return (Math.atan2(p.y - live.current.cy, p.x - live.current.cx) * 180) / Math.PI;
-  };
+  const flowPoint = (clientX: number, clientY: number) =>
+    rf.screenToFlowPosition({x: clientX, y: clientY});
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
@@ -54,25 +57,29 @@ export function RotateGrip({nodeId, rotation, onGesture}: Props) {
     if (!c) return;
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
-    /* the start angle is the pointer's own bearing so the first frame is a
-       zero delta (no jump on grab). */
-    live.current = {startAngle: bearing(e.clientX, e.clientY), moved: false, ...c};
+    /* ROTATE-FIX — the CENTRE first, then the grab bearing, and the centre is
+       an ARGUMENT to beginRotate: the literal-ordering bug (a `bearing()` call
+       inside the assignment's own object literal, reading the PREVIOUS ref)
+       can no longer be written. The first frame is therefore exactly 0°. */
+    const p = flowPoint(e.clientX, e.clientY);
+    live.current = {begin: beginRotate(c.cx, c.cy, p.x, p.y), moved: false};
     onGesture('start', 0);
 
     const onMove = (ev: PointerEvent) => {
-      const a = bearing(ev.clientX, ev.clientY);
-      let delta = a - live.current.startAngle;
-      if (delta > 180) delta -= 360;
-      if (delta <= -180) delta += 360;
-      live.current.moved = true;
-      onGesture('delta', snapRotation(delta, ev.shiftKey, ROTATE_SNAP_DEG));
+      const g = live.current;
+      if (!g) return;
+      const q = flowPoint(ev.clientX, ev.clientY);
+      g.moved = true;
+      onGesture('delta', snapRotation(rotateDelta(g.begin, q.x, q.y), ev.shiftKey, ROTATE_SNAP_DEG));
     };
     const finish = (cancelled: boolean) => {
       el.releasePointerCapture(e.pointerId);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);
-      if (cancelled || !live.current.moved) onGesture('cancel', 0);
+      const moved = live.current?.moved ?? false;
+      live.current = null;
+      if (cancelled || !moved) onGesture('cancel', 0);
       else onGesture('end', 0);
     };
     const onUp = () => finish(false);
