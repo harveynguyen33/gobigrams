@@ -212,12 +212,16 @@ export type DiagramPreset = {
 };
 
 /** LAYOUTS registry — one entry per engine. The K3 CSS transition wrapper is
- *  applied by the caller (`animateLayout`), so it stays preset-independent. */
+ *  applied by the caller (`animateLayout`), so it stays preset-independent.
+ *  ROUND LAYOUT — the layered engines read `spec.direction` (falling back to
+ *  their own birth direction), so the persisted Canvas preference can flow
+ *  through `useCanvasTools`'s `{...preset.layout, direction: layoutDir}`
+ *  override. The grid engine keeps its own geometry (no direction). */
 export const LAYOUTS = {
   'layered-lr': (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
-    layoutDiagram(nodes, edges, {direction: 'LR', spacing: spec.spacing, bandGroups: spec.bandGroups}),
+    layoutDiagram(nodes, edges, {direction: spec.direction ?? 'LR', spacing: spec.spacing, bandGroups: spec.bandGroups}),
   'layered-tb': (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
-    layoutDiagram(nodes, edges, {direction: 'TB', spacing: spec.spacing, bandGroups: spec.bandGroups}),
+    layoutDiagram(nodes, edges, {direction: spec.direction ?? 'TB', spacing: spec.spacing, bandGroups: spec.bandGroups}),
   grid: (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
     gridLayout(nodes, edges, {cols: spec.cols ?? 2, gap: spec.spacing}),
   free: () => new Map<string, {x: number; y: number}>(),

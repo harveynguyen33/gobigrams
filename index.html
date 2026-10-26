@@ -10,6 +10,11 @@
          ships in /brand/ — unreferenced candidates were removed 2026-10-25. -->
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
     <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <!-- ROUND PWA — the install surface: manifest + theme colour (same
+         #1b1b1b as the manifest's background/theme so the installed-app
+         splash and the browser UI agree with the app's own palette). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#1b1b1b" />
     <!-- SEO base (public launch prep): description + OG/Twitter. og:url/content
          domain is intentionally the placeholder-free relative form; set the
          canonical + og:url absolute URLs when the public host is chosen. -->
@@ -77,6 +82,16 @@
         um.src = 'https://analytics.tech-goblin.com/script.js';
         um.setAttribute('data-website-id', 'ee9cefdb-9ecb-4d2e-8aaf-a56d44b0420a');
         document.head.appendChild(um);
+      }
+    </script>
+    <!-- ROUND PWA — service-worker registration. GATED on https for the same
+         reason the Umami block above is gated on the production hostname:
+         the dev server runs on LAN http, where a registered worker would
+         cache dev assets and shadow every reload. https-only (what CF Pages
+         serves) is also what SW scope security requires. -->
+    <script>
+      if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        navigator.serviceWorker.register('/sw.js');
       }
     </script>
   </head>

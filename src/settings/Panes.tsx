@@ -5,6 +5,7 @@
 import {useRef} from 'react';
 import {MARQUEE_OPTS} from '../marqueeMode';
 import {ZORDER_OPTS} from '../zOrderMode';
+import {LAYOUT_DIR_OPTS} from '../layoutMode';
 import {ROADMAP, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from '../roadmap';
 import {APP_VERSION} from './version';
 import type {Props} from './shared';
@@ -12,8 +13,8 @@ import {Row, ToolbarChip, Toggle, Segmented, gridSizeOptions} from './Controls';
 
 export function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
-  marquee, onMarquee, zOrder, onZOrder, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
+  marquee, onMarquee, zOrder, onZOrder, layoutDir, onLayoutDir, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -83,6 +84,19 @@ export function CanvasPane({
             value={zOrder}
             onPick={onZOrder}
             labelOf={v => ZORDER_OPTS.find(o => o.v === v)?.label ?? String(v)}
+          />
+        </Row>
+        {/* ROUND LAYOUT — the auto-layout direction. Two radios (the engine
+            supports exactly two); the stored token is the engine's own
+            'TB' / 'LR' and the words on the buttons are the plain-language
+            names, same convention as the marquee row above. */}        
+        <Row label="Auto-layout direction" hint="which way the Arrange button stacks layers: downward, or rightward">
+          <Segmented
+            label="Auto-layout direction"
+            options={LAYOUT_DIR_OPTS.map(o => o.v)}
+            value={layoutDir}
+            onPick={onLayoutDir}
+            labelOf={v => LAYOUT_DIR_OPTS.find(o => o.v === v)?.label ?? String(v)}
           />
         </Row>
         <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">

@@ -73,6 +73,7 @@ const SHORTCUTS_KEYS: {what: string; keys: string[]}[] = [
   {what: 'Delete selection',         keys: ['Del']},
   {what: 'Copy / paste / duplicate', keys: ['⌘/Ctrl', 'C', 'V', 'D']},
   {what: 'Deselect',                 keys: ['Esc']},
+  {what: 'Rotate selection',         keys: ['Alt', 'R']},
   {what: 'Fit view to diagram',      keys: ['⇧', '1']},
   {what: 'Toggle read-only review mode', keys: ['⇧', '2']},
   {what: 'Nudge selection',          keys: ['←↑↓→']},
@@ -229,6 +230,7 @@ export default function Settings({
   highlight, onHighlight,
   marquee, onMarquee,
   zOrder, onZOrder,
+  layoutDir, onLayoutDir,
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
   returnFocusTo,
@@ -336,6 +338,8 @@ export default function Settings({
           onMarquee={onMarquee}
           zOrder={zOrder}
           onZOrder={onZOrder}
+          layoutDir={layoutDir}
+          onLayoutDir={onLayoutDir}
           pngScale={pngScale}
           onPngScale={onPngScale}
           pngPad={pngPad}

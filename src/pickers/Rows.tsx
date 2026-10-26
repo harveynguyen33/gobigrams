@@ -286,3 +286,38 @@ export function ToggleRow({value, onChange, options, title, wide, grid3, half}: 
   );
 }
 
+
+/* ===========================================================================
+   RotationRow — ROUND ROTATE item 3: the inspector's Rotation row (number
+   input + reset). Lives HERE, not App.tsx, because a package-p invariant
+   keeps App free of numeric input elements; the row is presentational and
+   writes through the caller's onChange (App's `update`, one undo entry per
+   commit like every inspector field).
+   =========================================================================== */
+export function RotationRow({value, onChange}: {value: number; onChange: (v: number) => void}) {
+  return (
+    <div className="field">
+      <label>rotation</label>
+      <div className="field-row">
+        <input
+          type="number"
+          min={-180}
+          max={180}
+          step={1}
+          value={value}
+          onChange={e => {
+            const n = Number(e.target.value);
+            onChange(e.target.value === '' || !Number.isFinite(n) ? 0 : n);
+          }}
+        />
+        <button
+          type="button"
+          className="mbtn"
+          title="Reset rotation to 0"
+          aria-label="Reset rotation to 0"
+          onClick={() => onChange(0)}
+        >↺</button>
+      </div>
+    </div>
+  );
+}

@@ -5,6 +5,7 @@ import type React from 'react';
 import {type Mode, type ThemeName} from '../theme';
 import {type MarqueeMode} from '../marqueeMode';
 import {type ZOrderMode} from '../zOrderMode';
+import {type LayoutDirection} from '../layout';
 
 export type Props = {
   open: boolean;
@@ -61,6 +62,11 @@ export type Props = {
    *  React Flow prop; this row is the discoverable surface. */
   zOrder: ZOrderMode;
   onZOrder: (m: ZOrderMode) => void;
+  /** ROUND LAYOUT — the auto-layout direction (Canvas pane). App owns the
+   *  persisted value through `useLayoutDir` (prefs.ts path); the toolbar's
+   *  auto-layout consumes it through useCanvasTools. */
+  layoutDir: LayoutDirection;
+  onLayoutDir: (d: LayoutDirection) => void;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
   /** ROUND BI — the current board as a PNG data URL, through App's existing

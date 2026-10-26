@@ -2,6 +2,8 @@ import {memo} from 'react';
 import {Handle, Position, useStore, type NodeProps} from '@xyflow/react';
 import {KeyRound, Link, Table2, ChevronDown, ChevronRight, Eye} from 'lucide-react';
 import {resolveColor, type ColorKey} from '../colors';
+import {paintRotation, rotateTransform} from '../rotation';
+import {RotateGrip} from '../components/RotateGrip';
 
 /* ---------------------------------------------------------------------------
    L3c — the ERD `table` node. The one genuinely new node type in the package
@@ -46,6 +48,9 @@ export type TableKind = {
   __showMode?: ShowMode;
   /** injected by App: called with the new collapsed flag */
   __onToggle?: (id: string, collapsed: boolean) => void;
+  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
+  rotation?: number;
+  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
   /** injected by App: called when a column is clicked (inspector focus) */
   __onPickColumn?: (id: string, col: TableColumn) => void;
 };
@@ -79,11 +84,19 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     incoming.set(e.targetHandle, (incoming.get(e.targetHandle) ?? 0) + 1);
   });
 
+  /* ROUND ROTATE — same root transform scheme as DiagramNode (see there);
+     the column handles are children, so FK edges follow the rotated rows. */
+  const rot = rotateTransform(paintRotation(d as {rotation?: number}));
+  const grip = selected && d.__rotate ? (
+    <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
+      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+  ) : null;
   return (
     <div
       className={`tnode${selected ? ' selected' : ''}${collapsed ? ' collapsed' : ''}`}
-      style={{'--nc': nc} as React.CSSProperties}
+      style={{'--nc': nc, ...(rot ? {transform: rot} as React.CSSProperties : {})} as React.CSSProperties}
     >
+      {grip}
       <Handle type="target" position={Position.Left} id={`left_rel_${d.columns?.[0]?.id ?? 'h'}`} className="tnode-h tnode-h-head" />
       <Handle type="source" position={Position.Right} id={`right_rel_${d.columns?.[0]?.id ?? 'h'}`} className="tnode-h tnode-h-head" />
 

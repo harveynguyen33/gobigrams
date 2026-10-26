@@ -75,6 +75,7 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onTakeTour, onSendFee
             <div className="help-row"><span>Redo</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>Z</kbd></span></div>
             <div className="help-row"><span>Delete selection</span><span className="help-keys"><kbd>Del</kbd></span></div>
             <div className="help-row"><span>Copy / paste / duplicate</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>C</kbd><kbd>V</kbd><kbd>D</kbd></span></div>
+            <div className="help-row"><span>Rotate selection<span className="help-hint">Shift-drag the grip snaps 15°</span></span><span className="help-keys"><kbd>Alt</kbd><kbd>R</kbd></span></div>
             <div className="help-row"><span>Deselect</span><span className="help-keys"><kbd>Esc</kbd></span></div>
             <div className="help-row"><span>Fit view to diagram</span><span className="help-keys"><kbd>⇧</kbd><kbd>1</kbd></span></div>
             <div className="help-row"><span>Toggle read-only review mode</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>

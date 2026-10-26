@@ -4,6 +4,8 @@ import {lucideByName} from '../lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
 import {resolveColor, type ColorKey} from '../colors';
 import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
+import {paintRotation, rotateTransform} from '../rotation';
+import {RotateGrip} from '../components/RotateGrip';
 import {SHAPE_MIN_PX} from './customShape';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in
@@ -158,6 +160,13 @@ export type NodeKind = {
   color?: string;
   /** Architectural shape — generic notation, not a use case. */
   shape?: string;
+  /** ROUND ROTATE — geometry rotation in degrees, normalised (-180, 180].
+   *  OPTIONAL: absent = 0, and boards from before this round render
+   *  byte-identically (no migration needed — see boardMigrations.ts).
+   *  The K5 post-it tilt is NOT stored here; paintRotation adds it. */
+  rotation?: number;
+  /** ROUND ROTATE — App's gesture writer, threaded per-node (selected only). */
+  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
   /** L3a: 'tb' renders Top(target)/Bottom(source) ports instead of Left/Right. */
   handles?: HandleMode;
   /** L3a: 'label-only' renders one centered sentence, no kicker/sub/metric. */
@@ -500,6 +509,26 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     </>
   ) : null;
 
+  /* ROUND ROTATE — the geometry rotation + the K5 tilt, ONE inline transform
+     on the ROOT (never the wrapper: NodeWrapper overwrites style.transform,
+     and the CSS `rotate` property would compose before the wrapper's
+     translate and orbit the canvas origin). null at 0° keeps the style key
+     off untouched nodes entirely. The four NodeHandles are DOM children, so
+     their client rects rotate with this transform and React Flow re-resolves
+     edges at the rotated port sites (updateNodeInternals fires on the
+     data-driven re-render through useNodeObserver's effect). */
+  /* ROUND ROTATE — the transform rides the SAME style object tsVars fills
+     (extending the door's result, not adding a second read), so the exact
+     `style={{'--nc': nc, ...tsVars}` literal every renderer uses is kept. */
+  const rotT = rotateTransform(paintRotation(d as {rotation?: number; shape?: string}));
+  if (rotT) (tsVars as Record<string, string>).transform = rotT;
+  /* ROUND ROTATE — the grip, ABOVE the top resize grip (selected only; the
+     writer arrives per-node through data.__rotate from App's useRotation). */
+  const grip = selected && d.__rotate ? (
+    <RotateGrip nodeId={id} rotation={(d.rotation as number | undefined) ?? 0}
+      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+  ) : null;
+
   if (shape === 'note') {
     return (
       <div
@@ -507,6 +536,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
+        {grip}
         <NodeHandles nodeId={id} />
         {postit}
         {/* ROUND V — the text lives in its own box so the root's border can stay
@@ -526,6 +556,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     return (
       <div className={`group-node${selected ? ' selected' : ''}${d.icon ? ' has-badge' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
         {resizer}
+        {grip}
         <NodeHandles nodeId={id} />
         <div className="group-head" aria-hidden="true" />
         {d.icon && (
@@ -551,6 +582,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
+        {grip}
         <NodeHandles nodeId={id} />
         <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
         {postit}
@@ -571,6 +603,7 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   return (
     <div ref={innerRef} className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
+      {grip}
       <NodeHandles nodeId={id} />
       <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
       {postit}

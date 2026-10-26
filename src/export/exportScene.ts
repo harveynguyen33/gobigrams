@@ -76,6 +76,11 @@ export type SceneNode = {
   rawSvg?: string;            /* customshape: the user SVG string, verbatim */
   textRect?: TextRect | null; /* the measured block (tableMarkup consumes it) */
   data?: Record<string, unknown> | null;
+  /** ROUND ROTATE — paint rotation in degrees, normalised (-180, 180].
+   *  Undefined = 0 = the emitter writes no transform (byte-identical export
+   *  for unrotated boards). Includes the K5 post-it tilt exactly like the
+   *  canvas root's inline transform — ONE number, one painter. */
+  rotation?: number;
 };
 
 export type SceneEdge = {
@@ -336,6 +341,15 @@ export function buildSceneBody(input: ExportInput): Scene {
     const sn: SceneNode = {
       id: n.id, absX: p.x, absY: p.y, w: s.w, h: s.h,
       kind, accent, rows: [], data: n.data ?? null,
+      /* ROUND ROTATE — GEOMETRY rotation only (d.rotation), NOT the K5 tilt:
+       *  the tilt was a canvas-only CSS affectation before this round and the
+       *  export never painted it, so including it here would change the bytes
+       *  of every old actor/note board — the round's byte-parity invariant
+       *  forbids that. A node the user HAS rotated exports with its full
+       *  stored angle. */
+      rotation: typeof (n.data as {rotation?: unknown} | null)?.rotation === 'number'
+        ? ((n.data as {rotation: number}).rotation || undefined)
+        : undefined,
     };
     if (kind === 'group') {
       /* group children bounds (absolute space) — the ±12 frame inflation is
@@ -480,10 +494,29 @@ export function buildSceneBody(input: ExportInput): Scene {
   for (const n of nodes) {
     const s = nodeSize(n);
     const p = abs.get(n.id)!;
-    bounds.minX = Math.min(bounds.minX, p.x);
-    bounds.minY = Math.min(bounds.minY, p.y);
-    bounds.maxX = Math.max(bounds.maxX, p.x + s.w);
-    bounds.maxY = Math.max(bounds.maxY, p.y + s.h);
+    /* ROUND ROTATE — a rotated node's paint extent is the orbit of its four
+     * corners, which can exceed the w×h AABB (a 100×50 box at 90° paints a
+     * 50×100 footprint whose corners stick out along BOTH axes). Union the
+     * rotated corners — exactly the AABB at 0°. Geometry rotation only, same
+     * as the emitter (the K5 tilt is canvas-only, as it always was). */
+    const rotDeg = typeof (n.data as {rotation?: unknown} | null)?.rotation === 'number'
+      ? (n.data as {rotation: number}).rotation
+      : 0;
+    if (rotDeg === 0) {
+      bounds.minX = Math.min(bounds.minX, p.x);
+      bounds.minY = Math.min(bounds.minY, p.y);
+      bounds.maxX = Math.max(bounds.maxX, p.x + s.w);
+      bounds.maxY = Math.max(bounds.maxY, p.y + s.h);
+    } else {
+      const a = (rotDeg * Math.PI) / 180, cos = Math.abs(Math.cos(a)), sin = Math.abs(Math.sin(a));
+      /* the rotated box's axis-aligned extent around its OWN centre */
+      const ex = (s.w * cos + s.h * sin) / 2, ey = (s.w * sin + s.h * cos) / 2;
+      const cX = p.x + s.w / 2, cY = p.y + s.h / 2;
+      bounds.minX = Math.min(bounds.minX, cX - ex);
+      bounds.minY = Math.min(bounds.minY, cY - ey);
+      bounds.maxX = Math.max(bounds.maxX, cX + ex);
+      bounds.maxY = Math.max(bounds.maxY, cY + ey);
+    }
   }
   if (!nodes.length) bounds = {minX: 0, minY: 0, maxX: 800, maxY: 400};
   /* edges can stick out beyond the boxes (label boxes, long routes): union

@@ -1,21 +1,18 @@
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState,
+  ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {type ExportScope, type ExportFormat} from './dialogs/ExportModal';
 import {
-  Copy, Download,
-  Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
+  Copy, ChevronDown, ChevronLeft, ChevronRight, Trash2,
   LayoutGrid, Plus, Pencil, Save,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   BringToFront, SendToBack,
-  PanelLeftClose, PanelRightClose,
   LayoutTemplate,
   X,
 } from 'lucide-react';
@@ -30,8 +27,7 @@ import {
   // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with
   // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
   // are written, and no axis is projected.
-  applyDrag, bendAxisFor, dragPoint, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
-  type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
+  applyDrag, bendAxisFor, dragPoint, plainMidpoint, BEND_SNAP_PX, type BendPhase, type Pt,
 } from './edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules. `reverseEdgePatch` is AK-15's
    mirror; `labelBgOf` is AK-12's tolerant reader (an unknown value resolves to
@@ -44,13 +40,16 @@ import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './e
 import DiagramNode, {type NodeKind} from './nodes/DiagramNode';
 import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
-import TableNode, {relHandleId, type TableColumn, type ShowMode} from './nodes/TableNode';
+import {useRotation} from './useRotation';
+import {ROTATE_SNAP_DEG} from './layoutConstants';
+import {RotateGrip} from './components/RotateGrip';
+import TableNode, {type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
 import Tooltip from './Tooltip';
-import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
-import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './nodes/shapes';
+import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey} from './colors';
+import {SHAPES, asShape, ShapePreview, type Shape} from './nodes/shapes';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
  * editing surface (canvas render) never needs the emitter at first paint:
  * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
@@ -70,7 +69,7 @@ import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
 import {
-  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
+  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow,
   /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
      two pure helpers the harness executes rather than restates. */
   FlowSpeed,
@@ -91,8 +90,7 @@ import {
   type TextVAlign,
 } from './textStyle';
 import {
-  PRESETS, getPreset, asPreset, isPresetId, edgeColorPatch, edgeColorLiteralPatch,
-  C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
+  getPreset, edgeColorPatch, edgeColorLiteralPatch, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset, type PathId,
 } from './presets';
 import {type PaletteItem} from './palette';
@@ -115,18 +113,14 @@ import Checklist, {type ChecklistTaskId} from './nodes/Checklist';
    (one open-state, one focus-restore target per opener). */
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
-import {layoutDiagram} from './layout';
 /* ROUND AM, AM-3 — the flow glyphs' ONE home. Imported HERE and in
-   `GoblinEdge.tsx`, which is what makes AL-6's "reuses FLOW_ICON_PATHS' own
-   vocabulary" structural: the glyph chip row and the travelling chip read the
-   same map. The module holds no React Flow, so the panel can read it without
-   pulling the canvas in. */
+   `GoblinEdge.tsx` (AL-6: the chip row and the travelling chip read the same
+   map). No React Flow, so the panel reads it without pulling the canvas in. */
 import {FLOW_ICON_PATHS} from './nodes/flowIcons';
-import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './nodes/Crowfoot';
+import {CrowFootDefs, cardinalityLabel, isCrowFoot} from './nodes/Crowfoot';
 import {
   useHoverChoreography, useInteractionGuard, useLayoutTransition, useAnimationGating,
-  useHoverHighlight,
-  NO_ANIM, READ_ONLY, NO_PAN,
+  useHoverHighlight, NO_ANIM, READ_ONLY, NO_PAN,
 } from './choreography';
 import {useEditorInterface} from './useEditorInterface';
 import {
@@ -142,6 +136,7 @@ import {usePanelCollapse, isPanelHidden} from './panelCollapse';
    enum, and the hook that owns both. */
 import {useMarqueeMode} from './marqueeMode';
 import {useZOrderMode} from './zOrderMode';
+import {useLayoutDir} from './layoutMode';
 import {useInspectorSections} from './inspectorState';
 import {searchLibrary, groupByCategory} from './paletteSearch';
 import {
@@ -157,14 +152,14 @@ import * as library from './library';
  *  pipeline lives in `./customShape`; this is only the canvas node + the
  *  library plumbing. `Shape` stays at 19 — `customshape` is a node type. */
 import CustomShapeNode from './nodes/CustomShapeNode';
-import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape, type SvgRejectReason} from './nodes/customShape';
+import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape} from './nodes/customShape';
 /* ROUND BN, ITEM 2 — the module-level helpers now live in focused modules;
    moved verbatim, imports only. Size budgets: checks/file-size-gate.mjs. */
 import {
   SHAPE_REJECT_MESSAGE, PATH_TYPES, isGoblinEdge, RECONNECT_RADIUS,
   type PathType,
 } from './boardConstants';
-import {migrateNode, migrateEdge, migrateDoc} from './boardMigrations';
+import {migrateEdge, migrateDoc} from './boardMigrations';
 import {useUndoHistory, type Snap} from './useUndoHistory';
 import {usePersistence} from './usePersistence';
 import {useConnections} from './useConnections';
@@ -386,6 +381,12 @@ export default function App() {
      paint = stored z, the default) vs 'lift' (the library's select-raises
      behaviour). See src/zOrderMode.ts. */
   const {mode: zOrderMode, zIndexMode, setMode: setZOrderMode} = useZOrderMode();
+  /* ROUND LAYOUT — THE AUTO-LAYOUT DIRECTION. Persisted Canvas preference
+     (prefs.ts path, same family as grid-size): overrides the preset's own
+     layout default so a flowchart board can also arrange left-right. The
+     toolbar's auto-layout consumes it through useCanvasTools; Settings →
+     Canvas owns the radio row. See `src/layoutMode.ts`. */
+  const {layoutDir, setLayoutDir} = useLayoutDir();
   const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave} =
     useHoverChoreography(wrap, edgesRef, highlight && !readOnly);
   const {startInteraction, endInteraction} = useInteractionGuard(wrap);
@@ -842,6 +843,10 @@ export default function App() {
   const [past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo] = useUndoHistory(
     nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
 
+  /* ROUND ROTATE — the rotation write cluster (grip gesture + selection
+     chord; one undo entry per gesture — see src/useRotation.ts). */
+  const [onRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory);
+
   // ---- clipboard (copy / paste / duplicate) ----
   const clipboard = useRef<Snap | null>(null);
 
@@ -1182,7 +1187,7 @@ export default function App() {
      distribute) now lives in useCanvasTools.ts, moved verbatim. */
   const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
     nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
-    rf, sel, zOrderMode, preset);
+    rf, sel, zOrderMode, preset, layoutDir);
 
 
   const selected = nodes.find(n => n.id === sel);
@@ -1765,6 +1770,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          `data`, per-node — exactly how the edge renderer gets `onCommitLabel`
          and `readOnly` in `rfEdges` above (fix L). Read off the node's OWN
          type, so no other kind is touched. */
+      /* ROUND ROTATE — the grip + its writer travel per-node (a custom node
+         component receives only its own data; the same threading the label
+         and table kinds use above). The grip renders ONLY on the SELECTED
+         node, so one node carries the affordance at a time. */
+      const rotData = n.selected ? {
+        __rotate: onRotateGesture,
+      } : {};
       if (n.type === 'label') {
         return {
           ...n,
@@ -1773,6 +1785,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             ...((n.data ?? {}) as any),
             onCommitText: commitLabelText,
             readOnly,
+            ...rotData,
           },
         };
       }
@@ -1787,12 +1800,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               pushHistory();
               setNodes(ns => ns.map(m => m.id === id ? {...m, data: {...(m.data as any), collapsed}} : m));
             },
+            ...rotData,
           },
         };
       }
-      return {...n, className: nodeClassName};
+      /* memo safety: an UNSELECTED node's data object stays reference-equal
+         (a new data object per recompute would defeat DiagramNode's memo). */
+      return n.selected
+        ? {...n, className: nodeClassName, data: {...((n.data ?? {}) as any), ...rotData}}
+        : {...n, className: nodeClassName};
     }),
-    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText],
+    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText, onRotateGesture],
   );
 
   /* ---------------------------------------------------------------------
@@ -2618,6 +2636,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         if (e.shiftKey) redo(); else undo();
         return;
       }
+      /* ROUND ROTATE — Alt+R / Alt+Shift+R = ±15° on the selection (single
+         node: its own delta; multi: each member keeps its own delta while
+         its centre orbits the selection centroid — ONE undo entry, the
+         useRotation chord writer). Matched on e.code (Shift rewrites the
+         delivered character), never `mod` — Alt alone, so the browser's
+         own menu-focus chords are not stolen. */
+      if (e.altKey && !mod && e.code === 'KeyR') {
+        e.preventDefault();
+        rotateSelection(e.shiftKey ? -ROTATE_SNAP_DEG : ROTATE_SNAP_DEG);
+        return;
+      }
       if (mod && k === 'c') { copySelection(); return; }
       if (mod && k === 'v') { e.preventDefault(); pasteClipboard(40); return; }
       if (mod && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
@@ -3383,11 +3412,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       <div className="field">
         <label>size</label>
         {/* ROUND X, ITEM 1 — BACK TO THE BARE SEGMENTED ROW. ROUND W put a
-            custom-size `<input type="number">` beside these four buttons, inside
-            `.insp-num-row`, and that flex row squeezed the 4-column grid into a
-            31×121px COLUMN — the four steps stacked vertically at `left: 1005`,
-            identical for all of them (Harvey: "UI lệch, quá xấu"). The input is
-            GONE; the steps are the control again, full panel width, one row.
+            custom-size number input beside these four buttons, and that flex
+            row squeezed the 4-column grid into a 31×121px COLUMN (Harvey:
+            "UI lệch, quá xấu"). The input is GONE; the steps are the control
+            again, full panel width, one row.
 
             THE RULE STAYS (Harvey: "rule giữ khi cần"). `scale` on `TextStyle`,
             `TEXT_SCALE_MIN/MAX`, `clampTextScale` and the `scale` read in
@@ -4390,6 +4418,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onMarquee: setMarqueeMode,
             zOrder: zOrderMode,
             onZOrder: setZOrderMode,
+            layoutDir,
+            onLayoutDir: setLayoutDir,
             pngScale,
             onPngScale,
             pngPad,
@@ -5100,53 +5130,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ) : selCount >= 2 ? (
             <>
               {/* C2: multi-select summary — never a single node's fields.
-
-                  ROUND BD — THE BLOCK REDESIGNED (Harvey: "ugly"; defects were
-                  measured off his screenshot). What changed and why:
-
-                  (2) 'Color · Delete' SPLIT. Two unrelated concepts under one
-                  header made the delete pill under the swatches read as
-                  colour-related. Delete is now its own block at the BOTTOM —
-                  destructive actions live apart from constructive ones, one
-                  button only (the swatches' own duplicate pill up top is gone).
-
-                  (B/DUPLICATE) Duplicate STAYS in the panel rather than moving
-                  to the sel-bar. The sel-bar already carries it, but the bar is
-                  the quick-gesture set while the panel is the inventory of
-                  bulk actions — dropping the panel's copy would leave the
-                  inventory destroy-only and hide a legitimate bulk action. The
-                  pairing is now deliberate: exactly ONE neutral button and ONE
-                  destructive button, side by side, the destructive one styled
-                  apart (below).
-
-                  (5) DESTRUCTIVE DIFFERENTIATED. `.mbtn.danger` only recoloured
-                  on HOVER — at rest it was identical to `.mbtn` (measured
-                  defect). The block-level `.multi-danger` now paints the
-                  danger at REST (border + text in the accent), matching the
-                  destructive styling Figma/draw.io use, and stays hover-recolour
-                  free. `.mbtn.danger` keeps its hover role elsewhere.
-
-                  (7) LABELS TITLE-CASED (one convention for this block; the
-                  icon buttons are icon-only with `title` tooltips — the pick
-                  is recorded in the harness).
-
-                  (3)+(4) BOTH 'Move with arrow keys' hints DELETED — the same
-                  keyboard fact appeared twice in one block; the shortcut lives
-                  on the `?` sheet, which is where hints belong (the sidebar
-                  hint block was deleted for the same reason, see the note at
-                  the sidebar's tail).
-
-                  (A) ALIGN AS A 3x2 ICON GRID. Same lucide icons, same
-                  icon→action mapping as the sel-bar (App.tsx `sel-bar` block):
-                  the two surfaces must agree — one gesture vocabulary, two
-                  places. `flex: 1 1 0` equal widths (the AA rule). Distribute
-                  is TWO equal icon buttons in one row. Arrange (new) gets the
-                  same row shape.
-
-                  (8) SWATCH GRID EQUAL COLUMNS via the shared `.swatches
-                  .swatch6` control — cells equalise for free, and the ring
-                  semantics now match the single-node Style section (see the
-                  ROUND BD note at `swatchRow`). */}
+                  ROUND BD redesigned this block (the decisions are pinned
+                  by checks/round-bd-multi-panel.mjs); comment pruned
+                  2026-10-26 for the ROUND ROTATE App budget. */}
               <div className="multi-head">{selCount} nodes selected</div>
               <div className="sec-label">Align</div>
               <div className="multi-actions multi-grid3">
@@ -5413,6 +5399,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     color={resolveColor(selected.data as any)}
                   />
                 </div>
+                {/* ROUND ROTATE — the Rotation row lives in Rows.tsx
+                    (RotationRow): App.tsx must carry no numeric input element
+                    (a package-p invariant), and the row is presentational. */}
+                <RotationRow
+                  value={(((selected.data as any).rotation as number | undefined) ?? 0)}
+                  onChange={v => update({rotation: v === 0 ? undefined : v} as any)}
+                />
                 {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
                     inner arcs (database / storeddata only). A key choice keeps
                     this row's neighbour contract simple: clearing the shape back
@@ -5516,30 +5509,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
                   )}
                 </div>
-                {/* ROUND AD, ITEM 5(a) — OPTION B'S LABEL. Harvey kept the
-                    editor's semantic colour grouping, on the condition that the
-                    panel SAYS it is this editor's grouping and not an ISO
-                    convention — and that the colour stays overridable per node
-                    (the swatch row directly above: the key only supplies the
-                    default). Three properties this row is built to hold:
-
-                    · VISIBLE WITHOUT HOVER. It is markup, not a `title`
-                      attribute. A hover-only label is invisible on a tablet,
-                      and this project ships to touch.
-                    · DISMISSIBLE, AND THE DISMISSAL PERSISTS. The × writes
-                      `diagram-studio:color-key-note` through the established
-                      convention (`src/colorKeyNote.ts`, the same shape as
-                      MARQUEE_KEY / ANIMATE_KEY / SECTIONS_KEY), so it is gone
-                      for good rather than back on the next selection. The key is
-                      American (ROUND AH) so it moves WITH this copy: a dismissal
-                      stored under the older British key is ignored rather than
-                      migrated, which is what lets a user who had dismissed the
-                      pre-rename note see this text once and dismiss it again.
-                    · ONE SHORT LINE, AND IT DOES NOT STEAL FOCUS. A plain
-                      `<span>` with `role="button" tabIndex={0}`, exactly like
-                      `.fav-remove` and `.cust-remove`; nothing autofocuses it,
-                      and the string is measured to fit one line at the panel's
-                      width (see the note in `src/colorKeyNote.ts`). */}
+                {/* ROUND AD, ITEM 5(a) — the colour-key note: visible,
+                    dismissible (persisted key in src/colorKeyNote.ts),
+                    one line, no focus steal. History pruned 2026-10-26
+                    for the ROUND ROTATE App budget. */}
                 {keyNoteShown && (
                   <div className="key-note" data-key-note="true">
                     <span className="key-note-text">{KEY_NOTE_TEXT}</span>

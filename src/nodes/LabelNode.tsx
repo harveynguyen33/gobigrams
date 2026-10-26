@@ -1,6 +1,8 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
 import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
+import {paintRotation, rotateTransform} from '../rotation';
+import {RotateGrip} from '../components/RotateGrip';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
 
@@ -65,6 +67,9 @@ export type LabelKind = {
   /** ROUND S — review mode, threaded through `data` for the same reason (the
    *  read-only flag had to reach the edge renderer this way too — fix L). */
   readOnly?: boolean;
+  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
+  rotation?: number;
+  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
   /** PACKAGE-P §E.2 — the Text section's stored style, same shape and same
    *  lazy-write discipline as the goblin kind (`src/textStyle.ts`). Absent on
    *  every board written before PACKAGE-P, and an absent one renders exactly as
@@ -215,6 +220,15 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
     setEditing(false);
   };
 
+  /* ROUND ROTATE — same root transform scheme as DiagramNode (see there):
+     the transform rides the tsVars object so the exact `style={tsVars`
+     literal the renderers use is kept. */
+  const rotT = rotateTransform(paintRotation(d as {rotation?: number}));
+  if (rotT) (tsVars as Record<string, string>).transform = rotT;
+  const grip = selected && d.__rotate ? (
+    <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
+      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+  ) : null;
   return (
     <div
       className={`label-node${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
@@ -237,6 +251,7 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
       title={editing || ro ? undefined : `${shown}${shown.length <= 24 ? '  ·  Double-click to edit' : ''}`}
     >
       {resizer}
+      {grip}
       {editing ? (
         /* `nodrag` — measured in @xyflow/system's useDrag: a pointerdown whose
            target matches `.nodrag` is dropped by the d3-drag filter, and

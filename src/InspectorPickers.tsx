@@ -4,7 +4,7 @@
    esbuild bundle entries in the harnesses — is unchanged. */
 export {popoverPlacement, placementStyle} from './pickers/popover';
 export {G, ArtWidth, ArtDash, ArtFlow, ArtCurve, ArtArrow, ArtCardinality} from './pickers/Art';
-export {IconPickerRow, ShapesPicker, ToggleRow, type PickerOption} from './pickers/Rows';
+export {IconPickerRow, ShapesPicker, ToggleRow, RotationRow, type PickerOption} from './pickers/Rows';
 export {Stepper, SPEED_MIN, SPEED_MAX, sliderSeconds, storableSeconds, FlowSpeed} from './pickers/StepperFlow';
 export {Section, CardReadout} from './pickers/Section';
 export {SHAPES} from './nodes/shapes';

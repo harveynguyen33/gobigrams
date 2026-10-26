@@ -3432,7 +3432,11 @@ kbd {
    points the handle alone is the affordance. */
 
 /* ---- K5: post-it treatment for `actor` and `note` ONLY -------------- */
-.node.shape-actor { transform: rotate(-1deg); }
+/* ROUND ROTATE — the ±1° tilts moved OUT of the sheet into the nodes' ONE
+   inline transform (paintRotation in src/rotation.ts folds postitTilt into
+   the geometry angle). Two `transform`s on the same element cannot compose:
+   the inline geometry rotation would be overwritten by this rule (or fight
+   it, depending on order). The gradient/shadow/radius stays here. */
 .node.shape-actor > .node-body,
 .note-node {
   background: linear-gradient(135deg,
@@ -3443,7 +3447,6 @@ kbd {
 }
 .note-node {
   position: relative;
-  transform: rotate(1deg);
   border-left: none; padding: 10px 14px 12px;
   box-shadow: 1px 1px 3px color-mix(in srgb, var(--shadow) 60%, transparent), 3px 4px 8px color-mix(in srgb, var(--shadow) 40%, transparent);
 }
@@ -5457,3 +5460,31 @@ kbd {
 .node.shape-delay.body-inset      { --body-inset: 2% 42% 2% 3%; }
 .node.shape-display.body-inset    { --body-inset: 2% 30% 2% 12%; }
 .node.shape-offpage.body-inset    { --body-inset: 2% 3% 34% 3%; }
+
+/* ---- ROUND ROTATE — the rotate grip above the top resize grip ---------- */
+/* Positioning contract: the grip is rendered as a child of the node ROOT
+   (inside the rotated subtree would make it orbit WITH the node, which is
+   what the export needs but NOT the handle — it must sit at the UNROTATED
+   top edge). Instead DiagramNode renders it OUTSIDE the rotation wrapper
+   (a sibling positioned by the unrotated box), so these rules only style
+   it. Tokens only: the --sel / --surface pair the resize grips use, 12px
+   disc, 10px glyph. z-index 3: above the resize grips (2), below the
+   connect points (5) — the same ladder the resizer block documents. */
+.ds-rotate-grip {
+  position: absolute;
+  left: 50%; top: -30px;
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--sel);
+  background: var(--surface);
+  color: var(--sel);
+  cursor: grab;
+  z-index: 3;
+  padding: 0;
+}
+.ds-rotate-grip:active { cursor: grabbing; }
+.ds-rotate-grip:focus-visible {
+  outline: 2px solid var(--sel);
+  outline-offset: 2px;
+}

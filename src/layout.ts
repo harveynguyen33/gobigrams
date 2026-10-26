@@ -1,4 +1,5 @@
 import {type Node, type Edge} from '@xyflow/react';
+import {MAX_LAYER_WIDTH} from './layoutConstants';
 
 /**
  * Deterministic layered layout (F8) — a small hand-rolled longest-path layering
@@ -6,13 +7,24 @@ import {type Node, type Edge} from '@xyflow/react';
  * Non-hierarchical / disconnected nodes keep their relative position, spread
  * out to the right of the widest layer.
  *
- * PACKAGE-L / L3a additions (all opt-in; the default call is unchanged):
- *  - `direction`  — 'LR' (columns) or 'TB' (rows). A flowchart reads downward.
+ * PACKAGE-L / L3a additions (all opt-in):
+ *  - `direction`  — 'TB' (rows, the default) or 'LR' (columns). A flowchart
+ *                   reads downward, so TB is what a caller that omits the
+ *                   field gets (ROUND LAYOUT; every shipped caller passes it
+ *                   explicitly, so old boards are unchanged).
  *  - `spacing`    — per-preset gaps.
  *  - `bandGroups` — top-level `group` nodes are pool/lane BANDS: they keep their
  *                   authored rectangle and are excluded from the layer
  *                   assignment. This is what makes swimlane templates work
  *                   without inventing a second layout engine.
+ *
+ * ROUND LAYOUT additions:
+ *  - wide layers WRAP (`wrapLayer`, `MAX_LAYER_WIDTH` in layoutConstants.ts):
+ *    a layer too wide for the viewport packs into rows inside its layer slot
+ *    instead of smearing one row across three screens.
+ *  - ISLANDS keep their relative offsets (`islandsOf`): connectivity splits
+ *    the participants into islands; each island after the first is translated
+ *    so its centroid keeps its pre-layout offset from the first island's.
  *
  * The old cycle handling — "anything unassigned lands on layer 0" — silently
  * flattened every flowchart loop-back. Layering now runs on the DAG left after
@@ -31,6 +43,55 @@ export type LayoutOptions = {
 };
 
 export const isGroupNode = (n: Node) => (n.data as any)?.shape === 'group';
+
+/** Pack `spreads` (the across-extents of one layer's nodes, in authored order)
+ * into rows no wider than `max` — the ROUND LAYOUT wide-layer wrap. Returns
+ * each node's {row, across} slot; a layer that fits stays one row with the
+ * exact packed offsets (identical to the pre-round packing), and an over-wide
+ * layer wraps into rows separated by `gap` worth of `along` space. Pure: no
+ * DOM, no direction knowledge — the caller maps row/across back onto whichever
+ * axis its direction uses. */
+export function wrapLayer(spreads: number[], gap: number, max: number): {row: number; across: number}[] {
+  const out: {row: number; across: number}[] = [];
+  let row = 0, across = 0;
+  for (const s of spreads) {
+    if (across > 0 && across + s > max) { row += 1; across = 0; }
+    out.push({row, across});
+    across += s + gap;
+  }
+  return out;
+}
+
+/** Split participant node ids into connected components (islands) — the ROUND
+ * LAYOUT grouping for keeping disconnected subgraphs where the author put
+ * them. Edge direction is irrelevant (an undirected walk), feedback arcs
+ * included. Order is stable: islands surface in first-encounter order, members
+ * in participant order. */
+export function islandsOf(nodes: Node[], edges: Edge[]): string[][] {
+  const adj = new Map<string, Set<string>>();
+  nodes.forEach(n => adj.set(n.id, new Set()));
+  edges.forEach(e => {
+    const s = adj.get(e.source), t = adj.get(e.target);
+    if (s && t) { s.add(e.target); t.add(e.source); }
+  });
+  const seen = new Set<string>();
+  const islands: string[][] = [];
+  nodes.forEach(n => {
+    if (seen.has(n.id)) return;
+    const island: string[] = [];
+    const queue = [n.id];
+    seen.add(n.id);
+    while (queue.length) {
+      const id = queue.shift()!;
+      island.push(id);
+      for (const next of adj.get(id) ?? []) {
+        if (!seen.has(next)) { seen.add(next); queue.push(next); }
+      }
+    }
+    islands.push(island);
+  });
+  return islands;
+}
 
 /** DFS feedback arcs: an edge whose target is still on the current DFS stack. */
 function feedbackArcs(ids: Set<string>, edges: Edge[]): Set<string> {
@@ -62,7 +123,7 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
   const result = new Map<string, {x: number; y: number}>();
   if (!nodes.length) return result;
 
-  const direction: LayoutDirection = opts.direction ?? 'LR';
+  const direction: LayoutDirection = opts.direction ?? 'TB';
   const spacing: LayoutSpacing = opts.spacing ?? {x: 70, y: 24};
 
   // Only layout participants are placed; everything else keeps its position.
@@ -158,20 +219,31 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
     }
   }
 
-  // ---- coordinate assignment: pack each layer with a fixed gap ----
+  // ---- coordinate assignment: pack each layer with a fixed gap, WRAPPING an
+  // over-wide layer into rows inside its slot (ROUND LAYOUT). The along-axis
+  // advance per wrapped row is the layer's own max thickness + gap, so a
+  // wrapped layer reads as a block, not a diagonal. ----
   const pos = new Map<string, {x: number; y: number}>();
   let along = 0;
   for (let i = 0; i <= maxLayer; i++) {
     const rows = byLayer.get(i)!;
     if (!rows.length) { along += layerGap; continue; }
-    let across = 0, thick = 0;
-    for (const id of rows) {
-      const n = participants.find(t => t.id === id)!;
-      pos.set(id, direction === 'LR' ? {x: along, y: across} : {x: across, y: along});
-      across += spread(n) + spreadGap;
-      thick = Math.max(thick, thickness(n));
+    const members = rows.map(id => participants.find(t => t.id === id)!);
+    const slots = wrapLayer(members.map(spread), spreadGap, MAX_LAYER_WIDTH);
+    const rowsInLayer = slots.reduce((a, s) => Math.max(a, s.row), 0) + 1;
+    let thick = 0;
+    for (let r = 0; r < rowsInLayer; r++) {
+      thick = Math.max(thick, ...members.filter((_, k) => slots[k].row === r).map(thickness));
     }
-    along += thick + layerGap;
+    for (let r = 0; r < rowsInLayer; r++) {
+      const rowAlong = along + r * (thick + layerGap);
+      members.forEach((n, k) => {
+        if (slots[k].row !== r) return;
+        const {across} = slots[k];
+        pos.set(n.id, direction === 'LR' ? {x: rowAlong, y: across} : {x: across, y: rowAlong});
+      });
+    }
+    along += rowsInLayer * thick + (rowsInLayer - 1) * layerGap + layerGap;
   }
 
   // centre each layer on its own axis for a balanced look
@@ -200,6 +272,30 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
     orphans.forEach(n => { pos.set(n.id, direction === 'LR' ? {x: start, y: across} : {x: across, y: start}); across += spread(n) + spreadGap; });
     const d = across / 2;
     orphans.forEach(n => { const p = pos.get(n.id)!; pos.set(n.id, direction === 'LR' ? {x: p.x, y: p.y - d} : {x: p.x - d, y: p.y}); });
+  }
+
+  // ---- ROUND LAYOUT: islands keep their relative offsets. The shared grid
+  // above places every island as if it were one board (that is what keeps
+  // layer alignment honest); here each island AFTER THE FIRST is translated
+  // so its centroid keeps its PRE-LAYOUT offset from the first island's
+  // centroid — an island the author parked bottom-right stays bottom-right
+  // instead of snapping into the column next to island zero. Singleton
+  // islands are skipped: a lone node is an ORPHAN, deliberately parked after
+  // the last layer (see above; that behaviour is pinned by package-templates).
+  const islands = islandsOf(participants, edges).filter(is => is.length > 1);
+  if (islands.length > 1) {
+    const pre = islands.map(is => is.reduce(
+      (a, id) => { const n = participants.find(t => t.id === id)!.position; return {x: a.x + n.x / is.length, y: a.y + n.y / is.length}; },
+      {x: 0, y: 0}));
+    const post = islands.map(is => is.reduce(
+      (a, id) => { const p = pos.get(id) ?? {x: 0, y: 0}; return {x: a.x + p.x / is.length, y: a.y + p.y / is.length}; },
+      {x: 0, y: 0}));
+    islands.forEach((is, i) => {
+      if (i === 0) return;
+      const dx = (pre[i].x - pre[0].x) - (post[i].x - post[0].x);
+      const dy = (pre[i].y - pre[0].y) - (post[i].y - post[0].y);
+      is.forEach(id => { const p = pos.get(id); if (p) pos.set(id, {x: p.x + dx, y: p.y + dy}); });
+    });
   }
 
   participants.forEach(n => { const p = pos.get(n.id); if (p) result.set(n.id, {x: Math.round(p.x), y: Math.round(p.y)}); });

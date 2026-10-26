@@ -356,7 +356,37 @@ function boardsApi(): Plugin {
   };
 }
 
+/* ROUND PWA — stamp the service worker's cache name at build time.
+ * public/sw.js carries the placeholder `__SW_CACHE_VERSION__`; APP_VERSION
+ * comes from src/settings/version.ts (the single source of truth) and the
+ * short hash from the BUILT index.html bytes, so a version bump OR any
+ * content change rotates the cache name `gobigrams-v<version>-<hash>` and
+ * the worker's activate pass deletes the old generation. public/ files are
+ * copied verbatim by Vite AFTER the bundle is written, so the stamp runs in
+ * closeBundle on dist/sw.js directly. NO new npm deps. */
+function swCacheStamp(): Plugin {
+  const VERSION_FILE = path.resolve(__dirname, 'src/settings/version.ts');
+  let outDir = 'dist';
+  return {
+    name: 'gobigrams-sw-cache-stamp',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const swFile = path.join(outDir, 'sw.js');
+      const htmlFile = path.join(outDir, 'index.html');
+      if (!fs.existsSync(swFile) || !fs.existsSync(htmlFile)) return;
+      const sw = fs.readFileSync(swFile, 'utf8');
+      if (!sw.includes('__SW_CACHE_VERSION__')) return; // already stamped (watch rebuild)
+      const m = fs.readFileSync(VERSION_FILE, 'utf8').match(/APP_VERSION\s*=\s*'([^']+)'/);
+      if (!m) throw new Error('APP_VERSION not found in src/settings/version.ts');
+      const hash = crypto.createHash('sha256').update(fs.readFileSync(htmlFile)).digest('hex').slice(0, 8);
+      fs.writeFileSync(swFile, sw.replaceAll('__SW_CACHE_VERSION__', `${m[1]}-${hash}`));
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), boardsApi()],
+  plugins: [react(), boardsApi(), swCacheStamp()],
   server: {host: '0.0.0.0', port: 5200, strictPort: true},
 });

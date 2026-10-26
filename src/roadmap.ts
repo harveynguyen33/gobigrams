@@ -49,32 +49,11 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'editor',
   },
   {
-    title: 'Install as an app (PWA)',
-    desc: 'Add the editor to your desktop or home screen — it opens full-screen and keeps working offline. The board storage is already local; this makes it feel native.',
-    status: 'now',
-    confidence: 'committed',
-    area: 'site',
-  },
-  {
     title: 'Public launch',
     desc: 'License, public repository and a hosted build so anyone can open the editor in a browser. Feedback and issue reporting shipped; the hosting decision is the gate.',
     status: 'now',
     confidence: 'committed',
     area: 'site',
-  },
-  {
-    title: 'Rotation for shapes and groups',
-    desc: 'Rotate a shape or a selected group — connection points rotate with the shape so edges stay attached. CSS-transform approach (the library\u2019s own rotatable-node pattern); a scoped round of its own.',
-    status: 'next',
-    confidence: 'committed',
-    area: 'editor',
-  },
-  {
-    title: 'Smarter auto-layout',
-    desc: 'The layered layout grows direction control (top-down / left-right) and better spacing for wide ERDs and architecture boards.',
-    status: 'next',
-    confidence: 'committed',
-    area: 'editor',
   },
   {
     title: 'Collaboration',
@@ -140,6 +119,9 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
+  {label: 'round ROTATE', what: 'Rotate shapes and groups \u2014 connection points follow the shape and exports match', when: '2026-10'},
+  {label: 'round LAYOUT', what: 'Auto-layout direction control + wide-board wrapping + islands keep their offsets', when: '2026-10'},
+  {label: 'round PWA', what: 'Install as an app — PWA manifest + offline shell', when: '2026-10'},
   {label: 'round BG', what: 'Connection handles on imported art, plain arrows for every new line, feedback and issue reporting', when: '2026-10'},
   {label: 'round BF', what: 'Per-shape resize floors and the selected-box ring for imported art \u2014 the resize snap is gone', when: '2026-10'},
   {label: 'round AZ', what: 'Shipped fonts (Inter, JetBrains Mono) embedded in exports \u2014 files render the same on machines that have nothing installed', when: '2026-10'},

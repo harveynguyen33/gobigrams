@@ -46,6 +46,8 @@
  */
 import {memo} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
+import {paintRotation, rotateTransform} from '../rotation';
+import {RotateGrip} from '../components/RotateGrip';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
 import {resolveColor} from '../colors';
 import type {ColorKey} from '../colors';
@@ -55,6 +57,9 @@ export type CustomShapeKind = {
   viewBox: string;
   title: string;
   colorKey: ColorKey;
+  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
+  rotation?: number;
+  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
 };
 
 /* The goblin node's scheme, verbatim (DiagramNode's handleDblClick +
@@ -85,8 +90,12 @@ const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
     <div
       className={`custom-shape-node${selected ? ' selected' : ''}`}
       data-shape-title={d.title}
-      style={{'--nc': nc} as React.CSSProperties}
+      style={{'--nc': nc, ...(rotateTransform(paintRotation(d as {rotation?: number})) ? {transform: rotateTransform(paintRotation(d as {rotation?: number}))!} as React.CSSProperties : {})} as React.CSSProperties}
     >
+      {selected && d.__rotate && (
+        <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
+          onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+      )}
       {selected && (
         /* §8.3 — the live resize carries the same 32px floor the import path
            enforces, and NO ceiling: ROUND BE (2026-10-23, Harvey: resize

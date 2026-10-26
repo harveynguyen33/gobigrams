@@ -24,6 +24,7 @@ import {resolveColor} from '../colors';
 import {asShape, shapeFrameSvg} from '../nodes/shapes';
 import {EXPORT_TOKENS} from '../theme';
 import {labelAnchor, type LabelPos} from '../edgeLabel';
+import {rotateSvgTransform} from '../rotation';
 import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
 import {shapeLineToSvg, type OutlineShaper} from './textOutline';
 
@@ -973,20 +974,19 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
   /* nodes */
   for (const n of scene.nodes) {
     const s = {w: n.w, h: n.h};
-    parts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${n.absX + off.x},${n.absY + off.y})">`);
+    /* ROUND ROTATE — the same paint angle the canvas root carries, as
+       rotate(deg,cx,cy) about the node's own centre; no transform at 0°
+       (untouched boards export byte-identically). */
+    const rt = rotateSvgTransform(n.rotation ?? 0, s.w, s.h);
+    parts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${n.absX + off.x},${n.absY + off.y})${rt ? ' ' + rt : ''}">`);
     if (n.kind === 'label') {
       for (const r of n.rows) parts.push(rowEl(r));
     } else if (n.kind === 'customshape') {
-      /* ROUND AY item 4 — the raw user SVG is inlined under a scale() wrapper.
-       * A nested <svg> WITHOUT width/height defaults to 100%/100% of the
-       * NEAREST VIEWPORT — inside a standalone file that is the ROOT svg, so
-       * the artwork painted at viewport size (measured: viewBox-fit scaled it
-       * to 296x148, teal bbox (53,77)-(295,195) instead of (50,50)-(245,147))
-       * instead of the node box. The canvas never hit this (its <img> src has
-       * one root svg with intrinsic size). Give the nested svg the node box as
-       * explicit width/height so the scale() wrapper's arithmetic is the ONLY
-       * sizing force. (If the user string carries its own width/height we keep
-       * it — verbatim inlining, per the AU spec table.) */
+      /* ROUND AY item 4 — a nested <svg> without width/height defaults to
+         100% of the NEAREST VIEWPORT (the root svg here — measured: the art
+         painted at viewport size). Give the nested svg the node box as
+         explicit size so scale()'s arithmetic is the only sizing force;
+         a user width/height is kept (verbatim inlining, per the AU table). */
       const sized = n.rawSvg
         ? /<svg[^>]*\swidth="/.test(n.rawSvg)
           ? n.rawSvg
