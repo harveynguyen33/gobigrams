@@ -133,23 +133,25 @@ export function plainMidpoint(geo: BendGeo): Pt {
   return {x: (sg.x + tg.x) / 2, y: (sg.y + tg.y) / 2};
 }
 
-/** Is a midpoint handle offered on this geometry at all? Every OPPOSITE-side
- *  pair — the set of shapes where a waypoint reads as a bend of the line rather
- *  than as a second elbow on the same side. The drag itself is 2-D everywhere,
- *  so this is the ONLY condition left; the old axis model's collapsed-bar
- *  special-casing is gone with the axis model that needed it.
+/** Is a midpoint handle offered on this geometry at all?
  *
- *  THIS GATE IS ABOUT THE ORTHOGONAL SPLIT, so it only applies to the kinds the
- *  split exists for (`step`/`smoothstep`). The free kinds (`bezier`/`straight`)
- *  never consult it: they have no split to collapse, so they are always
- *  draggable — see `GoblinEdge`'s `bendActive`.
+ *  ROUND T gated this on OPPOSITE-side pairs — the aesthetic call that a
+ *  waypoint on a same-side/adjacent pair "reads as a second elbow" — and that
+ *  gate made the handle silently absent on most hand-drawn connections
+ *  between diagonally-placed nodes.
+ *
+ *  BEND-ALL (2026-10-27, Harvey's device test): the gate is REMOVED. Every
+ *  geometry offers the handle; the renderer's `bendActive` is the constant
+ *  true and this function accepts every pair so the exported model and the
+ *  renderer cannot drift back apart. The only gates left are the renderer's
+ *  own: selected, and not read-only.
  *
  *  NOTE this is the HANDLE's gate, not the renderer's: the renderer routes
- *  through our own path whenever a bend key is STORED (`needsCustom`), including
- *  a key an older board stored on a geometry that would not offer a handle
- *  today. */
-export function bendDraggable4(geo: BendGeo): boolean {
-  return OPPOSITE_SIDE[geo.sp] === geo.tp;
+ *  through our own path whenever a bend key is STORED (`needsCustom`),
+ *  including a key an older board stored on a geometry that would not offer
+ *  a handle today. */
+export function bendDraggable4(_geo: BendGeo): boolean {
+  return true;
 }
 
 /** `bendDraggable4` as the renderer/reporting shape (a caller that wants the

@@ -15,13 +15,13 @@ import {
   // for the edge's own kind (they all read both coordinates); no waypoint routes
   // through the generator unchanged. That is `needsCustom` exactly, so the
   // renderer and `App`'s condition cannot disagree, and an untouched board
-  // cannot move by a pixel. `bendDraggable4` is now only the HANDLE's gate, and
-  // only for the orthogonal kinds.
+  // cannot move by a pixel. BEND-ALL (2026-10-27): the handle's gate is no
+  // longer geometric at all — see `bendActive` below.
   // ROUND U — `bezierPath`/`straightPath` are the free kinds' own routes, and
   // `isFreeBendKind`/`bendAxisFor` are the ONE axis decision shared with `App`:
   // `'free'` on those kinds (no lock, both keys written), draw.io's pointer rule
   // on `step`/`smoothstep` (unchanged).
-  bendDraggable4, bendAxisFor, drawnMid, freePath, isFreeBendKind, needsCustom,
+  bendAxisFor, drawnMid, freePath, isFreeBendKind, needsCustom,
   bezierPath, straightPath,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
 } from '../edgeBend';
@@ -212,20 +212,17 @@ const GoblinEdge = memo((props: EdgeProps) => {
     s: {x: sourceX, y: sourceY}, t: {x: targetX, y: targetY},
     sp: sourcePosition as Side4, tp: targetPosition as Side4,
   };
-  /* The gate — is a midpoint handle offered on this geometry at all? ROUND T:
-     every OPPOSITE-side pair, and nothing else. There is no per-geometry axis
-     any more: the drag is 2-D everywhere and the axis is decided per gesture
-     from the POINTER (see `onBendDown`/`edgeBend.bendAxisFor`).
+  /* The gate — is a midpoint handle offered on this geometry at all?
+     BEND-ALL (2026-10-27): the ROUND-T aesthetic gate (opposite-side pairs
+     only — `bendDraggable4`) was REMOVED per Harvey's device test: a
+     hand-drawn same-side/adjacent connection between diagonally-placed nodes
+     silently offered nothing to pull. EVERY geometry offers the handle now;
+     the axis of the drag is still decided per gesture from the POINTER
+     (see `onBendDown`/`edgeBend.bendAxisFor`), which handles same-side and
+     adjacent pairs sensibly — it reads the pointer delta, never the pairing.
 
-     ROUND U — EVERY KIND THIS COMPONENT RENDERS OFFERS ONE. `bendDraggable4` is
-     about the orthogonal split (it rejects a same-side pair, where a waypoint
-     would read as a second elbow); `bezier`/`straight` have no split at all, so
-     consulting it there would be meaningless — they are always draggable. The
-     `selected && !ro` gate below still applies to all four kinds. */
-  const bendActive = useMemo(
-    () => (isFreeBendKind(kind) ? true : bendDraggable4(bGeo)),
-    [kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
-  );
+     The `selected && !ro` gate below still applies to all four kinds. */
+  const bendActive = true;
   /** ROUND T — the cursor the handle shows, which is draw.io's own feedback for
    *  a locked axis and the detail that makes the lock readable rather than
    *  mysterious: `col-resize` while dragging horizontally, `row-resize`
