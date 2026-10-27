@@ -51,6 +51,8 @@ export type TableKind = {
   /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
   rotation?: number;
   __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
+  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
+  __rotateSel?: boolean;
   /** injected by App: called when a column is clicked (inspector focus) */
   __onPickColumn?: (id: string, col: TableColumn) => void;
 };
@@ -87,7 +89,8 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   /* ROUND ROTATE — same root transform scheme as DiagramNode (see there);
      the column handles are children, so FK edges follow the rotated rows. */
   const rot = rotateTransform(paintRotation(d as {rotation?: number}));
-  const grip = selected && d.__rotate ? (
+  /* GROUP-ROTATE: sole-selection token — no per-node grip in a multi. */
+  const grip = selected && d.__rotateSel && d.__rotate ? (
     <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
       onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
   ) : null;

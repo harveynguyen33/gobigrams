@@ -60,6 +60,8 @@ export type CustomShapeKind = {
   /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
   rotation?: number;
   __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
+  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
+  __rotateSel?: boolean;
 };
 
 /* The goblin node's scheme, verbatim (DiagramNode's handleDblClick +
@@ -92,7 +94,9 @@ const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
       data-shape-title={d.title}
       style={{'--nc': nc, ...(rotateTransform(paintRotation(d as {rotation?: number})) ? {transform: rotateTransform(paintRotation(d as {rotation?: number}))!} as React.CSSProperties : {})} as React.CSSProperties}
     >
-      {selected && d.__rotate && (
+      {/* GROUP-ROTATE: the sole-selection token guards the per-node grip —
+          a multi-selection renders no per-node grips (App's shared grip). */}
+      {selected && d.__rotateSel && d.__rotate && (
         <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
           onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
       )}

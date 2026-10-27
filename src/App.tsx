@@ -42,7 +42,7 @@ import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
 import {useRotation} from './useRotation';
 import {ROTATE_SNAP_DEG} from './layoutConstants';
-import {RotateGrip} from './components/RotateGrip';
+import {GroupRotateGrip} from './components/GroupRotateGrip';
 import TableNode, {type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
@@ -850,7 +850,7 @@ export default function App() {
      React Flow store from CONTEXT and would throw above <ReactFlow>, so the
      bridge (rendered inside it) fills this ref and useRotation owns WHEN. */
   const rotateInternals = useRef<((ids: string | string[]) => void) | null>(null);
-  const [onRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory, rotateInternals);
+  const [onRotateGesture, onGroupRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory, rotateInternals);
 
   // ---- clipboard (copy / paste / duplicate) ----
   const clipboard = useRef<Snap | null>(null);
@@ -1777,10 +1777,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          type, so no other kind is touched. */
       /* ROUND ROTATE — the grip + its writer travel per-node (a custom node
          component receives only its own data; the same threading the label
-         and table kinds use above). The grip renders ONLY on the SELECTED
-         node, so one node carries the affordance at a time. */
+         and table kinds use above). GROUP-ROTATE: the writer is injected on
+         EVERY selected node (the chord path needs no per-node data), but the
+         SOLE-SELECTION token `__rotateSel` only on the single selected one —
+         in a multi-selection no per-node grip renders and App's shared
+         GroupRotateGrip drives the group instead. */
       const rotData = n.selected ? {
         __rotate: onRotateGesture,
+        ...(selCount === 1 ? {__rotateSel: true} : {}),
       } : {};
       if (n.type === 'label') {
         return {
@@ -1815,7 +1819,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         ? {...n, className: nodeClassName, data: {...((n.data ?? {}) as any), ...rotData}}
         : {...n, className: nodeClassName};
     }),
-    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText, onRotateGesture],
+    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText, onRotateGesture, selCount],
   );
 
   /* ---------------------------------------------------------------------
@@ -4688,6 +4692,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           {/* ROTATE-FIX: hands the store's updateNodeInternals up (the hook
               needs a provider ancestor; App is above <ReactFlow>). */}
           <RotateInternalsBridge onReady={u => { rotateInternals.current = u; }} />
+          {/* GROUP-ROTATE: the ONE shared rotate grip for a multi-selection,
+              above-centre of the selection union box (it must be a <ReactFlow>
+              child: it reads the store's live nodes/transform to place itself
+              in screen space). Sole selection keeps the per-node RotateGrip. */}
+          {!readOnly && selCount >= 2 && (
+            <GroupRotateGrip onGesture={onGroupRotateGesture} />
+          )}
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}

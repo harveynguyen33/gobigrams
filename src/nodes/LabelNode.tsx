@@ -70,6 +70,8 @@ export type LabelKind = {
   /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
   rotation?: number;
   __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
+  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
+  __rotateSel?: boolean;
   /** PACKAGE-P §E.2 — the Text section's stored style, same shape and same
    *  lazy-write discipline as the goblin kind (`src/textStyle.ts`). Absent on
    *  every board written before PACKAGE-P, and an absent one renders exactly as
@@ -225,7 +227,8 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
      literal the renderers use is kept. */
   const rotT = rotateTransform(paintRotation(d as {rotation?: number}));
   if (rotT) (tsVars as Record<string, string>).transform = rotT;
-  const grip = selected && d.__rotate ? (
+  /* GROUP-ROTATE: sole-selection token — no per-node grip in a multi. */
+  const grip = selected && d.__rotateSel && d.__rotate ? (
     <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
       onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
   ) : null;

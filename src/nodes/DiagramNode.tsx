@@ -167,6 +167,10 @@ export type NodeKind = {
   rotation?: number;
   /** ROUND ROTATE — App's gesture writer, threaded per-node (selected only). */
   __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
+  /** GROUP-ROTATE — App injects this ONLY on the sole selected node (the
+   *  per-node grip is guarded to a single selection; multi gets the shared
+   *  GroupRotateGrip at App level instead). */
+  __rotateSel?: boolean;
   /** L3a: 'tb' renders Top(target)/Bottom(source) ports instead of Left/Right. */
   handles?: HandleMode;
   /** L3a: 'label-only' renders one centered sentence, no kicker/sub/metric. */
@@ -524,9 +528,11 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      `style={{'--nc': nc, ...tsVars}` literal every renderer uses is kept. */
   const rotT = rotateTransform(paintRotation(d as {rotation?: number; shape?: string}));
   if (rotT) (tsVars as Record<string, string>).transform = rotT;
-  /* ROUND ROTATE — the grip, ABOVE the top resize grip (selected only; the
-     writer arrives per-node through data.__rotate from App's useRotation). */
-  const grip = selected && d.__rotate ? (
+  /* ROUND ROTATE — the grip, ABOVE the top resize grip. GROUP-ROTATE: the
+     sole-selection token (`__rotateSel`, injected by App only when the
+     selection is EXACTLY this node) guards it — a multi-selection renders
+     NO per-node grips; the ONE shared grip is App's GroupRotateGrip. */
+  const grip = selected && d.__rotateSel && d.__rotate ? (
     <RotateGrip nodeId={id} rotation={(d.rotation as number | undefined) ?? 0}
       onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
   ) : null;

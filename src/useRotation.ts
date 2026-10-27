@@ -40,6 +40,10 @@ export function useRotation(
   const guard = useRef<RotateGuard>(newRotateGuard());
   /** gesture-start geometry per node id (rotation + position for cancel). */
   const start = useRef<Map<string, {rotation: number; x: number; y: number}>>(new Map());
+  /** GROUP gesture start geometry (ROUND GROUP-ROTATE): rotation + box per
+   *  member, so delta frames orbit the same mean-of-centres centroid the
+   *  chord writer's group path uses (rotateMembersAround, Figma's rule). */
+  const gstart = useRef<Map<string, {rotation: number; x: number; y: number; w: number; h: number}>>(new Map());
   /* ROTATE-FIX — EDGES FOLLOW THE SHAPE. A rotation is a `data` change, and a
    * data change does NOT re-measure a node's handle bounds: React Flow keeps
    * the old `handleBounds` and every edge keeps its old endpoint coordinates.
@@ -94,6 +98,60 @@ export function useRotation(
     recordRotateGesture(guard.current, {end: true});
   }, [nodesRef, setNodes, pushHistory, internals]);
 
+  /** ROUND GROUP-ROTATE — the SHARED grip's gesture writer: the same phase
+   *  contract as the per-node one, but the unit is the WHOLE selection and
+   *  the angle orbits the selection CENTROID (rotateMembersAround, the pure
+   *  function — one setNodes write per frame, ONE undo entry per gesture,
+   *  updateNodeInternals once per member at end/cancel). */
+  const onGroupRotateGesture = useCallback((phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => {
+    const snap = () => {
+      gstart.current.clear();
+      for (const n of nodesRef.current) {
+        if (!n.selected || n.parentId) continue;
+        gstart.current.set(n.id, {
+          rotation: ((n.data as Record<string, unknown>).rotation as number | undefined) ?? 0,
+          x: n.position.x, y: n.position.y,
+          w: n.measured?.width ?? 190, h: n.measured?.height ?? 100,
+        });
+      }
+    };
+    if (phase === 'start') {
+      if (recordRotateGesture(guard.current, {start: true})) pushHistory();
+      snap();
+      return;
+    }
+    if (!gstart.current.size) return;
+    if (phase === 'delta') {
+      const sized = [...gstart.current].map(([id, g]) => ({
+        id, x: g.x, y: g.y, w: g.w, h: g.h, rotation: g.rotation,
+      }));
+      /* the pure function orbits the GROUP centroid — the same
+         mean-of-member-centres rule the chord writer's group path uses. */
+      const next = rotateMembersAround(sized, delta);
+      const byId = new Map(next.map(m => [m.id, m]));
+      setNodes(ns => ns.map(n => {
+        const m = byId.get(n.id);
+        if (!m) return n;
+        return {...n, position: {x: m.x, y: m.y},
+          data: {...(n.data as Record<string, unknown>), rotation: m.rotation || undefined}};
+      }));
+      return;
+    }
+    /* end | cancel: cancel restores every member's snapshot geometry; both
+       re-measure once per member and re-arm the one-entry latch. */
+    if (phase === 'cancel') {
+      setNodes(ns => ns.map(n => {
+        const g0 = gstart.current.get(n.id);
+        if (!g0) return n;
+        return {...n, position: {x: g0.x, y: g0.y},
+          data: {...(n.data as Record<string, unknown>), rotation: g0.rotation || undefined}};
+      }));
+    }
+    updateNodeInternals([...gstart.current.keys()]);
+    gstart.current.clear();
+    recordRotateGesture(guard.current, {end: true});
+  }, [nodesRef, setNodes, pushHistory, internals]);
+
   /** The CHORD writer: ±`deg` on the selection. ONE node = its own rotation
    *  delta; MANY = each member keeps its own rotation delta while its centre
    *  orbits the selection centroid (rotateMembersAround, the pure function —
@@ -125,5 +183,5 @@ export function useRotation(
     updateNodeInternals(next.map(m => m.id));
   }, [nodesRef, setNodes, pushHistory, internals]);
 
-  return [onRotateGesture, rotateSelection] as const;
+  return [onRotateGesture, onGroupRotateGesture, rotateSelection] as const;
 }

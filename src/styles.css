@@ -5488,3 +5488,32 @@ kbd {
   outline: 2px solid var(--sel);
   outline-offset: 2px;
 }
+
+/* ---- ROUND GROUP-ROTATE — the ONE shared grip for a multi-selection ---- */
+/* The multi-selection's shared rotate affordance (App's GroupRotateGrip, a
+   <ReactFlow> child): RotateGrip's own vocabulary — 18px disc + glyph, the
+   --sel / --surface pair — repositioned. It is NOT a child of the renderer:
+   its left/top are set inline by the component (screen-space coords INSIDE
+   .react-flow__renderer), so this rule positions it absolutely against the
+   renderer (pointer-events: the disc itself, never the canvas under it) and
+   everything else mirrors .ds-rotate-grip. z-index 1000: above node chrome
+   (the connect points' 5), below modals — same intent as the per-node
+   grip's ladder, one rung higher because it spans many nodes. */
+.ds-group-rotate-grip {
+  position: absolute;
+  transform: translate(-50%, 0);
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--sel);
+  background: var(--surface);
+  color: var(--sel);
+  cursor: grab;
+  z-index: 1000;
+  padding: 0;
+}
+.ds-group-rotate-grip:active { cursor: grabbing; }
+.ds-group-rotate-grip:focus-visible {
+  outline: 2px solid var(--sel);
+  outline-offset: 2px;
+}
