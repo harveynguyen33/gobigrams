@@ -97,6 +97,30 @@ export function rotatePoint(x: number, y: number, w: number, h: number, deg: num
   return {x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos};
 }
 
+/** ROUND SELBOX — a node's ROTATED axis-aligned extent: the union of its
+ *  four corners rotated `deg` about the box centre, as an AABB in the same
+ *  space as `(x, y)`. Exactly the box at 0°; at other angles it can EXCEED
+ *  w×h on both axes (a 100×50 box at 45° paints a ~106.07×106.07 footprint).
+ *
+ *  ONE home, every consumer: the canvas selection box, the group grip's
+ *  union and the export bounds (exportScene) all call this — the pre-SELBOX
+ *  export path inlined the same |cos|/|sin| arithmetic, and the UI paths
+ *  used the unrotated boxes, which is the lag this round kills.
+ *
+ *  Golden (checks/round-selbox.mjs a2): rotatedExtent(0, 0, 100, 50, 45)
+ *  -> w = h = 150/√2 ≈ 106.0660 — NOT 100×50. */
+export function rotatedExtent(x: number, y: number, w: number, h: number, deg: number): {
+  x: number; y: number; w: number; h: number;
+} {
+  const a = (norm180(deg) * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(a)), sin = Math.abs(Math.sin(a));
+  /* the rotated box's half-extent about its own centre (exact: the AABB of a
+   * rotated rectangle is (w|cos| + h|sin|) × (w|sin| + h|cos|)) */
+  const ex = (w * cos + h * sin) / 2, ey = (w * sin + h * cos) / 2;
+  const cx = x + w / 2, cy = y + h / 2;
+  return {x: cx - ex, y: cy - ey, w: 2 * ex, h: 2 * ey};
+}
+
 /** The four mid-edge handle sites, rotated about the box centre. Keys are
  *  the handle ids DiagramNode / CustomShapeNode render (`left` / `right` /
  *  `top` / `bottom`); each value is the handle CENTRE in the box's local

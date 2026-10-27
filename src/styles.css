@@ -5517,3 +5517,38 @@ kbd {
   outline: 2px solid var(--sel);
   outline-offset: 2px;
 }
+
+/* ---------- ROUND SELBOX (2026-10-27): the rotation-aware selection box ---- *
+ *
+ * THE SPLIT. React Flow's own multi-selection box
+ * (`.react-flow__nodesselection-rect`) unions the selected nodes' UNROTATED
+ * `position`+`measured` internals (getInternalNodesBounds in @xyflow/system
+ * — no rotation field exists on the internals), and RF offers no prop to
+ * feed it different geometry. After a group rotation that dashed box LAGS
+ * the shapes: a 100×50 card at 45° paints a ~106×106 footprint and its
+ * corners poke out of the box. So SELBOX takes the PAINT away from RF and
+ * gives it to the app's own overlay (src/components/SelectionBox.tsx, a
+ * ViewportPortal child that unions `rotatedExtent` from src/rotation.ts —
+ * the same pure function the export bounds path uses).
+ *
+ * The hide below is PAINT-ONLY: `visibility: hidden` keeps the rect's box,
+ * its focusability and — critically — its `pointer-events: all` hit target,
+ * so RF's GROUP DRAG (grab the box, move the whole selection) and its
+ * arrow-key nudge keep working exactly as before. Only the stale dashed
+ * paint is gone. */
+.ds-flow-wrap .react-flow__nodesselection-rect {
+  visibility: hidden; /* 2026-10-27 SELBOX: RF's box lags rotated shapes; the app's .ds-selection-box paints instead */
+}
+
+/* The app's box — RF's own selection vocabulary, verbatim: the same
+   --sel-soft fill and 1px dotted --sel border styles.css feeds RF's
+   --xy-selection-* tokens, so at 0° it is pixel-indistinguishable from the
+   box RF painted, and at any angle it CONTAINS the rotated shapes.
+   Flow-coordinates sizing comes inline from SelectionBox (a ViewportPortal
+   child); paint-only, so it never touches hit testing. */
+.ds-selection-box {
+  position: absolute;
+  pointer-events: none;
+  background: var(--sel-soft);
+  border: 1px dotted var(--sel);
+}

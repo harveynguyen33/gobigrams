@@ -43,6 +43,7 @@ import {newResizeGuard, recordResizeGesture} from './resizeHistory';
 import {useRotation} from './useRotation';
 import {ROTATE_SNAP_DEG} from './layoutConstants';
 import {GroupRotateGrip} from './components/GroupRotateGrip';
+import {SelectionBox} from './components/SelectionBox';
 import TableNode, {type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
@@ -4698,6 +4699,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               in screen space). Sole selection keeps the per-node RotateGrip. */}
           {!readOnly && selCount >= 2 && (
             <GroupRotateGrip onGesture={onGroupRotateGesture} />
+          )}
+          {/* SELBOX: the app's rotation-aware multi-selection box — RF's own
+              rect unions UNROTATED internals (no override prop) and lags a
+              rotated group; ours unions rotatedExtent in RF's selection
+              vocabulary, RF's rect is paint-hidden (styles.css), paint-only. */}
+          {selCount >= 2 && (
+            <SelectionBox />
           )}
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child

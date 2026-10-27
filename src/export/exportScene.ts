@@ -34,6 +34,7 @@
 
 import {resolveColor} from '../colors';
 import {asShape} from '../nodes/shapes';
+import {rotatedExtent} from '../rotation';
 import {labelAnchor, type LabelPos} from '../edgeLabel';
 import {
   type ExportNode, type ExportEdge, type ExportInput,
@@ -508,14 +509,14 @@ export function buildSceneBody(input: ExportInput): Scene {
       bounds.maxX = Math.max(bounds.maxX, p.x + s.w);
       bounds.maxY = Math.max(bounds.maxY, p.y + s.h);
     } else {
-      const a = (rotDeg * Math.PI) / 180, cos = Math.abs(Math.cos(a)), sin = Math.abs(Math.sin(a));
-      /* the rotated box's axis-aligned extent around its OWN centre */
-      const ex = (s.w * cos + s.h * sin) / 2, ey = (s.w * sin + s.h * cos) / 2;
-      const cX = p.x + s.w / 2, cY = p.y + s.h / 2;
-      bounds.minX = Math.min(bounds.minX, cX - ex);
-      bounds.minY = Math.min(bounds.minY, cY - ey);
-      bounds.maxX = Math.max(bounds.maxX, cX + ex);
-      bounds.maxY = Math.max(bounds.maxY, cY + ey);
+      /* ROUND SELBOX — the ONE shared extent (src/rotation.ts rotatedExtent):
+       * the inline |cos|/|sin| arithmetic this file used to carry is gone; the
+       * export path and the canvas selection box now share the same function. */
+      const e = rotatedExtent(p.x, p.y, s.w, s.h, rotDeg);
+      bounds.minX = Math.min(bounds.minX, e.x);
+      bounds.minY = Math.min(bounds.minY, e.y);
+      bounds.maxX = Math.max(bounds.maxX, e.x + e.w);
+      bounds.maxY = Math.max(bounds.maxY, e.y + e.h);
     }
   }
   if (!nodes.length) bounds = {minX: 0, minY: 0, maxX: 800, maxY: 400};

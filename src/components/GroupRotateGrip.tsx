@@ -28,6 +28,7 @@
 import {useRef} from 'react';
 import {useReactFlow, useStore} from '@xyflow/react';
 import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../rotation';
+import {rotatedExtent} from '../rotation';
 import type {RotateBegin} from '../rotation';
 
 type Props = {
@@ -44,17 +45,22 @@ export function GroupRotateGrip({onGesture}: Props) {
   const live = useRef<{begin: RotateBegin; moved: boolean} | null>(null);
 
   /* ONE comparable string per concern (the RotateInternalsBridge pattern):
-     the union geometry of the selected nodes, and the viewport transform. */
+     the union geometry of the selected nodes, and the viewport transform.
+     ROUND SELBOX: the string now carries each node's ROTATION, and the
+     union below is over the nodes' ROTATED extents (rotatedExtent) — a
+     rotated member paints outside its unrotated box, and the grip must
+     anchor above-centre of the TRUE union, not the stale one. */
   const sig = useStore(s => s.nodes
     .filter(n => n.selected && !n.parentId)
-    .map(n => `${n.id}:${n.position.x},${n.position.y},${n.measured?.width ?? 190},${n.measured?.height ?? 100}`)
+    .map(n => `${n.id}:${n.position.x},${n.position.y},${n.measured?.width ?? 190},${n.measured?.height ?? 100},${(n.data as {rotation?: number}).rotation ?? 0}`)
     .join('|'));
   const view = useStore(s => s.transform.join(','));
 
   const boxes = sig ? sig.split('|').map(p => {
     const at = p.indexOf(':');
-    const [x, y, w, h] = p.slice(at + 1).split(',').map(Number);
-    return {x, y, w, h};
+    const [x, y, w, h, deg] = p.slice(at + 1).split(',').map(Number);
+    /* the node's ROTATED extent — the union of its four rotated corners */
+    return rotatedExtent(x, y, w, h, deg);
   }) : [];
   if (boxes.length < 2) return null; /* App gates on selCount >= 2; the store is the truth */
 
