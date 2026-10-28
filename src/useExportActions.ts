@@ -16,6 +16,7 @@ import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';
 import {readToken, tokensFor, EXPORT_TOKENS} from './theme';
 import {mermaidToGraph} from './mermaid';
+import {gobiInsert} from './gobiInsert';
 import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from './export/exportSvg';
 import type {OutlineShaper} from './export/textOutline';
 
@@ -473,17 +474,36 @@ export function useExportActions(
   // ---- import JSON ----
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /* AQ21 — the export modal's Mermaid import lands here. Fresh ids, grid
-     layout. AS-3: the import is ADDITIVE (setNodes/setEdges append), so it is
-     ONE undo entry: pushHistory() snapshots the pre-import graph (and clears
-     `future`, the redo contract) BEFORE the append — a single Cmd+Z removes
-     exactly the import, redo restores it. (The old code wiped history here,
-     which was copied from the JSON import — but that path REPLACES the
-     board; this one appends, so the reset destroyed undoable work.) */
+  /* AQ21 — the export modal's TEXT imports land here. Fresh ids, grid layout.
+     AS-3: the import is ADDITIVE (setNodes/setEdges append), so it is ONE undo
+     entry: pushHistory() snapshots the pre-import graph (and clears `future`,
+     the redo contract) BEFORE the append — a single Cmd+Z removes exactly the
+     import, redo restores it. (The old code wiped history here, which was
+     copied from the JSON import — but that path REPLACES the board; this one
+     appends, so the reset destroyed undoable work.)
+     GOBI-2: the `.gobi` door dispatches the SAME event, so both text doors get
+     the same append + the same single undo entry. Its detail is already REAL
+     board nodes/edges (the compiler ran the palette factories and the layout),
+     so it skips mermaidToGraph and inserts verbatim — through gobiInsert, which
+     remaps ids a canvas node already owns. */
+  /* The append must see the ids the canvas REALLY owns, not the ones this
+     effect closed over when it subscribed (its deps stay [flash, tickTask]).
+     One assignment per render, never stale. */
+  const liveGraph = useRef({nodes, edges});
+  liveGraph.current = {nodes, edges};
   useEffect(() => {
     const h = (ev: Event) => {
       const parsed = (ev as CustomEvent).detail;
       if (!parsed) return;
+      if (parsed.from === 'gobi' && parsed.board) {
+        const ins = gobiInsert(parsed.board, liveGraph.current);
+        pushHistory();
+        setNodes(ns => [...ns, ...ins.nodes]);
+        setEdges(es => [...es, ...ins.edges]);
+        bumpHist(v => v + 1);
+        flash(`Imported ${ins.nodes.length} nodes · ${ins.edges.length} edges from .gobi`);
+        return;
+      }
       const {nodes: mmNodes, edges: mmEdges, nextId} = mermaidToGraph(parsed, readNextId());
       setNextId(nextId);
       pushHistory();

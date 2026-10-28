@@ -5432,6 +5432,23 @@ kbd {
   border-radius: var(--r-md, 8px); padding: var(--space-2, 8px);
   resize: vertical; min-height: 70px;
 }
+/* GOBI-2 — the .gobi door's compile errors: ONE ROW PER ERROR, the position
+   first in the mono face so a column of line:col reads as a single gutter.
+   Tokens only, and the same border/padding rhythm as .em-ta above so the box
+   and its errors read as one control. */
+.em-errs {
+  margin: 0; padding: var(--space-2, 8px); list-style: none;
+  display: flex; flex-direction: column; gap: var(--space-1, 4px);
+  max-height: 132px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 2px solid var(--red);
+  border-radius: var(--r-md, 8px);
+}
+.em-err { font-size: var(--fs-2xs); color: var(--fg); line-height: 1.45; }
+.em-err-at {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--red); margin-right: var(--space-1, 4px);
+}
 .em-stage {
   flex: 1 1 auto; min-height: 320px; overflow: auto;
   border: 1px solid var(--border); border-radius: var(--r-lg, 14px);

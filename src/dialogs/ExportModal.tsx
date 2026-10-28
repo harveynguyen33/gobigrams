@@ -89,6 +89,13 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   const [exportBusy, setExportBusy] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  /* GOBI-2 — the `.gobi` door's own state. The error shape is declared HERE
+   * rather than imported from src/gobi on purpose: a type import is still a
+   * static import of the compiler module, and the modal must reach the
+   * compiler only through import() (checks/round-gobi-door.mjs A3/A4). */
+  const [gobiText, setGobiText] = useState('');
+  const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
+  const [gobiNote, setGobiNote] = useState<string | null>(null);
   const tabRef = useRef<HTMLButtonElement>(null);
 
   const scoped = useMemo(() => {
@@ -191,6 +198,28 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     window.setTimeout(onClose, 900);
   };
 
+  /* GOBI-2 — the `.gobi` door. Same tab, same event, one undo entry; the
+   * ONLY differences from the Mermaid box are the language and the fact that
+   * the compiler is the app's own (so a bad paste comes back as structured
+   * errors instead of a re-parse). The compiler arrives through import(): the
+   * modal never statically imports src/gobi, so this door costs the main
+   * bundle nothing until someone pastes. */
+  const doImportGobi = async () => {
+    setGobiErrors([]);
+    setGobiNote(null);
+    const {compileGobi} = await import('../gobi');
+    const res = compileGobi(gobiText);
+    if (res.ok === false) {
+      /* NOTHING is dispatched: the board is untouched and the errors ARE the
+       * answer — one row per error, line:column first. */
+      setGobiErrors(res.errors);
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board: res.board}}));
+    setGobiNote(`Compiled ${count(res.board.nodes.length, 'node')} · ${count(res.board.edges.length, 'edge')} — inserting onto the board…`);
+    window.setTimeout(onClose, 900);
+  };
+
   return (
     <div className="sp-overlay em-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="em-modal" role="dialog" aria-label="Export or import diagram">
@@ -218,6 +247,33 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
               </button>
               {importMsg && <div className="em-note">{importMsg}</div>}
               <div className="em-note">Flowchart subset: node shapes, edge labels, subgraphs. Styling (classDef) is not imported.</div>
+
+              {/* GOBI-2 — the .gobi door, beside Mermaid (same tab, same import
+                  event, same one-undo-step contract). Errors replace the note
+                  row: one line per compile error, line:col first, and NOTHING
+                  reached the canvas. */}
+              <div className="em-label">From .gobi text</div>
+              <textarea
+                className="em-ta"
+                placeholder={'board "Kafka rebalance storm"\ndirection LR\nbroker = service "Broker" icon:server color:amber\nbroker -> orders "append" flow:dots'}
+                value={gobiText}
+                onChange={ev => setGobiText(ev.target.value)}
+                rows={8}
+                spellCheck={false}
+              />
+              <button className="em-go" onClick={doImportGobi} disabled={!gobiText.trim()}>
+                Import .gobi
+              </button>
+              {gobiErrors.length > 0 && (
+                <ul className="em-errs" role="alert">
+                  {gobiErrors.map((e, i) => (
+                    <li className="em-err" key={`${e.line}:${e.col}:${i}`}>
+                      <span className="em-err-at">{e.line}:{e.col}</span> {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="em-note">{gobiNote ?? 'Gobigrams’ own text format — compiles onto this board in one undo step.'}</div>
 
               <div className="em-label">From file</div>
               <button className="em-go secondary" onClick={onImportJson}>

@@ -42,6 +42,13 @@ research/
 # by checks/round-ay-png-diff.mjs; only the BEFORE fixtures are committed)
 .ay4-png-after/
 .ay4-diff-report.json
+# ROUND GOBI-2 scratch: the .gobi live probe's screenshots + console log
+.gobi-live/
+# ROUND GOBI-2: scripts/gobi-render.mjs bundles the TS compiler into the repo
+# root (a /tmp file cannot resolve this project's node_modules), then removes it
+.gobi-render-entry.ts
+.gobi-render-out.mjs
+
 # ROUND C scratch: the live-probe artefacts (probe board SVG/PNG rasters,
 # regenerated per run by checks/round-c-live.mjs)
 .rc-live/
