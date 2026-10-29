@@ -25,6 +25,7 @@ import {parseGobi} from './gobiParser';
 import {validateGobi} from './gobiValidator';
 import {
   GOBI_CARD_TOKENS,
+  GOBI_KIND_ITEM,
   type GobiAst,
   type GobiEdgeStmt,
   type GobiError,
@@ -33,25 +34,17 @@ import {
 
 /* ------------------------------------------------------------------ kinds */
 
-/** kind → palette LABEL (the unique key every palette list carries). */
-const KIND_LABEL: Record<string, string> = {
-  service: 'Service', database: 'Database', queue: 'Queue', external: 'External',
-  actor: 'Actor', storage: 'Storage', gateway: 'Gateway', group: 'Group', note: 'Note',
-  terminator: 'Terminal', process: 'Process', decision: 'Decision', io: 'Input / Output',
-  document: 'Document', subprocess: 'Predefined process', preparation: 'Preparation',
-  manual: 'Manual operation', delay: 'Delay', connector: 'On-page connector',
-  offpage: 'Off-page connector', manualinput: 'Manual input', display: 'Display',
-  storeddata: 'Stored data', looplimit: 'Loop limit', internalstorage: 'Internal storage',
-  text: 'Text',
-};
-
-/** REAL palette items — PALETTE and FLOWCHART_PALETTE stay UNFILTERED by the
- *  create-surface gates (the flags only gate LIBRARY), so the compiler speaks
- *  the full v1 vocabulary whatever the UI currently offers. */
+/** ROUND GOBI-LOCK — kind → palette item is DERIVED from the same registry
+ * union gobiTypes builds its vocabulary from (GOBI_KIND_ITEM): the kind word
+ * IS the item's Shape id (or `text`/`table` for the two non-shape kinds), and
+ * the palette LABEL (the unique key every palette list carries) comes along
+ * for the ride. The hand-written 27-entry KIND_LABEL map this replaces could
+ * drift from the registry in either direction — the exact defect the lock
+ * closes; checks/round-gobi-lock.mjs C7 asserts no restatement returns. */
 const ITEMS: PaletteItem[] = [...PALETTE, ...FLOWCHART_PALETTE, TABLE_PALETTE_ITEM];
 
 const itemFor = (kind: string): PaletteItem | undefined =>
-  ITEMS.find((p) => p.label === KIND_LABEL[kind]);
+  ITEMS.find((p) => p.label === GOBI_KIND_ITEM[kind]?.label);
 
 /* ------------------------------------------------------------- the result */
 

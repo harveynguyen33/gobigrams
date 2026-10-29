@@ -5,6 +5,14 @@ import type {ColorKey} from '../colors';
 import type {CrowFoot} from '../nodes/Crowfoot';
 import type {Pt, BendPhase} from '../edgeBend';
 import type {LabelWrite} from '../edgeLabel';
+import type {FlowIconName} from '../nodes/flowIcons';
+
+/** ROUND GOBI-LOCK — the ONE edge-flow vocabulary. The canvas's edge options
+ * row (App.tsx), the renderer and the .gobi language (src/gobi/gobiTypes.ts)
+ * all read THIS array, so no hand-listed copy can disagree with the registry.
+ * round-gobi-lock L4c holds the language's array equal to it. */
+export const EDGE_FLOW_KINDS = ['none', 'dots', 'dash', 'pulse', 'icon'] as const;
+export type EdgeFlowKind = (typeof EDGE_FLOW_KINDS)[number];
 
 /* The edge's stored `data` shape — the members ROUND AK..BN wrote, verbatim
    from the renderer's own cast (moved so the panel and the renderer read ONE
@@ -17,8 +25,8 @@ export type EdgeData = {
        return/self = dashed + open. Colour follows the edge's own stroke. */
     seqMsg?: 'sync' | 'async' | 'return' | 'self';
     offset?: 'center' | 'start' | 'end';
-    flow?: 'none' | 'dots' | 'dash' | 'pulse' | 'icon';
-    flowIcon?: 'mail' | 'package' | 'file' | 'zap' | 'settings' | 'database';
+    flow?: EdgeFlowKind;
+    flowIcon?: FlowIconName;
     flowCount?: number;
     flowDuration?: number;
     /** L1: symbolic stroke key — resolved per theme. */

@@ -34,6 +34,10 @@ export function usePersistence(
   setBoardList: React.Dispatch<React.SetStateAction<BoardMeta[]>>,
   flash: (msg: string) => void,
   applyBoard: (doc: BoardDoc) => void,
+  /** GOBI-S1 — true while a share-link fragment owns the boot: the last-board
+   *  bootstrap is skipped entirely (a shared view never loads, and never
+   * seeds, the visitor's own boards). */
+  shareActive: React.MutableRefObject<boolean>,
 ) {
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -228,6 +232,15 @@ export function usePersistence(
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
+    /* GOBI-S1 — a share view owns this boot: no board is loaded and none is
+       seeded. `boardLoaded` flips true here directly (the async path below
+       does it in its finally) so the empty-state panel logic behaves; the
+       save gate stays closed (the shared doc's id is never written to
+       boardLoadedDocId — useShareView). */
+    if (shareActive.current) {
+      setBoardLoaded(true);
+      return;
+    }
     (async () => {
       try {
         let list = await boards.listBoards();
@@ -265,7 +278,7 @@ export function usePersistence(
         setBoardLoaded(true);
       }
     })();
-  }, []);
+  }, [shareActive]);
 
   return [saveState, modeLabel, storageEstimate, localMode, dirty,
     flushSave, refreshBoards, saveTimer, skipAutosave] as const;

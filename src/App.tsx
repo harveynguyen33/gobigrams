@@ -44,6 +44,12 @@ import {useRotation} from './useRotation';
 import {ROTATE_SNAP_DEG} from './layoutConstants';
 import {GroupRotateGrip} from './components/GroupRotateGrip';
 import {SelectionBox} from './components/SelectionBox';
+/* GOBI-S1 — the share view: hook (route + decode + edit-copy) and chrome.
+ * BoardsPopover is the GOBI-S1 extraction that PAID for this round's App
+ * lines (the hard cap may never grow). */
+import {useShareView, shareViewPayload} from './useShareView';
+import {ShareBanner} from './components/ShareBanner';
+import BoardsPopover from './components/BoardsPopover';
 import TableNode, {type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
@@ -798,10 +804,13 @@ export default function App() {
      bump and the undo/selection reset) and is passed in; saveTimer and
      skipAutosave come back out because two later App sites still write them
      (the board-switch cancel and the beforeunload fast flush). */
+  /* GOBI-S1 — a fragment-owned boot (`#b=`) is a SHARE VIEW: the persistence
+   * bootstrap must not load (or seed) the visitor's boards while it is on. */
+  const shareActive = useRef(shareViewPayload() !== null);
   const [saveState, modeLabel, storageEstimate, localMode, dirty,
     flushSave, refreshBoards, saveTimer, skipAutosave] = usePersistence(
     nodes, edges, nodesRef, edgesRef, curBoard, presetId, mode, autosave,
-    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard);
+    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard, shareActive);
 
   /* ROUND BN-2 — the boards menu cluster now lives in useBoardsMenu.ts
      (moved verbatim). boardsOpen/boardList/curBoard/presetId stay here
@@ -844,6 +853,13 @@ export default function App() {
   // ---- history (undo / redo) ----
   const [past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo] = useUndoHistory(
     nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
+
+  /* GOBI-S1 — the share view route (see useShareView). `shareActive` is
+   * declared above usePersistence so the bootstrap gate can read it. */
+  const {shareDoc, shareError, shareHome, editCopy, dismissError} = useShareView(
+    setNodes, setEdges, setCurBoard, setBoardList, setBoardLoadedDocId,
+    adoptBoardPreset, setReadOnly, readOnlyRef, pushHistory,
+    () => rf?.fitView({padding: 0.25, maxZoom: 1}), flash, shareActive);
 
   /* ROUND ROTATE — the rotation write cluster (grip gesture + selection
      chord; one undo entry per gesture — see src/useRotation.ts).
@@ -3876,96 +3892,27 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 never render inside the head. The inline style carries the
                 anchor computed in `boardsPopClamp` (left = button right + 6,
                 top = button top, max-width = viewport − anchor − 8). */}
-            {boardsOpen && boardsPopPos && createPortal(
-              <div
-                className="pop boards-pop"
-                style={{position: 'fixed', left: boardsPopPos.left, top: boardsPopPos.top, maxWidth: Math.min(360, boardsPopPos.maxW), width: 360}}
-              >
-                {/* AT-1 — mode is VISIBLE, not guessed: one small line above the
-                    list. server → "Saved to server files"; local → "Saved in
-                    this browser". No dead buttons, no modal, no override (the
-                    mode follows the host; a manual switcher is out of scope). */}
-                <div className="boards-mode" data-storage-mode aria-live="polite">{modeLabel}</div>
-                {/* AT-4 #2 — the storage readout (local mode only): estimate()
-                    as "X MB used of ~Y MB" + ONE honesty sentence. No scare
-                    modals; the JSON export it names is the Export modal's
-                    JSON button, already in the app. */}
-                {localMode && storageEstimate && (
-                  <div className="boards-mode boards-storage-readout" data-storage-readout>
-                    {storageEstimate}
-                  </div>
-                )}
-                {/* ITEM B — the LIST owns the scroll (`overflow-y: auto`,
-                    `max-height: 300px`); the actions block below is PINNED and
-                    always visible (Save now reachable at any list length). */}
-                <div className="boards-list">
-                  {boardList.map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className={`pop-item boards-item${b.id === curBoard?.id ? ' current' : ''}`}
-                      title={b.name}
-                      onClick={() => void openBoard(b.id)}
-                    >
-                      {/* ITEM B — de-cramped row: the NAME is its own
-                          ellipsising line and the preset badge sits OUTSIDE
-                          it (it used to live INSIDE the ellipsising span and
-                          clipped to "Ar…" on any narrow popup). `title` on
-                          the row carries the full name through truncation. */}
-                      <span className="boards-item-name">{b.name}</span>
-                      <span className="boards-item-preset">{getPreset(b.preset).label}</span>
-                      <span className="boards-item-meta">
-                        {b.nodeCount}n · {b.edgeCount}e · {fmtDate(b.updatedAt)}
-                      </span>
-                    </button>
-                  ))}
-                  {!boardList.length && <div className="boards-empty">No boards yet</div>}
-                </div>
-                <div className="boards-actions">
-                  {/* ITEM 6b — every row closes the menu and opens the designed
-                      dialog. Focus returns to the BOARDS BUTTON on close, not to
-                      the row: choosing a row unmounts the menu, so a row ref is
-                      already null by the time the dialog finishes. The trigger
-                      that still exists is the one focus goes back to. */}
-                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); newBoard(); }}>
-                    <Plus size={14} /> New board
-                  </button>
-                  {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery's ONLY entry
-                      point (D2: boards menu only; a toolbar chip is a recorded
-                      deferral, not an omission to fix here). It sits beside
-                      "New board" because it is the same intent — start a board —
-                      with a catalog in front of it.
-                      ROUND 4, ITEM 2 — the row read "Create from Templates"
-                      (Harvey, verbatim: "Còn cái Templates... bên ngoài thì đổi
-                      thành Create from Templates"). Only the MENU ROW was
-                      renamed; the gallery's own heading is still "Templates".
-                      ITEM B (2026-10-22) — HARVEY: the label must NOT wrap, so
-                      the row is shortened to "Templates" (the handler, the
-                      stash-clear and the route are untouched). checks tg11 and
-                      round-4 i2 are RE-ANCHORED to the new literal, dated.
-                      ROUND 6, ITEM 3 — this route has NO typed name, so it is
-                      the one place that MUST empty the dialog's name stash: a
-                      name abandoned in an earlier dialog would otherwise name
-                      this unrelated board. The gallery then auto-numbers. */}
-                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}>
-                    <LayoutTemplate size={14} /> Templates
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
-                    <Pencil size={14} /> Rename
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); void doDuplicateBoard(); }}>
-                    <Copy size={14} /> Duplicate
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); deleteBoard(); }}>
-                    <Trash2 size={14} /> Delete
-                  </button>
-                  <button type="button" className="pop-item primary" disabled={!curBoard} onClick={() => { setBoardsOpen(false); void flushSave(); }}>
-                    <Save size={14} /> Save now
-                  </button>
-                </div>
-              </div>,
-              document.body,
-            )}
+            {/* GOBI-S1 — the popover JSX moved to src/components/BoardsPopover.tsx
+                (the extraction that paid for this round's App lines; harness
+                boards-popover-pinned reads App + useBoardsMenu + the component). */}
+            <BoardsPopover
+              open={boardsOpen}
+              pos={boardsPopPos}
+              modeLabel={modeLabel}
+              localMode={localMode}
+              storageEstimate={storageEstimate}
+              boardList={boardList}
+              curBoard={curBoard}
+              fmtDate={fmtDate}
+              onOpenBoard={id => void openBoard(id)}
+              onClose={() => setBoardsOpen(false)}
+              onNewBoard={() => { setBoardsOpen(false); newBoard(); }}
+              onTemplates={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}
+              onRename={() => { setBoardsOpen(false); renameBoard(); }}
+              onDuplicate={() => { setBoardsOpen(false); void doDuplicateBoard(); }}
+              onDelete={() => { setBoardsOpen(false); deleteBoard(); }}
+              onSaveNow={() => { setBoardsOpen(false); void flushSave(); }}
+            />
           </div>
           <div className={`save-ind${saveState === 'saving' ? ' busy' : ''}${saveState === 'error' ? ' err' : ''}`} aria-live="polite">
             {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : saveState === 'error' ? 'save failed' : (dirty && !autosave ? 'unsaved' : '')}
@@ -4304,6 +4251,19 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ref={wrap}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}>
+        {/* GOBI-S1 — the share view's banner (or its error card) sits above
+            the toolbar: a fragment-owned board announces itself read-only and
+            offers the ONE exit. Nothing renders when no fragment is present. */}
+        {(shareDoc || shareError) && (
+          <ShareBanner
+            mode={shareError ? 'error' : 'viewing'}
+            boardName={shareDoc?.name ?? ''}
+            reason={shareError ?? undefined}
+            home={shareHome}
+            onEditCopy={() => void editCopy()}
+            onOpenApp={() => void dismissError()}
+          />
+        )}
         {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
             in src/components/Toolbar.tsx; App threads every state/handler. */}
         <Toolbar

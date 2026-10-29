@@ -30,7 +30,12 @@ import type {ReactNode} from 'react';
  * the edge's colour and the chip's size, the panel sets the chip's), so nothing
  * here bakes in a stroke width or a class that would fight the caller.
  */
-export const FLOW_ICON_PATHS: Record<string, ReactNode> = {
+/* ROUND GOBI-LOCK — FlowIconName is derived from the table's own keys (the
+ * `as const satisfies` form keeps every key a literal at the type level while
+ * the runtime object stays byte-identical): the .gobi flowIcon: vocabulary
+ * (gobiTypes) and EdgeData.flowIcon read THIS table as the one registry; no
+ * second hand-listed icon set may exist. */
+const FLOW_ICON_TABLE = {
   // envelope / letter
   mail: (
     <>
@@ -66,4 +71,7 @@ export const FLOW_ICON_PATHS: Record<string, ReactNode> = {
       <path d="M3 12a9 3 0 0 0 18 0" />
     </>
   ),
-};
+} as const satisfies Record<string, ReactNode>;
+
+export type FlowIconName = keyof typeof FLOW_ICON_TABLE;
+export const FLOW_ICON_PATHS: Record<FlowIconName, ReactNode> = FLOW_ICON_TABLE;

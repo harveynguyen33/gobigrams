@@ -2,6 +2,11 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {EXPORT_TOKENS, tokensFor} from '../theme';
 import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
+/* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
+ * compiler (round-bn2 lazy law, pinned by round-gobi-door A3/A4): no static
+ * import of src/share keeps the codec off the boot path. The URL helpers read
+ * only `location`, so the modal pulls just what it needs at click time. */
+type ShareUrl = {payload: string; url: string; length: number};
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';
@@ -96,6 +101,11 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   const [gobiText, setGobiText] = useState('');
   const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
   const [gobiNote, setGobiNote] = useState<string | null>(null);
+  /* GOBI-S1 — the Share door's state: the built link (shown + copied) and a
+   * copy confirmation. `null` = not built yet (the row starts collapsed to a
+   * single button so the long URL does not own the modal on open). */
+  const [shareUrl, setShareUrl] = useState<ShareUrl | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const tabRef = useRef<HTMLButtonElement>(null);
 
   const scoped = useMemo(() => {
@@ -220,6 +230,26 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     window.setTimeout(onClose, 900);
   };
 
+  /* GOBI-S1 — the Share door: the CURRENT scoped board → one URL whose
+   * fragment carries the whole doc (never a server). Copy on build; show the
+   * link and its length; warn past the big-board threshold where some chat
+   * tools truncate pasted URLs. The codec + URL helper arrive by import(). */
+  const doShare = async () => {
+    const {buildShareUrl} = await import('../share');
+    const doc = {
+      id: 'shared', name: boardName ?? 'Shared diagram',
+      nodes: scoped.nodes, edges: scoped.edges, updatedAt: Date.now(),
+    };
+    const built = await buildShareUrl(doc);
+    const url = {payload: built.payload, url: built.url, length: built.url.length};
+    setShareUrl(url);
+    setShareCopied(false);
+    try {
+      await navigator.clipboard.writeText(url.url);
+      setShareCopied(true);
+    } catch { /* the link is still shown + selectable for manual copy */ }
+  };
+
   return (
     <div className="sp-overlay em-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="em-modal" role="dialog" aria-label="Export or import diagram">
@@ -327,6 +357,25 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           <div className="em-label">Theme</div>
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />
           <div className="em-note">Preview and file both use the chosen theme — what you see is what downloads.</div>
+
+          {/* GOBI-S1 — Share by link: the whole board rides the URL fragment,
+              so nothing touches a server. Beside the other doors, per spec §3.3. */}
+          <div className="em-label">Share</div>
+          <button className="em-go secondary" onClick={() => void doShare()}>
+            Build share link
+          </button>
+          {shareUrl && (
+            <>
+              <input className="em-share-url" readOnly value={shareUrl.url}
+                onFocus={e => e.currentTarget.select()} aria-label="Share link" />
+              <div className="em-note">
+                {shareCopied ? 'Copied to clipboard — ' : ''}{shareUrl.length.toLocaleString()} characters.
+              </div>
+              {shareUrl.length > 8000 && (
+                <div className="em-note" role="alert">This board is big — export JSON instead.</div>
+              )}
+            </>
+          )}
 
           {/* AR-3 — reads `exportBusy` only; a preview rebuild must not change
               this button's label or disabled state. */}

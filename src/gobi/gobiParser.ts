@@ -25,6 +25,7 @@ import {
   GOBI_FLOW_ICONS,
   GOBI_THEMES,
   GOBI_CARD_TOKENS,
+  gobiKindHint,
   gobiSuggest,
   gobiKindList,
   type GobiAst,
@@ -40,7 +41,7 @@ const SHAPE_KINDS = new Set<string>(GOBI_KINDS);
 const ATTR_KEYS = new Set(['sub', 'icon', 'color', 'kicker']);
 const EDGE_TAIL_KEYWORDS = new Set(['dashed', 'dotted', 'solid', 'flow', 'flowIcon', 'flowCount', 'card', 'techn', 'x']);
 
-type Declared = {kind: 'node' | 'group' | 'table' | 'text'; line: number};
+type Declared = {kind: 'node' | 'group' | 'table' | 'text' | 'invalid'; line: number};
 
 export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; ast: GobiAst | null; errors: GobiError[]} {
   const errors: GobiError[] = [];
@@ -56,6 +57,14 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
 
   const ast: GobiAst = {board: null, direction: 'TB', theme: null, statements: []};
   const declared = new Map<string, Declared>();
+  /** Bind id -> an INVALID placeholder (GOBI-FIX2). Used ONLY when a declaration
+   *  fails solely on an unknown kind: the id still counts as "seen" so edges and
+   *  membership blocks referencing it do NOT re-report "never declared" (one bad
+   *  kind = one error). Diagnosis only — the document still refuses and never
+   *  emits a board, and the placeholder never reaches the AST or a BoardDoc.
+   *  Keep the FIX2-BIND markers: the round-gobi-errors.mjs negative control
+   *  reverts exactly these lines to prove C1 goes red without them. */
+  const declare = (id: string, d: Declared) => { declared.set(id, d); };
   let sawStatement = false; // board must be the FIRST statement (before any other)
 
   const err = (t: {line: number; col: number}, message: string, hint?: string) => {
@@ -192,8 +201,20 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
       if (suggestion) {
         err(kindTok, `I don't know the shape "${kindWord}". Did you mean "${suggestion}"?`);
       } else {
-        err(kindTok, `I don't know the shape "${kindWord}". Valid kinds: ${gobiKindList()}`);
+        // GOBI-FIX2: hopeless spellings still name the CLOSEST shipped kind
+        // (GOBI-HINT: curated role-word hints first, then the distance pick —
+        // never a synonym map, and the word itself stays refused). Falls back
+        // to the category list for a blank.
+        const closest = kindTok.type === 'ident' ? gobiKindHint(kindWord) : null;
+        err(kindTok, closest
+          ? `I don't know the shape "${kindWord}". Did you mean "${closest}"? Valid kinds: ${gobiKindList()}`
+          : `I don't know the shape "${kindWord}". Valid kinds: ${gobiKindList()}`);
       }
+      /* FIX2-BIND: the declaration failed ONLY on its kind — bind the id as an
+       * invalid placeholder so downstream edges/memberships stop re-reporting
+       * "never declared". Structural failures (no kind word, malformed line)
+       * keep cascading by design. FIX2-BIND */
+      declare(id, {kind: 'invalid', line: idTok.line});
       skipToNextLine(); return;
     }
     next();
@@ -201,7 +222,7 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
       err(idTok, `"${id}" is declared twice. Rename one of them.`);
     }
     const nodeKind = kindWord as GobiNodeKind;
-    declared.set(id, {kind: nodeKind === 'group' ? 'group' : nodeKind === 'table' ? 'table' : nodeKind === 'text' ? 'text' : 'node', line: idTok.line});
+    declare(id, {kind: nodeKind === 'group' ? 'group' : nodeKind === 'table' ? 'table' : nodeKind === 'text' ? 'text' : 'node', line: idTok.line});
 
     const stmt: GobiStatement = {
       kind: 'node', id, nodeKind,

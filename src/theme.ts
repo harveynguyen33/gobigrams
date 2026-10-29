@@ -47,7 +47,10 @@ export const THEME_CARDS: ThemeCard[] = [
   {id: 'contrast', name: 'Contrast', note: 'high contrast · accessibility', auto: false},
 ];
 
-const THEME_IDS: ThemeName[] = ['dark', 'light', 'paper', 'midnight', 'contrast'];
+/* ROUND GOBI-LOCK — exported so the .gobi vocabulary (src/gobi/gobiTypes.ts)
+ * derives its theme: words from the ONE registry instead of restating them;
+ * round-gobi-lock L4e holds the two equal. */
+export const THEME_IDS: ThemeName[] = ['dark', 'light', 'paper', 'midnight', 'contrast'];
 /** ITEM 1 — EXPORTED because the pre-paint boot script in `index.html`'s <head>
  *  cannot import it: it reads the same key by literal. `checks/theme-boot-sync.mjs`
  *  asserts the two literals are equal, so a rename of this key cannot silently

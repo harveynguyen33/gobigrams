@@ -5459,6 +5459,41 @@ kbd {
   font: inherit; font-size: var(--fs-2xs); color: var(--dim);
   white-space: pre-wrap; word-break: break-word; margin: 0;
 }
+/* GOBI-S1 — the share-link field: the URL is read-only (built, not typed),
+   select-on-focus so one click selects it for manual copy, mono + tabular
+   digits so the length note and the field read as one row. Tokens only. */
+.em-share-url {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-2xs); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px); padding: var(--space-2, 8px);
+  width: 100%; box-sizing: border-box; cursor: text;
+}
+/* GOBI-S1 — the share view's banner: one row above the canvas (name + why
+   read-only + the two exits), and the error-card variant for a broken link.
+   Tokens only; flex-wrap keeps it honest on the phone tier. */
+.ds-share-banner {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 6;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+/* The floating toolbar (absolute, top:14, centre) would sit ON the banner;
+   while a banner is present the toolbar drops below it. :has() keeps the
+   coupling in the sheet — no second state flag in App. */
+.canvas-wrap:has(.ds-share-banner) .toolbar { top: 64px; }
+.ds-share-title { font-size: var(--fs-sm); font-weight: 650; color: var(--fg); }
+.ds-share-sub { font-size: var(--fs-2xs); color: var(--dim2); flex: 1 1 160px; }
+.ds-share-actions { display: flex; gap: var(--space-2, 8px); margin-left: auto; }
+.ds-share-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--bg); background: var(--acc);
+  border: 0; border-radius: var(--r-md, 8px);
+  padding: 4px var(--space-2, 8px); cursor: pointer; text-decoration: none;
+}
+.ds-share-btn.secondary { background: var(--surface); color: var(--fg); border: 1px solid var(--border); }
+.ds-share-error { border-left: 3px solid var(--red); }
 
 /* AQ10 — slanted silhouettes: the INSCRIBED RECTANGLE must sit inside the
    outline, not just a generous border band — Harvey's screenshot: "Decision?"
