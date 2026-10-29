@@ -78,7 +78,7 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onTakeTour, onSendFee
             <div className="help-row"><span>Rotate selection<span className="help-hint">Shift-drag the grip snaps 15°</span></span><span className="help-keys"><kbd>Alt</kbd><kbd>R</kbd></span></div>
             <div className="help-row"><span>Deselect</span><span className="help-keys"><kbd>Esc</kbd></span></div>
             <div className="help-row"><span>Fit view to diagram</span><span className="help-keys"><kbd>⇧</kbd><kbd>1</kbd></span></div>
-            <div className="help-row"><span>Toggle read-only review mode</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>
+            <div className="help-row"><span>Read-only review</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>
             {/* the same hint Settings → Shortcuts shows on this row, so the two
                 surfaces carry the same information (item 4), not just the same
                 labels */}

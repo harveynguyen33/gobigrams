@@ -75,7 +75,7 @@ const SHORTCUTS_KEYS: {what: string; keys: string[]}[] = [
   {what: 'Deselect',                 keys: ['Esc']},
   {what: 'Rotate selection',         keys: ['Alt', 'R']},
   {what: 'Fit view to diagram',      keys: ['⇧', '1']},
-  {what: 'Toggle read-only review mode', keys: ['⇧', '2']},
+  {what: 'Read-only review',        keys: ['⇧', '2']},
   {what: 'Nudge selection',          keys: ['←↑↓→']},
   {what: 'Collapse / expand both panels', keys: ['⌘/Ctrl', '⌃', '⇧', '\\']},
   {what: 'Toggle left panel',            keys: ['⌘/Ctrl', '⌃', '⇧', '[']},
@@ -149,7 +149,7 @@ function ConnectionsPane({
         {/* HARVEY 2026-10-13 — Proximity connect REMOVED (feature retired). The
             replacement is dblclick-on-a-handle -> nearest-shape connect, and it
             is a real control: default ON, with an adjustable reach. */}
-        <Row label="Connect on handle double-click" hint="double-click a connection dot to join the nearest shape within reach">
+        <Row label="Connect on handle double-click" hint="double-click a dot to join the nearest shape in reach">
           <Toggle
             label="Connect on handle double-click"
             value={dblConnect}
@@ -157,7 +157,7 @@ function ConnectionsPane({
           />
         </Row>
         {dblConnect && (
-          <Row label="Connect reach" hint="how far (in canvas px) the nearest shape may be; beyond it nothing connects">
+          <Row label="Connect reach" hint="how far the nearest shape may be">
             <Segmented
               label="Connect reach"
               options={dblRangeOptions(dblRange)}

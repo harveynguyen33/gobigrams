@@ -342,10 +342,3 @@ export function gridLayout(nodes: Node[], edges: Edge[], opts: {cols?: number; g
   return result;
 }
 
-/** Linear interpolation between two positions (used by the layout animation). */
-export const lerpPos = (a: {x: number; y: number}, b: {x: number; y: number}, t: number) => ({
-  x: a.x + (b.x - a.x) * t,
-  y: a.y + (b.y - a.y) * t,
-});
-
-export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);

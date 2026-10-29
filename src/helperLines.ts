@@ -66,8 +66,6 @@ export type HelperGuides = {
   horizontal: {y: number; x1: number; x2: number} | null;
 };
 
-export const NO_GUIDES: HelperGuides = {vertical: null, horizontal: null};
-
 const anchorsX = (x: number, w: number) => [x, x + w / 2, x + w];
 const anchorsY = (y: number, h: number) => [y, y + h / 2, y + h];
 

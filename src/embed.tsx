@@ -16,7 +16,7 @@
  * app-wide persistence/bootstrap machinery — an embed must never read or
  * write the visitor's boards, so this component owns no board state at all.
  * (feature-map home: src/embed.tsx) */
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ReactFlow,
   Background,
@@ -33,14 +33,11 @@ import {ShareBanner} from './components/ShareBanner';
 import {nodeTypes, embedNodes} from './embedNodeTypes';
 import {edgeTypes} from './edges';
 
-/** The fragment key a shared link uses (mirrors src/share's SHARE_KEY). */
-const SHARE_FRAGMENT = '#b=';
-
 /** Read the share payload off the current URL. Null when absent. */
 function embedPayload(): string | null {
   try {
     const h = location.hash;
-    return h.startsWith(SHARE_FRAGMENT) ? decodeURIComponent(h.slice(SHARE_FRAGMENT.length)) : null;
+    return h.startsWith('#b=') ? decodeURIComponent(h.slice(3)) : null;
   } catch { return null; }
 }
 
@@ -53,15 +50,13 @@ function EmbedFlow() {
   const [state, setState] = useState<EmbedState>({phase: 'decoding'});
   const fitted = useRef(false);
 
-  useEffect(() => {
-    const payload = embedPayload();
-    if (!payload) { setState({phase: 'error', reason: 'missing'}); return; }
-    let alive = true;
-    (async () => {
-      /* The SAME decoder every door uses — never a local parser. */
+  /* The ONE decode+apply path (GOBI-SHARE-FIX): the mount decode and every
+     hashchange route through it. The SAME decoder every door uses — never a
+     local parser. */
+  const applyEmbed = useCallback(async (payload: string) => {
+    try {
       const mod = await import('./share');
       const res = await mod.decodeShare(payload);
-      if (!alive) return;
       if (res.ok === false) { setState({phase: 'error', reason: res.reason}); return; }
       const doc = migrateDoc(res.board);
       setState({
@@ -72,9 +67,23 @@ function EmbedFlow() {
            and paints no bend affordances. */
         edges: doc.edges.map(e => ({...e, selected: false, data: {...(e.data ?? {}), readOnly: true}})),
       });
-    })();
-    return () => { alive = false; };
+    } catch { setState({phase: 'error', reason: 'network'}); }
   }, []);
+  /* (applyEmbed has [] deps — stable — so the listener calls it directly.) */
+
+  /* Mount decode AND the address-bar re-decode (GOBI-SHARE-FIX), one effect
+     — the same contract as the share view, minus the exits. One listener,
+     removed on unmount. */
+  useEffect(() => {
+    const onEmbedHash = () => {
+      const payload = embedPayload();
+      if (payload === null) { setState({phase: 'error', reason: 'missing'}); return; }
+      void applyEmbed(payload);
+    };
+    onEmbedHash();
+    window.addEventListener('hashchange', onEmbedHash);
+    return () => window.removeEventListener('hashchange', onEmbedHash);
+  }, [applyEmbed]);
 
   /* Nothing is clickable in an embed: selection would only paint state the
      embed cannot use, and a click must not look like it did something
@@ -85,7 +94,7 @@ function EmbedFlow() {
   if (state.phase === 'error') {
     return (
       <div className="embed-shell">
-        <ShareBanner mode="error" boardName="" reason={state.reason} home="" onEditCopy={() => {}} onOpenApp={() => {}} />
+        <ShareBanner mode="error" boardName="" reason={state.reason} onEditCopy={() => {}} onOpenApp={() => {}} />
       </div>
     );
   }

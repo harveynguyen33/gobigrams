@@ -20,7 +20,7 @@ export function CanvasPane({
       <h2 className="settings-h" id="settings-title">Canvas</h2>
       <p className="settings-sub">How the drawing surface behaves.</p>
       <div className="settings-rows">
-        <Row label="Grid size" hint="the snap grid pitch in pixels; the visible dot grid uses the same value">
+        <Row label="Grid size" hint="snap grid pitch; the visible dot grid uses the same value">
           <Segmented
             label="Grid size"
             options={gridSizeOptions(gridSize)}
@@ -31,12 +31,12 @@ export function CanvasPane({
         {/* PACKAGE-S §S-3 — the autosave control. Default ON = the historical
             behaviour; OFF stops the debounced write and the save indicator shows
             `unsaved` until Save / Cmd+S flushes. */}
-        <Row label="Autosave" hint="write the board automatically as you work; off means you save with Cmd+S and the indicator shows when work is unsaved">
+        <Row label="Autosave" hint="save as you work; off = Cmd+S, the indicator shows unsaved work">
           <Toggle label="Autosave" value={autosave} onToggle={() => onAutosave(v => !v)} />
         </Row>
         {/* PACKAGE-S §S-2 — export defaults. Defaults (2x / 48) are today's
             hard-coded values, so a user who never opens Settings sees no change. */}
-        <Row label="PNG export scale" hint="resolution multiplier for Export PNG: 1x fastest and smallest, 3x sharpest">
+        <Row label="PNG export scale" hint="1x fastest, 3x sharpest">
           <Segmented
             label="PNG export scale"
             options={['1x', '2x', '3x']}
@@ -44,7 +44,7 @@ export function CanvasPane({
             onPick={(v) => onPngScale(parseInt(v, 10))}
           />
         </Row>
-        <Row label="Export padding" hint="empty space around the diagram in the exported image, in pixels">
+        <Row label="Export padding" hint="empty space around the export, in pixels">
           <Segmented
             label="Export padding"
             options={['24', '48', '96']}
@@ -52,7 +52,7 @@ export function CanvasPane({
             onPick={(v) => onPngPad(parseInt(v, 10))}
           />
         </Row>
-        <Row label="Alignment guides" hint="dashed guides appear when a node lines up with a neighbour that is close by">
+        <Row label="Alignment guides" hint="dashed guides when a node aligns with a neighbour">
           <Toggle label="Alignment guides" value={alignGuides} onToggle={() => onAlignGuides(v => !v)} />
           <ToolbarChip />
         </Row>
@@ -63,7 +63,7 @@ export function CanvasPane({
             group. Values print as plain language (`Touch` / `Enclose`) while the
             stored token stays `touch` / `enclose`, and the hint states what each
             one does in the terms Harvey used when he asked for it. */}
-        <Row label="Marquee selection" hint="what a drag-box on the empty canvas picks up">
+        <Row label="Marquee selection" hint="what a drag-box on canvas picks up">
           <Segmented
             label="Marquee selection"
             options={MARQUEE_OPTS.map(o => o.v)}
@@ -77,7 +77,7 @@ export function CanvasPane({
             selecting never reorders, so Bring to front / Send to back are always
             exactly what they say. 'Lift on select' restores the library's
             select-raises behaviour for anyone who prefers the pop. */}
-        <Row label="Layer display" hint="whether selecting a node raises it above its neighbours">
+        <Row label="Layer display" hint="whether a selected node lifts above its neighbours">
           <Segmented
             label="Layer display"
             options={ZORDER_OPTS.map(o => o.v)}
@@ -90,7 +90,7 @@ export function CanvasPane({
             supports exactly two); the stored token is the engine's own
             'TB' / 'LR' and the words on the buttons are the plain-language
             names, same convention as the marquee row above. */}        
-        <Row label="Auto-layout direction" hint="which way the Arrange button stacks layers: downward, or rightward">
+        <Row label="Auto-layout direction" hint="how Arrange stacks layers: downward or rightward">
           <Segmented
             label="Auto-layout direction"
             options={LAYOUT_DIR_OPTS.map(o => o.v)}
@@ -183,7 +183,6 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
       <img className="about-logo" src="/brand/lockup.svg" alt="Gobigrams" width={280} height={213} />
       <p className="settings-sub">
         <b>Gobigrams</b> — diagrams drawn by a goblin with a grudge and a ruler.
-        Surprisingly straight lines. Zero patience for messy boxes.
       </p>
       <div className="settings-rows">
         <Row label="Version">

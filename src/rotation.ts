@@ -74,12 +74,6 @@ export function paintRotation(data: Rotatable & {shape?: string}): number {
   return norm180((data.rotation ?? 0) + postitTilt(data.shape));
 }
 
-/** True when the root would carry no transform at all (keeps the DOM of
- *  untouched boards byte-identical: no style key, no repainting). */
-export function isRotated(data: Rotatable & {shape?: string}): boolean {
-  return paintRotation(data) !== 0;
-}
-
 /** The pure point rotation. `(x, y)` is a point in the box's local space
  *  (top-left origin); the box is `w × h`; the result is the point rotated
  *  `deg` degrees CLOCKWISE about the box centre, in the same local space.

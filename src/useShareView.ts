@@ -1,19 +1,21 @@
 /* useShareView.ts — ROUND GOBI-S1: the share-link VIEW ROUTE. On load, a
  * `#b=<payload>` fragment owns the canvas: the board is decoded from the URL
  * (never a server), rendered READ-ONLY, with no autosave — a shared link must
- * never write to the visitor's boards. "Edit a copy" clones it into a normal
- * editable board with ONE undo entry back to the shared view, and strips the
- * fragment so a reload does not re-enter read-only. (feature-map home: src/useShareView.ts)
+ * never write to the visitor's boards. "Copy to my boards" clones it into a
+ * normal editable board with ONE undo entry back to the shared view, and
+ * strips the fragment so a reload does not re-enter read-only.
+ * (feature-map home: src/useShareView.ts)
  *
  * The codec arrives by DYNAMIC import (the round-bn2 lazy law): nothing about
  * sharing costs the boot path until a link is actually opened.
  *
- * Save-gate interplay (AS-5): the shared doc is applied WITHOUT setting
- * `boardLoadedDocId`, so `canAutosave` stays false for the whole read-only
- * view — the debounced effect schedules nothing and every flushSave caller
- * (board switches, "Save now") writes nothing. The visitor's boards are
- * untouched; "Edit a copy" is the one exit, and it arms the gate for the NEW
- * board's id only. */
+ * ROUND GOBI-SHARE-FIX (Harvey's device test, 2026-10-29): editing the
+ * fragment in the address bar used to do NOTHING — the decode ran once on
+ * mount. Mount AND every `hashchange` now route through ONE decode+apply
+ * path (`applyShare`). Save-gate (AS-5): the shared doc is applied WITHOUT
+ * setting `boardLoadedDocId`, so `canAutosave` stays false for the whole
+ * read-only view; "Copy to my boards" is the one exit, and it arms the gate
+ * for the NEW board's id only. */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type * as React from 'react';
 import type {Edge, Node} from '@xyflow/react';
@@ -59,46 +61,69 @@ export function useShareView(
   const [shareDoc, setShareDoc] = useState<BoardDoc | null>(null);
   /** The decode failed: a plain reason string for the error card. */
   const [shareError, setShareError] = useState<string | null>(null);
-  /** The app's canonical home (for "Open in Gobigrams"), read from the codec
-   *  module at decode time so the prod-host constant stays in ONE place. */
-  const [shareHome, setShareHome] = useState('');
 
-  useEffect(() => {
-    const payload = shareViewPayload();
-    if (!payload) return;
-    let alive = true;
-    (async () => {
+  /* The ONE decode+apply path (GOBI-SHARE-FIX): mount and every hashchange
+     route through it — never a second parser; the SAME decoder every door
+     uses (harness S5f); a refusal is an error card, not a throw. READ-ONLY
+     rides the existing `readOnly` state (the preference key is NOT written —
+     this is the link's mode, not the user's) and the save gate stays CLOSED
+     (no setBoardLoadedDocId): nothing here may reach any board file. */
+  const applyShare = useCallback(async (payload: string) => {
+    try {
       const mod = await import('./share');
-      if (!alive) return;
-      setShareHome(mod.SHARE_BASE_URL);
-      /* The view route decodes through the SAME decoder every door uses —
-         never its own parser (harness S5f). A refusal is an error card, not
-         a throw and not a blank canvas. */
       const res = await mod.decodeShare(payload);
-      if (!alive) return;
-      if (res.ok === false) { setShareError(res.reason); return; }
+      /* GOBI-SHARE-ERR: a refusal takes the WHOLE scene with it — the same
+         two setters the success branch writes through (no second seam), so
+         the error card never sits over the previous board. */
+      if (res.ok === false) {
+        setShareError(res.reason); setShareDoc(null);
+        setNodes([]); setEdges([]);
+        return;
+      }
       const doc = migrateDoc(res.board);
+      setShareError(null);
       setShareDoc(doc);
-      /* READ-ONLY: review mode's own props/class gating (nodesDraggable,
-         panOnDrag, handle reveal…) ride the existing `readOnly` state. The
-         preference key is NOT written — this is the link's mode, not the
-         user's; "Edit a copy" turns it off. */
       setReadOnly(true);
       readOnlyRef.current = true;
       setNodes(doc.nodes.map(n => ({...n, selected: false})));
       setEdges(doc.edges.map(e => ({...e, selected: false})));
       setCurBoard(doc);
-      /* The save gate stays CLOSED (no setBoardLoadedDocId): nothing the
-         visitor does in this view may reach any board file. */
-    })();
-    return () => { alive = false; };
+    } catch {
+      /* Same contract as the refusal (GOBI-SHARE-ERR). */
+      setShareError('network'); setNodes([]); setEdges([]);
+    }
+  }, [setNodes, setEdges, setCurBoard, setReadOnly, readOnlyRef]);
+
+  /** A broken link is dismissible: reload at the stripped URL so the visitor
+   *  lands in the normal app (the bootstrap was skipped for the share boot,
+   *  so a live re-bootstrap is a reload, not a state patch). */
+  const dismissError = useCallback(() => {
+    stripFragment();
+    location.assign(location.pathname + location.search);
   }, []);
 
-  /** "Edit a copy": the ONE exit. Creates a real board holding the shared
-   *  content, applies it with ONE undo entry (pushHistory records the shared
-   *  view first — undo returns to it, the same contract as the JSON-import
-   *  path), arms the save gate for the copy's id only, strips the fragment,
-   *  and leaves review mode. */
+  /* Mount decode AND the address-bar re-decode (GOBI-SHARE-FIX), one effect:
+     a corrupt payload swaps the board for the error card; restoring a valid
+     one brings the board back; a removed fragment leaves cleanly (the
+     reload re-boots the normal app — the same contract as dismissing a
+     broken link). All deps are stable, so the listener binds once and is
+     removed on unmount. */
+  useEffect(() => {
+    const onShareHash = () => {
+      const payload = shareViewPayload();
+      if (payload === null) { dismissError(); return; }
+      void applyShare(payload);
+    };
+    if (shareViewPayload() !== null) onShareHash();
+    window.addEventListener('hashchange', onShareHash);
+    return () => window.removeEventListener('hashchange', onShareHash);
+    /* (GOBI-SHARE-ERR) deps trimmed: the others are refs/stable setters. */
+  }, [applyShare, dismissError]);
+
+  /** "Copy to my boards": the ONE exit — creates a real board with the shared
+   *  content, ONE undo entry back to the shared view (pushHistory first, the
+   *  JSON-import contract), arms the save gate for the copy's id only, strips
+   *  the fragment, and leaves review mode. */
   const editCopy = useCallback(async () => {
     if (!shareDoc) return;
     try {
@@ -131,13 +156,5 @@ export function useShareView(
   }, [shareDoc, setNodes, setEdges, setCurBoard, setBoardList, setBoardLoadedDocId,
     adoptBoardPreset, setReadOnly, readOnlyRef, pushHistory, fitView, flash, shareActive]);
 
-  /** A broken link is dismissible: reload at the stripped URL so the visitor
-   *  lands in the normal app (the bootstrap was skipped for the share boot,
-   *  so a live re-bootstrap is a reload, not a state patch). */
-  const dismissError = useCallback(() => {
-    stripFragment();
-    location.assign(location.pathname + location.search);
-  }, []);
-
-  return {shareDoc, shareError, shareHome, editCopy, dismissError} as const;
+  return {shareDoc, shareError, editCopy, dismissError} as const;
 }

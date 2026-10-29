@@ -975,6 +975,12 @@ body {
 .tbtn-icon.on {
   color: var(--sel); border-color: var(--sel); background: var(--sel-soft);
 }
+/* GOBI-SHARE-LOCK — a natively-disabled button fires no mouse events in
+   Chrome, so the disabled read-only toggle's hover is carried by this wrap
+   span (the Tooltip clones its handlers onto it); the inner button passes
+   pointer events through so its OWN disabled cursor still reads. */
+.tbtn-hold { display: inline-flex; flex: none; }
+.tbtn-hold > button:disabled { pointer-events: none; }
 
 /* custom tooltip (Tooltip.tsx) — position:fixed via inline style, portal'd to body */
 .tooltip {

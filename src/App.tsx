@@ -856,7 +856,7 @@ export default function App() {
 
   /* GOBI-S1 — the share view route (see useShareView). `shareActive` is
    * declared above usePersistence so the bootstrap gate can read it. */
-  const {shareDoc, shareError, shareHome, editCopy, dismissError} = useShareView(
+  const {shareDoc, shareError, editCopy, dismissError} = useShareView(
     setNodes, setEdges, setCurBoard, setBoardList, setBoardLoadedDocId,
     adoptBoardPreset, setReadOnly, readOnlyRef, pushHistory,
     () => rf?.fitView({padding: 0.25, maxZoom: 1}), flash, shareActive);
@@ -2538,6 +2538,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   // `rf`) and every setter it calls, so neither path can close over a stale
   // `readOnly` and flip the mode the wrong way.
   const toggleReadOnly = useCallback(() => {
+    /* GOBI-SHARE-LOCK — a share view cannot be unlocked from inside: the
+       toggle is disabled and Shift+2 lands here only via the keyboard path,
+       which must be inert too ("Copy to my boards" is the ONE exit). The ref (not
+       the state) decides so an in-flight keydown during the share decode is
+       also covered. */
+    if (shareActive.current) return;
     const next = !readOnly;
     setReadOnly(next);
     readOnlyRef.current = next; /* AUDIT-16 — visible to in-flight gestures immediately */
@@ -2560,7 +2566,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     } else {
       flash('Editing enabled');
     }
-  }, [readOnly, rf, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount]);
+  }, [readOnly, rf, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount, shareActive]);
 
   // ---- keyboard shortcuts ----
   useEffect(() => {
@@ -4259,9 +4265,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             mode={shareError ? 'error' : 'viewing'}
             boardName={shareDoc?.name ?? ''}
             reason={shareError ?? undefined}
-            home={shareHome}
-            onEditCopy={() => void editCopy()}
-            onOpenApp={() => void dismissError()}
+            onEditCopy={editCopy}
+            onOpenApp={dismissError}
           />
         )}
         {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
@@ -4274,6 +4279,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           onFitView={() => rf?.fitView({padding: 0.25})}
           readOnly={readOnly}
           onToggleReadOnly={toggleReadOnly}
+          shareLock={!!shareDoc}
           alignGuides={alignGuides}
           onSetAlignGuides={setAlignGuides}
           onSetGuides={setGuides}
