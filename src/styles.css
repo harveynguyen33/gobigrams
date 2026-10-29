@@ -5604,3 +5604,18 @@ kbd {
   background: var(--sel-soft);
   border: 1px dotted var(--sel);
 }
+
+/* ===========================================================================
+   ROUND GOBI-S2 — the /embed route's shell. A chrome-less host for the
+   embedded board: full-bleed, dark canvas, no app chrome. The error card
+   reuses .ds-share-banner's own styles (ShareBanner), so only the shell
+   needs anything new. Tokens only — zero colour literals (hex cap holds).
+=========================================================================== */
+.embed-shell {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+}
+.embed-shell .ds-share-banner {
+  margin: 16px;
+}

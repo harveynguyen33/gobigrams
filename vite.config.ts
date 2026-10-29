@@ -389,4 +389,15 @@ function swCacheStamp(): Plugin {
 export default defineConfig({
   plugins: [react(), boardsApi(), swCacheStamp()],
   server: {host: '0.0.0.0', port: 5200, strictPort: true},
+  /* ROUND GOBI-S2 — a SECOND html entry: /embed (the iframe-embedding
+     renderer). The two entries' module graphs share chunks, so the main
+     index chunk does not grow by a byte (harness round-gobi-embed E6). */
+  build: {
+    rollupOptions: {
+      input: {
+        index: path.resolve(__dirname, 'index.html'),
+        embed: path.resolve(__dirname, 'embed.html'),
+      },
+    },
+  },
 });
