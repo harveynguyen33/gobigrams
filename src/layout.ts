@@ -1,5 +1,6 @@
 import {type Node, type Edge} from '@xyflow/react';
-import {MAX_LAYER_WIDTH} from './layoutConstants';
+import {DEFAULT_NODE_H, DEFAULT_NODE_W, EDGE_LABEL_ROOM_PAD, MAX_LAYER_WIDTH} from './layoutConstants';
+import {estimateEdgeLabelWidth} from './labelMetrics';
 
 /**
  * Deterministic layered layout (F8) — a small hand-rolled longest-path layering
@@ -135,8 +136,8 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
   if (!participants.length) return result;
 
   const ids = new Set(participants.map(n => n.id));
-  const width = (n: Node) => (n.measured?.width ?? n.width ?? 190) as number;
-  const height = (n: Node) => (n.measured?.height ?? n.height ?? 60) as number;
+  const width = (n: Node) => (n.measured?.width ?? n.width ?? DEFAULT_NODE_W) as number;
+  const height = (n: Node) => (n.measured?.height ?? n.height ?? DEFAULT_NODE_H) as number;
   /** Extent measured along the layer axis (LR: width, TB: height). */
   const thickness = (n: Node) => direction === 'LR' ? width(n) : height(n);
   /** Extent measured across the layer axis (within one layer). */
@@ -219,6 +220,21 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
     }
   }
 
+  // ---- ROUND GOBI-LAYOUT: label room. A label paints centred on the cut
+  // between its end layers, so the widest crossing label needs
+  // `labelW + 2 * EDGE_LABEL_ROOM_PAD` of air or it lands on a node box
+  // (measured: every label on a 4-node LR board overlapped one). The gap is
+  // UNIFORM — raised to the widest cut's need — so the row stays even; per-cut
+  // gaps would reintroduce the 60/60/70 unevenness this round removes.
+  let labelGap = 0;
+  for (const e of edges) {
+    const a = layer.get(e.source), b = layer.get(e.target);
+    const text = typeof e.label === 'string' ? e.label.trim() : '';
+    if (text && a != null && b != null && a !== b)
+      labelGap = Math.max(labelGap, estimateEdgeLabelWidth(text) + 2 * EDGE_LABEL_ROOM_PAD);
+  }
+  const gap = Math.max(layerGap, labelGap);
+
   // ---- coordinate assignment: pack each layer with a fixed gap, WRAPPING an
   // over-wide layer into rows inside its slot (ROUND LAYOUT). The along-axis
   // advance per wrapped row is the layer's own max thickness + gap, so a
@@ -227,7 +243,7 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
   let along = 0;
   for (let i = 0; i <= maxLayer; i++) {
     const rows = byLayer.get(i)!;
-    if (!rows.length) { along += layerGap; continue; }
+    if (!rows.length) { along += gap; continue; }
     const members = rows.map(id => participants.find(t => t.id === id)!);
     const slots = wrapLayer(members.map(spread), spreadGap, MAX_LAYER_WIDTH);
     const rowsInLayer = slots.reduce((a, s) => Math.max(a, s.row), 0) + 1;
@@ -236,14 +252,14 @@ export function layoutDiagram(nodes: Node[], edges: Edge[], opts: LayoutOptions 
       thick = Math.max(thick, ...members.filter((_, k) => slots[k].row === r).map(thickness));
     }
     for (let r = 0; r < rowsInLayer; r++) {
-      const rowAlong = along + r * (thick + layerGap);
+      const rowAlong = along + r * (thick + gap);
       members.forEach((n, k) => {
         if (slots[k].row !== r) return;
         const {across} = slots[k];
         pos.set(n.id, direction === 'LR' ? {x: rowAlong, y: across} : {x: across, y: rowAlong});
       });
     }
-    along += rowsInLayer * thick + (rowsInLayer - 1) * layerGap + layerGap;
+    along += rowsInLayer * thick + (rowsInLayer - 1) * gap + gap;
   }
 
   // centre each layer on its own axis for a balanced look
@@ -313,8 +329,8 @@ export function gridLayout(nodes: Node[], edges: Edge[], opts: {cols?: number; g
   if (!tops.length) return result;
   const cols = Math.max(1, opts.cols ?? 2);
   const gap = opts.gap ?? {x: 120, y: 80};
-  const width = (n: Node) => (n.measured?.width ?? n.width ?? 240) as number;
-  const height = (n: Node) => (n.measured?.height ?? n.height ?? 160) as number;
+  const width = (n: Node) => (n.measured?.width ?? n.width ?? DEFAULT_NODE_W) as number;
+  const height = (n: Node) => (n.measured?.height ?? n.height ?? DEFAULT_NODE_H) as number;
   const degree = new Map<string, number>();
   tops.forEach(n => degree.set(n.id, 0));
   edges.forEach(e => {

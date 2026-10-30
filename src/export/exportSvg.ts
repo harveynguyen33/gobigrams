@@ -145,6 +145,11 @@ export type ExportEdge = {
   id: string;
   source: string;
   target: string;
+  /** GOBI-CONNECT — the handle ids the edge was created with (`'left'|'right'|
+   *  'top'|'bottom'` for a goblin node; compound ERD column ids otherwise).
+   *  The headless route (`edgeRoute`) rebuilds the canvas's anchors from them;
+   *  absent/unknown falls back to the stub. */
+  sourceHandle?: string | null; targetHandle?: string | null;
   data?: Record<string, unknown> | null;
   markerEnd?: unknown;
   markerStart?: unknown;
@@ -959,7 +964,7 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
     const marker = markerId(e.color, e.marker.w, e.marker.h);
     parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}" marker-end="url(#${marker})"/>`);
     if (e.label) {
-      const lw = Math.max(24, e.label.row.content.length * 6.6 + 12);
+      const lw = Math.max(24, e.label.row.content.length * 6.6 + 12); /* = labelMetrics.estimateEdgeLabelWidth, pinned by M1 */
       const mid = {x: e.label.x + off.x, y: e.label.y + off.y};
       parts.push(
         `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(scene.surface)}" stroke="${escAttr(scene.dim)}" stroke-width="0.8"/>`,
@@ -1050,21 +1055,6 @@ export function emitSvg(scene: Scene, ctx: EmitCtx = {}): string {
     (allDefs.length ? `<defs>${allDefs.join('')}</defs>` : '') +
     content +
     `</svg>`;
-}
-
-/** Model-space straight route when no live element exists (the harness path —
- *  deterministic, no DOM). Endpoints are the boxes' ABSOLUTE flow-space
- *  centres (D3: through the parentId chain), the same anchors React Flow
- *  hands the canvas edge. */
-function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
-  abs: Map<string, {x: number; y: number}>): {
-  d: string; start: {x: number; y: number}; end: {x: number; y: number};
-} {
-  const ss = nodeSize(s), ts = nodeSize(t);
-  const sp = abs.get(s.id)!, tp = abs.get(t.id)!;
-  const x1 = sp.x + ss.w / 2, y1 = sp.y + ss.h / 2;
-  const x2 = tp.x + ts.w / 2, y2 = tp.y + ts.h / 2;
-  return {d: `M ${x1},${y1} L ${x2},${y2}`, start: {x: x1, y: y1}, end: {x: x2, y: y2}};
 }
 
 function hashStr(s: string): number {

@@ -195,12 +195,18 @@ function buildNodes(ast: GobiAst): {nodes: Node[]; order: string[]} {
     if (!item) continue; // vocabulary guaranteed by the parser; unreachable
     const data = {...item.make()} as Record<string, unknown>;
 
-    /* author overrides (smart defaults, explicit overrides — §1 goal 3). */
+    /* author overrides (smart defaults, explicit overrides — §1 goal 3).
+       ROUND GOBI-LAYOUT: a .gobi node NEVER inherits the palette's `sub` —
+       in a text language the author's words are the source of truth, and the
+       seeded default was inventing prose he never wrote (actor → "person",
+       service → "stateless"). `sub` exists on the node ONLY when written.
+       `kicker` stays a factory default: it is the KIND label, not prose, and
+       the palette drag path (a different product surface) keeps its defaults. */
     if (item.kind === 'label') {
       data.text = stmt.title ?? stmt.id;
     } else {
       data.title = stmt.title ?? stmt.id;
-      if (stmt.attrs.sub) data.sub = stmt.attrs.sub;
+      data.sub = stmt.attrs.sub ?? '';
       if (stmt.attrs.kicker) data.kicker = stmt.attrs.kicker;
       if (stmt.attrs.icon) data.icon = stmt.attrs.icon;
       if (stmt.attrs.color) data.colorKey = stmt.attrs.color;

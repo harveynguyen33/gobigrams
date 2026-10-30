@@ -41,6 +41,9 @@ import {
   type TextRect,
 } from './exportSvg';
 import {getTextMetrics, getTextAscent, type TextWidthFn, type TextAscentFn} from '../textMetrics';
+/* GOBI-CONNECT — the headless route (handle-aware), the ONE owner of the
+ * anchor arithmetic + the generator call for a DOM-less export. */
+import {edgeRoute} from './edgeRoute';
 
 /* ------------------------------------------------------------------ types */
 
@@ -448,7 +451,15 @@ export function buildSceneBody(input: ExportInput): Scene {
     const src = byId.get(e.source)!;
     const tgt = byId.get(e.target)!;
     const color = resolveVar(resolveColor(e.data), tokens);
-    const route = (e.el ? measurer.edgePath(e.el) : null) ?? stubEdgePath(e, src, tgt, abs);
+    /* GOBI-CONNECT (t_c911fabb) — the headless fallback is no longer a
+     * centre-to-centre stub: with no live element we rebuild the REAL route
+     * from the edge's own handles + the nodes' absolute boxes, through the
+     * same generators the canvas paints with (see `edgeRoute`). The old stub
+     * stays LAST for the shapes it still covers honestly — an edge whose
+     * handles are unknown or compound (the ERD column ids). */
+    const route = (e.el ? measurer.edgePath(e.el) : null)
+      ?? edgeRoute(e, {...abs.get(src.id)!, ...nodeSize(src)}, {...abs.get(tgt.id)!, ...nodeSize(tgt)})
+      ?? stubEdgePath(e, src, tgt, abs);
     const me = (typeof e.markerEnd === 'object' && e.markerEnd !== null ? e.markerEnd : {}) as {width?: unknown; height?: unknown};
     const mw = typeof me.width === 'number' && isFinite(me.width) && me.width > 0 ? me.width : 14;
     const mh = typeof me.height === 'number' && isFinite(me.height) && me.height > 0 ? me.height : 14;
