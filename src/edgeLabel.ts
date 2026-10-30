@@ -155,6 +155,41 @@ export function labelBgClass(v: unknown): string {
   return `lb-${labelBgOf(v)}`;
 }
 
+/** ROUND GOBI-TEXT — THE SAME THREE STATES AS SVG-PAINTABLE LITERALS.
+ *
+ *  The exporter has no stylesheet: it paints a `<rect>` plate, so the class has
+ *  to be resolved to a fill/stroke pair somewhere. That decision belongs HERE,
+ *  beside `labelBgOf` / `labelBgClass`, or the export would restate it and the
+ *  canvas and the export could disagree (they did: every exported label got a
+ *  `--surface` plate with a `--dim` hairline regardless of its state, which is
+ *  the "disabled chip" Harvey saw).
+ *
+ *  ROUND GOBI-TEXT2 — THE EXPORT'S DEFAULT IS `surface`, AND THAT IS A
+ *  DELIBERATE DIVERGENCE FROM THE CANVAS'S `none`. The canvas default draws no
+ *  plate and keeps its glyphs legible with a `text-shadow` halo in `--bg`; SVG
+ *  text has no equivalent that survives an unknown page background (a `--bg`
+ *  halo paints a dark ring around every glyph on a white page), and the
+ *  exported file is a DOCUMENT, not a canvas. Measured consequence of leaving
+ *  it unpainted: the route line ran straight through the label. A STORED
+ *  `none` is still honoured - the user who chose it gets no plate.
+ *
+ *    unset   -> `--surface` opaque, ringless (see above)
+ *    none    -> transparent fill, transparent stroke
+ *    surface -> `--surface`, or the stored `labelBgKey` colour if one is set
+ *    outline -> the stored colour (transparent when none), hairline
+ *               `--border-strong` — the same token the class declares.
+ *
+ *  `storedInk` is the caller's already-resolved `labelBgKey` literal (this leaf
+ *  module resolves no colours itself), and `tok` its resolved tokens. */
+export function labelPlatePaint(
+  bg: unknown, storedInk: string | undefined, tok: {surface: string; border: string},
+): {fill: string; stroke: string} {
+  const state = bg === undefined ? 'surface' : labelBgOf(bg);
+  if (state === 'surface') return {fill: storedInk ?? tok.surface, stroke: 'transparent'};
+  if (state === 'outline') return {fill: storedInk ?? 'transparent', stroke: tok.border};
+  return {fill: 'transparent', stroke: 'transparent'};
+}
+
 /* ===========================================================================
    AK-10 — the anchor, and the free 2-D offset applied to it.
    =========================================================================== */

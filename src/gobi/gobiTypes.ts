@@ -55,7 +55,7 @@ export type GobiNodeKind =
   /* non-shape kinds */
   | 'table' | 'text';
 
-export type GobiAttrKey = 'sub' | 'icon' | 'color' | 'kicker';
+export type GobiAttrKey = 'sub' | 'icon' | 'color' | 'kicker' | 'align' | 'valign';
 
 /** v1 node attrs; values are decoded strings (idents need no quotes, free
  *  text does — the spec's quoting rule). */

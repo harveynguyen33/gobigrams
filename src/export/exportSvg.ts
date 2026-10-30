@@ -23,7 +23,7 @@
 import {resolveColor} from '../colors';
 import {asShape, shapeFrameSvg} from '../nodes/shapes';
 import {EXPORT_TOKENS} from '../theme';
-import {labelAnchor, type LabelPos} from '../edgeLabel';
+import {LABEL_HALF_H_PX, labelAnchor, type LabelPos} from '../edgeLabel';
 import {rotateSvgTransform} from '../rotation';
 import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
 import {shapeLineToSvg, type OutlineShaper} from './textOutline';
@@ -965,9 +965,9 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
     parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}" marker-end="url(#${marker})"/>`);
     if (e.label) {
       const lw = Math.max(24, e.label.row.content.length * 6.6 + 12); /* = labelMetrics.estimateEdgeLabelWidth, pinned by M1 */
-      const mid = {x: e.label.x + off.x, y: e.label.y + off.y};
+      const mid = {x: e.label.x, y: e.label.y}; /* GOBI-TEXT2 - FLOW space, like the path above: this group ALREADY carries translate(off), so adding the offset here shifted the plate by (off,off) a second time (measured +24,+24 on the door's own render). The plate below is the canvas label's own box: 5px radius (`.edge-label`), 2*LABEL_HALF_H_PX tall, and its fill comes from labelPlatePaint (opaque --surface by default). */
       parts.push(
-        `<rect x="${mid.x - lw / 2}" y="${mid.y - 9}" width="${lw}" height="18" rx="4" fill="${escAttr(scene.surface)}" stroke="${escAttr(scene.dim)}" stroke-width="0.8"/>`,
+        `<rect x="${mid.x - lw / 2}" y="${mid.y - LABEL_HALF_H_PX}" width="${lw}" height="${LABEL_HALF_H_PX * 2}" rx="5" fill="${escAttr(e.label.plateFill ?? 'transparent')}" stroke="${escAttr(e.label.plateStroke ?? 'transparent')}" stroke-width="1"/>`,
         /* ROUND C — the label row goes through rowMarkup like every other
          * row, so outline mode covers it too (was a direct textLine, which
          * left the edge label as the ONE <text> survivor in outlined

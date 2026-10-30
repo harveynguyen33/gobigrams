@@ -337,6 +337,18 @@ export {COLOR_KEYS, COLOR_VAR};
  *  nothing to the title, which is the one row most people want centred. */
 const JUSTIFY: Record<TextAlign, string> = {left: 'flex-start', center: 'center', right: 'flex-end'};
 
+/** ROUND GOBI-TEXT — `align` as an SVG `text-anchor`, for the DOM-less exporter.
+ *
+ *  The canvas centres a block with `text-align` / `justify-content`; an SVG
+ *  `<text>` has no layout engine to do either, so the exporter has to anchor it
+ *  instead. `start` is `<text>`'s own default, so a node with no align (every
+ *  pre-GOBI-TEXT node) emits exactly the bytes it emitted before. Only the
+ *  stub/headless path consults this: a DOM measurement already reflects the
+ *  CSS, and anchoring a measured run a second time would double the offset. */
+export function alignAnchor(align: string | undefined): 'start' | 'middle' | 'end' {
+  return align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
+}
+
 /** Is this choice the value that renders ANYWAY? If so it must not be stored —
  *  `cur` being told about a field the user never chose is exactly the defect
  *  §E.2 names ("do not write a value the user did not choose"). */

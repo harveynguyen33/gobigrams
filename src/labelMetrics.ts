@@ -25,3 +25,18 @@
 export function estimateEdgeLabelWidth(text: string): number {
   return Math.max(24, text.length * 6.6 + 12);
 }
+
+/** ROUND GOBI-TEXT — the edge label's FONT, as the canvas sheet declares it.
+ *
+ *  `.edge-label` (`src/styles.css`) reads `font-size: calc(var(--fs-sm) *
+ *  var(--ts-scale, 1))` and `font-weight: var(--ts-weight, 600)`: 11px
+ *  SEMIBOLD, and it has been semibold since long before the text section
+ *  existed. A browser export MEASURES those off the live element, but the
+ *  headless door (`.gobi` render, blog fence, /embed) has no DOM to measure, so
+ *  the emitter used to fall back to 10.5 / 500 — a deliberately different pair
+ *  that made an exported label read as a disabled chip instead of as the
+ *  canvas label. These two numbers are the sheet's, kept in the ONE leaf module
+ *  the layout and the emitter already share; `checks/round-gobi-text.mjs` pins
+ *  them against `--fs-sm` and the rule's own weight fallback parsed out of
+ *  `src/styles.css`, so a restated literal here cannot drift. */
+export const EDGE_LABEL_FONT = {size: 11, weight: 600} as const;

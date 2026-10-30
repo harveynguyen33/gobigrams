@@ -32,15 +32,20 @@
  * (runs/baselineTops).
  */
 
-import {resolveColor} from '../colors';
+import {resolveColor, COLOR_VAR, isColorKey} from '../colors';
 import {asShape} from '../nodes/shapes';
 import {rotatedExtent} from '../rotation';
-import {labelAnchor, type LabelPos} from '../edgeLabel';
+import {labelAnchor, labelPlatePaint, type LabelPos} from '../edgeLabel';
 import {
   type ExportNode, type ExportEdge, type ExportInput,
   type TextRect,
 } from './exportSvg';
 import {getTextMetrics, getTextAscent, type TextWidthFn, type TextAscentFn} from '../textMetrics';
+/* ROUND GOBI-TEXT — the sheet's own edge-label font (11px semibold): the
+ * headless door cannot measure it, so ONE leaf constant supplies it. */
+import {EDGE_LABEL_FONT} from '../labelMetrics';
+/* ROUND GOBI-TEXT — the align → SVG text-anchor mapping for the DOM-less path. */
+import {alignAnchor} from '../textStyle';
 /* GOBI-CONNECT — the headless route (handle-aware), the ONE owner of the
  * anchor arithmetic + the generator call for a DOM-less export. */
 import {edgeRoute} from './edgeRoute';
@@ -93,7 +98,15 @@ export type SceneEdge = {
   color: string;
   strokeWidth: number;
   marker: {w: number; h: number};
-  label?: {x: number; y: number; row: SceneTextRow};
+  label?: {
+    x: number; y: number; row: SceneTextRow;
+    /** ROUND GOBI-TEXT — the plate, resolved from the SAME three states the
+     *  canvas declares as classes (`.edge-label.lb-none|lb-surface|lb-outline`):
+     *  `transparent`/`transparent` for `none` (the default), `--surface` (or the
+     *  stored `labelBgKey`) for `surface`, and the stored colour / `transparent`
+     *  fill with a `--border-strong` hairline for `outline`. */
+    plateFill?: string; plateStroke?: string;
+  };
 };
 
 export type Bounds = {minX: number; minY: number; maxX: number; maxY: number};
@@ -178,6 +191,11 @@ export function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
   return {d: `M ${x1},${y1} L ${x2},${y2}`, start: {x: x1, y: y1}, end: {x: x2, y: y2}};
 }
 
+/** `.node-body`'s horizontal padding (`styles.css: 'padding: 14px 18px 14px'`).
+ *  The canvas centres node text inside this content box, so a DOM-less export
+ *  must use it too; the number lives here and nowhere else in this path. */
+const BODY_PAD_X = 18;
+
 /* ------------------------------------------------------- text row building */
 
 /** The wrap for ONE block, served through the item-1 cache. `measure` is the
@@ -193,7 +211,6 @@ function cachedWrap(
     widthOf, ascentOf);
   return {lines: m.lines, ascent: m.ascent};
 }
-void cachedWrap;
 
 const estimateTextWidth = (text: string, o: {size: number; spacing?: number}): number =>
   text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
@@ -214,8 +231,15 @@ export function buildNodeRows(
     ? titleTop.top + titleTop.ascent
     : t.y + Math.min(t.size, box.h > 60 ? 16 : box.h * 0.3) + 4;
   const xRow = t.x;
+  /* ROUND GOBI-TEXT — with NO measurement (`t.runs` absent: the headless door
+     and every stub) the exporter must place the runs itself, and the node's own
+     `textStyle.align` is exactly what the canvas would honour: centre anchors
+     the text block's MIDDLE, right anchors its END. A measured rect already
+     reflects the CSS, so the derivation is skipped there. */
+  const anchor = t.runs ? undefined : alignAnchor((d.textStyle as {align?: string} | undefined)?.align);
+  const place = (x: number) => (anchor === 'middle' ? x + t.w / 2 : anchor === 'end' ? x + t.w : x);
   const runOf = (row: 'kicker' | 'title' | 'sub' | 'metric'): number =>
-    t.runs?.[row]?.x ?? xRow;
+    place(t.runs?.[row]?.x ?? xRow);
   const topOf = (row: 'kicker' | 'sub' | 'metric', legacyOffset: number): number => {
     const bt = t.baselineTops?.[row];
     return bt ? bt.top + bt.ascent : yTitleStart + legacyOffset;
@@ -244,7 +268,7 @@ export function buildNodeRows(
   }
 
   const availW = Math.max(12, t.titleW ?? t.w);
-  const {lines: wrapped, ascent: titleAscent} = cachedWrap(
+  const {lines: wrapped} = cachedWrap(
     title, availW,
     {family: titleFamily, size: t.size, weight: t.weight, spacing: t.spacing ?? 0},
     widthOf, ascentOf);
@@ -256,12 +280,6 @@ export function buildNodeRows(
     const maxLines = lineHeight > 0 ? Math.max(1, Math.floor(budget / lineHeight)) : 1;
     if (useWrapped.length > maxLines) useWrapped = useWrapped.slice(0, maxLines);
   }
-
-  /* the cached ascent only bakes when the measurer did NOT supply the row's
-   * own measured ascent (the AX baselineTops) — the measured one wins, the
-   * cache fills the gap for stub measurers and the legacy stack. */
-  const bake = (top: {top: number; ascent: number} | undefined, fallbackY: number): number =>
-    top ? top.top + top.ascent : fallbackY + titleAscent * 0;
 
   useWrapped.forEach((ln, i) => {
     const baseline = titleTop
@@ -275,7 +293,6 @@ export function buildNodeRows(
     });
   });
   y += (useWrapped.length - 1) * lineHeight;
-  void bake;
 
   if (hasSub) {
     y = topOf('sub', lineHeight);
@@ -294,7 +311,10 @@ export function buildNodeRows(
       fill: accent, family: metricFont?.family,
     });
   }
-  return rows;
+  /* ROUND GOBI-TEXT — the derived anchor rides on every row (the emitter only
+     writes `text-anchor` when it is not `start`, so an unaligned node is
+     byte-identical). */
+  return anchor && anchor !== 'start' ? rows.map((r) => ({...r, anchor})) : rows;
 }
 
 /* ------------------------------------------------------------- buildScene */
@@ -322,8 +342,6 @@ export function buildSceneBody(input: ExportInput): Scene {
     if (hook) return hook({size, weight, family});
     return size * 0.78;
   };
-  void tokens;
-
   const ink = {
     fg: tokens['--fg'] || '#e8e8ea',
     dim: tokens['--dim'] || '#8a8a92',
@@ -332,6 +350,18 @@ export function buildSceneBody(input: ExportInput): Scene {
   };
 
   const isGroup = (n: ExportNode) => asShape(n.data?.shape) === 'group';
+
+  /** A node's TEXT BOX. A measurer with a DOM reports the element's rect; one
+   *  without (`runs` absent — the `alignAnchor` signal) cannot, and a fixed box
+   *  centres EVERY node at the same x (measured: -6px at 190, -56px at 290).
+   *  So the SCENE derives it from the node's own width; BODY_PAD_X is the ONE
+   *  number. Every shape body is inset symmetrically, so this centres them all. */
+  const textBox = (el: unknown, s: {w: number; h: number}): TextRect | null => {
+    const t = measurer.text(el);
+    return t && t.runs ? t
+      : {...(t ?? {y: s.h * 0.18, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}),
+        x: BODY_PAD_X, w: Math.max(12, s.w - BODY_PAD_X * 2)};
+  };
 
   /* ---- nodes */
   const sceneNodes: SceneNode[] = [];
@@ -437,11 +467,9 @@ export function buildSceneBody(input: ExportInput): Scene {
     const plain = n.data?.plainCylinder !== false;
     (sn as SceneNode & {plain?: boolean}).plain = plain;
     sn.icon = measurer.icon?.(n.el) ?? null;
-    const t = measurer.text(n.el);
-    sn.textRect = t ?? null;
-    sn.rows = buildNodeRows(n, s,
-      t ?? {x: 13, y: s.h * 0.18, w: s.w * 0.72, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'},
-      {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf);
+    const t = textBox(n.el, s);
+    sn.textRect = t;
+    sn.rows = buildNodeRows(n, s, t as TextRect, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf);
     sceneNodes.push(sn);
   }
 
@@ -483,13 +511,21 @@ export function buildSceneBody(input: ExportInput): Scene {
             labelPinned: d.labelPinned === true,
           });
       const lf = measurer.edgeLabelFont?.(e.id)
-        ?? (measurer.defaultFamily ? {family: measurer.defaultFamily('mono'), size: 10.5, weight: 500, spacing: 0} : undefined);
+        ?? {family: measurer.defaultFamily?.('mono'), size: EDGE_LABEL_FONT.size, weight: EDGE_LABEL_FONT.weight, spacing: 0};
+      /* ROUND GOBI-TEXT — the canvas label's OWN colours, resolved to literals.
+         The ink is `--label-fg` (data.labelTextKey) falling back to `--fg`; the
+         plate is `labelPlatePaint` (src/edgeLabel.ts), the ONE owner of "which
+         plate state paints what" — the canvas reads the same states as classes. */
+      const inkOf = (v: unknown): string | undefined => (isColorKey(v) ? resolveVar(COLOR_VAR[v], tokens) : undefined);
+      const plate = labelPlatePaint(d.labelBg, inkOf(d.labelBgKey),
+        {surface: ink.surface, border: tokens['--border-strong'] || ink.dim});
       se.label = {
         x: L.x, y: L.y,
+        plateFill: plate.fill, plateStroke: plate.stroke,
         row: {
           x: 0, baselineY: 4, content: label,
-          size: lf?.size ?? 10.5, weight: lf?.weight ?? 500,
-          fill: ink.dim, family: lf?.family,
+          size: lf?.size ?? EDGE_LABEL_FONT.size, weight: lf?.weight ?? EDGE_LABEL_FONT.weight,
+          fill: inkOf(d.labelTextKey) ?? ink.fg, family: lf?.family,
           spacing: lf?.spacing ? lf.spacing : undefined,
         },
       };

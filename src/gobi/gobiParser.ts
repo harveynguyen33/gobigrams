@@ -36,9 +36,11 @@ import {
   type GobiStatement,
   type GobiToken,
 } from './gobiTypes';
+/* ROUND GOBI-TEXT (§2.9) — the align/valign vocabulary, derived in gobiText. */
+import {GOBI_ALIGN_VALUES, GOBI_VALIGN_VALUES} from './gobiText';
 
 const SHAPE_KINDS = new Set<string>(GOBI_KINDS);
-const ATTR_KEYS = new Set(['sub', 'icon', 'color', 'kicker']);
+const ATTR_KEYS = new Set(['sub', 'icon', 'color', 'kicker', 'align', 'valign']);
 const EDGE_TAIL_KEYWORDS = new Set(['dashed', 'dotted', 'solid', 'flow', 'flowIcon', 'flowCount', 'card', 'techn', 'x']);
 
 type Declared = {kind: 'node' | 'group' | 'table' | 'text' | 'invalid'; line: number};
@@ -261,14 +263,26 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
         skipToNextLine(); return;
       }
       next();
-      stmt.attrs[String(keyTok.value)] = String(valTok.value);
-      if (String(keyTok.value) === 'color' && valTok.type === 'ident' && !GOBI_COLOR_KEYS.includes(String(valTok.value))) {
-        const sug = gobiSuggest(String(valTok.value), GOBI_COLOR_KEYS);
+      const key = String(keyTok.value);
+      const val = String(valTok.value);
+      stmt.attrs[key] = val;
+      if (key === 'color' && valTok.type === 'ident' && !GOBI_COLOR_KEYS.includes(val)) {
+        const sug = gobiSuggest(val, GOBI_COLOR_KEYS);
         err(valTok, sug
-          ? `color "${valTok.value}" isn't a board colour. Did you mean "${sug}"?`
-          : `color "${valTok.value}" isn't a board colour. Try: ${GOBI_COLOR_KEYS.join(', ')}.`);
+          ? `color "${val}" isn't a board colour. Did you mean "${sug}"?`
+          : `color "${val}" isn't a board colour. Try: ${GOBI_COLOR_KEYS.join(', ')}.`);
       }
-      if (String(keyTok.value) === 'kicker' && valTok.type === 'string' && String(valTok.value).includes(' ')) {
+      /* ROUND GOBI-TEXT (§2.9) — the same closed world the kind word lives in:
+       * the language may only say a value the canvas can actually render, so an
+       * unknown alignment is REFUSED at the token that carries it and the
+       * message names all the legal ones. */
+      if (key === 'align' && !GOBI_ALIGN_VALUES.includes(val)) {
+        err(valTok, `align "${val}" isn't a text alignment. Try: ${GOBI_ALIGN_VALUES.join(', ')}.`);
+      }
+      if (key === 'valign' && !GOBI_VALIGN_VALUES.includes(val)) {
+        err(valTok, `valign "${val}" isn't a vertical alignment. Try: ${GOBI_VALIGN_VALUES.join(', ')}.`);
+      }
+      if (key === 'kicker' && valTok.type === 'string' && val.includes(' ')) {
         // kicker is a single word by convention but a string is legal; no error.
       }
     }

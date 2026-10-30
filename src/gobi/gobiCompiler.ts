@@ -22,6 +22,7 @@ import type {BoardDoc} from '../boards';
 import type {ColorKey} from '../colors';
 import type {TableColumn} from '../nodes/TableNode';
 import {parseGobi} from './gobiParser';
+import {gobiTextStyle} from './gobiText';
 import {validateGobi} from './gobiValidator';
 import {
   GOBI_CARD_TOKENS,
@@ -211,6 +212,15 @@ function buildNodes(ast: GobiAst): {nodes: Node[]; order: string[]} {
       if (stmt.attrs.icon) data.icon = stmt.attrs.icon;
       if (stmt.attrs.color) data.colorKey = stmt.attrs.color;
     }
+
+    /* ROUND GOBI-TEXT (§2.9) — the language's text alignment. Every non-table
+       kind carries it, because the canvas reads `data.textStyle` through ONE
+       emitter (`textStyleVars`) for the card, the note, the label and the
+       group label alike. `align` is always written (the .gobi default is
+       CENTER, which the app's own card default — left — does not supply), and
+       `vAlign` only when the author wrote it (the app's per-target default is
+       already right for every box). */
+    data.textStyle = gobiTextStyle(stmt.attrs);
 
     /* size: the palette's own size, else the container defaults the app's
        insert path applies (C3), else the layout fallback takes over. */
