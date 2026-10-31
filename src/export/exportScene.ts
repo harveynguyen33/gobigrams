@@ -49,6 +49,8 @@ import {alignAnchor} from '../textStyle';
 /* GOBI-CONNECT — the headless route (handle-aware), the ONE owner of the
  * anchor arithmetic + the generator call for a DOM-less export. */
 import {edgeRoute} from './edgeRoute';
+/* ROUND GOBI-TEXT3 — the DOM-less vertical placement (a leaf: no cycle). */
+import {vAlignRows} from './textVAlign';
 
 /* ------------------------------------------------------------------ types */
 
@@ -102,10 +104,16 @@ export type SceneEdge = {
     x: number; y: number; row: SceneTextRow;
     /** ROUND GOBI-TEXT — the plate, resolved from the SAME three states the
      *  canvas declares as classes (`.edge-label.lb-none|lb-surface|lb-outline`):
-     *  `transparent`/`transparent` for `none` (the default), `--surface` (or the
+     *  `transparent`/`transparent` for `none` (the DEFAULT), `--surface` (or the
      *  stored `labelBgKey`) for `surface`, and the stored colour / `transparent`
-     *  fill with a `--border-strong` hairline for `outline`. */
-    plateFill?: string; plateStroke?: string;
+     *  fill with a `--border-strong` hairline for `outline`.
+     *  ROUND GOBI-TEXT3 — `halo` is the literal `--bg` and is present ONLY for
+     *  `none`, the state that draws no plate: the canvas keeps such a label
+     *  legible with a `--bg` text-shadow, and the emitter paints the same ring
+     *  as a `paint-order="stroke"` stroke on the glyphs (SVG has no
+     *  text-shadow). `plateFill`/`plateStroke` are meaningless when a halo is
+     *  set — nothing is painted behind it. */
+    plateFill?: string; plateStroke?: string; halo?: string;
   };
 };
 
@@ -363,6 +371,14 @@ export function buildSceneBody(input: ExportInput): Scene {
         x: BODY_PAD_X, w: Math.max(12, s.w - BODY_PAD_X * 2)};
   };
 
+  /** ROUND GOBI-TEXT3 — a DOM-LESS block is placed ARITHMETICALLY, from the
+   *  node's own stored `vAlign` (see textVAlign.ts: the sheet's
+   *  `justify-content` needs a layout engine the headless door has not got).
+   *  A measured rect already reflects the CSS, so it is left untouched. */
+  const placeRows = (n: ExportNode, s: {w: number; h: number}, t: TextRect | null, rows: SceneTextRow[]): SceneTextRow[] =>
+    t && t.runs ? rows
+      : vAlignRows(rows, s.h, (n.data?.textStyle as {vAlign?: string} | undefined)?.vAlign, ascentOf);
+
   /* ---- nodes */
   const sceneNodes: SceneNode[] = [];
   const sceneGroups: SceneNode[] = [];
@@ -448,9 +464,9 @@ export function buildSceneBody(input: ExportInput): Scene {
       sn.frame = 'note';
       sn.textRect = noteText ?? null;
       sn.rows = noteText
-        ? buildNodeRows(n, s, noteText, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf)
-        : buildNodeRows(n, s, {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'},
-            {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf);
+        ? placeRows(n, s, noteText, buildNodeRows(n, s, noteText, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf))
+        : placeRows(n, s, null, buildNodeRows(n, s, {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'},
+            {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf));
       sceneNodes.push(sn);
       continue;
     }
@@ -469,7 +485,7 @@ export function buildSceneBody(input: ExportInput): Scene {
     sn.icon = measurer.icon?.(n.el) ?? null;
     const t = textBox(n.el, s);
     sn.textRect = t;
-    sn.rows = buildNodeRows(n, s, t as TextRect, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf);
+    sn.rows = placeRows(n, s, t, buildNodeRows(n, s, t as TextRect, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf));
     sceneNodes.push(sn);
   }
 
@@ -518,10 +534,10 @@ export function buildSceneBody(input: ExportInput): Scene {
          plate state paints what" — the canvas reads the same states as classes. */
       const inkOf = (v: unknown): string | undefined => (isColorKey(v) ? resolveVar(COLOR_VAR[v], tokens) : undefined);
       const plate = labelPlatePaint(d.labelBg, inkOf(d.labelBgKey),
-        {surface: ink.surface, border: tokens['--border-strong'] || ink.dim});
+        {surface: ink.surface, border: tokens['--border-strong'] || ink.dim, bg: ink.bg});
       se.label = {
         x: L.x, y: L.y,
-        plateFill: plate.fill, plateStroke: plate.stroke,
+        plateFill: plate.fill, plateStroke: plate.stroke, halo: plate.halo,
         row: {
           x: 0, baselineY: 4, content: label,
           size: lf?.size ?? EDGE_LABEL_FONT.size, weight: lf?.weight ?? EDGE_LABEL_FONT.weight,

@@ -605,12 +605,16 @@ function tokenStyle(tokens: Record<string, string>): string {
  *  font-family covers rows emitted without one. */
 function textLine(
   x: number, y: number, content: string,
-  o: {size: number; weight: number; fill: string; anchor?: string; spacing?: string; opacity?: string; family?: string},
+  o: {size: number; weight: number; fill: string; anchor?: string; spacing?: string; opacity?: string; family?: string; halo?: string},
 ): string {
   const a = [
     `x="${x}"`, `y="${y}"`,
     `font-size="${o.size}"`, `font-weight="${o.weight}"`,
+    /* GOBI-TEXT3 — the halo: `paint-order="stroke"` paints the stroke FIRST and
+       the fill over it, so a 2px stroke reads as a 1px ring outside every glyph
+       — the SVG stand-in for `.edge-label.lb-none`'s `text-shadow` in --bg. */
     `fill="${escAttr(o.fill)}"`,
+    o.halo ? `stroke="${escAttr(o.halo)}" stroke-width="2" stroke-linejoin="round" paint-order="stroke"` : '',
     o.family ? `font-family="${escAttr(o.family)}"` : '',
     o.anchor && o.anchor !== 'start' ? `text-anchor="${o.anchor}"` : '',
     o.spacing ? `letter-spacing="${o.spacing}"` : '',
@@ -894,7 +898,7 @@ export type EmitCtx = {
  *  (ctx.outline) — the ONE place the mode branches (D4: the emitter stays
  *  a pure function of (Scene, ctx); the shapers are injected). A row whose
  *  family has no shaper, or whose shaping throws, falls back to <text>. */
-function rowMarkup(r: SceneTextRow, outline?: EmitCtx['outline']): string {
+function rowMarkup(r: SceneTextRow, outline?: EmitCtx['outline'], halo?: string): string {
   if (outline) {
     const shaper = (r.family ? outline.shapers.get(r.family) : undefined) ?? outline.defaultShaper;
     if (shaper) {
@@ -914,7 +918,7 @@ function rowMarkup(r: SceneTextRow, outline?: EmitCtx['outline']): string {
   return textLine(r.x, r.baselineY, r.content, {
     size: r.size, weight: r.weight, fill: r.fill,
     family: r.family, anchor: r.anchor,
-    spacing: r.spacing !== undefined ? String(r.spacing) : undefined,
+    spacing: r.spacing !== undefined ? String(r.spacing) : undefined, halo,
   });
 }
 
@@ -965,14 +969,20 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
     parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}" marker-end="url(#${marker})"/>`);
     if (e.label) {
       const lw = Math.max(24, e.label.row.content.length * 6.6 + 12); /* = labelMetrics.estimateEdgeLabelWidth, pinned by M1 */
-      const mid = {x: e.label.x, y: e.label.y}; /* GOBI-TEXT2 - FLOW space, like the path above: this group ALREADY carries translate(off), so adding the offset here shifted the plate by (off,off) a second time (measured +24,+24 on the door's own render). The plate below is the canvas label's own box: 5px radius (`.edge-label`), 2*LABEL_HALF_H_PX tall, and its fill comes from labelPlatePaint (opaque --surface by default). */
+      const mid = {x: e.label.x, y: e.label.y}; /* GOBI-TEXT2 - FLOW space, like the path above: this group ALREADY carries translate(off), so adding the offset here shifted the plate by (off,off) a second time (measured +24,+24 on the door's own render). The plate below is the canvas label's own box: 5px radius (`.edge-label`), 2*LABEL_HALF_H_PX tall, and it is painted ONLY for the plate states (labelPlatePaint): the `none` default has no background. */
+      const painted = (e.label.plateFill ?? 'transparent') !== 'transparent'
+        || (e.label.plateStroke ?? 'transparent') !== 'transparent';
+      /* GOBI-TEXT3 - no `<rect>` at all unless a plate state paints one: the
+         canvas default (`lb-none`) has NO background, and its label keeps the
+         route legible with a --bg halo (carried as `halo` on the row instead). */
+      if (painted) parts.push(
+        `<rect x="${mid.x - lw / 2}" y="${mid.y - LABEL_HALF_H_PX}" width="${lw}" height="${LABEL_HALF_H_PX * 2}" rx="5" fill="${escAttr(e.label.plateFill ?? 'transparent')}" stroke="${escAttr(e.label.plateStroke ?? 'transparent')}" stroke-width="1"/>`);
       parts.push(
-        `<rect x="${mid.x - lw / 2}" y="${mid.y - LABEL_HALF_H_PX}" width="${lw}" height="${LABEL_HALF_H_PX * 2}" rx="5" fill="${escAttr(e.label.plateFill ?? 'transparent')}" stroke="${escAttr(e.label.plateStroke ?? 'transparent')}" stroke-width="1"/>`,
         /* ROUND C — the label row goes through rowMarkup like every other
          * row, so outline mode covers it too (was a direct textLine, which
          * left the edge label as the ONE <text> survivor in outlined
          * exports — measured live on the RC probe board). */
-        rowMarkup({...e.label.row, x: mid.x - lw / 2 + 6, baselineY: mid.y + 4}, outline));
+        rowMarkup({...e.label.row, x: mid.x - lw / 2 + 6, baselineY: mid.y + 4}, outline, e.label.halo));
     }
   }
   parts.push('</g>');

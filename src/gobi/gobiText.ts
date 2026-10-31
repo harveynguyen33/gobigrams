@@ -15,10 +15,18 @@
  * and out of scope. A `.gobi` document is a different author: Harvey asked for
  * a text-authored diagram to come out CENTRED without saying so on every line
  * ("liệu các chữ center đc ko"), so the compiler WRITES `align: 'center'` and
- * `align:left` is the opt-out. `vAlign` deliberately has no language default:
- * the app's per-target no-write value (`vAlignForBody` — top on a card, middle
- * on a label-only node) is already right for every box, so absence is the
- * honest default and `valign:` only overrides it.
+ * `align:left` is the opt-out.
+ *
+ * ROUND GOBI-TEXT3 — `vAlign` NOW HAS A LANGUAGE DEFAULT TOO: `middle`
+ * (`GOBI_VALIGN_DEFAULT`). Harvey, looking at the render: "chữ chỉ đang ở top
+ * center, có thể để chữ ở middle in vertical được không". The APP's per-target
+ * no-write value (`vAlignForBody` — top on a card) is NOT touched: the compiler
+ * WRITES `vAlign:'middle'` onto every node it builds, so the value travels in
+ * `data.textStyle`, the canvas paints it through `textStyleVars` and the PNG
+ * paints it through the scene's own placement (src/export/textVAlign.ts). One
+ * stored value, two painters — that is what makes them agree; changing
+ * `vAlignForBody` instead would have repainted every existing board.
+ * `valign:top` / `valign:bottom` remain the opt-outs.
  *
  * A leaf module on purpose: the parser and the compiler both read it, and it
  * imports nothing but the text model. */
@@ -37,13 +45,17 @@ export const GOBI_VALIGN_VALUES: string[] = TEXT_VALIGN_OPTS.map((o) => o.v);
 /** The align a `.gobi` node gets when the document says nothing (Harvey's ask). */
 export const GOBI_ALIGN_DEFAULT: TextAlign = 'center';
 
+/** The vertical align a `.gobi` node gets when the document says nothing —
+ *  ROUND GOBI-TEXT3, Harvey's ask: the text sits in the MIDDLE of the box. */
+export const GOBI_VALIGN_DEFAULT: TextVAlign = 'middle';
+
 /** Node attributes → the ONE `TextStyle` the compiler stores on `data`.
  *  Values are validated by the PARSER (it holds the token, so it can point at
  *  the offending word); this function is the write, not a second gate. */
 export function gobiTextStyle(attrs: {align?: string; valign?: string}): TextStyle {
   const style: TextStyle = {
     align: (attrs.align as TextAlign | undefined) ?? GOBI_ALIGN_DEFAULT,
+    vAlign: (attrs.valign as TextVAlign | undefined) ?? GOBI_VALIGN_DEFAULT,
   };
-  if (attrs.valign) style.vAlign = attrs.valign as TextVAlign;
   return style;
 }
