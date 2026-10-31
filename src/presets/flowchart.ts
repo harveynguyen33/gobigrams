@@ -4,6 +4,7 @@ import {type ColorKey} from '../colors';
 import {PALETTE, type DiagramType, type PaletteCategory, type PaletteItem} from '../palette';
 import {type Shape} from '../nodes/shapes';
 import {makeEdge, FLOWCHART_EDGES, type EdgeDefaults, type TemplateSpec} from './basic';
+import {CARD_SIZE, SIZE_EXCEPTIONS} from '../nodeSizes';
 /* ===========================================================================
    L3a — flowchart palette (ISO 5807). `preparation` adapts the gateway hexagon.
 =========================================================================== */
@@ -32,47 +33,18 @@ const FLOW: DiagramType[] = ['flowchart'];
  *  literal, so the panel can never list `Note` twice. */
 export const NOTE_ITEM: PaletteItem = PALETTE.find(p => p.label === 'Note') as PaletteItem;
 /* ===========================================================================
-   ROUND AF — THE ONE DEFAULT SIZE FOR EVERY FLOWCHART SHAPE.
+   GOBI-SIZE — 290x145 IS THE ONE CARD SIZE, and it lives in src/nodeSizes.ts
+   (CARD_SIZE) together with the WHY: the frame's own 2.000 ratio, the 141/200
+   resizer floor it must clear, and the fact that no card may be size-less at
+   all. These two names are kept because ~60 call sites import them; each is an
+   ALIAS BY VALUE over that ONE table, never a second decision.
 
-   RATIO 2.0 IS NOT A TASTE, IT IS THE FRAME'S OWN RATIO. Every silhouette is
-   drawn ONCE in a normalised frame — `viewBox="0 0 200 100"` with
-   `preserveAspectRatio="none"` (`ShapeFrame`, src/nodes/shapes.tsx) — so the drawing is
-   STRETCHED to whatever box the node is handed, and 200:100 = 2.0 is the single
-   ratio at which each shape paints exactly as drawn. At every other ratio the
-   silhouette is distorted: a circle flattens into an ellipse, the terminal's
-   round caps go elliptical. The three sizes this palette used to carry were
-   1.50 (Terminal 270x180), 1.56 (Decision 150x96) and 1.00 (On-page connector
-   84x84) — all three distorted, and the thirteen entries with NO size fell to
-   `.node { min-width: 190px }` at auto height, i.e. a 190-wide sliver tens of
-   pixels tall. One size at one ratio removes the distortion instead of hiding
-   it, and removes the "one shape is huge and the rest are slivers" read.
-
-   WHY 290x145 AND NOT 280x140. 280x140 is the approved size and it has the right
-   SHAPE, but 140 is 1px BELOW this app's own resizer floor (`NODE_MIN_H` = 141,
-   src/nodes/DiagramNode.tsx). React Flow's resizer does not lift a below-floor node up
-   to the floor. Its clamp is
-   `getSizeClamp(size, minSize, maxSize) = max(0, minSize - size, size - maxSize)`,
-   which returns 1 for a 140-tall node, and a HORIZONTAL drag folds that into the
-   vertical delta as a SUBTRACTION — so grabbing a left/right grip silently
-   shrinks the height to 139, then 137, 133, 125 … to zero, because each drag
-   re-reads the height the previous one ate. EXECUTED against the shipped
-   `getDimensionsAfterResize` (see `checks/round-af-flowchart-sizes.mjs`): a
-   140-tall node collapses on a horizontal drag while a 145-tall node is inert.
-   145 clears the 141 height floor AND the 200 width floor with real slack, at
-   exactly ratio 2.0 (290/145 = 2.000). It is still ~13% less area than the
-   270x180 Terminal Harvey called too big, so the fix brings the Terminal DOWN
-   rather than inflating the other fifteen shapes. */
-export const FLOWCHART_NODE_SIZE = {width: 290, height: 145} as const;
-
-/* ROUND BE (2026-10-23) — the connector is SQUARE. Its silhouette is a circle
-   (shapes.tsx now draws it in a square frame, where it reaches every edge), so
-   its default node must be square or NodeResizer's grips sit in the dead
-   corners the 2:1 box added (Harvey: "4 góc mũi tên xa so với hình tròn").
-   152x152 is the ratio-2.0 default's own SHORT edge (145) raised to the next
-   grid-16 multiple, so the circle is the same visual height as every sibling
-   on the palette while being genuinely round. Every other flowchart shape
-   stays on FLOWCHART_NODE_SIZE. */
-export const CONNECTOR_NODE_SIZE = {width: 152, height: 152} as const;
+   The On-page connector is the ONE flowchart shape whose box is SQUARE: its
+   silhouette is a circle, so a 2:1 box paints an ellipse and leaves
+   NodeResizer's grips in dead corners (ROUND BE) — hence its own exception row.
+=========================================================================== */
+export const FLOWCHART_NODE_SIZE = {...CARD_SIZE};
+export const CONNECTOR_NODE_SIZE = {...SIZE_EXCEPTIONS.connector.size};
 
 export const FLOWCHART_PALETTE: PaletteItem[] = [
   fc('Terminal', 'stadium · start / end', 'terminator', 'green', 'Start', 'flowchart', FLOW, ['start', 'end', 'start / end', 'pill', 'stop', 'terminator'], 'stadium', FLOWCHART_NODE_SIZE),
@@ -102,7 +74,7 @@ export const FLOWCHART_PALETTE: PaletteItem[] = [
   {
     label: 'Lane', hint: 'container · role', shape: 'group', colorKey: 'slate', kind: 'goblin',
     category: 'groups', types: FLOW, aliases: ['swimlane', 'pool', 'role', 'container', 'system'], geometry: 'dashed boundary band',
-    size: {width: 420, height: 200},
+    size: SIZE_EXCEPTIONS.group.size,
     make: () => ({shape: 'group', kicker: '', title: 'Lane', sub: 'role', metric: '', metricUnit: '', icon: '', colorKey: 'slate'} as any),
   },
   NOTE_ITEM,

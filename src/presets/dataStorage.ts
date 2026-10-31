@@ -4,6 +4,7 @@ import {type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
 import {type TableColumn} from '../nodes/TableNode';
 import {makeEdge, ERD_EDGES, type EdgeDefaults, type TemplateSpec} from './basic';
+import {SIZE_EXCEPTIONS} from '../nodeSizes';
 /* ===========================================================================
    L3c — ERD palette + template.
 =========================================================================== */
@@ -11,7 +12,7 @@ import {makeEdge, ERD_EDGES, type EdgeDefaults, type TemplateSpec} from './basic
 export const TABLE_PALETTE_ITEM: PaletteItem = {
   label: 'Table', hint: 'columns + keys', shape: 'note', colorKey: 'cyan', kind: 'erg-table' as any,
   category: 'entities', types: ['erd'], aliases: ['entity', 'schema', 'db table'], geometry: 'table · columns',
-  size: {width: 250, height: 170},
+  size: SIZE_EXCEPTIONS.table.size,
   // `make` is provided for the type contract only — App builds table nodes.
   make: () => ({text: ''} as any),
 };
@@ -21,6 +22,7 @@ export const TABLE_PALETTE_ITEM: PaletteItem = {
 export const ERD_ENUM_NOTE_ITEM: PaletteItem = {
   label: 'Note (enum)', hint: 'enum / annotation', shape: 'note', colorKey: 'amber', kind: 'goblin',
   category: 'annotations', types: ['erd'], aliases: ['enum', 'field values'], geometry: 'plain text annotation',
+  size: SIZE_EXCEPTIONS.note.size,
   /* AQ20 — same shape + category as the shared Note; the purpose line must
      say this one lists field values. */
   purpose: 'an ERD note listing the allowed values of a field',
@@ -97,21 +99,21 @@ export const SEQUENCE_PALETTE: PaletteItem[] = [
     label: 'Lifeline', hint: 'head + dashed stem', shape: 'lifeline', colorKey: 'cyan', kind: 'goblin',
     category: 'sequence', types: ['sequence'], aliases: ['participant', 'column', 'object'],
     geometry: 'head + dashed stem', purpose: 'a sequence participant — stretch it downward to lengthen the lifeline',
-    size: {width: 190, height: 380},
+    size: SIZE_EXCEPTIONS.lifeline.size,
     make: () => ({shape: 'lifeline', kicker: '', title: 'Participant', sub: '', metric: '', metricUnit: '', colorKey: 'cyan'}),
   },
   {
     label: 'Activation', hint: 'thin bar · processing', shape: 'activation', colorKey: 'cyan', kind: 'goblin',
     category: 'sequence', types: ['sequence'], aliases: ['active', 'bar', 'focus'],
     geometry: 'thin vertical bar', purpose: 'the span in which a participant processes — level S2+',
-    size: {width: 30, height: 220},
+    size: SIZE_EXCEPTIONS.activation.size,
     make: () => ({shape: 'activation', kicker: '', title: 'activation', sub: '', metric: '', metricUnit: '', colorKey: 'cyan'}),
   },
   {
     label: 'Fragment', hint: 'frame · alt / loop', shape: 'fragment', colorKey: 'slate', kind: 'goblin',
     category: 'sequence', types: ['sequence'], aliases: ['alt', 'opt', 'loop', 'par', 'frame', 'combined'],
     geometry: 'frame + label tab', purpose: 'a combined fragment — set its kind in the kicker (alt / opt / loop / par)',
-    size: {width: 480, height: 180},
+    size: SIZE_EXCEPTIONS.fragment.size,
     make: () => ({shape: 'fragment', kicker: 'loop', title: 'fragment', sub: '[ condition ]', metric: '', metricUnit: '', colorKey: 'slate'}),
   },
 ];

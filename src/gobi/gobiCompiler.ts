@@ -222,13 +222,16 @@ function buildNodes(ast: GobiAst): {nodes: Node[]; order: string[]} {
        already right for every box). */
     data.textStyle = gobiTextStyle(stmt.attrs);
 
-    /* size: the palette's own size, else the container defaults the app's
-       insert path applies (C3), else the layout fallback takes over. */
-    const size = item.size
-      ?? (stmt.nodeKind === 'group' ? {width: 320, height: 200} : null);
+    /* size: the palette item's own size — the ONE source both create paths
+       read (GOBI-SIZE, src/nodeSizes.ts). Every kind carries one, so this is
+       unconditional: the old `group 320x200` fallback disagreed with the
+       palette's 420x200 for the same shape, and the `? : {}` guard it needed
+       goes with it. */
+    const size = item.size!;
     nodes.push({
       id: stmt.id, type: item.kind, position: {x: 0, y: 0},
-      ...(size ? {width: size.width, height: size.height, style: {width: size.width, height: size.height}} : {}),
+      width: size.width, height: size.height,
+      style: {width: size.width, height: size.height},
       data,
     } as Node);
   }

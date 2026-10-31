@@ -1887,22 +1887,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
     const data = item.make() as any;
     const shape = asShape(data?.shape);
-    // C3: containers get sensible default dimensions so NodeResizer has a
-    // baseline and the resize persists through node.style.
-    const size = item.size ?? (shape === 'group'
-      ? {width: 320, height: 200}
-      : shape === 'note'
-        ? {width: 200, height: 90}
-        : null);
+    // C3: the palette item owns the box, so NodeResizer's baseline and the
+    // persisted style agree by construction. GOBI-SIZE (src/nodeSizes.ts) gave
+    // every kind an explicit size, which RETIRES the group/note fallbacks that
+    // used to sit here as a SECOND, quietly different answer (320x200 / 200x90).
+    const size = item.size;
     /* AQ19 — CENTRE THE NODE UNDER THE CURSOR: `p` is the cursor/flow point and
        RF anchors node.position at the TOP-LEFT, so a dropped node always sat
        down-right of where the user pointed. Offset by half the node's known
-       size (defaults for shapes without one) — every insert path funnels the
-       cursor point through here or its sibling inserters. */
-    const half = {
-      w: (size ? size.width : 190) / 2,
-      h: (size ? size.height : 95) / 2,
-    };
+       size (every palette row has one — GOBI-SIZE made `size` REQUIRED on
+       PaletteItem) — every insert path funnels the cursor point through here
+       or its sibling inserters. */
+    const half = {w: size.width / 2, h: size.height / 2};
     const centre = {x: p.x - half.w, y: p.y - half.h};
     // L3a: a flowchart node defaults to vertical handles and a label-only body.
     if (preset.id === 'flowchart' && shape !== 'group' && shape !== 'note') {
@@ -1931,7 +1927,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     data.textStyle = {align: 'center', vAlign: 'middle'};
     setNodes(ns => [...ns, {
       id, type: item.kind, position: centre, data: {...data, __dropAt: p}, selected: false,
-      ...(size ? {style: {width: size.width, height: size.height}} : null),
+      style: {width: size.width, height: size.height},
     }]);
     /* AQ19 — the estimated half-size differs from the RENDERED box (content,
        font, auto-grow), so after the node mounts and settles, re-measure and

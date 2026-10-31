@@ -2,6 +2,7 @@ import {type NodeKind} from './nodes/DiagramNode';
 import {type LabelKind} from './nodes/LabelNode';
 import {type Shape} from './nodes/shapes';
 import {type ColorKey} from './colors';
+import {CARD_SIZE, SIZE_EXCEPTIONS} from './nodeSizes';
 
 /* The symbolic-colour layer lives in colors.ts (no imports → no cycle). */
 export {
@@ -56,8 +57,12 @@ export type PaletteItem = {
   shape: Shape;
   colorKey: ColorKey;
   kind: PalKind;
-  /** Optional default node size (a flowchart diamond needs more height). */
-  size?: {width: number; height: number};
+  /** The default node size, REQUIRED: GOBI-SIZE (2026-10-31) made every palette
+      row carry one — a size-less item rendered at the 190px CSS floor while its
+      neighbours were 290x145 ("cái to cái nhỏ"). The type is the enforcement:
+      `CARD_SIZE` for a card, a `SIZE_EXCEPTIONS` row for the few kinds whose
+      geometry genuinely differs (src/nodeSizes.ts). */
+  size: {width: number; height: number};
   /** AQ20 — per-item purpose override for the search-result source line. The
       category map (SOURCE_PURPOSE) is generic; C4 entries all share the c4
       category, so without an override every C4 row reads the same sentence.
@@ -93,64 +98,61 @@ export const node = (
  *  coverage rather than trusting the reading. */
 export const PALETTE: PaletteItem[] = [
   {
-    label: 'Service', hint: 'rounded rect · app', shape: 'service', colorKey: 'cyan', kind: 'goblin',
+    label: 'Service', hint: 'rounded rect · app', shape: 'service', colorKey: 'cyan', kind: 'goblin', size: CARD_SIZE,
     category: 'architecture', types: ['architecture'], aliases: ['app', 'application'], geometry: 'rounded rect',
     make: () => node('service', 'Service', 'service', 'stateless', 'cyan', 'server'),
   },
   {
-    label: 'Database', hint: 'cylinder · datastore', shape: 'database', colorKey: 'violet', kind: 'goblin',
+    label: 'Database', hint: 'cylinder · datastore', shape: 'database', colorKey: 'violet', kind: 'goblin', size: CARD_SIZE,
     category: 'data-storage', types: ['architecture'], aliases: ['cyl', 'db', 'store', 'datastore'], geometry: 'cylinder',
     make: () => node('database', 'Database', 'database', 'primary', 'violet', 'database'),
   },
   {
-    label: 'Queue', hint: 'rows + items · bus', shape: 'queue', colorKey: 'amber', kind: 'goblin',
+    label: 'Queue', hint: 'rows + items · bus', shape: 'queue', colorKey: 'amber', kind: 'goblin', size: CARD_SIZE,
     category: 'architecture', types: ['architecture'], aliases: ['bus', 'topic', 'stream'], geometry: 'rows',
     make: () => node('queue', 'Queue', 'stream', 'message bus', 'amber', 'layers'),
   },
   {
-    label: 'External', hint: 'dashed rect · 3rd party', shape: 'external', colorKey: 'accent', kind: 'goblin',
+    label: 'External', hint: 'dashed rect · 3rd party', shape: 'external', colorKey: 'accent', kind: 'goblin', size: CARD_SIZE,
     category: 'architecture', types: ['architecture'], aliases: ['third party', 'cloud'], geometry: 'dashed rect',
     make: () => node('external', 'External System', 'external', 'third party', 'accent', 'cloud'),
   },
   {
-    label: 'Actor', hint: 'rect + person · user', shape: 'actor', colorKey: 'green', kind: 'goblin',
+    label: 'Actor', hint: 'rect + person · user', shape: 'actor', colorKey: 'green', kind: 'goblin', size: CARD_SIZE,
     category: 'architecture', types: ['architecture'], aliases: ['person', 'user'], geometry: 'rect + person',
     make: () => node('actor', 'User', 'actor', 'person', 'green', 'user'),
   },
   {
-    label: 'Storage', hint: 'bucket · objects', shape: 'storage', colorKey: 'amber', kind: 'goblin',
+    label: 'Storage', hint: 'bucket · objects', shape: 'storage', colorKey: 'amber', kind: 'goblin', size: CARD_SIZE,
     category: 'data-storage', types: ['architecture'], aliases: ['bucket', 'object', 'objects'], geometry: 'bucket',
     make: () => node('storage', 'Storage', 'object store', 'bucket', 'amber', 'package'),
   },
   {
-    label: 'Gateway', hint: 'hexagon · api / lb', shape: 'gateway', colorKey: 'cyan', kind: 'goblin',
+    label: 'Gateway', hint: 'hexagon · api / lb', shape: 'gateway', colorKey: 'cyan', kind: 'goblin', size: CARD_SIZE,
     category: 'architecture', types: ['architecture'], aliases: ['hex', 'api', 'lb'], geometry: 'hexagon',
     make: () => node('gateway', 'Gateway', 'ingress', 'load balancer', 'cyan', 'router'),
   },
   {
-    label: 'Group', hint: 'dashed boundary', shape: 'group', colorKey: 'slate', kind: 'goblin',
+    label: 'Group', hint: 'dashed boundary', shape: 'group', colorKey: 'slate', kind: 'goblin', size: SIZE_EXCEPTIONS.group.size,
     category: 'groups', types: ['architecture'], aliases: ['boundary', 'vpc', 'cluster'], geometry: 'dashed boundary',
     make: () => node('group', 'Group', 'boundary', 'vpc', 'slate', ''),
   },
   {
-    label: 'Note', hint: 'plain text', shape: 'note', colorKey: 'slate', kind: 'goblin',
+    label: 'Note', hint: 'plain text', shape: 'note', colorKey: 'slate', kind: 'goblin', size: SIZE_EXCEPTIONS.note.size,
     category: 'annotations', types: ['architecture', 'flowchart', 'c4'],
     aliases: ['annotation', 'comment', 'sticky'], geometry: 'plain text annotation',
     // One canonical Note (v2 §12.7): the flowchart/C4 sites already used sub:''.
     make: () => node('note', 'Note', 'note', '', 'slate', 'sticky-note'),
   },
   {
-    label: 'Text', hint: 'plain caption', shape: 'note', colorKey: 'slate', kind: 'label',
+    label: 'Text', hint: 'plain caption', shape: 'note', colorKey: 'slate', kind: 'label', size: SIZE_EXCEPTIONS.label.size,
     category: 'basic', types: ['architecture'], aliases: ['label', 'plain'], geometry: 'free text label',
-    // ROUND R — a default box so a fresh label is usable rather than collapsing
-    // to its content width. 180px is ~21 monospace characters of run at 13px
-    // (180 - 12px padding, ~7.8px per char), so the default string fits on ONE
-    // line with room to roughly double before it wraps; 64px is 2.87 line boxes
-    // (64 - 8px padding, 19.5px per line), i.e. two typed lines with slack, and
-    // sits comfortably ABOVE the 48px resizer floor so a new label never renders
-    // at its own minimum. `addNodeByLabel` already honours `item.size`, so
-    // nothing in App.tsx has to change.
-    size: {width: 180, height: 64},
+    // ROUND R chose 180x64 for a fresh label: 180px is ~21 monospace characters
+    // at 13px, so the default string fits on ONE line with room to roughly double
+    // before it wraps, and 64px is two typed lines with slack — comfortably above
+    // the 48px resizer floor. GOBI-SIZE moved the NUMBER to SIZE_EXCEPTIONS.label,
+    // because a note is an annotation too and the two should read alike.
+    // `addNodeByLabel` honours `item.size`, so nothing in App.tsx has to change.
     make: () => ({text: 'Text label'}),
   },
 ];
