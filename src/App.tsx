@@ -114,7 +114,7 @@ import {RotateInternalsBridge} from './components/RotateInternalsBridge';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
-import Checklist, {type ChecklistTaskId} from './nodes/Checklist';
+import Checklist, {type ChecklistTaskId, isChecklistComplete} from './nodes/Checklist';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
@@ -173,6 +173,7 @@ import {useConnections} from './useConnections';
 import {useExportActions} from './useExportActions';
 import {useCanvasTools} from './useCanvasTools';
 import {useBoardsMenu} from './useBoardsMenu';
+import {useChecklist} from './useChecklist';
 import {
   edgeMarkerUrl, edgeStrokeKeyOf, hasCrow, isEditable, nodeW, nodeH,
   edgeGeo, edgeDrawnMid, TableGlyph, dashArray, favouritePreview, markerFor,
@@ -574,9 +575,9 @@ export default function App() {
     feedbackReturn.current = from;
     setFeedbackOpen(true);
   }, []);
-  /** Discrete "user did it" signals for the checklist (idempotent per task). */
-  const [doneSignal, setDoneSignal] = useState<ChecklistTaskId | null>(null);
-  const tickTask = useCallback((id: ChecklistTaskId) => { setDoneSignal(id); }, []);
+  /** ONBOARD-P4 — the checklist's facts and their one write path live in
+   *  `useChecklist`: the `?` sheet reads/clears the same fact the panel paints. */
+  const [checklistDone, tickTask, checklistDismissed, dismissChecklist, restoreChecklist] = useChecklist();
 
   // ---- multi-document boards (disk-backed via dev-server API) ----
   const [curBoard, setCurBoard] = useState<BoardDoc | null>(null);
@@ -2848,6 +2849,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       setNodes(parsed.nodes);
       setEdges(importedEdges);
       bumpHist(v => v + 1);
+      tickTask('board');   // ONBOARD-P4 B2 — importing a board is an explicit act
       // Import replaces the CURRENT board's content (or seeds a new board when
       // none is open) — it does not create a separate board.
       if (curBoard) {
@@ -4295,15 +4297,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {notice && <div className="toast">{notice}</div>}
 
-        {/* H2: getting-started checklist — ticks as the user performs actions.
-            ITEM 3: no `onAllDone`. Completing all 6 auto-hides the panel (its own
-            `done.size >= TASKS.length` return below); the toast it used to raise
-            fired on EVERY load for anyone who had already finished, because the
-            once-per-mount guard was a ref that reset with the page. */}
-        <Checklist
-          doneSignal={doneSignal}
-          hasSecondBoard={boardList.length >= 2}
-        />
+        {/* H2: getting-started checklist. Its state, its auto-hide and the
+            history of the removed completion toast live in Checklist.tsx. */}
+        <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
 
         {/* F2: context menu (node / edge / pane right-click) */}
         {ctx && (
@@ -4325,6 +4321,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           open={help}
           onToggle={() => setHelp(h => !h)}
           onSendFeedback={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
+          canRestoreChecklist={checklistDismissed && !isChecklistComplete(checklistDone)}
+          onRestoreChecklist={() => { setHelp(false); restoreChecklist(); }}
         />
 
         {/* D1: searchable insert palette */}

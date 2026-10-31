@@ -13,7 +13,7 @@
  *  their widths from the source text (label/hint/keys/gestures regexes) —
  *  reformatting them breaks the BN-3 reader update. */
 import type * as React from 'react';
-import {MessageSquarePlus} from 'lucide-react';
+import {ListChecks, MessageSquarePlus} from 'lucide-react';
 import Tooltip from '../Tooltip';
 
 type HelpSheetProps = {
@@ -26,12 +26,17 @@ type HelpSheetProps = {
   onToggle: () => void;
   /** closes the sheet and opens the ONE feedback dialog (App's openFeedback). */
   onSendFeedback: () => void;
+  /** ONBOARD-P4 B1 — true when the panel is DISMISSED and not already complete,
+   *  i.e. when "show it again" would do something. App computes it. */
+  canRestoreChecklist: boolean;
+  /** Clears the stored dismissal and re-shows the panel (App owns the write). */
+  onRestoreChecklist: () => void;
 };
 
 /** The `?` cheat sheet: what the product can do + the keyboard and mouse-gesture
  *  reference. Mounted inside `.canvas-wrap` beside the toolbar; `.help-pop`
  *  z-index (30) sits below the Settings modal (70) and the feedback overlay (80). */
-export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback}: HelpSheetProps) {
+export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback, canRestoreChecklist, onRestoreChecklist}: HelpSheetProps) {
   return <>
         <Tooltip label="Keyboard shortcuts (?)">
           <button
@@ -63,6 +68,14 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback}: Help
             >
               <MessageSquarePlus size={13} /> Send feedback
             </button>
+            {/* ONBOARD-P4 B1 — the way back. Offered only while it would do
+                something: App hides it once all six are ticked (the panel
+                auto-hides then) and while the panel is already on screen. */}
+            {canRestoreChecklist && (
+              <button type="button" className="help-action-btn" data-help-checklist onClick={onRestoreChecklist}>
+                <ListChecks size={13} /> Show the getting-started checklist
+              </button>
+            )}
             {/* Item 4: this sheet and Settings → Shortcuts must present the
                 SAME information — same two groups, same entries, same order,
                 same wording. Keys render as `kbd` chips; gestures render as

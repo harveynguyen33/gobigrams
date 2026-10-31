@@ -8,6 +8,7 @@ import {gridLayout, layoutDiagram, type LayoutDirection, type LayoutSpacing} fro
 import {type CrowFoot} from '../nodes/Crowfoot';
 import {type ThemeName} from '../theme';
 import {type ShowMode} from '../nodes/TableNode';
+import type {EdgeFlowKind} from '../edges/edgeData';
 import type {Node} from '@xyflow/react';
 /* ---------------------------------------------------------------------------
    L2 — THE PRESET SPINE.
@@ -247,6 +248,8 @@ export type EdgeSeed = {
   targetHandle?: string | null;
   label?: string;
   techn?: string;
+  /* ONBOARD-P4 — a seeded edge may preview a flow (registry: EDGE_FLOW_KINDS). */
+  flow?: EdgeFlowKind;
   crowStart?: CrowFoot;
   crowEnd?: CrowFoot;
 };
@@ -278,7 +281,7 @@ export function makeEdge(source: string, target: string, e: EdgeDefaults, id: st
     target,
     animated: false,
     style: {stroke: color, ...(dash ? {strokeDasharray: dash} : null), ...(e.strokeWidth ? {strokeWidth: e.strokeWidth} : null)},
-    data: {shape: e.path, offset: 'center', strokeKey: e.strokeKey, ...(seed.techn ? {techn: seed.techn} : null)},
+    data: {shape: e.path, offset: 'center', strokeKey: e.strokeKey, ...(seed.flow ? {flow: seed.flow} : null), ...(seed.techn ? {techn: seed.techn} : null)},
   };
   if (seed.label) edge.label = seed.label;
   if (markerStart) edge.markerStart = markerStart;

@@ -315,11 +315,14 @@ export function useBoardsMenu(
       });
       setCurBoard(c => c ? {...c, name: saved.name, updatedAt: saved.updatedAt} : c);
       setBoardList(l => l.map(b => b.id === curBoard.id ? {...b, name: saved.name, updatedAt: saved.updatedAt} : b));
+      /* ONBOARD-P4 B2 — a RENAME is the act that most often makes the first
+         board "yours": the board task used to need a SECOND board to exist. */
+      tickTask('board');
       flash(`Renamed to “${name}”`);
     } catch (err) {
       flash(`Rename failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, flushSave, flash, presetId]);
+  }, [curBoard, flushSave, flash, presetId, tickTask]);
 
   const doDuplicateBoard = useCallback(async () => {
     if (!curBoard) return;
@@ -339,11 +342,12 @@ export function useBoardsMenu(
       });
       setBoardList(await boards.listBoards());
       applyBoard(saved);
+      tickTask('board');
       flash(`Duplicated to “${name}”`);
     } catch (err) {
       flash(`Duplicate failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, flushSave, applyBoard, flash]);
+  }, [curBoard, flushSave, applyBoard, flash, tickTask]);
 
   /** ITEM 6b — opens the designed destructive confirm. */
   const deleteBoard = useCallback(() => { setBoardDlg('delete'); }, []);
