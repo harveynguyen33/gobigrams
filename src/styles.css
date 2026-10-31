@@ -2697,7 +2697,7 @@ kbd {
    `.sp-card`, `.sp-item` and `.sp-input` already use one rule above. */
 .bd-overlay {
   /* Above `.sp-overlay`'s 40: a modal dialog must outrank the insert palette if
-     both are somehow up. Still below Settings (70) and the tour (10000). */
+     both are somehow up. Still below Settings (70) and the tooltip layer (9999). */
   z-index: 45;
 }
 .bd-card {
@@ -3221,41 +3221,21 @@ kbd {
   background: var(--elevated); border: 1px solid var(--border-strong);
   border-radius: 4px; padding: 1px 4px; font-size: var(--fs-xs); color: var(--fg);
 }
-
-/* ---------- H1: guided tour ---------- */
-.tour-overlay { position: fixed; inset: 0; z-index: 10000; }
-.tour-spot {
-  position: absolute; border-radius: 10px;
-  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--bg) 55%, transparent), 0 0 0 4px var(--sel);
-  pointer-events: none;
-  transition: all .2s ease;
+/* ONBOARD-P3 — the two ways in. `.canvas-empty` is pointer-events:none so clicks
+   fall through to the canvas; the ACTION ROW opts back IN, or the button looks
+   right and is dead (that is the measured defect class, not a theory). */
+.ce-actions {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  margin-top: 14px; pointer-events: auto;
 }
-.tour-card {
-  position: absolute; width: 340px; max-width: calc(100vw - 24px);
-  background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 12px; padding: 14px 16px 12px;
-  box-shadow: var(--shadow-pop);
-  z-index: 10001;
+.ce-btn {
+  font-family: var(--mono); font-size: var(--fs-md); font-weight: 600;
+  background: var(--elevated); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 7px 12px; cursor: pointer; transition: all .15s;
 }
-.tour-count {
-  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); letter-spacing: .08em;
-}
-.tour-title { font-size: var(--fs-xl); font-weight: 650; color: var(--fg); margin-top: 3px; }
-.tour-body { font-size: var(--fs-md); line-height: 1.5; color: var(--dim); margin-top: 7px; }
-.tour-actions { display: flex; align-items: center; gap: 6px; margin-top: 14px; }
-.tour-btn {
-  font-family: var(--mono); font-size: var(--fs-md);
-  background: transparent; color: var(--fg);
-  border: 1px solid var(--border-strong); border-radius: 7px;
-  padding: 4px 10px; cursor: pointer; transition: all .15s;
-}
-.tour-btn:hover { background: var(--elevated); border-color: var(--dim); }
-.tour-btn:disabled { opacity: .4; cursor: not-allowed; }
-.tour-btn:disabled:hover { background: transparent; border-color: var(--border-strong); }
-.tour-primary { background: var(--acc); border-color: var(--acc); color: var(--on-acc); font-weight: 600; }
-.tour-primary:hover { background: var(--on-acc-hover); border-color: var(--on-acc-hover); }
-.tour-replay { border-color: transparent; color: var(--dim); padding-left: 0; }
-.tour-replay:hover { color: var(--sel); background: transparent; border-color: transparent; }
+.ce-btn:hover { border-color: var(--acc); color: var(--acc); }
+.ce-or { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 
 /* ---------- H2: getting-started checklist ---------- */
 .gsc {
@@ -3307,20 +3287,27 @@ kbd {
   background: var(--green); border-color: var(--green); color: var(--bg);
 }
 
-/* help popover: Take a tour item */
-.help-tour-btn {
+/* ONBOARD-P2/3 — the `?` sheet's capability block: what the deleted step-by-step
+   overlay uniquely named, as four scannable rows. Plain rows — no numbering, no
+   step chain, no controls — so it reads as a list, not a walkthrough. Tokens only. */
+.help-cap { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 14px; }
+.help-cap-row { display: flex; flex-direction: column; gap: 1px; }
+.help-cap-row b { font-size: var(--fs-md); font-weight: 600; color: var(--fg); }
+.help-cap-row span { font-size: var(--fs-sm); color: var(--dim); line-height: 1.45; }
+
+/* help popover: the one action row (Send feedback) under the Shortcuts heading */
+.help-action-btn {
   display: flex; align-items: center; gap: 8px; width: 100%;
-  /* Item 3a: the button is now the FIRST element under the <h4>, so its spacing
-     moved from ABOVE it (margin-top: 8px, when it sat at the bottom of the
-     sheet) to BELOW it — that gap is what separates it from the Keyboard group.
-     The `h4` keeps its own 8px bottom margin, and `.help-pop h4 + .help-group`
-     only matches a group, so the first group still gets its normal 16px. */
+  /* Spacing lives BELOW the button: it sits directly under the <h4>, and this
+     bottom margin is what separates it from the Keyboard group. The `h4` keeps
+     its own 8px bottom margin, and `.help-pop h4 + .help-group` only matches a
+     group, so the first group still gets its normal 16px. */
   margin-top: 0; margin-bottom: 8px; padding: 7px 8px;
   background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 7px;
   color: var(--fg); font-family: var(--mono); font-size: var(--fs-md);
   cursor: pointer; transition: all .15s;
 }
-.help-tour-btn:hover { border-color: var(--acc); color: var(--acc); }
+.help-action-btn:hover { border-color: var(--acc); color: var(--acc); }
 
 /* =====================================================================
    PACKAGE-K — EventCatalog visual techniques
@@ -3709,8 +3696,8 @@ kbd {
    PACKAGE-M — Settings dialog (the theme became ONE setting in here)
    Tokens only: no literal hex, no literal rgba. z-index 70 sits above
    every canvas surface (toolbar 5, sel-bar 6, pop 30, sp-overlay 40,
-   ctx-menu 60) and below the tooltip layer (9999) + the Tour (10000), so a
-   tooltip fired from inside the modal still shows and the tour is never
+   ctx-menu 60) and below the tooltip layer (9999), so a tooltip fired from
+   inside the modal still shows and the dialog is never
    hidden behind the dialog.
    ===================================================================== */
 
@@ -5013,7 +5000,7 @@ kbd {
    its comment) — no viewport width. */
 .tg-overlay {
   /* Above the board dialog (45): the gallery can be opened from the dialog's
-     own trailing row, so it must outrank it. Still below Settings and the tour,
+     own trailing row, so it must outrank it. Still below Settings,
      exactly as `.bd-overlay` is. */
   z-index: 46;
   /* FLEX, not the inherited `display:grid` + `place-items:center`.

@@ -109,7 +109,6 @@ import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode,
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
-import Tour from './dialogs/Tour';
 import {HelpSheet} from './components/HelpSheet';
 import {RotateInternalsBridge} from './components/RotateInternalsBridge';
 import {ModalMounts} from './components/ModalMounts';
@@ -557,15 +556,14 @@ export default function App() {
     noticeTimer.current = window.setTimeout(() => setNotice(''), 2500);
   }, []);
 
-  // ---- H1/H2: onboarding — guided tour + getting-started checklist ----
-  /* ONBOARD-P1 — the tour NO LONGER auto-starts and keeps NO persistence. The old
-     first-visit effect wrote the `tour-seen` flag at MOUNT, i.e. before step 1 was
-     ever painted (docs/PHASE-0-WALKTHROUGH.md §4 D1 measured the flag already "1"
-     with zero interaction), so every visitor was recorded as having read a tour they
-     may have bailed out of on the first card — and completion could never be
-     measured. It now opens ONLY from the ? sheet's "Take a tour" button, always at
-     step 1, and closing it (Done or Skip) writes nothing, so it stays re-openable. */
-  const [tourOpen, setTourOpen] = useState(false);
+  // ---- H1/H2: onboarding — capability list in the ? sheet + getting-started checklist ----
+  /* ONBOARD-P2/3 (2026-10-31) — the step-by-step overlay is GONE and its code went
+     with it. Evidence: docs/PHASE-0-WALKTHROUGH.md §4 (D1-D4) — the scrim swallowed
+     every click including the four interactions it named, its one worthwhile step
+     depended on an edge the first-run board does not have, and it could never be
+     seen twice or measured. The four capabilities it was the ONLY surface for now
+     live as plain rows in the ? sheet (HelpSheet.tsx): animated flow, cardinality,
+     tables as nodes, autosave. */
   /* ROUND BI, ITEM 3 — ONE feedback dialog for the whole app: the ? help sheet
      and Settings → About both open THIS one. `feedbackReturn` is the element
      that opened it, so Esc/Cancel hands the caret back to that exact control
@@ -579,10 +577,6 @@ export default function App() {
   /** Discrete "user did it" signals for the checklist (idempotent per task). */
   const [doneSignal, setDoneSignal] = useState<ChecklistTaskId | null>(null);
   const tickTask = useCallback((id: ChecklistTaskId) => { setDoneSignal(id); }, []);
-  /** Close the tour. ONE callback shared by Done and Skip, stable identity so the
-   *  overlay's own step effects (which depend on `onDone`) do not re-run on every
-   *  App render — and it writes nothing, so the tour has no persistence at all. */
-  const closeTour = useCallback(() => setTourOpen(false), []);
 
   // ---- multi-document boards (disk-backed via dev-server API) ----
   const [curBoard, setCurBoard] = useState<BoardDoc | null>(null);
@@ -819,6 +813,12 @@ export default function App() {
     nodesRef, edgesRef, boardList, setBoardList, boardsOpen, setBoardsOpen,
     curBoard, setCurBoard, presetId, setPresetId, setShowMode, setNoCycles,
     setOneIn, suggestTheme, flushSave, saveTimer, applyBoard, flash, tickTask);
+
+  /** ONBOARD-P3 — the ONE way into the templates gallery. The boards menu and the
+   *  empty board's "Start from a template" both call THIS, so the gallery cannot
+   *  grow a second opener that forgets to clear the pending board name. */
+  const openTemplates = useCallback(() => { pendingBoardName.current = ''; setTgOpen(true); },
+    [pendingBoardName, setTgOpen]);
 
 
   // Item 3b: the `?` helper closes on an outside click too — the same pattern as
@@ -2605,14 +2605,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         }
         return;
       }
-      // H1: every other overlay on screen owns the keyboard. While the onboarding
-      // tour, the help popover, a board menu or the insert palette is open, an
-      // app shortcut must not fire behind it — a stray ⌘Z during the tour would
-      // undo the newcomer's own work, and `?` would stack the cheat sheet on top
-      // of a surface that is already being read. The tour handles its own
-      // Arrow/Enter/Escape in a CAPTURE listener that stops propagation
-      // (Tour.tsx), so those keys never arrive here and keep working.
-      if (tourOpen || help || boardsOpen || searchPos) return;
+      // H1: every other overlay on screen owns the keyboard. While the help
+      // popover, a board menu or the insert palette is open, an app shortcut must
+      // not fire behind it — a stray ⌘Z would undo the newcomer's own work, and
+      // `?` would stack the cheat sheet on top of a surface that is already being
+      // read. (ONBOARD-P2/3: the step-by-step overlay that used to be the first
+      // member of this guard is deleted; the three surfaces that remain are the
+      // same three this guard always covered.)
+      if (help || boardsOpen || searchPos) return;
       // Shift+1 (physical Digit1) — "fit view", the Figma/Excalidraw/Miro
       // convention. It carries a modifier, so it is legal under this app's
       // no-bare-key rule. Matched on `e.code`, NOT `e.key`: on most layouts
@@ -2635,8 +2635,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // handler starts swallowing everything. Move it below that return and the
       // shortcut becomes one-way: it can switch the mode ON and then never OFF.
       // It also deliberately sits after the overlay guard above, so a stray
-      // Shift+2 cannot flip the mode behind the tour, help, a board menu or the
-      // insert palette.
+      // Shift+2 cannot flip the mode behind help, a board menu or the insert
+      // palette.
       if (e.shiftKey && e.code === 'Digit2' && !mod) {
         e.preventDefault();
         toggleReadOnly();
@@ -2697,8 +2697,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // these branches sit BELOW the read-only early-return above (panel
       // visibility is a persisted layout mutation, so review mode must swallow
       // them exactly as it swallowed the chord before) and BELOW the overlay
-      // guard, so a stray chord cannot flip panels behind the tour, help, a
-      // board menu or the insert palette. They sit ABOVE the arrow-nudge, `?`
+      // guard, so a stray chord cannot flip panels behind help, a board menu or
+      // the insert palette. They sit ABOVE the arrow-nudge, `?`
       // and `/` branches, which they shadow.
       //
       // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
@@ -2750,8 +2750,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // draw.io's convention. Three guards, all required:
       //   * `mod` — a bare `/` only. Mod+/ is left for a future binding and is
       //     not stolen from the browser (Cmd+/ is a real shortcut elsewhere).
-      //   * the overlay guard ABOVE already returned while the tour, help, the
-      //     board menu or the insert modal is up, so `/` cannot focus a field
+      //   * the overlay guard ABOVE already returned while help, a board menu or
+      //     the insert modal is up, so `/` cannot focus a field
       //     behind a dialog.
       //   * `isEditable(e.target)` at the top of this handler means `/` typed
       //     INTO a field (including this one) can never re-trigger — which is
@@ -2767,7 +2767,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, rf, searchPos, help, boardsOpen, settingsOpen,
-      setPanelsVisible, tourOpen, readOnly, toggleReadOnly, boardDlg, tgOpen]);
+      setPanelsVisible, readOnly, toggleReadOnly, boardDlg, tgOpen]);
 
   // ---- C5: live zoom level for the zoom pill ----
   const ZoomPill = () => {
@@ -3905,7 +3905,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               onOpenBoard={id => void openBoard(id)}
               onClose={() => setBoardsOpen(false)}
               onNewBoard={() => { setBoardsOpen(false); newBoard(); }}
-              onTemplates={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}
+              onTemplates={() => { setBoardsOpen(false); openTemplates(); }}
               onRename={() => { setBoardsOpen(false); renameBoard(); }}
               onDuplicate={() => { setBoardsOpen(false); void doDuplicateBoard(); }}
               onDelete={() => { setBoardsOpen(false); deleteBoard(); }}
@@ -4305,14 +4305,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           hasSecondBoard={boardList.length >= 2}
         />
 
-        {/* H1: guided tour overlay — ONBOARD-P1: on request only, never on first visit */}
-        {tourOpen && (
-          <Tour
-            onDone={closeTour}
-            onSkip={closeTour}
-          />
-        )}
-
         {/* F2: context menu (node / edge / pane right-click) */}
         {ctx && (
           <ContextMenu
@@ -4324,16 +4316,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
             Positioned absolute relative to the .react-flow container. */}
-        {/* D2: keyboard cheat sheet */}
         {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
             (button + popover) lives in src/components/HelpSheet.tsx now;
-            App threads the open state, the two refs and the two openers. */}
+            App threads the open state, the two refs and the feedback opener. */}
         <HelpSheet
           btnRef={helpBtnRef}
           popRef={helpRef}
           open={help}
           onToggle={() => setHelp(h => !h)}
-          onTakeTour={() => { setHelp(false); setTourOpen(true); }}
           onSendFeedback={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
         />
 
@@ -4638,16 +4628,15 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           <Background color="var(--dots)" gap={gridSize} size={1} />
           {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
               and the board really has no nodes. `boardLoaded` is what stops a
-              load in flight from claiming "This board is empty" over a canvas
-              whose content is merely still on its way. */}
-          {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
-              and the board really has no nodes. `boardLoaded` is what stops a
-              load in flight from claiming "This board is empty" over a canvas
-              whose content is merely still on its way.
+              load in flight from claiming an empty board over a canvas whose
+              content is merely still on its way.
               ROUND BN-3 PHASE B: the panel body lives in
               src/components/CanvasEmptyPanel.tsx; the GATE stays here
               (boot-no-flash pins it to App.tsx). */}
-          <CanvasEmptyPanel show={boardLoaded && nodes.length === 0} />
+          <CanvasEmptyPanel
+            show={boardLoaded && nodes.length === 0}
+            onBrowseTemplates={openTemplates}
+          />
           {/* ROTATE-FIX: hands the store's updateNodeInternals up (the hook
               needs a provider ancestor; App is above <ReactFlow>). */}
           <RotateInternalsBridge onReady={u => { rotateInternals.current = u; }} />

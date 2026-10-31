@@ -138,7 +138,7 @@ export const SHIPPED: ShippedEntry[] = [
   {label: 'package 4', what: 'Inspector panel \u2014 per-shape sections, icon pickers, fold state', when: '2026-09'},
   {label: 'package 3', what: 'Settings and themes \u2014 five themes, one layout per screen size', when: '2026-09'},
   {label: 'package 2', what: 'Multi-diagram types \u2014 flowchart, ERD, C4, architecture', when: '2026-09'},
-  {label: 'package 1', what: 'Onboarding \u2014 guided tour and a getting-started checklist', when: '2026-09'},
+  {label: 'package 1', what: 'Onboarding \u2014 a capability list in the ? sheet and a getting-started checklist', when: '2026-09'},
 ];
 
 /**

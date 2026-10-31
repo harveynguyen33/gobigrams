@@ -1,16 +1,19 @@
 /* feature-map home: src/components/HelpSheet.tsx */
 /* HelpSheet.tsx — ROUND BN-3 PHASE B: the `?` cheat-sheet popover, lifted
  *  verbatim from App()'s return (App.tsx ~4483). The block is fully presentational:
- *  App owns `help` (open state), the outside-click refs and the two openers
- *  (tour, feedback — both need App state), so they stay props/refs threaded from
- *  App. No context, no store; `Waypoints` + `MessageSquarePlus` icons moved with
- *  the block (their only uses).
+ *  App owns `help` (open state), the outside-click refs and the feedback opener
+ *  (it needs App state), so they stay props/refs threaded from App. No context,
+ *  no store; `MessageSquarePlus` moved with the block (its only use).
+ *
+ *  ONBOARD-P2/3 (2026-10-31) — the four capabilities the deleted step-by-step
+ *  overlay was the ONLY surface for live here as plain rows above the shortcuts.
+ *  Facts about the product, not steps: no numbering, no order, no control.
  *
  *  The help-row lines are single-line on purpose: package-o-metrics measures
  *  their widths from the source text (label/hint/keys/gestures regexes) —
  *  reformatting them breaks the BN-3 reader update. */
 import type * as React from 'react';
-import {Waypoints, MessageSquarePlus} from 'lucide-react';
+import {MessageSquarePlus} from 'lucide-react';
 import Tooltip from '../Tooltip';
 
 type HelpSheetProps = {
@@ -21,16 +24,14 @@ type HelpSheetProps = {
   /** App's open state, threaded (App owns `help`; this sheet is dumb). */
   open: boolean;
   onToggle: () => void;
-  /** closes the sheet and opens the guided tour (App's `tourOpen`). */
-  onTakeTour: () => void;
   /** closes the sheet and opens the ONE feedback dialog (App's openFeedback). */
   onSendFeedback: () => void;
 };
 
-/** The `?` cheat sheet: keyboard + mouse-gesture reference. Mounted inside
- *  `.canvas-wrap` beside the toolbar; `.help-pop` z-index (30) sits below the
- *  Settings modal (70) and the feedback overlay (80). */
-export function HelpSheet({btnRef, popRef, open, onToggle, onTakeTour, onSendFeedback}: HelpSheetProps) {
+/** The `?` cheat sheet: what the product can do + the keyboard and mouse-gesture
+ *  reference. Mounted inside `.canvas-wrap` beside the toolbar; `.help-pop`
+ *  z-index (30) sits below the Settings modal (70) and the feedback overlay (80). */
+export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback}: HelpSheetProps) {
   return <>
         <Tooltip label="Keyboard shortcuts (?)">
           <button
@@ -43,24 +44,20 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onTakeTour, onSendFee
         </Tooltip>
         {open && (
           <div className="help-pop" ref={popRef}>
+            <h4>What Gobigrams can do</h4>
+            <div className="help-cap">
+              <div className="help-cap-row"><b>Animated flow</b><span>dots, dashes, pulses or an icon moving along a connection</span></div>
+              <div className="help-cap-row"><b>Cardinality</b><span>crow's foot on either end, including on plain connections</span></div>
+              <div className="help-cap-row"><b>Tables as nodes</b><span>columns, keys and checklists as first-class shapes</span></div>
+              <div className="help-cap-row"><b>Autosave</b><span>server board when the API exists, browser storage otherwise — the UI says which</span></div>
+            </div>
             <h4>Shortcuts</h4>
-            {/* Item 3a: the tour entry point is the FIRST element in the sheet —
-                directly under the title and above the Keyboard group — so it is
-                the most discoverable thing in the popover. Its spacing moved
-                from its top to its bottom (see `.help-tour-btn` in styles.css). */}
-            <button type="button" className="help-tour-btn" onClick={onTakeTour}>
-              <Waypoints size={13} /> Take a tour
-            </button>
-            {/* ROUND BI, ITEM 3 — the SECOND action of the same block: the
-                feedback form, one click from the shortcuts sheet. Same
-                .help-tour-btn treatment (its own 8px bottom margin is the gap
-                between the two, so the pair reads as one block and no colour or
-                new class is introduced). The popover closes FIRST, exactly like
-                the tour button, so the dialog's own autofocus lands inside it
-                and Esc hands the caret back to this ? button. */}
+            {/* ROUND BI, ITEM 3 — the feedback form, one click from the shortcuts
+                sheet. It closes the popover FIRST so the dialog's own autofocus
+                lands inside it and Esc hands the caret back to this ? button. */}
             <button
               type="button"
-              className="help-tour-btn"
+              className="help-action-btn"
               data-help-feedback
               onClick={onSendFeedback}
             >
