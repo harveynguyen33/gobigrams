@@ -3238,9 +3238,20 @@ kbd {
 .ce-or { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 
 /* ---------- H2: getting-started checklist ---------- */
+/* FIRST-VISIT rework (2026-11-01) — the panel used to sit at bottom:64px and
+   its 187px body grew DOWN over the zoom-control stack: the controls (bottom
+   15px, three 30px buttons + 2 borders = 92px tall) have their top edge 107px
+   above the canvas floor, so ANY expanded panel overlapped them by 43px (measured
+   at every height, not only short ones). The bottom anchor is now 15 + 92 + 13
+   clearance = 120px, so the panel ends ABOVE the control stack, and max-height
+   (120 bottom + 58 top clearance under the toolbar) plus the scrolling list
+   below keep it inside the canvas on short viewports — all six rows stay
+   reachable by scroll instead of painting over the canvas. */
 .gsc {
-  position: absolute; bottom: 64px; left: 16px; z-index: 6;
+  position: absolute; bottom: 120px; left: 16px; z-index: 6;
   width: 236px;
+  max-height: calc(100% - 178px);
+  display: flex; flex-direction: column;
   background: var(--panel-glass-strong); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px;
   box-shadow: var(--shadow-strong);
@@ -3271,7 +3282,10 @@ kbd {
   transition: all .15s;
 }
 .gsc-x:hover { color: var(--fg); background: var(--elevated); }
-.gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; }
+/* The scroll area when max-height binds (short viewports): the panel is a flex
+   column, so the list is the one member allowed to shrink — the head stays
+   pinned and the six rows scroll inside. */
+.gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; min-height: 0; }
 .gsc-item {
   display: flex; align-items: center; gap: 8px;
   font-size: var(--fs-md); color: var(--fg); padding: 4px 2px;
@@ -3683,7 +3697,11 @@ kbd {
 .node.shape-connector {
   display: grid; place-items: center;
 }
-.node.shape-connector .node-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); justify-content: var(--ts-justify, center); }
+/* FIRST-VISIT (2026-11-01) — the justify-content literal is GONE from this
+   rule: the base `.node-title` now centres by default, so the override said
+   the same thing twice. The font-size override (the connector's 12px title)
+   is the rule's whole job now. */
+.node.shape-connector .node-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); }
 .node.shape-connector .node-kicker,
 .node.shape-connector .node-sub,
 .node.shape-connector .node-metric { display: none; }
@@ -4411,8 +4429,15 @@ kbd {
    `nowrap` + ellipsis + a fixed column layout.
    ===================================================================== */
 /* The card's text container. `box-sizing: border-box` is global (line 268), so
-   `max-height: 100%` includes the padding and the padding stays inside the box. */
-.node-body { overflow: hidden; max-height: 100%; overflow-wrap: anywhere; }
+   `max-height: 100%` includes the padding and the padding stays inside the box.
+   FIRST-VISIT (2026-11-01) — WORD BOUNDARIES on the card rows: `anywhere` broke
+   'Queue' into 'Queu'/'e' on the queue card's own DEFAULT content (measured:
+   body band 66px inside a 191px node, span squeezed to 27px by the 17px icon +
+   7px gap). `break-word` only breaks a word when it cannot fit a whole line of
+   its own, and the `min-width: 0` belt below (the other measured-good pair in
+   the ROUND V table) keeps a 43-char word contained — see the queue band fix
+   at --body-inset for the SIZE half of that defect. */
+.node-body { overflow: hidden; max-height: 100%; overflow-wrap: break-word; word-break: normal; }
 /* The chain that makes that percentage bind — see the header.
    ROUND AI, ITEM 1 — THE MECHANISM, AND THE TWO THAT WERE REJECTED. The
    label-only body was 37px tall inside a 145px node, so `justify-content` had
@@ -4449,11 +4474,11 @@ kbd {
 .node-title > span:last-child,
 .node .lo-title > span:last-child,
 .group-label > span { min-width: 0; }
-.node-kicker, .node-title, .node-sub, .node-metric { overflow-wrap: anywhere; }
+.node-kicker, .node-title, .node-sub, .node-metric { overflow-wrap: break-word; word-break: normal; }
 /* label-only flowchart body: clipped horizontally by its own box; its
    `min-height: 100%` stays declared and stays inert (see the header). */
-.node .lo-body { overflow: hidden; overflow-wrap: anywhere; }
-.node .lo-title, .node .lo-sub { overflow-wrap: anywhere; }
+.node .lo-body { overflow: hidden; overflow-wrap: break-word; word-break: normal; }
+.node .lo-title, .node .lo-sub { overflow-wrap: break-word; word-break: normal; }
 /* the note kind is resizable too. Its text goes into an inner box, NOT onto the
    root: the root hosts the four connect dots and, when selected, the four resize
    grips, all centred on its border, and it has `height: 100%` (so it can never
@@ -4567,12 +4592,16 @@ kbd {
 .label-node { color: var(--ts-color, var(--fg)); }
 .label-node .node-label-input { color: var(--ts-color, var(--fg)); }
 
-.node-body { text-align: var(--ts-align, left); }
+/* FIRST-VISIT (2026-11-01) — the CARD body centres by default (was left):
+   `.node-body` and `.node .lo-title` join `.lo-body` on center, matching
+   `alignForBody` (src/textStyle.ts). The TEXT annotation kind (`.label-node`)
+   and the note body keep their left default — they are margin notes. */
+.node-body { text-align: var(--ts-align, center); }
 .node .lo-body { text-align: var(--ts-align, center); }
 .note-body { text-align: var(--ts-align, left); }
 .label-node { text-align: var(--ts-align, left); }
 .label-node .node-label-input { text-align: var(--ts-align, left); }
-.node-title { justify-content: var(--ts-justify, flex-start); }
+.node-title { justify-content: var(--ts-justify, center); }
 .node .lo-title { justify-content: var(--ts-justify, center); }
 
 /* ===========================================================================
@@ -5369,7 +5398,12 @@ kbd {
 .node.shape-database.body-inset,
 .node.shape-storeddata.body-inset { --body-inset: 35% 6% 20% 6%; }
 .node.shape-storage.body-inset    { --body-inset: 24% 3% 26% 3%; }
-.node.shape-queue.body-inset      { --body-inset: 2% 34% 2% 36%; }
+/* FIRST-VISIT (2026-11-01) — the RIGHT inset was 34% with nothing painted
+   there (the queue silhouette decorates only the LEFT side, x<62 of 200), so
+   the band was 30% of the node — too narrow for the card's own DEFAULT title
+   ('Queue' + icon: 80px needed, 66px supplied → 'Queu'/'e'). 8% clears the
+   rx=14 corner; the band is now 56%. */
+.node.shape-queue.body-inset      { --body-inset: 2% 8% 2% 36%; }
 .node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
 .node.shape-subprocess.body-inset,
 .node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }

@@ -308,12 +308,52 @@ export function libraryFor(id: PresetId): PaletteItem[] {
    THE PRESETS
 =========================================================================== */
 
+/* FIRST-VISIT (2026-11-01) — THE SEED BECAME A TEMPLATE. A brand-new visitor
+   now lands on an EMPTY canvas (the empty-state panel is the orientation
+   surface, not a finished diagram), so the teaching pipeline moved here from
+   `src/boardConstants.ts`'s `initialNodes`/`initialEdges` VERBATIM: same node
+   ids, same authored positions, same two edges (the labelled `e1` carries the
+   dots flow payload, `e2` is dashed), same group boundary around Queue +
+   Service. Everything is still built by the preset's own factories (palette
+   `make()` / `makeEdge`), so the template cannot drift from what the creation
+   paths produce — the ONBOARD-P4 invariant, moved not weakened. Resolved by
+   LABEL (not by index) so a palette re-order cannot silently re-aim it. */
+const ARCH_EDGES: EdgeDefaults = {
+  path: 'bezier',
+  strokeKey: 'slate',
+  dash: 'solid',
+  markerStart: null,
+  markerEnd: MarkerType.ArrowClosed,
+  flowAllowed: true,
+};
+const ARCH_PAL = libraryFor('architecture');
+const archItem = (label: string) => ARCH_PAL.find(p => p.label === label)!;
+const systemPipelineTemplate: TemplateSpec = {
+  id: 'sys-pipeline',
+  label: 'System pipeline',
+  hint: 'external → queue → service · boundary, flowing edge, dashed edge',
+  nodes: [
+    {id: 'n1', type: 'goblin', position: {x: 60, y: 180}, data: archItem('External').make() as any},
+    /* A parent must precede its children in the array (React Flow's rule), and a
+       child's position is PARENT-RELATIVE — the three authored absolute points
+       (60,180 / 360,170 / 680,180) are unchanged: 330+30, 96+74 and 330+350, 96+84. */
+    {id: 'g1', type: 'goblin', position: {x: 330, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
+      data: {...archItem('Group').make(), title: 'Your system', sub: 'boundary'} as any},
+    {id: 'n2', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 30, y: 74}, data: archItem('Queue').make() as any},
+    {id: 'n3', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 350, y: 84}, data: archItem('Service').make() as any},
+  ],
+  edges: [
+    makeEdge('n1', 'n2', ARCH_EDGES, 'e1', {label: 'events', flow: 'dots'}),
+    makeEdge('n2', 'n3', {...ARCH_EDGES, dash: 'dashed'}, 'e2'),
+  ],
+};
+
 /** 1 — `architecture`: today's behaviour, the default for every old board. */
 export const ARCHITECTURE_PRESET: DiagramPreset = {
   id: 'architecture',
   label: 'Architecture',
   hint: 'services · datastores · boundaries',
-  palette: libraryFor('architecture'),
+  palette: ARCH_PAL,
   edges: {
     path: 'bezier',
     strokeKey: 'slate',
@@ -328,6 +368,9 @@ export const ARCHITECTURE_PRESET: DiagramPreset = {
   // Truthful to today's behaviour: all three toggles ship OFF, so adopting this
   // preset cannot change an existing board (L2: architecture is byte-identical).
   caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
+  /* FIRST-VISIT (2026-11-01) — the former first-run seed, now reachable from
+     `Start from a template` (see systemPipelineTemplate above). */
+  templates: [systemPipelineTemplate],
   legend: [
     {colorKey: 'accent', label: 'External system'},
     {colorKey: 'cyan', label: 'Service'},

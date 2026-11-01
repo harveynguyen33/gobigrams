@@ -243,8 +243,13 @@ export function buildNodeRows(
      and every stub) the exporter must place the runs itself, and the node's own
      `textStyle.align` is exactly what the canvas would honour: centre anchors
      the text block's MIDDLE, right anchors its END. A measured rect already
-     reflects the CSS, so the derivation is skipped there. */
-  const anchor = t.runs ? undefined : alignAnchor((d.textStyle as {align?: string} | undefined)?.align);
+     reflects the CSS, so the derivation is skipped there.
+     FIRST-VISIT (2026-11-01) — the fallback is now CENTER: the card body's
+     no-write value moved from left to center (alignForBody), so an UNALIGNED
+     node must anchor middle here too or the headless export would disagree
+     with the canvas it cannot see. */
+  const storedAlign = (d.textStyle as {align?: string} | undefined)?.align;
+  const anchor = t.runs ? undefined : alignAnchor(storedAlign ?? 'center');
   const place = (x: number) => (anchor === 'middle' ? x + t.w / 2 : anchor === 'end' ? x + t.w : x);
   const runOf = (row: 'kicker' | 'title' | 'sub' | 'metric'): number =>
     place(t.runs?.[row]?.x ?? xRow);
