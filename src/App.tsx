@@ -926,10 +926,11 @@ export default function App() {
   const nudge = useCallback((dx: number, dy: number) => {
     const ids = new Set(nodesRef.current.filter(n => n.selected).map(n => n.id));
     if (!ids.size) return;
+    tickTask('move');   // CHECKLIST-EDGE — the arrows ARE a move gesture
     setNodes(ns => ns.map(n => ids.has(n.id)
       ? {...n, position: {x: n.position.x + dx, y: n.position.y + dy}}
       : n));
-  }, [setNodes]);
+  }, [setNodes, tickTask]);
 
   /** Delete every selected node (and its attached edges). */
   const deleteSelection = useCallback(() => {
@@ -939,8 +940,6 @@ export default function App() {
     setNodes(ns => ns.filter(n => !ids.has(n.id)));
     setEdges(es => es.filter(e => !ids.has(e.source) && !ids.has(e.target)));
   }, [pushHistory, setNodes, setEdges]);
-
-
 
   // ---- F2: context menu actions ----
   /** Absolute flow position of a node (parent-relative resolved up the tree). */
@@ -1241,7 +1240,7 @@ export default function App() {
      distribute) now lives in useCanvasTools.ts, moved verbatim. */
   const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
     nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
-    rf, sel, zOrderMode, preset, layoutDir);
+    rf, sel, zOrderMode, preset, layoutDir, tickTask);
 
 
   const selected = nodes.find(n => n.id === sel);

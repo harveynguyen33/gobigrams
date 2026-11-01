@@ -49,6 +49,14 @@ export function useConnections(
   /** Would adding source→target create a directed cycle? */
   const createsCycle = useCallback((source: string, target: string): boolean =>
     wouldCycle(source, target, edgesRef.current), [edgesRef]);
+  /** CHECKLIST-EDGE — the ONE home of the tick+tip pair for a created edge.
+   *  Two of the three creation paths carried only the tip, so a user who
+   *  never dragged handle-to-handle was stuck at 5/6 forever. An edge-creation
+   *  site must call THIS, never a bare fireTip/tickTask. */
+  const onEdgeCreated = useCallback(() => {
+    tickTask('edge');
+    fireTip('edge');
+  }, [tickTask, fireTip]);
   // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     /* AUDIT-follow-up — a rewire can create a cycle too: drop the end on a node
@@ -127,8 +135,8 @@ export function useConnections(
     // node this path used to insert.
     pushHistory();
     setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
-    fireTip('edge');
-  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath, fireTip]);
+    onEdgeCreated();
+  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath, onEdgeCreated]);
   /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
      DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
      owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
@@ -210,12 +218,12 @@ export function useConnections(
         sourceHandle: handleId, targetHandle: sides[0][1],
       });
       setEdges(es => addEdge(ne, es));
-      fireTip('edge');
+      onEdgeCreated();
       flash(facing < DBL_STRAIGHT_GAP ? 'Connected (straight — shapes are close)' : 'Connected to the nearest shape');
     };
     window.addEventListener('gobi:handle-connect', onHandleConnect);
     return () => window.removeEventListener('gobi:handle-connect', onHandleConnect);
-  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath, fireTip]);
+  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath, onEdgeCreated]);
 
   // ---- connect ---- (new edges use the editable goblinEdge type)
   // D4: a second connection between the same ordered pair of nodes is not a
@@ -248,8 +256,7 @@ export function useConnections(
         targetHandle: c.sourceHandle,
       };
     }
-    tickTask('edge');
-    fireTip('edge');
+    onEdgeCreated();
     /* AUDIT-2 + AUDIT-3 — the twin check, pushHistory and the id mint all moved
        OUT of the setEdges updater. Two reasons, both measured:
        (a) AUDIT-2: the twin-bump branch never pushed history, so Ctrl+Z after a
@@ -276,7 +283,7 @@ export function useConnections(
     setEdges(es => addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, newId, {
       sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
     }), es));
-  }, [tickTask, pushHistory, setEdges, preset, defaultPath, fireTip]);
+  }, [onEdgeCreated, pushHistory, setEdges, preset, defaultPath]);
 
   // ---- F7: connection rules applied to every new connection ----
   const onConnectRules = useCallback((c: Connection) => {
