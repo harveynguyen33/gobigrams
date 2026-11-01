@@ -18,6 +18,7 @@ import {getPreset} from './presets';
 import type {PresetId} from './presets';
 import type {BoardDialogResult} from './dialogs/BoardDialog';
 import type {ShowMode} from './nodes/TableNode';
+import {trackFirstAction} from './analytics';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useBoardsMenu(
@@ -197,6 +198,10 @@ export function useBoardsMenu(
    *  board the NEXT pick creates. Clearing before the early return makes that
    *  impossible by construction, so no exit path can leak the value. */
   const useTemplate = useCallback((key: string) => {
+    /* ONBOARD-P6 — `template` is the sixth first_action and has no checklist
+       task, so it reports itself here: the user picked a template to start
+       from. Deduped forever inside analytics (a pick is not a usage count). */
+    trackFirstAction('template');
     setTgOpen(false);
     const carried = pendingBoardName.current;
     pendingBoardName.current = '';

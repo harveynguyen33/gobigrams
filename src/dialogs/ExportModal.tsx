@@ -2,6 +2,7 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {EXPORT_TOKENS, tokensFor} from '../theme';
 import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
+import {trackExport} from '../analytics';
 /* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
  * compiler (round-bn2 lazy law, pinned by round-gobi-door A3/A4): no static
  * import of src/share keeps the codec off the boot path. The URL helpers read
@@ -175,6 +176,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
            printPdf builds the same svg string (theme/scope/outline baked
            in) inside App and hands it to the print view. */
         await printPdf({nodes: scoped.nodes, edges: scoped.edges, theme: effTheme, outline});
+        trackExport('pdf');   // ONBOARD-P6 — the value moment, on every export
         return;
       } else if (format === 'png') {
         const url = await buildPng({...scoped, theme: effTheme});
@@ -195,6 +197,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       a.download = name;
       a.click();
       URL.revokeObjectURL(a.href);
+      trackExport(format);   // ONBOARD-P6 — every export, not deduped: repetition is the signal
     } finally {
       setExportBusy(false);
     }
@@ -243,6 +246,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     const built = await buildShareUrl(doc);
     const url = {payload: built.payload, url: built.url, length: built.url.length};
     setShareUrl(url);
+    trackExport('share');   // ONBOARD-P6 — a built link is the share value moment
     setShareCopied(false);
     try {
       await navigator.clipboard.writeText(url.url);

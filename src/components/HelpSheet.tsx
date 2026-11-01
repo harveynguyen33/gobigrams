@@ -12,9 +12,11 @@
  *  The help-row lines are single-line on purpose: package-o-metrics measures
  *  their widths from the source text (label/hint/keys/gestures regexes) —
  *  reformatting them breaks the BN-3 reader update. */
+import {useEffect} from 'react';
 import type * as React from 'react';
 import {ListChecks, MessageSquarePlus} from 'lucide-react';
 import Tooltip from '../Tooltip';
+import {trackHelpOpen, trackSurface} from '../analytics';
 
 type HelpSheetProps = {
   /** the `?` toolbar button — feedback returns focus here when it closes. */
@@ -37,6 +39,14 @@ type HelpSheetProps = {
  *  reference. Mounted inside `.canvas-wrap` beside the toolbar; `.help-pop`
  *  z-index (30) sits below the Settings modal (70) and the feedback overlay (80). */
 export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback, canRestoreChecklist, onRestoreChecklist}: HelpSheetProps) {
+  /* ONBOARD-P6 — the counter-metric. BOTH doors into this sheet (the ? button
+     and the ? shortcut, plus the read-only fallback) drive the same `open`
+     state, so ONE effect covers every path and nothing can open it unmeasured. */
+  useEffect(() => {
+    if (!open) return;
+    trackSurface('help');
+    trackHelpOpen();
+  }, [open]);
   return <>
         <Tooltip label="Keyboard shortcuts (?)">
           <button

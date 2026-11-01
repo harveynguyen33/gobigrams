@@ -1,5 +1,6 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Check, ChevronDown, X} from 'lucide-react';
+import {trackSurface} from '../analytics';
 
 const KEY = 'diagram-studio:checklist-done';
 const DISMISS_KEY = 'diagram-studio:checklist-dismissed';
@@ -90,6 +91,12 @@ export default function Checklist({
   // All 6 done → auto-hide. This is a RENDER guard (the early return below), not
   // an effect: it needs no once-per-mount ref, so it cannot repeat itself on a
   // reload, and it keeps working when the checkmarks are already in localStorage.
+
+  /* ONBOARD-P6 — reported only when the panel ACTUALLY renders: a dismissed or
+     complete panel is not a surface, and saying otherwise would inflate the
+     denominator the whole funnel is measured against. The hook sits ABOVE both
+     early returns so its order never depends on them. */
+  useEffect(() => { if (!dismissed && done.size < TASKS.length) trackSurface('checklist'); }, [dismissed, done.size]);
 
   if (dismissed) return null;
   if (done.size >= TASKS.length) return null;

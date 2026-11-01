@@ -6,7 +6,9 @@
  *  ONBOARD-P3 (2026-10-31): the copy says what the product is FOR and offers the
  *  template route. `onBrowseTemplates` is App's ONE gallery opener — the same
  *  callback the boards menu calls, never a second path. */
+import {useEffect} from 'react';
 import {Panel} from '@xyflow/react';
+import {trackSurface} from '../analytics';
 
 type CanvasEmptyPanelProps = {
   /** App's gate: the board load has RESOLVED and the board truly has no nodes. */
@@ -19,6 +21,9 @@ type CanvasEmptyPanelProps = {
  *  Must stay a direct child of <ReactFlow>. `.canvas-empty` is pointer-events:none
  *  so clicks reach the canvas; the action row opts back IN or the button is dead. */
 export function CanvasEmptyPanel({show, onBrowseTemplates}: CanvasEmptyPanelProps) {
+  /* ONBOARD-P6 — the guidance surface reported itself. The effect sits ABOVE the
+     early return so the hook order never depends on `show`. */
+  useEffect(() => { if (show) trackSurface('empty_state'); }, [show]);
   if (!show) return null;
   return (
     <Panel position="top-center" className="canvas-empty" style={{marginTop: '12vh'}}>

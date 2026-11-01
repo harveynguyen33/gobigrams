@@ -19,12 +19,25 @@ import {
   type ChecklistTaskId, readChecklistDone, persistChecklistDone,
   readChecklistDismissed, writeChecklistDismissed,
 } from './nodes/Checklist';
+import {trackFirstAction, type FirstAction} from './analytics';
+
+/** ONBOARD-P6 — the checklist's six tasks mapped onto the analytics event's six
+ *  actions. `move` has NO counterpart: moving a node is housekeeping, not an
+ *  activation step, so it is deliberately not reported. `template` has no
+ *  checklist task — it fires from the template pick itself (useBoardsMenu).
+ *  Reporting HERE means every tick that lands, from any of the tickTask call
+ *  sites, is counted once and in the checklist's own vocabulary. */
+const FIRST_ACTION: Partial<Record<ChecklistTaskId, FirstAction>> = {
+  node: 'node', edge: 'edge', label: 'label', export: 'export', board: 'board',
+};
 
 /** `done` is the ticked set; `tick` completes one task; `dismissed` +
  *  `dismiss`/`restore` are the panel's visibility. */
 export function useChecklist() {
   const [done, setDone] = useState<Set<ChecklistTaskId>>(() => readChecklistDone());
   const tick = useCallback((id: ChecklistTaskId) => {
+    const action = FIRST_ACTION[id];
+    if (action) trackFirstAction(action);
     setDone(prev => {
       if (prev.has(id)) return prev;
       const next = new Set(prev);

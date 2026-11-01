@@ -41,3 +41,7 @@ list is for people deciding whether to adopt.)
 
 - In-app feedback prefills a GitHub issue (no account needed to write, one click to file)
 - Cookieless, self-hosted analytics (Umami) — no cookies, no trackers, no consent banner
+- Four events only, and no free text: which guidance surface was seen (`surface_view`, once per surface per
+  session), the first node / edge / label / export / board / template (`first_action`, once per browser),
+  every export by format, and `help_open` — the counter-metric, because help rising together with the
+  guidance surfaces means the surfaces are not teaching

@@ -39,6 +39,7 @@ import {asShape, ShapePreview, type Shape} from '../nodes/shapes';
 import {FOCUSABLE} from '../Settings';
 import {templateCatalog, type TemplateFamily} from '../templateCatalog';
 import type {PresetId, TemplateLevel} from '../presets';
+import {trackSurface} from '../analytics';
 
 /* How many distinct glyphs a card shows. TWO numbers, and neither is a
    breakpoint: they are COUNTS of preview glyphs. The wide one is what the
@@ -165,6 +166,11 @@ export default function TemplatesGallery({onCancel, onUse, returnFocusTo}: Props
   const cardRef = useRef<HTMLDivElement>(null);
   const firstCard = useRef<HTMLButtonElement | null>(null);
   const sections = useRef<Record<string, HTMLElement | null>>({});
+
+  /* ONBOARD-P6 — the gallery is mounted only while it is OPEN (ModalMounts
+     renders it behind `tgOpen`), so a mount effect is exactly "the templates
+     surface was shown". */
+  useEffect(() => { trackSurface('templates'); }, []);
 
   // The catalog is static data: deriving the cards once keeps the glyph strips
   // and the section keys stable for the life of the modal.
