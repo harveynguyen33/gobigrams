@@ -1,0 +1,8 @@
+# Gobigrams — a free, no-account diagram editor. Everything is indexable.
+User-agent: *
+Allow: /
+# /embed is a read-only renderer for one board; it carries its own noindex meta
+# (the blog embeds inline SVG instead), so it is listed as no-crawl here too.
+Disallow: /embed
+
+Sitemap: https://gobigrams.tech-goblin.com/sitemap.xml
