@@ -15,14 +15,19 @@
          splash and the browser UI agree with the app's own palette). -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#1b1b1b" />
-    <!-- SEO base (public launch prep): description + OG/Twitter. og:url/content
-         domain is intentionally the placeholder-free relative form; set the
-         canonical + og:url absolute URLs when the public host is chosen. -->
+    <!-- SEO base (public launch prep): description + OG/Twitter. The public host
+         is now live (2026-11-01), so the canonical, og:url and og:image are
+         ABSOLUTE — a relative og:image is ignored by several scrapers, and a
+         missing canonical lets /embed and share URLs compete with the app. -->
+    <link rel="canonical" href="https://gobigrams.tech-goblin.com/" />
     <meta name="description" content="Gobigrams is a free browser-based diagram editor — flowcharts, architecture and ER diagrams with real vector SVG export, no account needed. Draw diagrams in your browser, save them locally, export crisp SVG and PNG." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://gobigrams.tech-goblin.com/" />
     <meta property="og:title" content="Gobigrams — draw diagrams in your browser" />
     <meta property="og:description" content="Free browser diagram editor with real vector export. Flowcharts, architecture, ERD — no account, boards stay in your browser." />
-    <meta property="og:image" content="/brand/og.png" />
+    <meta property="og:image" content="https://gobigrams.tech-goblin.com/brand/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <!-- ITEM 1 — no theme flash on reload. This script is the boot theme writer
          and it runs in <head>, before anything paints, so the document can never
