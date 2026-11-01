@@ -1,0 +1,27 @@
+# wrangler.toml — CLOUDFLARE WORKERS BUILD (deployment config, 2026-11-01)
+#
+# WHY THIS FILE EXISTS. Cloudflare's build tried to AUTO-CONFIGURE the project and
+# refused: "The version of Vite used in the project (5.4.21) cannot be automatically
+# configured. Please update the Vite version to at least 6.0.0." Its framework
+# detector only understands Vite 6+; the app is on Vite 5.4 on purpose (the whole
+# gate set — tsc, the harness sweep, the byte ceiling — is measured against it), so
+# upgrading the bundler to satisfy a build host is the wrong trade.
+#
+# Declaring the static assets EXPLICITLY skips framework auto-configuration: wrangler
+# deploys ./dist as-is and never inspects package.json again. This is the documented
+# escape hatch, not a workaround.
+#
+# WHAT THE SITE IS: a pure static bundle (index.html + embed.html + hashed assets).
+# There is no server. The app's board API probe (`/api/boards`) fails on this origin
+# BY DESIGN — the probe requires a JSON content-type, so anything else (404, or the
+# SPA fallback's HTML) resolves the storage mode to "local" and boards live in the
+# browser's IndexedDB. The UI says which store is in use.
+#
+# not_found_handling: single-page-application serves index.html for unknown paths,
+# which is what makes the pretty /embed URL work: main.tsx already branches on
+# `path === '/embed'` and dynamically imports the chrome-less entry.
+
+name = "gobigrams"
+compatibility_date = "2026-11-01"
+
+assets = { directory = "./dist", not_found_handling = "single-page-application" }
