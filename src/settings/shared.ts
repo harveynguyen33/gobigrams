@@ -69,12 +69,12 @@ export type Props = {
   onLayoutDir: (d: LayoutDirection) => void;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
-  /** ROUND BI — the current board as a PNG data URL, through App's existing
-   *  export path (buildPng). Null on an empty board: the feedback dialog's
-   *  screenshot helper then renders nothing. */
+  /** ROUND BI — the current board as a PNG data URL (App's buildPng); null on
+   *  an empty board, so the feedback dialog's screenshot renders nothing. */
   boardPng?: (() => Promise<string>) | null;
   /** ROUND BI, ITEM 3 — the About pane's feedback entry opens the APP-level
-   *  dialog (App.tsx mounts the single instance; the ? help sheet is the other
-   *  opener). The element is passed so Esc returns focus to the exact control. */
+   *  dialog; the element is passed so Esc returns focus to the exact control. */
   onOpenFeedback: (from: HTMLElement | null) => void;
+  /** ONBOARD-P5 — the one-line tips switch (Canvas pane, default ON). */
+  tips: boolean; onTips: (v: boolean) => void;
 };

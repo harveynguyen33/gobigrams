@@ -115,6 +115,10 @@ import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
 import Checklist, {type ChecklistTaskId, isChecklistComplete} from './nodes/Checklist';
+/* ONBOARD-P5 — the one-line tips: the four gates live in the pure module, the
+ * render in src/components/TipToast.tsx. */
+import {takeTip, markTipSeen, tipsOn, setTipsOn, type TipId} from './tips';
+import TipToast from './components/TipToast';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
@@ -1068,6 +1072,38 @@ export default function App() {
   // key or the context menu it always had (see the mapping in DiagramNode.tsx);
   // `ctxAction` in particular is still the context menu's dispatcher.
 
+  /* =====================================================================
+     ONBOARD-P5 — ONE-LINE TIPS AT FIRST USE (src/tips.ts owns the gates).
+
+     App only decides WHEN to ask and WHERE a tip may land. The four gates (one
+     per session, once ever, claimed on show, the Settings switch) all live in
+     the pure module, so the harness executes them instead of reading them.
+
+     A TIP NEVER LANDS ON TOP OF A DIALOG — and one of its own triggers is fired
+     from INSIDE the ExportModal, so a blocked fire is QUEUED rather than
+     dropped, then shown once the last surface closes. */
+  const [tip, setTip] = useState<{id: TipId; line: string} | null>(null);
+  const pendingTip = useRef<TipId | null>(null);
+  const fireTip = useCallback((id: TipId) => {
+    if (settingsOpen || !!boardDlg || tgOpen || feedbackOpen || expOpen) { pendingTip.current = id; return; }
+    const line = takeTip(id);
+    if (line) setTip({id, line});
+  }, [settingsOpen, boardDlg, tgOpen, feedbackOpen, expOpen]);
+  useEffect(() => {
+    const id = pendingTip.current;
+    if (!id) return;
+    pendingTip.current = null;
+    fireTip(id);   // re-runs the same gate: shows now, or queues again
+  }, [fireTip]);
+  /** The × and the 12s auto-hide are the SAME act: both write the forever key. */
+  const dismissTip = useCallback(() => {
+    if (tip) markTipSeen(tip.id);
+    setTip(null);
+  }, [tip]);
+  /** gate 4's UI half — App state mirrors the pref so the Settings row repaints. */
+  const [tipsPref, setTipsPref] = useState(() => tipsOn());
+  const changeTips = useCallback((v: boolean) => { setTipsPref(v); setTipsOn(v); }, []);
+
   // ---- F3 + F9 + F1: drag lifecycle ----
   const absNodes = useCallback((ns: Node[]) => {
     // cache absolute positions for helper lines / proximity / reparenting
@@ -1086,7 +1122,7 @@ export default function App() {
   const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules] = useConnections(
     nodesRef, edgesRef, setEdges, setGuides, pushHistory, tickTask, flash, rf, wrap,
     readOnlyRef, pendingDrop, connectOrigin, shiftDown, absNodes, noCycles, oneIn,
-    dblConnect, dblRange, preset, defaultPath, () => idc++);
+    dblConnect, dblRange, preset, defaultPath, () => idc++, fireTip);
 
   const onNodeDrag = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     const ns = nodesRef.current;
@@ -1878,11 +1914,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           colorKey: 'cyan',
         } as any,
       }]);
+      /* ONBOARD-P5 — the first table the user creates. The keys below (pk/fk)
+         are the one thing a fresh table cannot show them. */
+      fireTip('table');
       return;
     }
 
     const data = item.make() as any;
     const shape = asShape(data?.shape);
+    /* ONBOARD-P5 — the first frame the user drops teaches what a frame DOES
+       (it adopts what you drag into it), which is not visible from the empty
+       boundary on screen. */
+    if (data.shape === 'group') fireTip('group');
     // C3: the palette item owns the box, so NodeResizer's baseline and the
     // persisted style agree by construction. GOBI-SIZE (src/nodeSizes.ts) gave
     // every kind an explicit size, which RETIRES the group/note fallbacks that
@@ -4300,6 +4343,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             history of the removed completion toast live in Checklist.tsx. */}
         <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
 
+        {/* ONBOARD-P5 — the one-line tip. Conditionally mounted: with tips OFF
+            `tip` never becomes non-null, so nothing is even rendered. */}
+        {tip && <TipToast line={tip.line} onDismiss={dismissTip} />}
+
         {/* F2: context menu (node / edge / pane right-click) */}
         {ctx && (
           <ContextMenu
@@ -4381,6 +4428,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onPngPad,
             autosave,
             onAutosave,
+            tips: tipsPref,
+            onTips: changeTips,
             returnFocusTo: settingsBtnRef,
             boardPng: nodes.length ? boardPngForFeedback : null,
             onOpenFeedback: openFeedback,
@@ -4391,7 +4440,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           boardPng={nodes.length ? boardPngForFeedback : null}
           expOpen={expOpen}
           onCloseExport={() => setExpOpen(false)}
-          onExported={() => tickTask('export')}
+          onExported={() => { tickTask('export'); fireTip('export'); }}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}

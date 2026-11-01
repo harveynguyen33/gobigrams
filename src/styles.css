@@ -5612,3 +5612,39 @@ kbd {
 .embed-shell .ds-share-banner {
   margin: 16px;
 }
+
+/* ===========================================================================
+   ONBOARD-P5 — the one-line tip. Its own band between the toolbar
+   (top:14px, 40px tall) and the bottom strip that already carries the notice
+   toast, the zoom pill and the getting-started checklist — so it collides with
+   none of them at 1280x577. Pointer events are declared ONLY on the toast
+   itself: no wrapper, no scrim, no full-bleed layer, so the canvas stays fully
+   usable for the ~12s it is on screen. Tokens only (hex cap holds).
+=========================================================================== */
+.tip-toast {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+  z-index: 7;
+  display: flex; align-items: center; gap: 10px;
+  width: max-content; max-width: min(460px, calc(100% - 32px));
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+  padding: 7px 8px 7px 12px;
+  font-size: var(--fs-md); line-height: 1.35;
+  pointer-events: auto;
+  animation: toast-in .18s ease-out;
+}
+.tip-toast-line { flex: 1; }
+.tip-toast-x {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; background: transparent;
+  border: none; border-radius: 6px; color: var(--dim); cursor: pointer;
+  transition: all .15s;
+}
+.tip-toast-x:hover { color: var(--fg); background: var(--elevated); }
+/* The SHARE-VIEW state: `.canvas-wrap:has(.ds-share-banner) .toolbar` above
+   drops the toolbar to top:64, exactly where this band starts, so the toast
+   covered the toolbar by 13,813 px^2 (measured at 1280x577 with a banner in
+   place). The same `:has()` coupling the toolbar uses fixes it here — the tip
+   follows the toolbar down instead of needing a second state flag. */
+.canvas-wrap:has(.ds-share-banner) .tip-toast { top: 114px; }

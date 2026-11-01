@@ -14,7 +14,8 @@ import {Row, ToolbarChip, Toggle, Segmented, gridSizeOptions} from './Controls';
 export function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
   marquee, onMarquee, zOrder, onZOrder, layoutDir, onLayoutDir, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
+  tips, onTips,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave' | 'tips' | 'onTips'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -101,6 +102,12 @@ export function CanvasPane({
         </Row>
         <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">
           <Toggle label="Highlight connections" value={highlight} onToggle={() => onHighlight()} />
+        </Row>
+        {/* ONBOARD-P5 — the one-line tips. Frequency rule: a tip is a first-use
+            nudge the user turns off once, so its switch lives here, not on the
+            toolbar. Off = nothing is scheduled and the toast does not mount. */}
+        <Row label="Tips" hint="one-line hints the first time you use a feature">
+          <Toggle label="Tips" value={tips} onToggle={() => onTips(!tips)} />
         </Row>
       </div>
     </>

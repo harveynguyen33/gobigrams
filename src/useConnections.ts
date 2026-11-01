@@ -1,12 +1,10 @@
 /* useConnections.ts — ROUND BN-2: the connection cluster moved out of App()
  *  verbatim (createsCycle, the F4 undoable reconnect with its bend-key reset,
- *  Part C drop-on-node connect, the HARVEY 2026-10-13 double-click
- *  auto-connect with AQ4b side projection, D4 twin-bump onConnect, and the F7
- *  rules wrapper). Behaviour-neutral: bodies are byte-identical except the
- *  three id-mint sites, which call the `nextId` parameter instead of the
- *  App-module-level `idc` counter (App owns the counter and passes
- *  `() => idc++`); pendingDrop/connectOrigin/readOnlyRef/shiftDown refs and
- *  the edges/node state stay in App and pass down positionally — no context.  (feature-map home: src/src/useConnections.ts)
+ *  Part C drop-on-node connect, the double-click auto-connect with AQ4b side
+ *  projection, D4 twin-bump onConnect, the F7 rules wrapper). Bodies are
+ *  byte-identical except the three id-mint sites, which call the `nextId`
+ *  parameter (App owns `idc`); refs and state stay in App, passed positionally.
+ *  (feature-map home: src/src/useConnections.ts)
  */
 import {useCallback, useEffect} from 'react';
 import type * as React from 'react';
@@ -18,6 +16,7 @@ import {makeEdge} from './presets';
 import type {PresetId, PathId} from './presets';
 import type {HelperGuides} from './helperLines';
 import type {ChecklistTaskId} from './nodes/Checklist';
+import type {TipId} from './tips';
 import type {EdgeData} from './App';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
@@ -43,13 +42,13 @@ export function useConnections(
   preset: {edges: Parameters<typeof makeEdge>[2]},
   defaultPath: PathId,
   nextId: () => number,
+  /** ONBOARD-P5 — the first edge's tip (the four gates live in src/tips.ts). */
+  fireTip: (id: TipId) => void,
 ) {
-
   // ---- F7 helpers: cycle detection on the current edge set ----
   /** Would adding source→target create a directed cycle? */
   const createsCycle = useCallback((source: string, target: string): boolean =>
     wouldCycle(source, target, edgesRef.current), [edgesRef]);
-
   // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     /* AUDIT-follow-up — a rewire can create a cycle too: drop the end on a node
@@ -62,8 +61,7 @@ export function useConnections(
     }
     pushHistory();
     // ROUND S: a waypoint measured against the OLD endpoints is nonsense the
-    // moment an end moves, so all three bend keys go with it. Nothing else on
-    // the edge's data is touched — type, styling, label and flow survive.
+    // moment an end moves, so all three bend keys go with it (nothing else does).
     setEdges(es => reconnectEdge(oldEdge, newConnection, es).map(e => {
       if (e.id !== oldEdge.id) return e;
       const data = {...((e.data ?? {}) as EdgeData)};
@@ -129,8 +127,8 @@ export function useConnections(
     // node this path used to insert.
     pushHistory();
     setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
-  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath]);
-
+    fireTip('edge');
+  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath, fireTip]);
   /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
      DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
      owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
@@ -212,11 +210,12 @@ export function useConnections(
         sourceHandle: handleId, targetHandle: sides[0][1],
       });
       setEdges(es => addEdge(ne, es));
+      fireTip('edge');
       flash(facing < DBL_STRAIGHT_GAP ? 'Connected (straight — shapes are close)' : 'Connected to the nearest shape');
     };
     window.addEventListener('gobi:handle-connect', onHandleConnect);
     return () => window.removeEventListener('gobi:handle-connect', onHandleConnect);
-  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath]);
+  }, [dblConnect, dblRange, oneIn, absNodes, noCycles, pushHistory, setEdges, flash, preset, defaultPath, fireTip]);
 
   // ---- connect ---- (new edges use the editable goblinEdge type)
   // D4: a second connection between the same ordered pair of nodes is not a
@@ -250,6 +249,7 @@ export function useConnections(
       };
     }
     tickTask('edge');
+    fireTip('edge');
     /* AUDIT-2 + AUDIT-3 — the twin check, pushHistory and the id mint all moved
        OUT of the setEdges updater. Two reasons, both measured:
        (a) AUDIT-2: the twin-bump branch never pushed history, so Ctrl+Z after a
@@ -276,7 +276,7 @@ export function useConnections(
     setEdges(es => addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, newId, {
       sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
     }), es));
-  }, [tickTask, pushHistory, setEdges, preset, defaultPath]);
+  }, [tickTask, pushHistory, setEdges, preset, defaultPath, fireTip]);
 
   // ---- F7: connection rules applied to every new connection ----
   const onConnectRules = useCallback((c: Connection) => {
