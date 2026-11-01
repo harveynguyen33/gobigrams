@@ -4,9 +4,7 @@ import {EXPORT_TOKENS, tokensFor} from '../theme';
 import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
 import {trackExport} from '../analytics';
 /* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
- * compiler (round-bn2 lazy law, pinned by round-gobi-door A3/A4): no static
- * import of src/share keeps the codec off the boot path. The URL helpers read
- * only `location`, so the modal pulls just what it needs at click time. */
+ * compiler (pinned by round-gobi-door A3/A4): no static import of src/share. */
 type ShareUrl = {payload: string; url: string; length: number};
 
 export type ExportScope = 'full' | 'selection';
@@ -40,6 +38,7 @@ type Props = {
   printPdf: (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}) => Promise<void>;
   /** AQ21-G — Import gets its own tab; JSON file picking stays in App (fileRef). */
   onImportJson: () => void;
+  onExported: () => void;  // ONBOARD-P7 — an export COMPLETED: App ticks the checklist's export task
 };
 
 /** AQ21 — the export modal. LEFT: scope + format + theme. RIGHT: a live
@@ -74,7 +73,7 @@ function Seg<T extends string>({value, set, options, aria, selCount, tabRef}: {
   );
 }
 
-export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson}: Props) {
+export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson, onExported}: Props) {
   const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
   const [format, setFormat] = useState<ExportFormat>('svg');
@@ -176,7 +175,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
            printPdf builds the same svg string (theme/scope/outline baked
            in) inside App and hands it to the print view. */
         await printPdf({nodes: scoped.nodes, edges: scoped.edges, theme: effTheme, outline});
-        trackExport('pdf');   // ONBOARD-P6 — the value moment, on every export
+        trackExport('pdf'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
         return;
       } else if (format === 'png') {
         const url = await buildPng({...scoped, theme: effTheme});
@@ -197,7 +196,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
       a.download = name;
       a.click();
       URL.revokeObjectURL(a.href);
-      trackExport(format);   // ONBOARD-P6 — every export, not deduped: repetition is the signal
+      trackExport(format); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
     } finally {
       setExportBusy(false);
     }
@@ -236,7 +235,9 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   /* GOBI-S1 — the Share door: the CURRENT scoped board → one URL whose
    * fragment carries the whole doc (never a server). Copy on build; show the
    * link and its length; warn past the big-board threshold where some chat
-   * tools truncate pasted URLs. The codec + URL helper arrive by import(). */
+   * tools truncate pasted URLs. Codec + URL helper arrive by import().
+   * ONBOARD-P7 DECISION — a built link COUNTS as "Export your diagram": P6's
+   * funnel already reads it as export {format:share}; the tick + this line move together (p7.1c). */
   const doShare = async () => {
     const {buildShareUrl} = await import('../share');
     const doc = {
@@ -246,7 +247,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     const built = await buildShareUrl(doc);
     const url = {payload: built.payload, url: built.url, length: built.url.length};
     setShareUrl(url);
-    trackExport('share');   // ONBOARD-P6 — a built link is the share value moment
+    trackExport('share'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
     setShareCopied(false);
     try {
       await navigator.clipboard.writeText(url.url);
@@ -346,9 +347,8 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
                 <input type="checkbox" checked={outline} onChange={e => setOutline(e.target.checked)} />
                 Outline text (glyph paths — exact everywhere, not selectable)
               </label>
-              {/* HARVEY 2026-10-22: a one-line explanation of what the option is FOR, next to it.
-                  The full text also lives in the README ("When to outline"); this is the in-place note
-                  so nobody has to leave the dialog to understand the trade. */}
+              {/* HARVEY 2026-10-22: what the option is FOR, in place — the full
+                  text also lives in the README ("When to outline"). */}
               <div className="em-note" style={{paddingLeft: 22, marginTop: -2}}>
                 Turns each text row into shapes: the file opens identically on any machine, even with no font
                 installed, and gets smaller than an embedded font. Use it for a file you send to a client, print,

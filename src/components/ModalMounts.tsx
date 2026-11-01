@@ -55,6 +55,7 @@ type ModalMountsProps = {
   buildSvg: React.ComponentProps<typeof ExportModal>['buildSvg'];
   buildPng: React.ComponentProps<typeof ExportModal>['buildPng'];
   printPdf: React.ComponentProps<typeof ExportModal>['printPdf'];
+  onExported: React.ComponentProps<typeof ExportModal>['onExported'];
   /* ---- the hidden JSON import input ---- */
   fileRef: React.RefObject<HTMLInputElement | null>;
   onImportFile: React.ChangeEventHandler<HTMLInputElement>;
@@ -82,14 +83,12 @@ export function ModalMounts(p: ModalMountsProps) {
           />
         )}
 
-        {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery. Inside `.canvas-wrap`
-            beside the board dialog and Settings, so its scrim covers the canvas
-            column and the two docked panels stay legible. Mounted AFTER the
-            dialog, and above it via `.tg-overlay`'s z-index: the dialog is never
-            visible through the gallery — the open gallery's scrim covers it —
-            and the dialog is unmounted (not hidden) whenever the gallery is
-            opened from the boards menu, so exactly one of the two creates the
-            board and the other cannot be clicked behind a scrim. */}
+        {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery, inside `.canvas-wrap`
+            beside the board dialog and Settings. Mounted AFTER the dialog and
+            above it via `.tg-overlay`'s z-index, so the dialog is never visible
+            through the gallery; the gallery is unmounted (not hidden) whenever
+            it opens, so exactly one of the two creates the board and the other
+            cannot be clicked behind a scrim. */}
         {p.tgOpen && (
           <TemplatesGallery
             onCancel={p.onCloseGallery}
@@ -139,6 +138,7 @@ export function ModalMounts(p: ModalMountsProps) {
           buildPng={p.buildPng}
           printPdf={p.printPdf}
           onImportJson={() => p.fileRef.current?.click()}
+          onExported={p.onExported}
         />
   </>;
 }

@@ -455,7 +455,6 @@ export default function App() {
     setDblRange(next);
     savePref('dbl-range', next);
   }, []);
-  // ---- AQ21 — the export modal ----
   const [expOpen, setExpOpen] = useState(false);
   // ---- D1: searchable insert palette (position = double-click point) ----
   const [searchPos, setSearchPos] = useState<{x: number; y: number} | null>(null);
@@ -4392,6 +4391,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           boardPng={nodes.length ? boardPngForFeedback : null}
           expOpen={expOpen}
           onCloseExport={() => setExpOpen(false)}
+          onExported={() => tickTask('export')}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}
