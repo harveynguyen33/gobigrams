@@ -10,6 +10,7 @@ import {useCallback} from 'react';
 import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';
 import {LAYOUTS, type LayoutSpec} from './presets';
+import type {LayoutDirection} from './layout';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useCanvasTools(
@@ -24,6 +25,7 @@ export function useCanvasTools(
   sel: string | null,
   zOrderMode: string,
   preset: {layout: LayoutSpec},
+  layoutDir: LayoutDirection,
 ) {
 
   // ---- F8: auto-layout with an eased move ----
@@ -38,7 +40,10 @@ export function useCanvasTools(
     // L2: the engine is a preset field. L3a: a flowchart runs top-to-bottom and
     // freezes its pool / lane bands; L3c: the ERD packer is a table grid.
     const fn = LAYOUTS[preset.layout.engine];
-    const target = fn(nodes, edges, preset.layout);
+    /* ROUND LAYOUT — the persisted Canvas direction OVERRIDES the preset's
+       own default (Settings → Canvas → Auto-layout direction). 'free' presets
+       ignore it (no positions to direct); grid keeps its own engine. */
+    const target = fn(nodes, edges, {...preset.layout, direction: layoutDir});
     if (!target.size) return;
     pushHistory();
     animateLayout(() => {
@@ -52,7 +57,7 @@ export function useCanvasTools(
          did nothing" (measured: y -340..756 on a 9-node board). */
       requestAnimationFrame(() => rf?.fitView({padding: 0.25, duration: 300}));
     });
-  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset]);
+  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset, layoutDir]);
 
 /* ROUND BD, ITEM 1 — THE Z-ORDER PRIMITIVES. The app had NONE: a grep for
    zIndex / bringToFront / sendToBack across src/ found only React Flow's own

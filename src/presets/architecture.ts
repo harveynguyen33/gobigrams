@@ -3,7 +3,7 @@ import {MarkerType, type Edge, Node} from '@xyflow/react';
 import type {Node as _N} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {PALETTE, type PaletteItem, type PaletteCategory, type DiagramType} from '../palette';
-import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../shapes';
+import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';
 import {
   QUEUE_ENABLED, ACTOR_ENABLED, STORAGE_ENABLED, NOTE_ENABLED, LANE_ENABLED, ERD_ENABLED,
   C4_ENABLED, SEQUENCE_ENABLED,
@@ -12,6 +12,7 @@ import {
 } from './basic';
 import {FLOWCHART_PALETTE, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, NOTE_ITEM} from './flowchart';
 import {TABLE_PALETTE_ITEM, ERD_ENUM_NOTE_ITEM, SEQUENCE_PALETTE} from './dataStorage';
+import {CARD_SIZE, SIZE_EXCEPTIONS} from '../nodeSizes';
 /* ===========================================================================
    L3b — C4 element table. ZERO new shapes: eight of the nine C4 primitives
    already exist, and the ninth (`external`) is already a dashed rect.
@@ -66,7 +67,9 @@ const c4PaletteItem = (t: C4Type): PaletteItem => {
        SOURCE_PURPOSE sentence made all C4 rows read identically in search.
        The level + the C4 element's own description say what THIS one is. */
     purpose: `a level-${e.level} C4 element — ${e.sub}`,
-    size: e.shape === 'group' ? {width: 460, height: 300} : undefined,
+    /* GOBI-SIZE — a C4 element is a CARD like every other one; a boundary is
+       the group exception. It used to be 460x300 or nothing at all. */
+    size: e.shape === 'group' ? SIZE_EXCEPTIONS.group.size : CARD_SIZE,
     make: () => ({
       shape: e.shape, kicker: e.kicker, title: e.kicker.replace(/[[\]]/g, ''),
       sub: e.sub, metric: '', metricUnit: '', icon: e.icon, colorKey: e.colorKey, c4Type: t,
@@ -74,7 +77,10 @@ const c4PaletteItem = (t: C4Type): PaletteItem => {
   };
 };
 
-const C4_PALETTE_ITEMS: PaletteItem[] = C4_PALETTE_TYPES.map(c4PaletteItem);
+/* Exported so checks/round-gobi-size.mjs can enumerate the C4 rows while
+   C4_ENABLED hides them from every create surface (an unenumerable registry is
+   an unverified one). */
+export const C4_PALETTE_ITEMS: PaletteItem[] = C4_PALETTE_TYPES.map(c4PaletteItem);
 
 /* ROUND AK, AK-8 — `C4_LABELS` WAS HERE, and it is DELETED.
    It was the C4 preset's list of relationship intent VERB PHRASES ("uses",

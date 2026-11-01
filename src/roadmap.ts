@@ -56,13 +56,6 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'site',
   },
   {
-    title: 'Rotation for shapes',
-    desc: 'Needs connection points to rotate with the shape, or every edge detaches. A round of its own, not a quick add.',
-    status: 'later',
-    confidence: 'exploring',
-    area: 'editor',
-  },
-  {
     title: 'Collaboration',
     desc: 'Live cursors, presence and comments. Held back until the editor can be shared with more than one person at a time.',
     status: 'next',
@@ -84,6 +77,34 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'editor',
   },
   {
+    title: 'Share a board by link',
+    desc: 'The whole board folded into a URL — no account, no server, open-and-see. The companion to self-hosted storage.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'data',
+  },
+  {
+    title: 'Embed a board in a page',
+    desc: 'An iframe snippet from the share link, for blogs and docs.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'site',
+  },
+  {
+    title: 'Import from draw.io',
+    desc: 'Paste .drawio XML and get nodes on the canvas — the migration path for the biggest audience.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'data',
+  },
+  {
+    title: 'Find and replace text',
+    desc: 'Rename an entity across a fifty-table ERD in one pass.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'editor',
+  },
+  {
     title: 'More diagram notations',
     desc: 'Beyond flowcharts, ERD, C4 and architecture \u2014 following the same shape-library and template structure.',
     status: 'later',
@@ -98,6 +119,9 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
+  {label: 'round ROTATE', what: 'Rotate shapes and groups \u2014 connection points follow the shape and exports match', when: '2026-10'},
+  {label: 'round LAYOUT', what: 'Auto-layout direction control + wide-board wrapping + islands keep their offsets', when: '2026-10'},
+  {label: 'round PWA', what: 'Install as an app — PWA manifest + offline shell', when: '2026-10'},
   {label: 'round BG', what: 'Connection handles on imported art, plain arrows for every new line, feedback and issue reporting', when: '2026-10'},
   {label: 'round BF', what: 'Per-shape resize floors and the selected-box ring for imported art \u2014 the resize snap is gone', when: '2026-10'},
   {label: 'round AZ', what: 'Shipped fonts (Inter, JetBrains Mono) embedded in exports \u2014 files render the same on machines that have nothing installed', when: '2026-10'},
@@ -114,7 +138,7 @@ export const SHIPPED: ShippedEntry[] = [
   {label: 'package 4', what: 'Inspector panel \u2014 per-shape sections, icon pickers, fold state', when: '2026-09'},
   {label: 'package 3', what: 'Settings and themes \u2014 five themes, one layout per screen size', when: '2026-09'},
   {label: 'package 2', what: 'Multi-diagram types \u2014 flowchart, ERD, C4, architecture', when: '2026-09'},
-  {label: 'package 1', what: 'Onboarding \u2014 guided tour and a getting-started checklist', when: '2026-09'},
+  {label: 'package 1', what: 'Onboarding \u2014 a capability list in the ? sheet and a getting-started checklist', when: '2026-09'},
 ];
 
 /**

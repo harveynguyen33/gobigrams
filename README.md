@@ -1,77 +1,65 @@
+<p align="center"><img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/brand/lockup.svg" alt="Gobigrams" width="320"></p>
+<p align="center"><sub>{ G }</sub> — a tiny goblin with a ruler, living in your browser tab.</p>
+
 # Gobigrams
 
-Draw diagrams in your browser — flowcharts, architecture and data-model diagrams —
-with a **real vector export** (selectable text, not a screenshot).
+Diagrams, but with a goblin. **Gobigrams** is a single-page canvas where boxes
+finally line up, arrows mean things, and the SVG you export is a *real vector
+file with selectable text* — not a screenshot wearing a vector hat.
 
-Gobigrams is a single-page React app built on [React Flow](https://reactflow.dev).
-There is no backend: boards live in your browser, and the app runs from any static
-host or even `file://`-style local serving.
+No account. No backend. No "please accept cookies" banner. The goblin counts
+visitors with a cookieless, self-hosted tally counter and otherwise keeps his
+nose out of your business. Your boards live in your browser until *you* decide
+to export them.
 
-> Status: v0.1.0, pre-1.0. The editor is feature-complete enough to be used daily;
-> expect rough edges around import of foreign formats.
+> Status: v0.1.0 — feature-complete enough for daily use, still occasionally
+> bumping into furniture. Report the bumps → [Support](./SUPPORT.md).
 
-## What it does
+## The short version
 
-- **Canvas** — 60+ shapes across Basic, Flowchart, Data & storage, Architecture and
-  Groups, plus custom SVG shapes you can drop in yourself.
-- **Edges that carry meaning** — solid / dashed / animated strokes, start and end
-  markers, cardinality for ERD-style links, labels that live on the line.
-- **Themes** — Dark, Light, Paper, Midnight and a high-contrast theme, plus per-element
-  authored colours that survive a theme switch.
-- **Boards** — named documents with autosave. Export any board as SVG (vector, with
-  real `<text>`), PNG, PDF or JSON; import JSON back in one undo step.
-- **Mermaid import** — paste Mermaid `flowchart` source and get nodes on the canvas.
-- **Keyboard-first** — full shortcut sheet in the **?** menu, nudge, duplicate,
-  align/distribute, auto-layout.
-- **A tour** — first visit runs a short guided tour; replay it any time from **?**
+- 🧌 60+ shapes, custom SVG drops, tables, checklists — enough to draw the thing
+- ➡️ Edges with intent: animated flow, cardinality, labels that ride the line
+- 🌗 Five themes and per-element colours that survive a theme switch
+- 📤 SVG (real text) · PNG · PDF · JSON · Mermaid import
+- ⌨️ Keyboard-first: nudge, duplicate, align, auto-layout, full shortcut sheet in **?**
+- 🗄️ Boards with autosave; storage is honest about where it keeps your stuff
 
-## Requirements
-
-- Node.js 20+ (tested on 20.20 and 22.23)
-- A modern browser (Chrome, Firefox, Safari or Edge)
+The category-by-category inventory lives in **[FEATURES.md](./FEATURES.md)**.
 
 ## Run it
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
+npm run build        # -> dist/ (fully static, host it anywhere)
 ```
 
-Build a static bundle:
-
-```bash
-npm run build        # -> dist/
-npm run preview      # serve the built bundle locally
-```
-
-`dist/` is fully static — put it behind any web server or CDN. The app detects at boot
-whether a board API is available: with one it persists server-side, without one it
-persists in the browser (IndexedDB) and says so plainly.
+Node.js 20+ and a modern browser. `dist/` runs behind any web server or CDN,
+or even `file://`-style local serving.
 
 ## How your data is stored
 
-Boards are stored **in your browser** by default. Nothing is uploaded anywhere.
-Export as JSON to keep a durable copy or to move a board between machines.
+In **your browser** (IndexedDB), unless the app finds a board API at boot —
+it probes and tells you plainly which one it found. Export JSON for a durable
+copy or to move a board between machines. Nothing is uploaded by default.
 
-## Feedback
+## Community
 
-Found a bug, or want a shape or tool that isn't there? Use **Send feedback** in the
-**?** menu — it writes your note into a prefilled GitHub issue (with an optional
-screenshot you can paste in) so nothing gets lost in a chat thread.
-
-## Project layout
-
-| Path | What it is |
-| --- | --- |
-| `src/` | The application — React components, styles, board model |
-| `public/` | Static assets served as-is (brand marks, favicons, manifest) |
-| `index.html` | Vite entry point |
-| `vite.config.ts` | Build config, including the optional board-API proxy |
+- 🐛 [Report a bug or request a shape](./SUPPORT.md) — the in-app *Feedback* link prefills the issue for you
+- 💬 [GitHub Discussions](https://github.com/harveynguyen33/gobigrams/discussions) — questions, show-and-tell, ideas
+- 🤝 [Contributing](./CONTRIBUTING.md) — yes, it's a solo goblin, but pull requests are welcome
+- 🔒 [Security](./SECURITY.md) — found something sensitive? Start here, not in a public issue
+- ☕ [Buy the goblin a coffee](https://www.buymeacoffee.com/harveynguyen) — donations keep the ruler sharp
 
 ## Tech
 
-React 19 · TypeScript · Vite · [@xyflow/react](https://reactflow.dev) (MIT) ·
-lucide-react icons · harfbuzzjs (used for text measurement so canvas and export agree).
+React 19 · TypeScript · Vite · [React Flow](https://reactflow.dev) (MIT) ·
+harfbuzzjs (canvas and export agree on text because they share a measurer).
+
+## Author
+
+[Harvey Nguyen](mailto:harvey.nguyen33@gmail.com) — the same email signs every
+commit, the LICENSE, CODEOWNERS and the in-app About pane.
 
 ## License
 

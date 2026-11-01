@@ -1,21 +1,18 @@
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState,
+  ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type FinalConnectionState,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
-import {type ExportScope, type ExportFormat} from './ExportModal';
 import {
-  Copy, Download,
-  Image, FileJson, ChevronDown, ChevronLeft, ChevronRight, FileCode, Trash2,
+  Copy, ChevronDown, ChevronLeft, ChevronRight, Trash2,
   LayoutGrid, Plus, Pencil, Save,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   BringToFront, SendToBack,
-  PanelLeftClose, PanelRightClose,
   LayoutTemplate,
   X,
 } from 'lucide-react';
@@ -30,8 +27,7 @@ import {
   // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with
   // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
   // are written, and no axis is projected.
-  applyDrag, bendAxisFor, dragPoint, drawnMid, plainMidpoint, BEND_SNAP_PX, isSide4,
-  type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
+  applyDrag, bendAxisFor, dragPoint, plainMidpoint, BEND_SNAP_PX, type BendPhase, type Pt,
 } from './edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules. `reverseEdgePatch` is AK-15's
    mirror; `labelBgOf` is AK-12's tolerant reader (an unknown value resolves to
@@ -41,16 +37,26 @@ import {
    box — see `useEdgeGesture`'s sibling note.) */
 import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './edgeLabel';
 
-import DiagramNode, {type NodeKind} from './DiagramNode';
-import LabelNode, {type LabelKind} from './LabelNode';
+import DiagramNode, {type NodeKind} from './nodes/DiagramNode';
+import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
-import TableNode, {relHandleId, type TableColumn, type ShowMode} from './TableNode';
+import {useRotation} from './useRotation';
+import {ROTATE_SNAP_DEG} from './layoutConstants';
+import {GroupRotateGrip} from './components/GroupRotateGrip';
+import {SelectionBox} from './components/SelectionBox';
+/* GOBI-S1 — the share view: hook (route + decode + edit-copy) and chrome.
+ * BoardsPopover is the GOBI-S1 extraction that PAID for this round's App
+ * lines (the hard cap may never grow). */
+import {useShareView, shareViewPayload} from './useShareView';
+import {ShareBanner} from './components/ShareBanner';
+import BoardsPopover from './components/BoardsPopover';
+import TableNode, {type TableColumn, type ShowMode} from './nodes/TableNode';
 import {edgeTypes} from './edges';
 import IconPicker from './IconPicker';
 import SearchPalette from './SearchPalette';
 import Tooltip from './Tooltip';
-import {COLORS, COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey, keyForHex} from './colors';
-import {SHAPES, SHAPE_IDS, asShape, ShapePreview, type Shape} from './shapes';
+import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey} from './colors';
+import {SHAPES, asShape, ShapePreview, type Shape} from './nodes/shapes';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
  * editing surface (canvas render) never needs the emitter at first paint:
  * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
@@ -70,7 +76,7 @@ import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from './inspector';
 import {
-  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section,
+  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow,
   /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
      two pure helpers the harness executes rather than restates. */
   FlowSpeed,
@@ -91,8 +97,7 @@ import {
   type TextVAlign,
 } from './textStyle';
 import {
-  PRESETS, getPreset, asPreset, isPresetId, edgeColorPatch, edgeColorLiteralPatch,
-  C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
+  getPreset, edgeColorPatch, edgeColorLiteralPatch, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset, type PathId,
 } from './presets';
 import {type PaletteItem} from './palette';
@@ -104,29 +109,25 @@ import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode,
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from './ContextMenu';
-import Tour from './Tour';
 import {HelpSheet} from './components/HelpSheet';
+import {RotateInternalsBridge} from './components/RotateInternalsBridge';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
-import Checklist, {type ChecklistTaskId} from './Checklist';
+import Checklist, {type ChecklistTaskId, isChecklistComplete} from './nodes/Checklist';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
 import {computeHelperSnap, type HelperGuides} from './helperLines';
 import HelperLinesView from './HelperLinesView';
-import {layoutDiagram} from './layout';
 /* ROUND AM, AM-3 — the flow glyphs' ONE home. Imported HERE and in
-   `GoblinEdge.tsx`, which is what makes AL-6's "reuses FLOW_ICON_PATHS' own
-   vocabulary" structural: the glyph chip row and the travelling chip read the
-   same map. The module holds no React Flow, so the panel can read it without
-   pulling the canvas in. */
-import {FLOW_ICON_PATHS} from './flowIcons';
-import {CrowFootDefs, cardinalityLabel, isCrowFoot, markerIdFor, type CrowFoot} from './crowfoot';
+   `GoblinEdge.tsx` (AL-6: the chip row and the travelling chip read the same
+   map). No React Flow, so the panel reads it without pulling the canvas in. */
+import {FLOW_ICON_PATHS} from './nodes/flowIcons';
+import {CrowFootDefs, cardinalityLabel, isCrowFoot} from './nodes/Crowfoot';
 import {
   useHoverChoreography, useInteractionGuard, useLayoutTransition, useAnimationGating,
-  useHoverHighlight,
-  NO_ANIM, READ_ONLY, NO_PAN,
+  useHoverHighlight, NO_ANIM, READ_ONLY, NO_PAN,
 } from './choreography';
 import {useEditorInterface} from './useEditorInterface';
 import {
@@ -142,6 +143,7 @@ import {usePanelCollapse, isPanelHidden} from './panelCollapse';
    enum, and the hook that owns both. */
 import {useMarqueeMode} from './marqueeMode';
 import {useZOrderMode} from './zOrderMode';
+import {useLayoutDir} from './layoutMode';
 import {useInspectorSections} from './inspectorState';
 import {searchLibrary, groupByCategory} from './paletteSearch';
 import {
@@ -156,21 +158,22 @@ import * as library from './library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
  *  library plumbing. `Shape` stays at 19 — `customshape` is a node type. */
-import CustomShapeNode from './CustomShapeNode';
-import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape, type SvgRejectReason} from './customShape';
+import CustomShapeNode from './nodes/CustomShapeNode';
+import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape} from './nodes/customShape';
 /* ROUND BN, ITEM 2 — the module-level helpers now live in focused modules;
    moved verbatim, imports only. Size budgets: checks/file-size-gate.mjs. */
 import {
   SHAPE_REJECT_MESSAGE, PATH_TYPES, isGoblinEdge, RECONNECT_RADIUS,
   type PathType,
 } from './boardConstants';
-import {migrateNode, migrateEdge, migrateDoc} from './boardMigrations';
+import {migrateEdge, migrateDoc} from './boardMigrations';
 import {useUndoHistory, type Snap} from './useUndoHistory';
 import {usePersistence} from './usePersistence';
 import {useConnections} from './useConnections';
 import {useExportActions} from './useExportActions';
 import {useCanvasTools} from './useCanvasTools';
 import {useBoardsMenu} from './useBoardsMenu';
+import {useChecklist} from './useChecklist';
 import {
   edgeMarkerUrl, edgeStrokeKeyOf, hasCrow, isEditable, nodeW, nodeH,
   edgeGeo, edgeDrawnMid, TableGlyph, dashArray, favouritePreview, markerFor,
@@ -340,7 +343,7 @@ export default function App() {
   // read by this same component's <ReactFlow> props and its one keydown
   // handler, so a hook in choreography.ts would add an indirection layer with a
   // single call site and no shared logic. Persistence follows the established
-  // convention here (`diagram-studio:edge-path`, `diagram-studio:tour-seen`):
+  // convention here (`diagram-studio:edge-path`, `diagram-studio:read-only`):
   // one namespaced key, read once in a lazy `useState` initialiser that never
   // throws when storage is unavailable, defaulting to OFF.
   //
@@ -386,6 +389,12 @@ export default function App() {
      paint = stored z, the default) vs 'lift' (the library's select-raises
      behaviour). See src/zOrderMode.ts. */
   const {mode: zOrderMode, zIndexMode, setMode: setZOrderMode} = useZOrderMode();
+  /* ROUND LAYOUT — THE AUTO-LAYOUT DIRECTION. Persisted Canvas preference
+     (prefs.ts path, same family as grid-size): overrides the preset's own
+     layout default so a flowchart board can also arrange left-right. The
+     toolbar's auto-layout consumes it through useCanvasTools; Settings →
+     Canvas owns the radio row. See `src/layoutMode.ts`. */
+  const {layoutDir, setLayoutDir} = useLayoutDir();
   const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave} =
     useHoverChoreography(wrap, edgesRef, highlight && !readOnly);
   const {startInteraction, endInteraction} = useInteractionGuard(wrap);
@@ -446,7 +455,6 @@ export default function App() {
     setDblRange(next);
     savePref('dbl-range', next);
   }, []);
-  // ---- AQ21 — the export modal ----
   const [expOpen, setExpOpen] = useState(false);
   // ---- D1: searchable insert palette (position = double-click point) ----
   const [searchPos, setSearchPos] = useState<{x: number; y: number} | null>(null);
@@ -506,7 +514,7 @@ export default function App() {
   // ---- G: the default edge path. `smoothstep` until the user changes an edge's
   // curvature in the inspector, at which point that choice becomes the default
   // for every edge drawn afterwards. Same convention as
-  // `diagram-studio:tour-seen` / `diagram-studio:theme`: one namespaced key, read
+  // `diagram-studio:theme`: one namespaced key, read
   // once through a lazy `useState` initialiser that never throws when storage is
   // unavailable. An absent or unparseable value reads as `smoothstep`.
   const EDGE_PATH_KEY = 'diagram-studio:edge-path';
@@ -548,9 +556,14 @@ export default function App() {
     noticeTimer.current = window.setTimeout(() => setNotice(''), 2500);
   }, []);
 
-  // ---- H1/H2: onboarding — guided tour + getting-started checklist ----
-  const TOUR_SEEN_KEY = 'diagram-studio:tour-seen';
-  const [tourOpen, setTourOpen] = useState(false);
+  // ---- H1/H2: onboarding — capability list in the ? sheet + getting-started checklist ----
+  /* ONBOARD-P2/3 (2026-10-31) — the step-by-step overlay is GONE and its code went
+     with it. Evidence: docs/PHASE-0-WALKTHROUGH.md §4 (D1-D4) — the scrim swallowed
+     every click including the four interactions it named, its one worthwhile step
+     depended on an edge the first-run board does not have, and it could never be
+     seen twice or measured. The four capabilities it was the ONLY surface for now
+     live as plain rows in the ? sheet (HelpSheet.tsx): animated flow, cardinality,
+     tables as nodes, autosave. */
   /* ROUND BI, ITEM 3 — ONE feedback dialog for the whole app: the ? help sheet
      and Settings → About both open THIS one. `feedbackReturn` is the element
      that opened it, so Esc/Cancel hands the caret back to that exact control
@@ -561,23 +574,9 @@ export default function App() {
     feedbackReturn.current = from;
     setFeedbackOpen(true);
   }, []);
-  /** Discrete "user did it" signals for the checklist (idempotent per task). */
-  const [doneSignal, setDoneSignal] = useState<ChecklistTaskId | null>(null);
-  const tickTask = useCallback((id: ChecklistTaskId) => { setDoneSignal(id); }, []);
-  const tourFinished = useCallback(() => {
-    setTourOpen(false);
-    try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* ignore */ }
-  }, []);
-  // First visit: auto-start the tour once (persisted). Runs only after the
-  // initial mount so StrictMode's double-effect doesn't restart it.
-  useEffect(() => {
-    let seen = false;
-    try { seen = localStorage.getItem(TOUR_SEEN_KEY) === '1'; } catch { /* ignore */ }
-    if (!seen) {
-      try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* ignore */ }
-      setTourOpen(true);
-    }
-  }, []);
+  /** ONBOARD-P4 — the checklist's facts and their one write path live in
+   *  `useChecklist`: the `?` sheet reads/clears the same fact the panel paints. */
+  const [checklistDone, tickTask, checklistDismissed, dismissChecklist, restoreChecklist] = useChecklist();
 
   // ---- multi-document boards (disk-backed via dev-server API) ----
   const [curBoard, setCurBoard] = useState<BoardDoc | null>(null);
@@ -795,10 +794,13 @@ export default function App() {
      bump and the undo/selection reset) and is passed in; saveTimer and
      skipAutosave come back out because two later App sites still write them
      (the board-switch cancel and the beforeunload fast flush). */
+  /* GOBI-S1 — a fragment-owned boot (`#b=`) is a SHARE VIEW: the persistence
+   * bootstrap must not load (or seed) the visitor's boards while it is on. */
+  const shareActive = useRef(shareViewPayload() !== null);
   const [saveState, modeLabel, storageEstimate, localMode, dirty,
     flushSave, refreshBoards, saveTimer, skipAutosave] = usePersistence(
     nodes, edges, nodesRef, edgesRef, curBoard, presetId, mode, autosave,
-    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard);
+    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard, shareActive);
 
   /* ROUND BN-2 — the boards menu cluster now lives in useBoardsMenu.ts
      (moved verbatim). boardsOpen/boardList/curBoard/presetId stay here
@@ -811,6 +813,12 @@ export default function App() {
     nodesRef, edgesRef, boardList, setBoardList, boardsOpen, setBoardsOpen,
     curBoard, setCurBoard, presetId, setPresetId, setShowMode, setNoCycles,
     setOneIn, suggestTheme, flushSave, saveTimer, applyBoard, flash, tickTask);
+
+  /** ONBOARD-P3 — the ONE way into the templates gallery. The boards menu and the
+   *  empty board's "Start from a template" both call THIS, so the gallery cannot
+   *  grow a second opener that forgets to clear the pending board name. */
+  const openTemplates = useCallback(() => { pendingBoardName.current = ''; setTgOpen(true); },
+    [pendingBoardName, setTgOpen]);
 
 
   // Item 3b: the `?` helper closes on an outside click too — the same pattern as
@@ -841,6 +849,21 @@ export default function App() {
   // ---- history (undo / redo) ----
   const [past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo] = useUndoHistory(
     nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
+
+  /* GOBI-S1 — the share view route (see useShareView). `shareActive` is
+   * declared above usePersistence so the bootstrap gate can read it. */
+  const {shareDoc, shareError, editCopy, dismissError} = useShareView(
+    setNodes, setEdges, setCurBoard, setBoardList, setBoardLoadedDocId,
+    adoptBoardPreset, setReadOnly, readOnlyRef, pushHistory,
+    () => rf?.fitView({padding: 0.25, maxZoom: 1}), flash, shareActive);
+
+  /* ROUND ROTATE — the rotation write cluster (grip gesture + selection
+     chord; one undo entry per gesture — see src/useRotation.ts).
+     ROUND ROTATE-FIX — the edge re-measure: updateNodeInternals reads the
+     React Flow store from CONTEXT and would throw above <ReactFlow>, so the
+     bridge (rendered inside it) fills this ref and useRotation owns WHEN. */
+  const rotateInternals = useRef<((ids: string | string[]) => void) | null>(null);
+  const [onRotateGesture, onGroupRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory, rotateInternals);
 
   // ---- clipboard (copy / paste / duplicate) ----
   const clipboard = useRef<Snap | null>(null);
@@ -1182,7 +1205,7 @@ export default function App() {
      distribute) now lives in useCanvasTools.ts, moved verbatim. */
   const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
     nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
-    rf, sel, zOrderMode, preset);
+    rf, sel, zOrderMode, preset, layoutDir);
 
 
   const selected = nodes.find(n => n.id === sel);
@@ -1760,11 +1783,22 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          byte-for-byte as before: there RF sets the token itself. */
       const nodeClassName = readOnly ? [n.className, NO_PAN].filter(Boolean).join(' ') : n.className;
       /* ROUND S — the `label` kind's in-place editor is rendered by
-         `src/LabelNode.tsx`, and a custom node component receives only its own
+         `src/nodes/LabelNode.tsx`, and a custom node component receives only its own
          `data`. So the commit callback and the review-mode flag travel through
          `data`, per-node — exactly how the edge renderer gets `onCommitLabel`
          and `readOnly` in `rfEdges` above (fix L). Read off the node's OWN
          type, so no other kind is touched. */
+      /* ROUND ROTATE — the grip + its writer travel per-node (a custom node
+         component receives only its own data; the same threading the label
+         and table kinds use above). GROUP-ROTATE: the writer is injected on
+         EVERY selected node (the chord path needs no per-node data), but the
+         SOLE-SELECTION token `__rotateSel` only on the single selected one —
+         in a multi-selection no per-node grip renders and App's shared
+         GroupRotateGrip drives the group instead. */
+      const rotData = n.selected ? {
+        __rotate: onRotateGesture,
+        ...(selCount === 1 ? {__rotateSel: true} : {}),
+      } : {};
       if (n.type === 'label') {
         return {
           ...n,
@@ -1773,6 +1807,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             ...((n.data ?? {}) as any),
             onCommitText: commitLabelText,
             readOnly,
+            ...rotData,
           },
         };
       }
@@ -1787,12 +1822,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               pushHistory();
               setNodes(ns => ns.map(m => m.id === id ? {...m, data: {...(m.data as any), collapsed}} : m));
             },
+            ...rotData,
           },
         };
       }
-      return {...n, className: nodeClassName};
+      /* memo safety: an UNSELECTED node's data object stays reference-equal
+         (a new data object per recompute would defeat DiagramNode's memo). */
+      return n.selected
+        ? {...n, className: nodeClassName, data: {...((n.data ?? {}) as any), ...rotData}}
+        : {...n, className: nodeClassName};
     }),
-    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText],
+    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText, onRotateGesture, selCount],
   );
 
   /* ---------------------------------------------------------------------
@@ -1843,22 +1883,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
     const data = item.make() as any;
     const shape = asShape(data?.shape);
-    // C3: containers get sensible default dimensions so NodeResizer has a
-    // baseline and the resize persists through node.style.
-    const size = item.size ?? (shape === 'group'
-      ? {width: 320, height: 200}
-      : shape === 'note'
-        ? {width: 200, height: 90}
-        : null);
+    // C3: the palette item owns the box, so NodeResizer's baseline and the
+    // persisted style agree by construction. GOBI-SIZE (src/nodeSizes.ts) gave
+    // every kind an explicit size, which RETIRES the group/note fallbacks that
+    // used to sit here as a SECOND, quietly different answer (320x200 / 200x90).
+    const size = item.size;
     /* AQ19 — CENTRE THE NODE UNDER THE CURSOR: `p` is the cursor/flow point and
        RF anchors node.position at the TOP-LEFT, so a dropped node always sat
        down-right of where the user pointed. Offset by half the node's known
-       size (defaults for shapes without one) — every insert path funnels the
-       cursor point through here or its sibling inserters. */
-    const half = {
-      w: (size ? size.width : 190) / 2,
-      h: (size ? size.height : 95) / 2,
-    };
+       size (every palette row has one — GOBI-SIZE made `size` REQUIRED on
+       PaletteItem) — every insert path funnels the cursor point through here
+       or its sibling inserters. */
+    const half = {w: size.width / 2, h: size.height / 2};
     const centre = {x: p.x - half.w, y: p.y - half.h};
     // L3a: a flowchart node defaults to vertical handles and a label-only body.
     if (preset.id === 'flowchart' && shape !== 'group' && shape !== 'note') {
@@ -1887,7 +1923,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     data.textStyle = {align: 'center', vAlign: 'middle'};
     setNodes(ns => [...ns, {
       id, type: item.kind, position: centre, data: {...data, __dropAt: p}, selected: false,
-      ...(size ? {style: {width: size.width, height: size.height}} : null),
+      style: {width: size.width, height: size.height},
     }]);
     /* AQ19 — the estimated half-size differs from the RENDERED box (content,
        font, auto-grow), so after the node mounts and settles, re-measure and
@@ -2494,6 +2530,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   // `rf`) and every setter it calls, so neither path can close over a stale
   // `readOnly` and flip the mode the wrong way.
   const toggleReadOnly = useCallback(() => {
+    /* GOBI-SHARE-LOCK — a share view cannot be unlocked from inside: the
+       toggle is disabled and Shift+2 lands here only via the keyboard path,
+       which must be inert too ("Copy to my boards" is the ONE exit). The ref (not
+       the state) decides so an in-flight keydown during the share decode is
+       also covered. */
+    if (shareActive.current) return;
     const next = !readOnly;
     setReadOnly(next);
     readOnlyRef.current = next; /* AUDIT-16 — visible to in-flight gestures immediately */
@@ -2516,7 +2558,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     } else {
       flash('Editing enabled');
     }
-  }, [readOnly, rf, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount]);
+  }, [readOnly, rf, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount, shareActive]);
 
   // ---- keyboard shortcuts ----
   useEffect(() => {
@@ -2563,14 +2605,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         }
         return;
       }
-      // H1: every other overlay on screen owns the keyboard. While the onboarding
-      // tour, the help popover, a board menu or the insert palette is open, an
-      // app shortcut must not fire behind it — a stray ⌘Z during the tour would
-      // undo the newcomer's own work, and `?` would stack the cheat sheet on top
-      // of a surface that is already being read. The tour handles its own
-      // Arrow/Enter/Escape in a CAPTURE listener that stops propagation
-      // (Tour.tsx), so those keys never arrive here and keep working.
-      if (tourOpen || help || boardsOpen || searchPos) return;
+      // H1: every other overlay on screen owns the keyboard. While the help
+      // popover, a board menu or the insert palette is open, an app shortcut must
+      // not fire behind it — a stray ⌘Z would undo the newcomer's own work, and
+      // `?` would stack the cheat sheet on top of a surface that is already being
+      // read. (ONBOARD-P2/3: the step-by-step overlay that used to be the first
+      // member of this guard is deleted; the three surfaces that remain are the
+      // same three this guard always covered.)
+      if (help || boardsOpen || searchPos) return;
       // Shift+1 (physical Digit1) — "fit view", the Figma/Excalidraw/Miro
       // convention. It carries a modifier, so it is legal under this app's
       // no-bare-key rule. Matched on `e.code`, NOT `e.key`: on most layouts
@@ -2593,8 +2635,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // handler starts swallowing everything. Move it below that return and the
       // shortcut becomes one-way: it can switch the mode ON and then never OFF.
       // It also deliberately sits after the overlay guard above, so a stray
-      // Shift+2 cannot flip the mode behind the tour, help, a board menu or the
-      // insert palette.
+      // Shift+2 cannot flip the mode behind help, a board menu or the insert
+      // palette.
       if (e.shiftKey && e.code === 'Digit2' && !mod) {
         e.preventDefault();
         toggleReadOnly();
@@ -2616,6 +2658,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       if (mod && k === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo(); else undo();
+        return;
+      }
+      /* ROUND ROTATE — Alt+R / Alt+Shift+R = ±15° on the selection (single
+         node: its own delta; multi: each member keeps its own delta while
+         its centre orbits the selection centroid — ONE undo entry, the
+         useRotation chord writer). Matched on e.code (Shift rewrites the
+         delivered character), never `mod` — Alt alone, so the browser's
+         own menu-focus chords are not stolen. */
+      if (e.altKey && !mod && e.code === 'KeyR') {
+        e.preventDefault();
+        rotateSelection(e.shiftKey ? -ROTATE_SNAP_DEG : ROTATE_SNAP_DEG);
         return;
       }
       if (mod && k === 'c') { copySelection(); return; }
@@ -2644,8 +2697,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // these branches sit BELOW the read-only early-return above (panel
       // visibility is a persisted layout mutation, so review mode must swallow
       // them exactly as it swallowed the chord before) and BELOW the overlay
-      // guard, so a stray chord cannot flip panels behind the tour, help, a
-      // board menu or the insert palette. They sit ABOVE the arrow-nudge, `?`
+      // guard, so a stray chord cannot flip panels behind help, a board menu or
+      // the insert palette. They sit ABOVE the arrow-nudge, `?`
       // and `/` branches, which they shadow.
       //
       // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
@@ -2697,8 +2750,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // draw.io's convention. Three guards, all required:
       //   * `mod` — a bare `/` only. Mod+/ is left for a future binding and is
       //     not stolen from the browser (Cmd+/ is a real shortcut elsewhere).
-      //   * the overlay guard ABOVE already returned while the tour, help, the
-      //     board menu or the insert modal is up, so `/` cannot focus a field
+      //   * the overlay guard ABOVE already returned while help, a board menu or
+      //     the insert modal is up, so `/` cannot focus a field
       //     behind a dialog.
       //   * `isEditable(e.target)` at the top of this handler means `/` typed
       //     INTO a field (including this one) can never re-trigger — which is
@@ -2714,7 +2767,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, rf, searchPos, help, boardsOpen, settingsOpen,
-      setPanelsVisible, tourOpen, readOnly, toggleReadOnly, boardDlg, tgOpen]);
+      setPanelsVisible, readOnly, toggleReadOnly, boardDlg, tgOpen]);
 
   // ---- C5: live zoom level for the zoom pill ----
   const ZoomPill = () => {
@@ -2795,6 +2848,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       setNodes(parsed.nodes);
       setEdges(importedEdges);
       bumpHist(v => v + 1);
+      tickTask('board');   // ONBOARD-P4 B2 — importing a board is an explicit act
       // Import replaces the CURRENT board's content (or seeds a new board when
       // none is open) — it does not create a separate board.
       if (curBoard) {
@@ -2964,7 +3018,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *  1. `art` is no longer `null`. It was the whole reason the row rendered as
    *     word-chips: `chipRow`'s glyph form falls back to `o.label`, so six
    *     `art: null` options painted six words. Each now carries its own glyph.
-   *  2. The glyphs come from `FLOW_ICON_PATHS` — moved to `src/flowIcons.tsx`
+   *  2. The glyphs come from `FLOW_ICON_PATHS` — moved to `src/nodes/flowIcons.tsx`
    *     (AM-3) so BOTH readers can reach it. AL-6's comment claimed this reuse;
    *     the module boundary made it a promise. This file and `GoblinEdge.tsx`
    *     now read the SAME map, so a chip cannot drift from the picture the edge
@@ -2982,7 +3036,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
       THE GLYPH PATHS DID NOT CHANGE, and they are not copied either. The six
       figures arrive from `FLOW_ICON_PATHS` — the map AM-3 moved into
-      `src/flowIcons.tsx` so this row and the travelling chip could not drift — and
+      `src/nodes/flowIcons.tsx` so this row and the travelling chip could not drift — and
       are SCALED INSIDE the shared frame instead of being re-drawn for it. The
       scale is read off the two geometries rather than guessed, and the rendered
       pixel arithmetic is stated so the number can be checked:
@@ -3383,11 +3437,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       <div className="field">
         <label>size</label>
         {/* ROUND X, ITEM 1 — BACK TO THE BARE SEGMENTED ROW. ROUND W put a
-            custom-size `<input type="number">` beside these four buttons, inside
-            `.insp-num-row`, and that flex row squeezed the 4-column grid into a
-            31×121px COLUMN — the four steps stacked vertically at `left: 1005`,
-            identical for all of them (Harvey: "UI lệch, quá xấu"). The input is
-            GONE; the steps are the control again, full panel width, one row.
+            custom-size number input beside these four buttons, and that flex
+            row squeezed the 4-column grid into a 31×121px COLUMN (Harvey:
+            "UI lệch, quá xấu"). The input is GONE; the steps are the control
+            again, full panel width, one row.
 
             THE RULE STAYS (Harvey: "rule giữ khi cần"). `scale` on `TextStyle`,
             `TEXT_SCALE_MIN/MAX`, `clampTextScale` and the `scale` read in
@@ -3838,96 +3891,27 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 never render inside the head. The inline style carries the
                 anchor computed in `boardsPopClamp` (left = button right + 6,
                 top = button top, max-width = viewport − anchor − 8). */}
-            {boardsOpen && boardsPopPos && createPortal(
-              <div
-                className="pop boards-pop"
-                style={{position: 'fixed', left: boardsPopPos.left, top: boardsPopPos.top, maxWidth: Math.min(360, boardsPopPos.maxW), width: 360}}
-              >
-                {/* AT-1 — mode is VISIBLE, not guessed: one small line above the
-                    list. server → "Saved to server files"; local → "Saved in
-                    this browser". No dead buttons, no modal, no override (the
-                    mode follows the host; a manual switcher is out of scope). */}
-                <div className="boards-mode" data-storage-mode aria-live="polite">{modeLabel}</div>
-                {/* AT-4 #2 — the storage readout (local mode only): estimate()
-                    as "X MB used of ~Y MB" + ONE honesty sentence. No scare
-                    modals; the JSON export it names is the Export modal's
-                    JSON button, already in the app. */}
-                {localMode && storageEstimate && (
-                  <div className="boards-mode boards-storage-readout" data-storage-readout>
-                    {storageEstimate}
-                  </div>
-                )}
-                {/* ITEM B — the LIST owns the scroll (`overflow-y: auto`,
-                    `max-height: 300px`); the actions block below is PINNED and
-                    always visible (Save now reachable at any list length). */}
-                <div className="boards-list">
-                  {boardList.map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className={`pop-item boards-item${b.id === curBoard?.id ? ' current' : ''}`}
-                      title={b.name}
-                      onClick={() => void openBoard(b.id)}
-                    >
-                      {/* ITEM B — de-cramped row: the NAME is its own
-                          ellipsising line and the preset badge sits OUTSIDE
-                          it (it used to live INSIDE the ellipsising span and
-                          clipped to "Ar…" on any narrow popup). `title` on
-                          the row carries the full name through truncation. */}
-                      <span className="boards-item-name">{b.name}</span>
-                      <span className="boards-item-preset">{getPreset(b.preset).label}</span>
-                      <span className="boards-item-meta">
-                        {b.nodeCount}n · {b.edgeCount}e · {fmtDate(b.updatedAt)}
-                      </span>
-                    </button>
-                  ))}
-                  {!boardList.length && <div className="boards-empty">No boards yet</div>}
-                </div>
-                <div className="boards-actions">
-                  {/* ITEM 6b — every row closes the menu and opens the designed
-                      dialog. Focus returns to the BOARDS BUTTON on close, not to
-                      the row: choosing a row unmounts the menu, so a row ref is
-                      already null by the time the dialog finishes. The trigger
-                      that still exists is the one focus goes back to. */}
-                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); newBoard(); }}>
-                    <Plus size={14} /> New board
-                  </button>
-                  {/* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery's ONLY entry
-                      point (D2: boards menu only; a toolbar chip is a recorded
-                      deferral, not an omission to fix here). It sits beside
-                      "New board" because it is the same intent — start a board —
-                      with a catalog in front of it.
-                      ROUND 4, ITEM 2 — the row read "Create from Templates"
-                      (Harvey, verbatim: "Còn cái Templates... bên ngoài thì đổi
-                      thành Create from Templates"). Only the MENU ROW was
-                      renamed; the gallery's own heading is still "Templates".
-                      ITEM B (2026-10-22) — HARVEY: the label must NOT wrap, so
-                      the row is shortened to "Templates" (the handler, the
-                      stash-clear and the route are untouched). checks tg11 and
-                      round-4 i2 are RE-ANCHORED to the new literal, dated.
-                      ROUND 6, ITEM 3 — this route has NO typed name, so it is
-                      the one place that MUST empty the dialog's name stash: a
-                      name abandoned in an earlier dialog would otherwise name
-                      this unrelated board. The gallery then auto-numbers. */}
-                  <button type="button" className="pop-item" onClick={() => { setBoardsOpen(false); pendingBoardName.current = ''; setTgOpen(true); }}>
-                    <LayoutTemplate size={14} /> Templates
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); renameBoard(); }}>
-                    <Pencil size={14} /> Rename
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); void doDuplicateBoard(); }}>
-                    <Copy size={14} /> Duplicate
-                  </button>
-                  <button type="button" className="pop-item" disabled={!curBoard} onClick={() => { setBoardsOpen(false); deleteBoard(); }}>
-                    <Trash2 size={14} /> Delete
-                  </button>
-                  <button type="button" className="pop-item primary" disabled={!curBoard} onClick={() => { setBoardsOpen(false); void flushSave(); }}>
-                    <Save size={14} /> Save now
-                  </button>
-                </div>
-              </div>,
-              document.body,
-            )}
+            {/* GOBI-S1 — the popover JSX moved to src/components/BoardsPopover.tsx
+                (the extraction that paid for this round's App lines; harness
+                boards-popover-pinned reads App + useBoardsMenu + the component). */}
+            <BoardsPopover
+              open={boardsOpen}
+              pos={boardsPopPos}
+              modeLabel={modeLabel}
+              localMode={localMode}
+              storageEstimate={storageEstimate}
+              boardList={boardList}
+              curBoard={curBoard}
+              fmtDate={fmtDate}
+              onOpenBoard={id => void openBoard(id)}
+              onClose={() => setBoardsOpen(false)}
+              onNewBoard={() => { setBoardsOpen(false); newBoard(); }}
+              onTemplates={() => { setBoardsOpen(false); openTemplates(); }}
+              onRename={() => { setBoardsOpen(false); renameBoard(); }}
+              onDuplicate={() => { setBoardsOpen(false); void doDuplicateBoard(); }}
+              onDelete={() => { setBoardsOpen(false); deleteBoard(); }}
+              onSaveNow={() => { setBoardsOpen(false); void flushSave(); }}
+            />
           </div>
           <div className={`save-ind${saveState === 'saving' ? ' busy' : ''}${saveState === 'error' ? ' err' : ''}`} aria-live="polite">
             {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : saveState === 'error' ? 'save failed' : (dirty && !autosave ? 'unsaved' : '')}
@@ -4266,6 +4250,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ref={wrap}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}>
+        {/* GOBI-S1 — the share view's banner (or its error card) sits above
+            the toolbar: a fragment-owned board announces itself read-only and
+            offers the ONE exit. Nothing renders when no fragment is present. */}
+        {(shareDoc || shareError) && (
+          <ShareBanner
+            mode={shareError ? 'error' : 'viewing'}
+            boardName={shareDoc?.name ?? ''}
+            reason={shareError ?? undefined}
+            onEditCopy={editCopy}
+            onOpenApp={dismissError}
+          />
+        )}
         {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
             in src/components/Toolbar.tsx; App threads every state/handler. */}
         <Toolbar
@@ -4276,6 +4272,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           onFitView={() => rf?.fitView({padding: 0.25})}
           readOnly={readOnly}
           onToggleReadOnly={toggleReadOnly}
+          shareLock={!!shareDoc}
           alignGuides={alignGuides}
           onSetAlignGuides={setAlignGuides}
           onSetGuides={setGuides}
@@ -4299,23 +4296,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {notice && <div className="toast">{notice}</div>}
 
-        {/* H2: getting-started checklist — ticks as the user performs actions.
-            ITEM 3: no `onAllDone`. Completing all 6 auto-hides the panel (its own
-            `done.size >= TASKS.length` return below); the toast it used to raise
-            fired on EVERY load for anyone who had already finished, because the
-            once-per-mount guard was a ref that reset with the page. */}
-        <Checklist
-          doneSignal={doneSignal}
-          hasSecondBoard={boardList.length >= 2}
-        />
-
-        {/* H1: guided tour overlay */}
-        {tourOpen && (
-          <Tour
-            onDone={tourFinished}
-            onSkip={tourFinished}
-          />
-        )}
+        {/* H2: getting-started checklist. Its state, its auto-hide and the
+            history of the removed completion toast live in Checklist.tsx. */}
+        <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
 
         {/* F2: context menu (node / edge / pane right-click) */}
         {ctx && (
@@ -4328,17 +4311,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
             Positioned absolute relative to the .react-flow container. */}
-        {/* D2: keyboard cheat sheet */}
         {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
             (button + popover) lives in src/components/HelpSheet.tsx now;
-            App threads the open state, the two refs and the two openers. */}
+            App threads the open state, the two refs and the feedback opener. */}
         <HelpSheet
           btnRef={helpBtnRef}
           popRef={helpRef}
           open={help}
           onToggle={() => setHelp(h => !h)}
-          onTakeTour={() => { setHelp(false); setTourOpen(true); }}
           onSendFeedback={() => { setHelp(false); feedbackReturn.current = helpBtnRef.current; setFeedbackOpen(true); }}
+          canRestoreChecklist={checklistDismissed && !isChecklistComplete(checklistDone)}
+          onRestoreChecklist={() => { setHelp(false); restoreChecklist(); }}
         />
 
         {/* D1: searchable insert palette */}
@@ -4390,6 +4373,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onMarquee: setMarqueeMode,
             zOrder: zOrderMode,
             onZOrder: setZOrderMode,
+            layoutDir,
+            onLayoutDir: setLayoutDir,
             pngScale,
             onPngScale,
             pngPad,
@@ -4406,6 +4391,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           boardPng={nodes.length ? boardPngForFeedback : null}
           expOpen={expOpen}
           onCloseExport={() => setExpOpen(false)}
+          onExported={() => tickTask('export')}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}
@@ -4428,7 +4414,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             to THIS React Flow instance. K3: ds-animating-layout (added/removed
             around programmatic layouts) and ds-no-anim (animation gating). */}
         <ReactFlow
-          nodes={rfNodes} edges={rfEdges}
+          nodes={rfNodes} edges={rfEdges} /* badge hidden 2026-10-25; credit -> About */ proOptions={{hideAttribution: true}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange}
           onConnect={onConnectRules}
           onConnectStart={(_e, params) => { if (params.nodeId) { pendingDrop.current = {source: params.nodeId!, target: '', sourceHandle: params.handleId, targetHandle: null} as any as Connection; connectOrigin.current = {nodeId: params.nodeId!, handleId: params.handleId}; } }}
@@ -4640,16 +4626,32 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           <Background color="var(--dots)" gap={gridSize} size={1} />
           {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
               and the board really has no nodes. `boardLoaded` is what stops a
-              load in flight from claiming "This board is empty" over a canvas
-              whose content is merely still on its way. */}
-          {/* Empty state — ITEM 2: shown only once the board load has RESOLVED
-              and the board really has no nodes. `boardLoaded` is what stops a
-              load in flight from claiming "This board is empty" over a canvas
-              whose content is merely still on its way.
+              load in flight from claiming an empty board over a canvas whose
+              content is merely still on its way.
               ROUND BN-3 PHASE B: the panel body lives in
               src/components/CanvasEmptyPanel.tsx; the GATE stays here
               (boot-no-flash pins it to App.tsx). */}
-          <CanvasEmptyPanel show={boardLoaded && nodes.length === 0} />
+          <CanvasEmptyPanel
+            show={boardLoaded && nodes.length === 0}
+            onBrowseTemplates={openTemplates}
+          />
+          {/* ROTATE-FIX: hands the store's updateNodeInternals up (the hook
+              needs a provider ancestor; App is above <ReactFlow>). */}
+          <RotateInternalsBridge onReady={u => { rotateInternals.current = u; }} />
+          {/* GROUP-ROTATE: the ONE shared rotate grip for a multi-selection,
+              above-centre of the selection union box (it must be a <ReactFlow>
+              child: it reads the store's live nodes/transform to place itself
+              in screen space). Sole selection keeps the per-node RotateGrip. */}
+          {!readOnly && selCount >= 2 && (
+            <GroupRotateGrip onGesture={onGroupRotateGesture} />
+          )}
+          {/* SELBOX: the app's rotation-aware multi-selection box — RF's own
+              rect unions UNROTATED internals (no override prop) and lags a
+              rotated group; ours unions rotatedExtent in RF's selection
+              vocabulary, RF's rect is paint-hidden (styles.css), paint-only. */}
+          {selCount >= 2 && (
+            <SelectionBox />
+          )}
           {/* F3: helper lines. `HelperLinesView` portals itself into React
               Flow's viewport (`ViewportPortal`), so it must stay a direct child
               of <ReactFlow> — it does its own flow-coord placement there. */}
@@ -5100,53 +5102,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           ) : selCount >= 2 ? (
             <>
               {/* C2: multi-select summary — never a single node's fields.
-
-                  ROUND BD — THE BLOCK REDESIGNED (Harvey: "ugly"; defects were
-                  measured off his screenshot). What changed and why:
-
-                  (2) 'Color · Delete' SPLIT. Two unrelated concepts under one
-                  header made the delete pill under the swatches read as
-                  colour-related. Delete is now its own block at the BOTTOM —
-                  destructive actions live apart from constructive ones, one
-                  button only (the swatches' own duplicate pill up top is gone).
-
-                  (B/DUPLICATE) Duplicate STAYS in the panel rather than moving
-                  to the sel-bar. The sel-bar already carries it, but the bar is
-                  the quick-gesture set while the panel is the inventory of
-                  bulk actions — dropping the panel's copy would leave the
-                  inventory destroy-only and hide a legitimate bulk action. The
-                  pairing is now deliberate: exactly ONE neutral button and ONE
-                  destructive button, side by side, the destructive one styled
-                  apart (below).
-
-                  (5) DESTRUCTIVE DIFFERENTIATED. `.mbtn.danger` only recoloured
-                  on HOVER — at rest it was identical to `.mbtn` (measured
-                  defect). The block-level `.multi-danger` now paints the
-                  danger at REST (border + text in the accent), matching the
-                  destructive styling Figma/draw.io use, and stays hover-recolour
-                  free. `.mbtn.danger` keeps its hover role elsewhere.
-
-                  (7) LABELS TITLE-CASED (one convention for this block; the
-                  icon buttons are icon-only with `title` tooltips — the pick
-                  is recorded in the harness).
-
-                  (3)+(4) BOTH 'Move with arrow keys' hints DELETED — the same
-                  keyboard fact appeared twice in one block; the shortcut lives
-                  on the `?` sheet, which is where hints belong (the sidebar
-                  hint block was deleted for the same reason, see the note at
-                  the sidebar's tail).
-
-                  (A) ALIGN AS A 3x2 ICON GRID. Same lucide icons, same
-                  icon→action mapping as the sel-bar (App.tsx `sel-bar` block):
-                  the two surfaces must agree — one gesture vocabulary, two
-                  places. `flex: 1 1 0` equal widths (the AA rule). Distribute
-                  is TWO equal icon buttons in one row. Arrange (new) gets the
-                  same row shape.
-
-                  (8) SWATCH GRID EQUAL COLUMNS via the shared `.swatches
-                  .swatch6` control — cells equalise for free, and the ring
-                  semantics now match the single-node Style section (see the
-                  ROUND BD note at `swatchRow`). */}
+                  ROUND BD redesigned this block (the decisions are pinned
+                  by checks/round-bd-multi-panel.mjs); comment pruned
+                  2026-10-26 for the ROUND ROTATE App budget. */}
               <div className="multi-head">{selCount} nodes selected</div>
               <div className="sec-label">Align</div>
               <div className="multi-actions multi-grid3">
@@ -5315,7 +5273,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               {/* PACKAGE-P §E.3(a) — THE PANEL'S SECOND TEXT WRITER IS GONE.
                   This branch used to register a 4-row <textarea> as its `text`
                   section, i.e. a SECOND writer for the same `text` the in-place
-                  editor on the canvas writes (`src/LabelNode.tsx`). §E.3 removes
+                  editor on the canvas writes (`src/nodes/LabelNode.tsx`). §E.3 removes
                   it in the same pass that lands its replacement, so the two can
                   never be out of step. `text` now registers the SAME Text
                   section a goblin gets (one body, one writer, two targets), and
@@ -5413,6 +5371,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     color={resolveColor(selected.data as any)}
                   />
                 </div>
+                {/* ROUND ROTATE — the Rotation row lives in Rows.tsx
+                    (RotationRow): App.tsx must carry no numeric input element
+                    (a package-p invariant), and the row is presentational. */}
+                <RotationRow
+                  value={(((selected.data as any).rotation as number | undefined) ?? 0)}
+                  onChange={v => update({rotation: v === 0 ? undefined : v} as any)}
+                />
                 {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
                     inner arcs (database / storeddata only). A key choice keeps
                     this row's neighbour contract simple: clearing the shape back
@@ -5516,30 +5481,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
                   )}
                 </div>
-                {/* ROUND AD, ITEM 5(a) — OPTION B'S LABEL. Harvey kept the
-                    editor's semantic colour grouping, on the condition that the
-                    panel SAYS it is this editor's grouping and not an ISO
-                    convention — and that the colour stays overridable per node
-                    (the swatch row directly above: the key only supplies the
-                    default). Three properties this row is built to hold:
-
-                    · VISIBLE WITHOUT HOVER. It is markup, not a `title`
-                      attribute. A hover-only label is invisible on a tablet,
-                      and this project ships to touch.
-                    · DISMISSIBLE, AND THE DISMISSAL PERSISTS. The × writes
-                      `diagram-studio:color-key-note` through the established
-                      convention (`src/colorKeyNote.ts`, the same shape as
-                      MARQUEE_KEY / ANIMATE_KEY / SECTIONS_KEY), so it is gone
-                      for good rather than back on the next selection. The key is
-                      American (ROUND AH) so it moves WITH this copy: a dismissal
-                      stored under the older British key is ignored rather than
-                      migrated, which is what lets a user who had dismissed the
-                      pre-rename note see this text once and dismiss it again.
-                    · ONE SHORT LINE, AND IT DOES NOT STEAL FOCUS. A plain
-                      `<span>` with `role="button" tabIndex={0}`, exactly like
-                      `.fav-remove` and `.cust-remove`; nothing autofocuses it,
-                      and the string is measured to fit one line at the panel's
-                      width (see the note in `src/colorKeyNote.ts`). */}
+                {/* ROUND AD, ITEM 5(a) — the colour-key note: visible,
+                    dismissible (persisted key in src/colorKeyNote.ts),
+                    one line, no focus steal. History pruned 2026-10-26
+                    for the ROUND ROTATE App budget. */}
                 {keyNoteShown && (
                   <div className="key-note" data-key-note="true">
                     <span className="key-note-text">{KEY_NOTE_TEXT}</span>

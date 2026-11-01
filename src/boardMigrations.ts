@@ -8,7 +8,7 @@ import type {Edge, Node} from '@xyflow/react';
 import {type BoardDoc} from './boards';
 import {COLOR_VAR, isColorKey, keyForHex, type ColorKey} from './colors';
 import {asPreset, makeEdge} from './presets';
-import {FLOW_ICON_PATHS} from './flowIcons';
+import {FLOW_ICON_PATHS} from './nodes/flowIcons';
 
 /* ---------------------------------------------------------------------------
    L1 — legacy-hex migration.
@@ -167,7 +167,7 @@ export const migrateEdge = (e: Edge): Edge => {
 
    React Flow's getEdgePosition resolves an endpoint through getHandle(bounds,
    handleId), which returns bounds[0] — the FIRST handle in DOM order — whenever
-   the stored id is missing. For the goblin node (src/DiagramNode.tsx
+   the stored id is missing. For the goblin node (src/nodes/DiagramNode.tsx
    NodeHandles) that first-of-type is the node's own orientation side, so an
    edge stored without ids "means" that side. Now that every handle carries an
    id we write that meaning down, so adding further handles later cannot

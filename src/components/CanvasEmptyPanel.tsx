@@ -2,36 +2,41 @@
  *  verbatim from App()'s <ReactFlow> children (App.tsx ~4732). The GATING
  *  (`boardLoaded && nodes.length === 0`) stays in App — boot-no-flash asserts
  *  it in App.tsx — so this component renders its body only when `show` is
- *  true and App owns the predicate. No context, no store. */
+ *  true and App owns the predicate. No context, no store.
+ *  ONBOARD-P3 (2026-10-31): the copy says what the product is FOR and offers the
+ *  template route. `onBrowseTemplates` is App's ONE gallery opener — the same
+ *  callback the boards menu calls, never a second path. */
+import {useEffect} from 'react';
 import {Panel} from '@xyflow/react';
+import {trackSurface} from '../analytics';
 
 type CanvasEmptyPanelProps = {
   /** App's gate: the board load has RESOLVED and the board truly has no nodes. */
   show: boolean;
+  /** opens the templates gallery (App's `openTemplates`). */
+  onBrowseTemplates: () => void;
 };
 
-/** The `.canvas-empty` hero: brand mark, title, sub and hint. Must stay a
- *  direct child of <ReactFlow> (the Panel positions itself in the viewport). */
-export function CanvasEmptyPanel({show}: CanvasEmptyPanelProps) {
+/** The `.canvas-empty` hero: brand mark, title, sub, the two ways in and a hint.
+ *  Must stay a direct child of <ReactFlow>. `.canvas-empty` is pointer-events:none
+ *  so clicks reach the canvas; the action row opts back IN or the button is dead. */
+export function CanvasEmptyPanel({show, onBrowseTemplates}: CanvasEmptyPanelProps) {
+  /* ONBOARD-P6 — the guidance surface reported itself. The effect sits ABOVE the
+     early return so the hook order never depends on `show`. */
+  useEffect(() => { if (show) trackSurface('empty_state'); }, [show]);
   if (!show) return null;
   return (
-    <Panel
-      position="top-center"
-      className="canvas-empty"
-      style={{marginTop: '12vh'}}
-    >
+    <Panel position="top-center" className="canvas-empty" style={{marginTop: '12vh'}}>
       <div className="ce-title">
-        {/* ROUND BH (public launch) — the Gobigrams icon as the panel's
-            natural header, above the "This board is empty" title
-            (.ce-logo, 240px hero, aspect-true 657:406, tokens only). pointer-events:none is
-            inherited from .canvas-empty. */}
+        {/* ROUND BH — the Gobigrams icon as the panel's natural header above the
+            title (.ce-logo, 240px hero, aspect-true 657:406, tokens only). */}
         <img className="ce-logo" src="/brand/logo-mark.svg?v=2" alt="Gobigrams" width={240} height={148} />
-        This board is empty
+        Draw your system
       </div>
-      <div className="ce-sub">
-        Drag a shape from the left panel onto the canvas, or
-        <br />
-        <b>double-click anywhere</b> to search and insert one.
+      <div className="ce-sub">Boxes, arrows, and what flows between them.</div>
+      <div className="ce-actions">
+        <button type="button" className="ce-btn" onClick={onBrowseTemplates}>Start from a template</button>
+        <span className="ce-or">or drag a shape from the left</span>
       </div>
       <div className="ce-hint">
         Then drag from a node's edge handle to connect · press <kbd>?</kbd> for shortcuts

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Diagram — Gobigrams embed</title>
+    <script>
+      /* The /embed entry's own theme boot: an embed is always the board's
+         dark canvas (the diagram decides its own look; a host page's
+         preference must not wash it out). Same literals as index.html's
+         boot writer, resolved straight to dark. */
+      (function () {
+        try {
+          var el = document.documentElement;
+          el.dataset.theme = 'dark';
+          el.classList.add('dark');
+        } catch (e) { /* never block the embed on this */ }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="embed"></div>
+    <script type="module" src="/src/embedEntry.ts"></script>
+  </body>
+</html>

@@ -17,7 +17,7 @@ import {wouldCycle} from './boardUtils';
 import {makeEdge} from './presets';
 import type {PresetId, PathId} from './presets';
 import type {HelperGuides} from './helperLines';
-import type {ChecklistTaskId} from './Checklist';
+import type {ChecklistTaskId} from './nodes/Checklist';
 import type {EdgeData} from './App';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */

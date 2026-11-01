@@ -13,7 +13,7 @@
    14.5, `.node-sub` 11.5, `.node-metric` 20 — i.e. the node's hierarchy IS the
    size ladder. A single px value would flatten all four to one number, destroy
    that hierarchy, and push the worst-case content (`queue`, 199x131, the
-   number `src/DiagramNode.tsx`'s `NODE_MIN_H` is derived from) past the resizer
+   number `src/nodes/DiagramNode.tsx`'s `NODE_MIN_H` is derived from) past the resizer
    floor this repo asserts. So the control emits a MULTIPLIER, it lands as ONE
    custom property (`--ts-scale`) on the node root, and every text rule in the
    sheet multiplies its own size by it: one write, whole block, and an unset
@@ -336,6 +336,18 @@ export {COLOR_KEYS, COLOR_VAR};
  *  property. Two properties, one user choice; `align` alone would silently do
  *  nothing to the title, which is the one row most people want centred. */
 const JUSTIFY: Record<TextAlign, string> = {left: 'flex-start', center: 'center', right: 'flex-end'};
+
+/** ROUND GOBI-TEXT — `align` as an SVG `text-anchor`, for the DOM-less exporter.
+ *
+ *  The canvas centres a block with `text-align` / `justify-content`; an SVG
+ *  `<text>` has no layout engine to do either, so the exporter has to anchor it
+ *  instead. `start` is `<text>`'s own default, so a node with no align (every
+ *  pre-GOBI-TEXT node) emits exactly the bytes it emitted before. Only the
+ *  stub/headless path consults this: a DOM measurement already reflects the
+ *  CSS, and anchoring a measured run a second time would double the offset. */
+export function alignAnchor(align: string | undefined): 'start' | 'middle' | 'end' {
+  return align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
+}
 
 /** Is this choice the value that renders ANYWAY? If so it must not be stored —
  *  `cur` being told about a field the user never chose is exactly the defect

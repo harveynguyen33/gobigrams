@@ -155,6 +155,49 @@ export function labelBgClass(v: unknown): string {
   return `lb-${labelBgOf(v)}`;
 }
 
+/** ROUND GOBI-TEXT3 — THE DEFAULT IS `none`, i.e. NO PLATE PLUS A HALO, which
+ *  is what the canvas has painted since ROUND AL-3.
+ *
+ *  ROUND GOBI-TEXT2 made the export diverge on purpose: it painted the opaque
+ *  `--surface` plate for an unset `labelBg`, on the belief that an unpainted
+ *  label let the route line run through the glyphs. That belief was wrong about
+ *  the CANVAS (`src/styles.css` `.edge-label.lb-none` draws no plate at all and
+ *  keeps the glyphs legible with a `text-shadow` halo in `--bg`), and Harvey
+ *  said so himself: "toi nghi toi text tren line connection, ko can co
+ *  background xung quanh vi chinh gobigrams khi them chu cung k co background".
+ *  The exported document carries its OWN `--bg` background rect, so a `--bg`
+ *  halo is exactly right on it — the reason GOBI-TEXT2 gave does not apply.
+ *
+ *  SVG HAS NO `text-shadow`, so the halo comes back as PAINT rather than as a
+ *  shadow: `paint-order="stroke"` draws the stroke FIRST and the fill over it,
+ *  which turns a 2px stroke into a 1px ring outside every glyph — the same
+ *  silhouette the canvas's four 1px shadows give. One `<text>` element, no
+ *  duplicate copy of the label under it (a copy would double the text in the
+ *  document, and a screen reader or a text extraction would see it twice).
+ *
+ *  `halo` is the literal `--bg` token (already resolved by the caller — this
+ *  leaf module resolves no colours), and it is emitted ONLY for `none`: the
+ *  other two states draw a plate, and a halo under a plate would be a second
+ *  edge nobody asked for (the canvas rule says the same).
+ *
+ *    unset   -> none (the canvas default): no plate, `--bg` halo
+ *    none    -> the same, explicitly stored
+ *    surface -> `--surface`, or the stored `labelBgKey` colour if one is set
+ *    outline -> the stored colour (transparent when none), hairline
+ *               `--border-strong` — the same token the class declares.
+ *
+ *  `storedInk` is the caller's already-resolved `labelBgKey` literal, and `tok`
+ *  its resolved tokens. */
+export type LabelPaint = {fill: string; stroke: string; halo?: string};
+export function labelPlatePaint(
+  bg: unknown, storedInk: string | undefined, tok: {surface: string; border: string; bg: string},
+): LabelPaint {
+  const state = labelBgOf(bg);
+  if (state === 'surface') return {fill: storedInk ?? tok.surface, stroke: 'transparent'};
+  if (state === 'outline') return {fill: storedInk ?? 'transparent', stroke: tok.border};
+  return {fill: 'transparent', stroke: 'transparent', halo: tok.bg};
+}
+
 /* ===========================================================================
    AK-10 — the anchor, and the free 2-D offset applied to it.
    =========================================================================== */

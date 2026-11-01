@@ -1,0 +1,30 @@
+{
+  "name": "Gobigrams",
+  "short_name": "Gobigrams",
+  "description": "A node-based diagram editor for architecture drawings. Dark theme, keyboard-friendly, built on React Flow (MIT).",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1b1b1b",
+  "theme_color": "#1b1b1b",
+  "icons": [
+    {
+      "src": "/brand/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

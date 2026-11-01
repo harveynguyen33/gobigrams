@@ -16,4 +16,4 @@ export const edgeTypes = {
 export const EDGE_TYPES = ['goblinEdge', 'bezier', 'smoothstep', 'step', 'straight'] as const;
 
 export {GoblinEdge};
-export * from './EdgeData';
+export * from './edgeData';

@@ -26,6 +26,9 @@ type ToolbarProps = {
   onFitView: () => void;
   readOnly: boolean;
   onToggleReadOnly: () => void;
+  /** GOBI-SHARE-LOCK — true while a share view owns the canvas: the read-only
+   *  toggle is disabled with a tooltip naming the ONE exit. */
+  shareLock: boolean;
   alignGuides: boolean;
   onSetAlignGuides: (v: boolean) => void;
   onSetGuides: (g: HelperGuides) => void;
@@ -58,21 +61,18 @@ export function Toolbar(p: ToolbarProps) {
             <button className="tbtn-icon" aria-label="Redo" disabled={!p.canRedo} onClick={p.onRedo}><Redo2 size={15} /></button>
           </Tooltip>
           {p.sep()}
-          <Tooltip label="Fit view to diagram — Shift+1">
+          <Tooltip label="Fit view — Shift+1">
             <button className="tbtn-icon" aria-label="Fit view" onClick={p.onFitView}><Maximize size={15} /></button>
           </Tooltip>
-          {/* Part B — read-only review mode. Sits with the other VIEW toggles
-              (fit view / alignment guides / snap), not in the export group: it
-              is a way of looking at the board, not an output. */}
-          <Tooltip label={p.readOnly ? 'Read-only review: ON — drag and scroll to pan, nothing can be selected or moved — Shift+2' : 'Read-only review: OFF — Shift+2'}>
-            <button
-              className={`tbtn-icon${p.readOnly ? ' on' : ''}`}
-              aria-label="Read-only review"
-              aria-pressed={p.readOnly}
+          {/* Part B — read-only review mode: a VIEW toggle, not an export. */}
+          <Tooltip label={p.shareLock ? 'Shared link — read-only. Use Copy to my boards to make it yours.' : p.readOnly ? 'Read-only review: ON — drag and scroll to pan, nothing can be selected or moved — Shift+2' : 'Read-only review: OFF — Shift+2'}>
+            {/* GOBI-SHARE-LOCK — a disabled button fires no mouse events in Chrome; the wrap span carries the hover (.tbtn-hold). */}
+            <span className="tbtn-hold"><button className={`tbtn-icon${p.readOnly ? ' on' : ''}`}
+              aria-label="Read-only review" aria-pressed={p.readOnly}
+              disabled={p.shareLock} aria-disabled={p.shareLock}
               onClick={p.onToggleReadOnly}
-            ><Eye size={15} /></button>
-          </Tooltip>
-          <Tooltip label={p.alignGuides ? 'Alignment guides: ON — a NEARBY node that lines up gets a dashed guide and the node snaps to it' : 'Alignment guides: OFF — drag freely, no auto-align'}>
+            ><Eye size={15} /></button></span></Tooltip>
+          <Tooltip label={p.alignGuides ? 'Alignment guides: ON — a lined-up neighbour gets a dashed guide and the node snaps to it' : 'Alignment guides: OFF — drag freely, no auto-align'}>
             <button
               className={`tbtn-icon${p.alignGuides ? ' on' : ''}`}
               aria-label="Alignment guides"
@@ -111,13 +111,13 @@ export function Toolbar(p: ToolbarProps) {
             <button className="tbtn-icon" aria-label="Duplicate selection" onClick={p.onDuplicate}><Copy size={15} /></button>
           </Tooltip>
           {p.sep()}
-          <Tooltip label="Auto-arrange the diagram into clean layers (animated, undoable)">
+          <Tooltip label="Auto-arrange into clean layers (animated, undoable)">
             <button className="tbtn-icon" aria-label="Auto-layout diagram" onClick={p.onAutoLayout}><LayoutGrid size={15} /></button>
           </Tooltip>
           {p.sep()}
 
           <div style={{position: 'relative'}}>
-            <Tooltip label="Export / Import — scope, format, theme and a live preview">
+            <Tooltip label="Export / Import — scope, format, theme, live preview">
               <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => p.onOpenExport(true)}>
                 <Upload size={13} style={{verticalAlign: -2}} /> Export
               </button>

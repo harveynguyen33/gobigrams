@@ -3,7 +3,7 @@
  *  keyword and this file's imports). Size budgets: checks/file-size-gate.mjs. */
 import type {Edge, Node} from '@xyflow/react';
 import {PRESETS, makeEdge} from './presets';
-import type {SvgRejectReason} from './customShape';
+import type {SvgRejectReason} from './nodes/customShape';
 
 /* PACKAGE-N §8.1 — the import rejection table, verbatim from the spec.
    Every message names the FIX where one exists: `no-viewbox`, `no-size` and
@@ -98,21 +98,36 @@ export const DBL_STRAIGHT_GAP = 160;
 
 
 
-/** G — the four connection points of the goblin node (src/DiagramNode.tsx
+/** G — the four connection points of the goblin node (src/nodes/DiagramNode.tsx
  *  NodeHandles). The onConnect direction guard is scoped to these: an ERD
  *  column handle is NOT in the set, so a relationship drag is never re-aimed. */
 export const GOBLIN_HANDLE_IDS: ReadonlySet<string> = new Set(['left', 'right', 'top', 'bottom']);
 
 /** H3a: the seeded sample reads as a tiny pipeline — External → Queue → Service —
  *  L2: built through the preset's palette + edge factory, so the seed is the
- *  same shape of data a user creates. */
+ *  same shape of data a user creates.
+ *
+ *  ONBOARD-P4 — THE SEED TEACHES BY EXAMPLE. The step-by-step overlay is gone, so
+ *  the first board SHOWS what the product does: the labelled edge carries a flow
+ *  payload (dots move on first paint), the second is dashed, and the two internal
+ *  parts sit inside a GROUP boundary while the external system sits outside it.
+ *  Everything is built by the preset's own factories (palette `make()` /
+ *  `makeEdge`), so the seed cannot drift from what the creation paths produce.
+ *  MEASURED before shipping the boundary: children inside its absolute box, the
+ *  banner clear of them, nothing off-screen, 2 edges + 3 payload dots, and the
+ *  SVG export carries the group title. */
 export const initialNodes: Node[] = [
   {id: 'n1', type: 'goblin', position: {x: 60, y: 180}, data: PRESETS.architecture.palette[3].make() as any},
-  {id: 'n2', type: 'goblin', position: {x: 360, y: 170}, data: PRESETS.architecture.palette[2].make() as any},
-  {id: 'n3', type: 'goblin', position: {x: 680, y: 180}, data: PRESETS.architecture.palette[0].make() as any},
+  /* A parent must precede its children in the array (React Flow's rule), and a
+     child's position is PARENT-RELATIVE — the three authored absolute points
+     (60,180 / 360,170 / 680,180) are unchanged: 330+30, 96+74 and 330+350, 96+84. */
+  {id: 'g1', type: 'goblin', position: {x: 330, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
+    data: {...PRESETS.architecture.palette[7].make(), title: 'Your system', sub: 'boundary'} as any},
+  {id: 'n2', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 30, y: 74}, data: PRESETS.architecture.palette[2].make() as any},
+  {id: 'n3', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 350, y: 84}, data: PRESETS.architecture.palette[0].make() as any},
 ];
 export const initialEdges: Edge[] = [
-  {...makeEdge('n1', 'n2', PRESETS.architecture.edges, 'e1'), label: 'events'},
-  makeEdge('n2', 'n3', PRESETS.architecture.edges, 'e2'),
+  makeEdge('n1', 'n2', PRESETS.architecture.edges, 'e1', {label: 'events', flow: 'dots'}),
+  makeEdge('n2', 'n3', {...PRESETS.architecture.edges, dash: 'dashed'}, 'e2'),
 ];
 

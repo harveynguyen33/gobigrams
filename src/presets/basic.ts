@@ -3,11 +3,12 @@ import {MarkerType, type Edge} from '@xyflow/react';
 import type {EdgeMarkerType} from '@xyflow/system';
 import {COLOR_VAR, type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
-import {type Shape} from '../shapes';
+import {type Shape} from '../nodes/shapes';
 import {gridLayout, layoutDiagram, type LayoutDirection, type LayoutSpacing} from '../layout';
-import {type CrowFoot} from '../crowfoot';
+import {type CrowFoot} from '../nodes/Crowfoot';
 import {type ThemeName} from '../theme';
-import {type ShowMode} from '../TableNode';
+import {type ShowMode} from '../nodes/TableNode';
+import type {EdgeFlowKind} from '../edges/edgeData';
 import type {Node} from '@xyflow/react';
 /* ---------------------------------------------------------------------------
    L2 — THE PRESET SPINE.
@@ -212,12 +213,16 @@ export type DiagramPreset = {
 };
 
 /** LAYOUTS registry — one entry per engine. The K3 CSS transition wrapper is
- *  applied by the caller (`animateLayout`), so it stays preset-independent. */
+ *  applied by the caller (`animateLayout`), so it stays preset-independent.
+ *  ROUND LAYOUT — the layered engines read `spec.direction` (falling back to
+ *  their own birth direction), so the persisted Canvas preference can flow
+ *  through `useCanvasTools`'s `{...preset.layout, direction: layoutDir}`
+ *  override. The grid engine keeps its own geometry (no direction). */
 export const LAYOUTS = {
   'layered-lr': (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
-    layoutDiagram(nodes, edges, {direction: 'LR', spacing: spec.spacing, bandGroups: spec.bandGroups}),
+    layoutDiagram(nodes, edges, {direction: spec.direction ?? 'LR', spacing: spec.spacing, bandGroups: spec.bandGroups}),
   'layered-tb': (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
-    layoutDiagram(nodes, edges, {direction: 'TB', spacing: spec.spacing, bandGroups: spec.bandGroups}),
+    layoutDiagram(nodes, edges, {direction: spec.direction ?? 'TB', spacing: spec.spacing, bandGroups: spec.bandGroups}),
   grid: (nodes: Node[], edges: Edge[], spec: LayoutSpec) =>
     gridLayout(nodes, edges, {cols: spec.cols ?? 2, gap: spec.spacing}),
   free: () => new Map<string, {x: number; y: number}>(),
@@ -243,6 +248,8 @@ export type EdgeSeed = {
   targetHandle?: string | null;
   label?: string;
   techn?: string;
+  /* ONBOARD-P4 — a seeded edge may preview a flow (registry: EDGE_FLOW_KINDS). */
+  flow?: EdgeFlowKind;
   crowStart?: CrowFoot;
   crowEnd?: CrowFoot;
 };
@@ -274,7 +281,7 @@ export function makeEdge(source: string, target: string, e: EdgeDefaults, id: st
     target,
     animated: false,
     style: {stroke: color, ...(dash ? {strokeDasharray: dash} : null), ...(e.strokeWidth ? {strokeWidth: e.strokeWidth} : null)},
-    data: {shape: e.path, offset: 'center', strokeKey: e.strokeKey, ...(seed.techn ? {techn: seed.techn} : null)},
+    data: {shape: e.path, offset: 'center', strokeKey: e.strokeKey, ...(seed.flow ? {flow: seed.flow} : null), ...(seed.techn ? {techn: seed.techn} : null)},
   };
   if (seed.label) edge.label = seed.label;
   if (markerStart) edge.markerStart = markerStart;

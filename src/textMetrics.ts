@@ -25,7 +25,7 @@
  * not geometry.
  */
 
-import {wrapText} from './exportSvg';
+import {wrapText} from './export/exportSvg';
 
 export type TextMetricsKey = {
   text: string;

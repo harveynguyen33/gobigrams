@@ -14,9 +14,9 @@ import {ZORDER_OPTS, type ZOrderMode} from './zOrderMode';
 /* ROUND BN-4 — Props moved to ./settings/shared; the two largest panes
    (Canvas, About+Roadmap) moved verbatim to ./settings/panes. */
 import type {Props} from './settings/shared';
-import {Row, ToolbarChip, Toggle, Segmented, dblRangeOptions} from './settings/controls';
+import {Row, ToolbarChip, Toggle, Segmented, dblRangeOptions} from './settings/Controls';
 import {APP_VERSION} from './settings/version';
-import {CanvasPane, AboutPane} from './settings/panes';
+import {CanvasPane, AboutPane} from './settings/Panes';
 /* ROUND BH — the in-app feedback dialog (public launch). ROUND BI, ITEM 3: the
  *  dialog itself now mounts ONCE in App.tsx (the ? help sheet is its second
  *  entry point), so Settings only forwards the opener through `onOpenFeedback`;
@@ -73,8 +73,9 @@ const SHORTCUTS_KEYS: {what: string; keys: string[]}[] = [
   {what: 'Delete selection',         keys: ['Del']},
   {what: 'Copy / paste / duplicate', keys: ['⌘/Ctrl', 'C', 'V', 'D']},
   {what: 'Deselect',                 keys: ['Esc']},
+  {what: 'Rotate selection',         keys: ['Alt', 'R']},
   {what: 'Fit view to diagram',      keys: ['⇧', '1']},
-  {what: 'Toggle read-only review mode', keys: ['⇧', '2']},
+  {what: 'Read-only review',        keys: ['⇧', '2']},
   {what: 'Nudge selection',          keys: ['←↑↓→']},
   {what: 'Collapse / expand both panels', keys: ['⌘/Ctrl', '⌃', '⇧', '\\']},
   {what: 'Toggle left panel',            keys: ['⌘/Ctrl', '⌃', '⇧', '[']},
@@ -148,7 +149,7 @@ function ConnectionsPane({
         {/* HARVEY 2026-10-13 — Proximity connect REMOVED (feature retired). The
             replacement is dblclick-on-a-handle -> nearest-shape connect, and it
             is a real control: default ON, with an adjustable reach. */}
-        <Row label="Connect on handle double-click" hint="double-click a connection dot to join the nearest shape within reach">
+        <Row label="Connect on handle double-click" hint="double-click a dot to join the nearest shape in reach">
           <Toggle
             label="Connect on handle double-click"
             value={dblConnect}
@@ -156,7 +157,7 @@ function ConnectionsPane({
           />
         </Row>
         {dblConnect && (
-          <Row label="Connect reach" hint="how far (in canvas px) the nearest shape may be; beyond it nothing connects">
+          <Row label="Connect reach" hint="how far the nearest shape may be">
             <Segmented
               label="Connect reach"
               options={dblRangeOptions(dblRange)}
@@ -229,6 +230,7 @@ export default function Settings({
   highlight, onHighlight,
   marquee, onMarquee,
   zOrder, onZOrder,
+  layoutDir, onLayoutDir,
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
   returnFocusTo,
@@ -336,6 +338,8 @@ export default function Settings({
           onMarquee={onMarquee}
           zOrder={zOrder}
           onZOrder={onZOrder}
+          layoutDir={layoutDir}
+          onLayoutDir={onLayoutDir}
           pngScale={pngScale}
           onPngScale={onPngScale}
           pngPad={pngPad}

@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {type PaletteItem, TYPE_LABEL, SOURCE_PURPOSE} from './palette';
 import {COLOR_VAR} from './colors';
-import {ShapePreview} from './shapes';
+import {ShapePreview} from './nodes/shapes';
 import {matchesQuery} from './paletteSearch';
 
 type Props = {
