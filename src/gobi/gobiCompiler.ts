@@ -22,6 +22,8 @@ import type {BoardDoc} from '../boards';
 import type {ColorKey} from '../colors';
 import type {TableColumn} from '../nodes/TableNode';
 import {parseGobi} from './gobiParser';
+import {getBezierPath, Position} from '@xyflow/react';
+import {gobiMemberOrder, packGroup, routeEdgeHandles, placeEdgeLabels, handlePoint} from './gobiLayout';
 import {gobiTextStyle} from './gobiText';
 import {validateGobi} from './gobiValidator';
 import {
@@ -71,25 +73,38 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
   const edges = buildEdges(ast);
 
   /* placeholder positions: authored order packed at (i·600, 0) so layout's
-     island logic has deterministic pre-offsets (§3.1 step 4). */
-  nodes.forEach((n, i) => { if (!n.position) n.position = {x: order.indexOf(n.id) * 600, y: 0}; });
+     island logic has deterministic pre-offsets (§3.1 step 4). ROUND
+     GOBI-FANOUT: the stamp is UNCONDITIONAL now — buildNodes seeds every node
+     at {0,0}, which silently defeated the old `if (!n.position)` guard and
+     collapsed every island's pre-layout offset onto one point. */
+  nodes.forEach((n) => { n.position = {x: order.indexOf(n.id) * 600, y: 0}; });
 
-  /* 5. LAYOUT — top-level participants only (children follow their group);
-     groups WITH members are excluded (their rect is derived in step 5b). */
-  const withMembers = new Set<string>();
-  for (const s of ast.statements) if (s.kind === 'membership') withMembers.add(s.group);
-  const participants = nodes.filter((n) => !n.parentId && !(withMembers.has(n.id) && (n.data as {shape?: string}).shape === 'group'));
-  const placed = layoutDiagram(participants, edges as Edge[], {direction: ast.direction, spacing: {x: 70, y: 24}});
+  /* 5. LAYOUT — ROUND GOBI-FANOUT: a member-holding group participates as ONE
+     entity. Edges are LIFTED to each end's top-level ancestor (an edge into a
+     member becomes an edge into its group; a wholly-internal edge lifts to a
+     self-loop and drops out of the LAYOUT graph only — the board keeps it),
+     and each group is sized by its packed members BEFORE the engine runs so
+     its layer slot reserves real room. The old exclusion ("its rect is
+     derived in 5b") packed members from the group's un-placed placeholder —
+     the measured 42,050 px2 source-on-child overlap this round removes. */
+  const parentOf = new Map<string, string>();
+  for (const s of ast.statements) if (s.kind === 'membership') for (const m of s.members) parentOf.set(m.id, s.group);
+  const topOf = (id: string): string => { let cur = id; while (parentOf.has(cur)) cur = parentOf.get(cur)!; return cur; };
+  const participants = nodes.filter((n) => !parentOf.has(n.id));
+  const lifted = edges
+    .filter((e) => topOf(e.source) !== topOf(e.target))
+    .map((e) => ({...e, source: topOf(e.source), target: topOf(e.target)}) as Edge);
+  const placed = layoutDiagram(participants, lifted, {direction: ast.direction, spacing: {x: 70, y: 24}});
   for (const [id, p] of placed) {
     const n = nodes.find((t) => t.id === id);
     if (n) n.position = {x: p.x, y: p.y};
   }
 
-  /* 5b. GROUPS — children first (grid-packed inside the group's origin),
-     then bottom-up bounding rectangles (+padding). The C4 template pattern:
-     a group is placed by layout, then its members are packed inside. */
-  const parentOf = new Map<string, string>();
-  for (const s of ast.statements) if (s.kind === 'membership') for (const m of s.members) parentOf.set(m.id, s.group);
+  /* 5b. GROUPS — bottom-up PACK for size (members ordered so internally
+     connected ones sit adjacent, packed on the CROSS axis: a column in LR, a
+     row in TB, so every member's layer-axis face is reachable from outside
+     the box), then top-down STAMP: members are written inside wherever the
+     layer engine put the group. */
   const depth = (id: string): number => {
     let d = 0;
     let cur = parentOf.get(id);
@@ -99,41 +114,88 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
   };
   const groupsWithMembers = [...new Set([...parentOf.values()])].sort((a, b) => depth(b) - depth(a));
   const PAD = 40;
-  const inner = 20; // padding between packed members
+  /* ROUND GOBI-FANOUT: 24 (was 20) so a label resting in the gap between two
+     stacked members (16.8px tall) clears both boxes by >3px each side. */
+  const INNER = 24;
   const boxOf = (n: Node) => ({
     x: n.position.x, y: n.position.y,
     w: (n.width as number) ?? (n.style?.width as number) ?? 190,
     h: (n.height as number) ?? (n.style?.height as number) ?? 60,
   });
+  const packOf = new Map<string, {w: number; h: number; slots: Map<string, {x: number; y: number}>}>();
   for (const g of groupsWithMembers) {
     const gNode = nodes.find((n) => n.id === g);
     if (!gNode) continue;
-    const members = nodes.filter((n) => parentOf.get(n.id) === g);
+    const members = gobiMemberOrder(nodes.filter((n) => parentOf.get(n.id) === g), edges);
     if (!members.length) continue;
-    /* stamp parentId (the board model's ONE parent field) and pack members
-       in a grid from the group's own top-left (laid out above, or its
-       authored-order placeholder when the group nests inside another). */
-    const origin = {x: gNode.position.x + PAD, y: gNode.position.y + PAD};
-    const cols = Math.ceil(Math.sqrt(members.length));
-    let cx = origin.x, cy = origin.y, rowH = 0;
-    for (const m of members) {
-      m.parentId = g;
-      m.position = {x: cx, y: cy};
+    const sizeOf = (m: Node) => {
+      const p = packOf.get(m.id);
+      if (p) return {w: p.w + 2 * PAD, h: p.h + 2 * PAD};
       const b = boxOf(m);
-      rowH = Math.max(rowH, b.h);
-      cx += b.w + inner;
-      if ((members.indexOf(m) + 1) % cols === 0) { cx = origin.x; cy += rowH + inner; rowH = 0; }
-    }
-    const boxes = members.map(boxOf);
-    const x0 = Math.min(...boxes.map((b) => b.x)) - PAD;
-    const y0 = Math.min(...boxes.map((b) => b.y)) - PAD;
-    const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + PAD;
-    const y1 = Math.max(...boxes.map((b) => b.y + b.h)) + PAD;
-    gNode.position = {x: x0, y: y0};
-    gNode.width = x1 - x0;
-    gNode.height = y1 - y0;
-    gNode.style = {width: x1 - x0, height: y1 - y0};
+      return {w: b.w, h: b.h};
+    };
+    const pack = packGroup(members, sizeOf, ast.direction, INNER);
+    packOf.set(g, pack);
+    gNode.width = pack.w + 2 * PAD;
+    gNode.height = pack.h + 2 * PAD;
+    gNode.style = {width: pack.w + 2 * PAD, height: pack.h + 2 * PAD};
   }
+  for (const g of [...groupsWithMembers].reverse()) {
+    const gNode = nodes.find((n) => n.id === g);
+    const pack = packOf.get(g);
+    if (!gNode || !pack) continue;
+    for (const [id, slot] of pack.slots) {
+      const m = nodes.find((t) => t.id === id);
+      if (!m) continue;
+      m.parentId = g;
+      m.position = {x: gNode.position.x + PAD + slot.x, y: gNode.position.y + PAD + slot.y};
+    }
+  }
+
+  /* 5c. ROUTING — ROUND GOBI-FANOUT: each edge's handle pair comes from the
+     endpoints' PLACED geometry (dominant axis), so an edge between stacked
+     group members enters through top/bottom rather than sweeping sideways
+     across the column, and an edge to anything left of its source leaves
+     left. Forward layer-to-layer edges resolve to exactly the old fixed
+     pair (right/left in LR, bottom/top in TB), so existing boards keep the
+     handles they compiled to before this round. */
+  const absBox = new Map<string, {x: number; y: number; w: number; h: number}>();
+  {
+    const absOf = (n: Node): {x: number; y: number} => {
+      const par = n.parentId ? nodes.find((t) => t.id === n.parentId) : undefined;
+      const p = par ? absOf(par) : {x: 0, y: 0};
+      return {x: p.x + n.position.x, y: p.y + n.position.y};
+    };
+    for (const n of nodes) {
+      const b = boxOf(n);
+      const p = absOf(n);
+      absBox.set(n.id, {x: p.x, y: p.y, w: b.w, h: b.h});
+    }
+  }
+  routeEdgeHandles(edges as Edge[], absBox);
+
+  /* 5d. LABELS — ROUND GOBI-FANOUT: an edge label whose auto-centred box
+     would land on a node box (or on a sibling label — two labels share one
+     gap when their edges run between the same stacked pair) is offset
+     PERPENDICULAR to the line, through the SAME stored pair a manual drag
+     writes, so the canvas renders it through the one anchor path and it
+     stays draggable. Labels already in air are left unpinned — a board that
+     needed no correction compiles to byte-identical JSON. The anchor is the
+     SAME bezier call GoblinEdge paints with, so the compiler corrects the
+     label exactly where the canvas will put it. */
+  const SIDE: Record<string, Position> = {
+    left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom,
+  };
+  placeEdgeLabels(nodes, edges as Edge[], absBox, (e) => {
+    const s = absBox.get(e.source), t = absBox.get(e.target);
+    if (!s || !t) return {x: 0, y: 0, vertical: false};
+    const sp = handlePoint(s, e.sourceHandle), tp = handlePoint(t, e.targetHandle);
+    const [, lx, ly] = getBezierPath({
+      sourceX: sp.x, sourceY: sp.y, targetX: tp.x, targetY: tp.y,
+      sourcePosition: SIDE[e.sourceHandle ?? 'right'], targetPosition: SIDE[e.targetHandle ?? 'left'],
+    });
+    return {x: lx, y: ly, vertical: Math.abs(tp.y - sp.y) > Math.abs(tp.x - sp.x)};
+  });
 
   /* 7. EMIT — nodes in canvas READING order (y, then x) of their absolute
      positions: deterministic, and it matches the spec §3.2 golden, which
