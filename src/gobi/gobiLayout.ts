@@ -143,6 +143,89 @@ export function handlePoint(b: Box, side?: string): {x: number; y: number} {
 }
 
 /* ===========================================================================
+ * DETOUR — ROUND GOBI-LAYOUT-2 (R2): a stacked group's MEMBERS are obstacles
+ * for every edge that does not END on them (GF3's own predicate — endpoints
+ * and ancestor groups are exempt, a member never is). The dominant-axis pair
+ * above clears them on the fixtures we can measure, but a shape the fixtures
+ * do not cover (an outside node below the group reaching a middle member)
+ * can still route through a sibling; when the CHOSEN pair's bezier crosses a
+ * body, the detour searches the perimeter pairs (arc over/under the pack, in
+ * through the far face) and adopts the first strictly better one. Boards
+ * whose edges already run clean are untouched — byte-identical JSON.
+ * =========================================================================== */
+const DETOUR_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ['bottom', 'bottom'], ['top', 'top'],
+  ['bottom', 'right'], ['bottom', 'left'], ['top', 'right'], ['top', 'left'],
+  ['right', 'right'], ['left', 'left'],
+  ['right', 'bottom'], ['left', 'bottom'], ['right', 'top'], ['left', 'top'],
+  ['bottom', 'top'], ['top', 'bottom'],
+  ['left', 'right'], ['right', 'left'],
+];
+
+const DETOUR_SAMPLES = 240;
+
+/** `bezNums` returns the bezier's 8 path numbers (M sx sy C c1 c1 c2 c2 tx ty)
+ * for a handle pair — the SAME generator the canvas paints with, supplied by
+ * the caller so this module stays free of renderer imports. */
+export function detourEdgeHandles(
+  nodes: Node[],
+  edges: Edge[],
+  box: Map<string, Box>,
+  bezNums: (s: Box, t: Box, sh: string, th: string) => number[] | null,
+): void {
+  const par = new Map(nodes.map((n) => [n.id, n.parentId]));
+  const anc = (id: string): Set<string> => {
+    const out = new Set<string>();
+    let cur = par.get(id);
+    while (cur) { out.add(cur); cur = par.get(cur); }
+    return out;
+  };
+  const inside = (p: {x: number; y: number}, b: Box) =>
+    p.x > b.x + 0.5 && p.x < b.x + b.w - 0.5 && p.y > b.y + 0.5 && p.y < b.y + b.h - 0.5;
+  const score = (s: Box, t: Box, sh: string, th: string, blockers: Box[]) => {
+    const nums = bezNums(s, t, sh, th);
+    if (!nums || nums.length !== 8) return null;
+    let hits = 0, len = 0;
+    let prev: {x: number; y: number} | null = null;
+    for (let i = 0; i <= DETOUR_SAMPLES; i++) {
+      const u = i / DETOUR_SAMPLES, v = 1 - u;
+      const p = {
+        x: v * v * v * nums[0] + 3 * v * v * u * nums[2] + 3 * v * u * u * nums[4] + u * u * u * nums[6],
+        y: v * v * v * nums[1] + 3 * v * v * u * nums[3] + 3 * v * u * u * nums[5] + u * u * u * nums[7],
+      };
+      if (prev) len += Math.hypot(p.x - prev.x, p.y - prev.y);
+      for (const b of blockers) if (inside(p, b)) { hits++; break; }
+      prev = p;
+    }
+    return {hits, len};
+  };
+  for (const e of edges) {
+    const s = box.get(e.source), t = box.get(e.target);
+    if (!s || !t) continue;
+    const exempt = new Set<string>([e.source, e.target, ...anc(e.source), ...anc(e.target)]);
+    const blockers: Box[] = [];
+    for (const [id, b] of box) if (!exempt.has(id)) blockers.push(b);
+    if (!blockers.length) continue;
+    const cur: [string, string] = [e.sourceHandle ?? 'right', e.targetHandle ?? 'left'];
+    const curScore = score(s, t, cur[0], cur[1], blockers);
+    if (!curScore || curScore.hits === 0) continue;   /* clean — write nothing */
+    let best = {pair: cur, hits: curScore.hits, len: curScore.len};
+    for (const [sh, th] of DETOUR_PAIRS) {
+      if (sh === best.pair[0] && th === best.pair[1]) continue;
+      const sc = score(s, t, sh, th, blockers);
+      if (!sc) continue;
+      if (sc.hits < best.hits || (sc.hits === best.hits && sc.len < best.len)) {
+        best = {pair: [sh, th], hits: sc.hits, len: sc.len};
+      }
+    }
+    if (best.pair[0] !== cur[0] || best.pair[1] !== cur[1]) {
+      e.sourceHandle = best.pair[0];
+      e.targetHandle = best.pair[1];
+    }
+  }
+}
+
+/* ===========================================================================
  * LABELS — an edge label whose auto-centred box would land on a node box (or
  * on an already-placed label) is offset PERPENDICULAR to the edge, the task's
  * stated remedy ("a label that is unreadable is worse than no label"). The

@@ -18,12 +18,13 @@ import {TABLE_PALETTE_ITEM} from '../presets/dataStorage';
 import {makeEdge} from '../presets/basic';
 import {CUSTOM_PRESET} from '../presets/index';
 import {layoutDiagram} from '../layout';
+import {GROUP_TITLE_H} from '../layoutConstants';
 import type {BoardDoc} from '../boards';
 import type {ColorKey} from '../colors';
 import type {TableColumn} from '../nodes/TableNode';
 import {parseGobi} from './gobiParser';
 import {getBezierPath, Position} from '@xyflow/react';
-import {gobiMemberOrder, packGroup, routeEdgeHandles, placeEdgeLabels, handlePoint} from './gobiLayout';
+import {gobiMemberOrder, packGroup, routeEdgeHandles, detourEdgeHandles, placeEdgeLabels, handlePoint} from './gobiLayout';
 import {gobiTextStyle} from './gobiText';
 import {validateGobi} from './gobiValidator';
 import {
@@ -117,6 +118,13 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
   /* ROUND GOBI-FANOUT: 24 (was 20) so a label resting in the gap between two
      stacked members (16.8px tall) clears both boxes by >3px each side. */
   const INNER = 24;
+  /* ROUND GOBI-LAYOUT-2 (R1): the group's TOP inset is NOT the side pad. The
+     K5 header banner (`.group-head` / `.group-label`) paints across the top
+     GROUP_TITLE_H of the box, so a member row stamped at PAD=40 put the title's
+     descenders ON the first member's top border (measured on fanout-a/b:
+     1,160 px2 title-x-member, title-bottom-to-member = -4px). One member gap
+     of clear air below the banner restores it (+24px). Bottom/sides stay PAD. */
+  const TOP = GROUP_TITLE_H + INNER;
   const boxOf = (n: Node) => ({
     x: n.position.x, y: n.position.y,
     w: (n.width as number) ?? (n.style?.width as number) ?? 190,
@@ -136,9 +144,11 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
     };
     const pack = packGroup(members, sizeOf, ast.direction, INNER);
     packOf.set(g, pack);
+    /* ROUND GOBI-LAYOUT-2 (R1): asymmetric vertical padding — TOP above (the
+       title banner + one member gap), PAD below. Sides stay symmetric. */
     gNode.width = pack.w + 2 * PAD;
-    gNode.height = pack.h + 2 * PAD;
-    gNode.style = {width: pack.w + 2 * PAD, height: pack.h + 2 * PAD};
+    gNode.height = pack.h + TOP + PAD;
+    gNode.style = {width: pack.w + 2 * PAD, height: pack.h + TOP + PAD};
   }
   for (const g of [...groupsWithMembers].reverse()) {
     const gNode = nodes.find((n) => n.id === g);
@@ -148,7 +158,16 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
       const m = nodes.find((t) => t.id === id);
       if (!m) continue;
       m.parentId = g;
-      m.position = {x: gNode.position.x + PAD + slot.x, y: gNode.position.y + PAD + slot.y};
+      /* ROUND GOBI-LAYOUT-2 (R2 root cause): PARENT-RELATIVE, the React Flow
+         model `parentId` demands. The old stamp wrote the ABSOLUTE point while
+         setting parentId, and every downstream reader that resolves the parent
+         chain (5c routing, 5d labels) then added the group origin a SECOND
+         time — members sat +group.x off to the right of where they render, the
+         dominant-axis handle chooser saw |dy|>|dx| for a plainly horizontal
+         hop, and an outside-node edge entered a MIDDLE member's side face
+         (measured: fanout-c's heartbeat crossed consumer-2 for 149 of 513
+         path samples). Emit (step 7) no longer re-subtracts — see below. */
+      m.position = {x: PAD + slot.x, y: TOP + slot.y};
     }
   }
 
@@ -174,6 +193,28 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
   }
   routeEdgeHandles(edges as Edge[], absBox);
 
+  /* 5c2. DETOUR — ROUND GOBI-LAYOUT-2 (R2): with true boxes the dominant-axis
+     pair clears the members on every fixture we can measure, but the pair is
+     chosen from CENTRES, not from the ink; a shape the fixtures do not cover
+     (an outside node reaching a middle member from below) can still cross a
+     sibling body. When the chosen pair's bezier crosses one, the detour
+     re-routes around the pack (perimeter arc / far face). Writes NOTHING for
+     edges that already run clean — byte-identical boards. */
+  const SIDE: Record<string, Position> = {
+    left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom,
+  };
+  const bezNums = (s: {x: number; y: number; w: number; h: number}, t: {x: number; y: number; w: number; h: number},
+                   sh: string, th: string): number[] | null => {
+    const sp = handlePoint(s, sh), tp = handlePoint(t, th);
+    const d = getBezierPath({
+      sourceX: sp.x, sourceY: sp.y, targetX: tp.x, targetY: tp.y,
+      sourcePosition: SIDE[sh] ?? Position.Right, targetPosition: SIDE[th] ?? Position.Left,
+    })[0];
+    const nums = (d.match(/-?[\d.]+/g) ?? []).map(Number);
+    return nums.length === 8 ? nums : null;
+  };
+  detourEdgeHandles(nodes, edges as Edge[], absBox, bezNums);
+
   /* 5d. LABELS — ROUND GOBI-FANOUT: an edge label whose auto-centred box
      would land on a node box (or on a sibling label — two labels share one
      gap when their edges run between the same stacked pair) is offset
@@ -183,9 +224,6 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
      needed no correction compiles to byte-identical JSON. The anchor is the
      SAME bezier call GoblinEdge paints with, so the compiler corrects the
      label exactly where the canvas will put it. */
-  const SIDE: Record<string, Position> = {
-    left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom,
-  };
   placeEdgeLabels(nodes, edges as Edge[], absBox, (e) => {
     const s = absBox.get(e.source), t = absBox.get(e.target);
     if (!s || !t) return {x: 0, y: 0, vertical: false};
@@ -200,20 +238,27 @@ export function compileGobi(text: string, opts: GobiCompileOptions = {}): GobiCo
   /* 7. EMIT — nodes in canvas READING order (y, then x) of their absolute
      positions: deterministic, and it matches the spec §3.2 golden, which
      prints broker(0,0) → orders(260,0) → consumer(520,0) even though the
-     group is declared FIRST. Members keep absolute coords for the sort,
-     then convert to parent-relative (React Flow's model for parentId). */
+     group is declared FIRST. ROUND GOBI-LAYOUT-2: member positions are
+     ALREADY parent-relative (the 5b stamp writes the React Flow model), so
+     the absolute sort key resolves the parent chain and the old
+     subtract-the-parent conversion pass is GONE — it existed only to undo the
+     stamp's absolute write, the same write that double-counted the group
+     origin in 5c/5d. */
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const absPos = new Map<string, {x: number; y: number}>();
-  for (const n of nodes) absPos.set(n.id, {x: n.position.x, y: n.position.y});
+  const absOfId = (id: string): {x: number; y: number} => {
+    if (absPos.has(id)) return absPos.get(id)!;
+    const n = nodeById.get(id)!;
+    const par = n.parentId ? absOfId(n.parentId) : {x: 0, y: 0};
+    const p = {x: par.x + n.position.x, y: par.y + n.position.y};
+    absPos.set(id, p);
+    return p;
+  };
+  for (const n of nodes) absOfId(n.id);
   nodes.sort((a, b) => {
     const pa = absPos.get(a.id)!, pb = absPos.get(b.id)!;
     return pa.y - pb.y || pa.x - pb.x;
   });
-  for (const n of nodes) {
-    if (n.parentId) {
-      const gp = absPos.get(n.parentId)!;
-      n.position = {x: absPos.get(n.id)!.x - gp.x, y: absPos.get(n.id)!.y - gp.y};
-    }
-  }
 
   /* 7. EMIT. */
   const now = opts.now ?? Date.now();

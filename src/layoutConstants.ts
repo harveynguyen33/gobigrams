@@ -52,6 +52,16 @@ export const ROTATE_SNAP_DEG = 15;
 export const DEFAULT_NODE_W = 200;
 export const DEFAULT_NODE_H = 131;
 
+/* ROUND GOBI-LAYOUT-2 — the group header banner's height. `.group-head` and
+   `.group-node .group-label` both occupy the top 44px of a group's box
+   (styles.css, K5; DiagramNode.tsx's RESIZABLE header documents the same 44).
+   A member-holding group compiled from .gobi must inset its first member row
+   BELOW this strip plus one member gap, or the title text sits on the first
+   member's top border (measured: 4px of overlap, 1,160 px2). Lives in this
+   leaf for the same cycle-avoidance reason as the constants above, and so the
+   harness can read the ONE number instead of restating it. */
+export const GROUP_TITLE_H = 44;
+
 /* ROUND GOBI-LAYOUT — how much clear air a label needs on each side of the
    widest one crossing a cut: half the plate's 12px horizontal padding, plus
    2px of judgement so the plate never kisses a border at the exact-fit
