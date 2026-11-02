@@ -6,6 +6,10 @@
 
 # Gobigrams
 
+**A browser-based diagram editor — flowcharts, architecture and ER diagrams — with real vector
+SVG export, no account, and nothing stored on a server.** Live at
+<https://gobigrams.tech-goblin.com>.
+
 Diagrams, but with a goblin. **Gobigrams** is a single-page canvas where boxes
 finally line up, arrows mean things, and the SVG you export is a *real vector
 file with selectable text* — not a screenshot wearing a vector hat.
