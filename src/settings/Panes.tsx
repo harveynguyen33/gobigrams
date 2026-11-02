@@ -229,10 +229,11 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
           </a>
           {' (MIT)'}
         </Row>
-        {/* SUPPORT (2026-10-25) — donate row, Harvey's BMC account exists
-            (buymeacoffee.com/harveynguyen33, live-verified). GitHub Sponsors
-            link already resolves via FUNDING.yml once his profile is
-            approved; both links pinned by checks/round-bg-feedback-entry. */}
+        {/* SUPPORT — Buy Me a Coffee is the chosen primary (Harvey, 2026-11-02: "Cứ dùng BMC,
+            đây là link chính"), which reverses the earlier Ko-fi plan. The handle is
+            harveynguyen33; an earlier FUNDING.yml said "harveynguyen", a different account.
+            GitHub Sponsors is enabled as well and needs no link here. Pinned by
+            checks/round-bg-feedback-entry. */}
         <Row label="Support">
           <a
             className="settings-link"

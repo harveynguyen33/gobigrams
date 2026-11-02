@@ -1,4 +1,7 @@
-<p align="center"><img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/brand/lockup.svg" alt="Gobigrams" width="320"></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/brand/lockup.svg#gh-dark-mode-only" alt="Gobigrams" width="320">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/brand/lockup-light.svg#gh-light-mode-only" alt="Gobigrams" width="320">
+</p>
 <p align="center"><sub>{ G }</sub> — a tiny goblin with a ruler, living in your browser tab.</p>
 
 # Gobigrams

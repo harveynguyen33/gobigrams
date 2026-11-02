@@ -1,4 +1,9 @@
-# These supported platforms live in the repo's public surface only.
+# Funding surfaces — published with the public snapshot.
 # By Harvey Nguyen <harvey.nguyen33@gmail.com>
+#
+# BMC is the chosen primary (Harvey, 2026-11-02: "Cứ dùng BMC, đây là link chính"), which reverses
+# the earlier Ko-fi plan. The handle is harveynguyen33 — an earlier file said "harveynguyen", which is
+# a different account and was live-verified wrong. GitHub Sponsors is enabled too and needs no line
+# here beyond the username.
 github: harveynguyen33
-custom: https://www.buymeacoffee.com/harveynguyen
+custom: ["https://buymeacoffee.com/harveynguyen33"]
