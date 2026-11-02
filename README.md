@@ -15,7 +15,7 @@ visitors with a cookieless, self-hosted tally counter and otherwise keeps his
 nose out of your business. Your boards live in your browser until *you* decide
 to export them.
 
-> Status: v0.1.0 — feature-complete enough for daily use, still occasionally
+> Status: v0.3.0 — feature-complete enough for daily use, still occasionally
 > bumping into furniture. Report the bumps → [Support](./SUPPORT.md).
 
 ## The short version
