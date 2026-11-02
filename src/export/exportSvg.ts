@@ -944,10 +944,10 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
   const rowEl = (r: SceneTextRow): string => rowMarkup(r, outline);
   /* groups first (behind everything) */
   for (const g of scene.groups) {
-    const cb = (g as SceneNode & {childBounds?: Bounds}).childBounds
-      ?? {minX: g.absX, minY: g.absY, maxX: g.absX + g.w, maxY: g.absY + g.h};
-    const left = cb.minX + off.x - 12, top = cb.minY + off.y - 12;
-    const lw = (cb.maxX - cb.minX) + 24, lh = (cb.maxY - cb.minY) + 24;
+    /* ROUND GOBI-GROUP-BANNER — the rect is the group node's own AUTHORED geometry,
+     * as the canvas paints; the childBounds ±12 re-fit collapsed the 68px banner inset. */
+    const left = g.absX + off.x, top = g.absY + off.y;
+    const lw = g.w, lh = g.h;
     parts.push(`<g data-ar-node="${escAttr(g.id)}" transform="translate(${left},${top})">`);
     parts.push(`<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(g.accent)}" stroke-width="1.2" stroke-dasharray="8 5"/>`);
     for (const r of g.rows) parts.push(rowEl(r));

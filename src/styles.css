@@ -4941,14 +4941,20 @@ kbd {
    at-rest position is untouched: with neither property emitted the fallback
    below is the literal that renders today.
 
-   THE FALLBACKS ARE THE BOXES' CURRENT VALUES, one per consumer — the same
-   discipline every other `--ts-*` consumer in this sheet follows:
-     .node-body              flex-start   (block layout put the rows at the top)
-     .node .lo-body          center       (its own rule already centred, 2471)
-     .note-body              flex-start
-     .label-node             flex-start
-   `middle` is the stored default and stores ABSENCE, so an untouched node emits
-   nothing and every box resolves to the literal it renders with today.
+   THE FALLBACKS, one per consumer — the same discipline every other `--ts-*`
+   consumer in this sheet follows. NODE-TEXT-CENTER (2026-11-03, Harvey: "the
+   text should always be center in both ways") moved the CARD and NOTE boxes to
+   `center`: an untouched node now centres its block vertically, and
+   `vAlignForBody('card')` answers `middle` on the model's side (the two halves
+   are asserted to agree, as before). The TEXT annotation kind keeps `top` — a
+   `.label-node` is content-sized, so there is no dead space to centre, and a
+   margin note reads better flush-left:
+     .node-body              center       (was flex-start until 2026-11-03)
+     .note-body              center       (was flex-start until 2026-11-03)
+     .label-node             flex-start   (unchanged — content-sized)
+   `middle` on a card now stores ABSENCE, so an untouched node emits nothing
+   and resolves to the literal above; an authored `top`/`bottom` still emits
+   `--ts-align-items` and wins.
 
    THE LABEL'S EDITOR NEEDS NO TWIN, and that is a measurement rather than an
    omission: the editor is a flex ITEM of `.label-node`, so the root's own
@@ -4977,8 +4983,13 @@ kbd {
    natural size nothing changes anywhere, because `min-height: 100%` against an
    automatic height is automatic.
    =========================================================================== */
-.node-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
-.note-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
+/* NODE-TEXT-CENTER (2026-11-03) — the vertical no-write value is CENTRE for a
+   card and a note (Harvey: "the text should always be center in both ways";
+   measured pre-fix on the sys-pipeline template: padTop 2 / padBottom 36 at
+   the 190x95 floor). `.label-node` keeps flex-start — see the ROUND Z header
+   above. `vAlignForBody` answers the same per target. */
+.node-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, center); }
+.note-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, center); }
 /* ROUND Z FIX 2 — THE FALLBACK IS THE BOX'S OWN NO-WRITE VALUE, and for this one
    it is `flex-start` (top): before this round the root had no `display: flex` at
    all, so its text began at `padding-top`, and `top` is what it must keep for a
@@ -5401,10 +5412,23 @@ kbd {
 /* FIRST-VISIT (2026-11-01) — the RIGHT inset was 34% with nothing painted
    there (the queue silhouette decorates only the LEFT side, x<62 of 200), so
    the band was 30% of the node — too narrow for the card's own DEFAULT title
-   ('Queue' + icon: 80px needed, 66px supplied → 'Queu'/'e'). 8% clears the
-   rx=14 corner; the band is now 56%. */
-.node.shape-queue.body-inset      { --body-inset: 2% 8% 2% 36%; }
-.node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
+   ('Queue' + icon: 80px needed, 66px supplied → 'Queu'/'e'). 8% cleared the
+   rx=14 corner; the band is now 56%.
+   NODE-TEXT-CENTER (2026-11-03) — Harvey: "the text should always be center in
+   both ways". Subtracting the rail from the LEFT only pushed the text +27px
+   right of centre (measured at 190 wide). The rail is now reserved on BOTH
+   sides (36%/36%): the band is 28% — 81px at the palette width 290, which
+   still holds the 80px default title — the text block is centred in the node
+   box, and the divider at x=62 keeps 14.5px of clear air at 290 (9.5px on a
+   legacy 190-wide unsized card, which auto-grow widens the moment its content
+   wraps). The exporter's DOM-less box reserves the same fraction
+   (RAIL_FRACTION, src/export/exportScene.ts) — round-node-text-center nt4a
+   asserts the two tables agree. */
+.node.shape-queue.body-inset      { --body-inset: 2% 36% 2% 36%; }
+/* NODE-TEXT-CENTER (2026-11-03) — the actor's person badge (ends x=58 of 200)
+   is the same class of side decoration: symmetric 34%/34% centres the band
+   (92.8px at 290) with 14.5px of clear air past the badge. */
+.node.shape-actor.body-inset      { --body-inset: 2% 34% 2% 34%; }
 .node.shape-subprocess.body-inset,
 .node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }
 /* ============================================================

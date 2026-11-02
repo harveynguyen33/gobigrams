@@ -328,19 +328,36 @@ const ARCH_EDGES: EdgeDefaults = {
 };
 const ARCH_PAL = libraryFor('architecture');
 const archItem = (label: string) => ARCH_PAL.find(p => p.label === label)!;
+/* NODE-TEXT-CENTER (2026-11-03) — the three cards now carry the palette's own
+   CARD_SIZE (290x145), the convention every OTHER template already follows
+   (flowchart's flowNode) and the palette insert path stamps (App.tsx). The
+   template was the one creation path that forgot GOBI-SIZE, so its cards fell
+   back to the 190x95 CSS floor — the geometry Harvey's "not centred"
+   screenshot was measured on. n1 moves 60 -> 20 so the wider card keeps its
+   clearance of the group's left edge (authored gap 80px, kept >= 20px); the
+   authored child positions already clear the 145px height inside the 250px
+   group (74/84 + 145 <= 250) and the K5 banner (>= 68). */
+const archCard = (id: string, label: string, position: {x: number; y: number}, parentId?: string): Node => ({
+  id, type: 'goblin', ...(parentId ? {parentId, extent: 'parent' as const} : null),
+  position,
+  width: CARD_SIZE.width, height: CARD_SIZE.height,
+  style: {width: CARD_SIZE.width, height: CARD_SIZE.height},
+  data: archItem(label).make() as any,
+});
 const systemPipelineTemplate: TemplateSpec = {
   id: 'sys-pipeline',
   label: 'System pipeline',
   hint: 'external → queue → service · boundary, flowing edge, dashed edge',
   nodes: [
-    {id: 'n1', type: 'goblin', position: {x: 60, y: 180}, data: archItem('External').make() as any},
+    archCard('n1', 'External', {x: 20, y: 180}),
     /* A parent must precede its children in the array (React Flow's rule), and a
-       child's position is PARENT-RELATIVE — the three authored absolute points
-       (60,180 / 360,170 / 680,180) are unchanged: 330+30, 96+74 and 330+350, 96+84. */
+       child's position is PARENT-RELATIVE — n2/n3 keep their authored relative
+       points (30,74 / 350,84 inside g1 at 330,96); n1 sits at (20,180) so the
+       290px-wide card clears the group's left edge (330). */
     {id: 'g1', type: 'goblin', position: {x: 330, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
       data: {...archItem('Group').make(), title: 'Your system', sub: 'boundary'} as any},
-    {id: 'n2', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 30, y: 74}, data: archItem('Queue').make() as any},
-    {id: 'n3', type: 'goblin', parentId: 'g1', extent: 'parent', position: {x: 350, y: 84}, data: archItem('Service').make() as any},
+    archCard('n2', 'Queue', {x: 30, y: 74}, 'g1'),
+    archCard('n3', 'Service', {x: 350, y: 84}, 'g1'),
   ],
   edges: [
     makeEdge('n1', 'n2', ARCH_EDGES, 'e1', {label: 'events', flow: 'dots'}),

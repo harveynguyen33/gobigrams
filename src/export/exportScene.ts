@@ -204,6 +204,16 @@ export function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
  *  must use it too; the number lives here and nowhere else in this path. */
 const BODY_PAD_X = 18;
 
+/* NODE-TEXT-CENTER (2026-11-03) — the side-rail fractions the sheet's
+ * `--body-inset` registry reserves for the two DECORATED silhouettes (the
+ *  queue's dot rail, divider x=62 of 200; the actor's person badge, ends
+ *  x=58). Reserved on BOTH sides so the DOM-less text box stays centred in
+ *  the node while clearing the decoration; at the palette width 290 that
+ *  leaves >= 14px of air past each decoration. The sheet is the source of
+ *  truth — checks/round-node-text-center.mjs (nt4a) asserts this table equals
+ *  the sheet's queue/actor rows, so the two cannot drift. */
+const RAIL_FRACTION: Partial<Record<string, number>> = {queue: 0.36, actor: 0.34};
+
 /* ------------------------------------------------------- text row building */
 
 /** The wrap for ONE block, served through the item-1 cache. `measure` is the
@@ -368,12 +378,23 @@ export function buildSceneBody(input: ExportInput): Scene {
    *  without (`runs` absent — the `alignAnchor` signal) cannot, and a fixed box
    *  centres EVERY node at the same x (measured: -6px at 190, -56px at 290).
    *  So the SCENE derives it from the node's own width; BODY_PAD_X is the ONE
-   *  number. Every shape body is inset symmetrically, so this centres them all. */
-  const textBox = (el: unknown, s: {w: number; h: number}): TextRect | null => {
-    const t = measurer.text(el);
-    return t && t.runs ? t
-      : {...(t ?? {y: s.h * 0.18, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}),
-        x: BODY_PAD_X, w: Math.max(12, s.w - BODY_PAD_X * 2)};
+   *  number. Every shape body is inset symmetrically, so this centres them all.
+   *
+   *  NODE-TEXT-CENTER (2026-11-03) — the two DECORATED silhouettes reserve
+   *  their side rail on BOTH sides, exactly as the sheet's `--body-inset`
+   *  registry does (RAIL_FRACTION below mirrors its queue/actor rows; the
+   *  harness round-node-text-center nt4a asserts the two tables agree), so the
+   *  DOM-less door never paints text across the queue's dot rail or the
+   *  actor's badge. The vertical default is the rect band's own top (2%) —
+   *  where the canvas starts a `valign:top` block; a MIDDLE block is
+   *  re-centred by `vAlignRows` either way. */
+  const textBox = (n: ExportNode, s: {w: number; h: number}): TextRect | null => {
+    const t = measurer.text(n.el);
+    if (t && t.runs) return t;
+    const rail = RAIL_FRACTION[String(asShape(n.data?.shape) ?? '')] ?? null;
+    const side = rail != null ? Math.round(rail * s.w) : BODY_PAD_X;
+    return {...(t ?? {y: s.h * 0.02, h: s.h * 0.96, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}),
+      x: side, w: Math.max(12, s.w - side * 2)};
   };
 
   /** ROUND GOBI-TEXT3 — a DOM-LESS block is placed ARITHMETICALLY, from the
@@ -407,18 +428,11 @@ export function buildSceneBody(input: ExportInput): Scene {
         : undefined,
     };
     if (kind === 'group') {
-      /* group children bounds (absolute space) — the ±12 frame inflation is
-       * painted geometry, applied by the EMITTER exactly as today */
-      const kids = nodes.filter(k => k.parentId === n.id && !isGroup(k));
-      let b = {minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity};
-      for (const k of kids) {
-        const ks = nodeSize(k);
-        const kp = abs.get(k.id)!;
-        b.minX = Math.min(b.minX, kp.x); b.minY = Math.min(b.minY, kp.y);
-        b.maxX = Math.max(b.maxX, kp.x + ks.w); b.maxY = Math.max(b.maxY, kp.y + ks.h);
-      }
-      if (!kids.length) b = {minX: p.x, minY: p.y, maxX: p.x + s.w, maxY: p.y + s.h};
-      (sn as SceneNode & {childBounds: typeof b}).childBounds = b;
+      /* ROUND GOBI-GROUP-BANNER — no childBounds re-fit here any more: the
+       * emitter paints the AUTHORED box (absX/absY + nodeSize), matching the
+       * canvas, so the compiled 68px banner inset survives every export door.
+       * The old members-bounds ± 12 computation is deleted with its only
+       * reader; a memberless group also paints its authored box. */
       const gt = measurer.text(n.el);
       const title = String(n.data?.title ?? n.id);
       const gtf = gt?.rows?.groupTitle;
@@ -488,7 +502,7 @@ export function buildSceneBody(input: ExportInput): Scene {
     const plain = n.data?.plainCylinder !== false;
     (sn as SceneNode & {plain?: boolean}).plain = plain;
     sn.icon = measurer.icon?.(n.el) ?? null;
-    const t = textBox(n.el, s);
+    const t = textBox(n, s);
     sn.textRect = t;
     sn.rows = placeRows(n, s, t, buildNodeRows(n, s, t as TextRect, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf));
     sceneNodes.push(sn);
