@@ -18,6 +18,18 @@ to export them.
 > Status: v0.3.0 — feature-complete enough for daily use, still occasionally
 > bumping into furniture. Report the bumps → [Support](./SUPPORT.md).
 
+## What it looks like
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/screenshots/pipeline.png" alt="A Gobigrams board: an external system sends events into a queue, which feeds a stateless service, with the last two inside a dashed group boundary" width="880">
+</p>
+<p align="center"><sub>One board — exported as SVG, embedded anywhere. <a href="https://gobigrams.tech-goblin.com">Draw your own</a>.</sub></p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/screenshots/editor.png" alt="The Gobigrams editor: shape palette and search on the left, canvas in the middle, inspector on the right" width="880">
+</p>
+<p align="center"><sub>The editor: shapes on the left, the canvas, and an inspector for whatever you select.</sub></p>
+
 ## The short version
 
 - 🧌 60+ shapes, custom SVG drops, tables, checklists — enough to draw the thing
