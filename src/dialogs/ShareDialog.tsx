@@ -104,6 +104,17 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
         <button ref={goRef} className="em-go" onClick={() => void doShare()} disabled={!nodes.length}>
           Build share link
         </button>
+        {/* EMPTY-SHARE-REASON (2026-11-03) — a disabled primary button with no
+         * stated reason reads as a bug, not a precondition. One sentence, next
+         * to the button, naming the next step; it disappears the moment the
+         * board has content because it is gated on the LIVE nodes prop. The
+         * button STAYS disabled — the precondition is real. data-shr-empty is
+         * the probe handle (round-toolbar-share e-family): assert on the
+         * attribute, never on the wording. No in-dialog insert action: none
+         * exists today and the card forbids inventing one. */}
+        {!nodes.length && (
+          <div className="em-note" data-shr-empty="">Nothing to share yet — add a node from the palette first.</div>
+        )}
         {shareUrl && (
           <>
             <input className="em-share-url" readOnly value={shareUrl.url}
