@@ -491,12 +491,21 @@ export function useExportActions(
      One assignment per render, never stale. */
   const liveGraph = useRef({nodes, edges});
   liveGraph.current = {nodes, edges};
+  /* ROUND IMPORT-ONCE — ids promised to an insert that has not committed yet.
+     gobiInsert records its winners into the set, so a duplicate delivery of
+     the same event (two active listeners, a double dispatch before the next
+     render) reserves PAST the first insert's ids instead of minting them
+     again — colliding node ids are what made React Flow render ZERO edges.
+     Cleared in an EFFECT keyed on the committed graph, never mid-render: a
+     render that does not contain the insert must not reopen the window. */
+  const reservedIds = useRef(new Set<string>());
+  useEffect(() => { reservedIds.current.clear(); }, [nodes, edges]);
   useEffect(() => {
     const h = (ev: Event) => {
       const parsed = (ev as CustomEvent).detail;
       if (!parsed) return;
       if (parsed.from === 'gobi' && parsed.board) {
-        const ins = gobiInsert(parsed.board, liveGraph.current);
+        const ins = gobiInsert(parsed.board, liveGraph.current, reservedIds.current);
         pushHistory();
         setNodes(ns => [...ns, ...ins.nodes]);
         setEdges(es => [...es, ...ins.edges]);
