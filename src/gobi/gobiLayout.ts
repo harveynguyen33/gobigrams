@@ -234,9 +234,65 @@ export function detourEdgeHandles(
  * label: it renders through the one anchor path (edgeLabel.ts labelAnchor)
  * and stays draggable/resettable. Only labels that NEED it are written — a
  * board whose labels already sit in air compiles to byte-identical JSON.
+ *
+ * EDGE-LABEL-BORDER (2026-11-03) — a group's BORDER LINE is an obstacle of
+ * its own, and the node-box pass above could never see it: the group is an
+ * ANCESTOR of the edge's endpoint, so it is rightly EXEMPT as a box (the
+ * member lives inside it) — yet its dashed border still cut the label in two
+ * (measured on the sys-pipeline template: 13 px of the "events" box outside
+ * the boundary, 21 px inside, the line through the middle of the word). The
+ * rule: a label box is either FULLY inside a group or fully outside it, and
+ * never within GROUP_BORDER_CLEAR_PX of the border ink — a straddling label
+ * reads as belonging to neither side.
  * =========================================================================== */
 const hitsBox = (a: Box, b: Box) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/** EDGE-LABEL-BORDER — the clearance a label box must keep from any group's
+ *  border LINE (the 2 px dashed stroke the sheet paints on the group rect). */
+export const GROUP_BORDER_CLEAR_PX = 8;
+export const GROUP_BORDER_INK_PX = 2;
+const BORDER_KEEP = GROUP_BORDER_CLEAR_PX + GROUP_BORDER_INK_PX / 2;
+
+const inflateBox = (b: Box, k: number): Box => ({x: b.x - k, y: b.y - k, w: b.w + 2 * k, h: b.h + 2 * k});
+const shrinkBox = (b: Box, k: number): Box | null =>
+  b.w > 2 * k && b.h > 2 * k ? {x: b.x + k, y: b.y + k, w: b.w - 2 * k, h: b.h - 2 * k} : null;
+const boxContains = (outer: Box, inner: Box) =>
+  inner.x >= outer.x && inner.y >= outer.y &&
+  inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+
+/** True when label box `L` is a legal position w.r.t. ONE group's border:
+ *  fully outside the inflated rect (clear of the line), or fully inside the
+ *  shrunk rect (also clear of the line). Crossing or hugging = false. */
+export function labelClearsBorder(L: Box, g: Box): boolean {
+  if (!hitsBox(L, inflateBox(g, BORDER_KEEP))) return true;
+  const inner = shrinkBox(g, BORDER_KEEP);
+  return inner != null && boxContains(inner, L);
+}
+
+/** The minimal SINGLE-AXIS translation that makes `L` legal vs `g` on one
+ *  side — the "moves along the edge" remedy, axis picked by the border line
+ *  being crossed — or null when that side cannot host the box at all (a
+ *  group too small to hold it clear of its own border). Smallest push wins
+ *  among the valid axes, so a label just inside the line nudges further in
+ *  instead of jumping across the whole group. */
+function borderPush(L: Box, g: Box, side: 'outside' | 'inside'): {x: number; y: number} | null {
+  const target = side === 'outside' ? inflateBox(g, BORDER_KEEP) : shrinkBox(g, BORDER_KEEP);
+  if (!target) return null;
+  const legal = side === 'outside'
+    ? (o: Box) => !hitsBox(o, target as Box)
+    : (o: Box) => boxContains(target as Box, o);
+  const cands = [
+    {x: target.x - (L.x + L.w), y: 0}, {x: target.x + target.w - L.x, y: 0},
+    {x: 0, y: target.y - (L.y + L.h)}, {x: 0, y: target.y + target.h - L.y},
+  ];
+  let best: {x: number; y: number} | null = null;
+  for (const c of cands) {
+    if (!legal({x: L.x + c.x, y: L.y + c.y, w: L.w, h: L.h})) continue;
+    if (!best || Math.abs(c.x) + Math.abs(c.y) < Math.abs(best.x) + Math.abs(best.y)) best = c;
+  }
+  return best;
+}
 
 export function placeEdgeLabels(
   nodes: Node[],
@@ -251,6 +307,15 @@ export function placeEdgeLabels(
     while (cur) { out.add(cur); cur = par.get(cur); }
     return out;
   };
+  /* EDGE-LABEL-BORDER: EVERY group's border rect is an obstacle, ancestor or
+     not — the ancestor exemption above is about the group's BODY (members
+     live inside it), never about its border line. */
+  const groups: Box[] = [];
+  for (const n of nodes) {
+    if ((n.data as {shape?: unknown} | undefined)?.shape !== 'group') continue;
+    const b = box.get(n.id);
+    if (b) groups.push(b);
+  }
   const placedLabels: Box[] = [];
   for (const e of edges) {
     const label = typeof e.label === 'string' ? e.label.trim() : '';
@@ -261,26 +326,70 @@ export function placeEdgeLabels(
     const exempt = new Set<string>([...anc(e.source), ...anc(e.target)]);
     const blockers: Box[] = [];
     for (const [id, b] of box) if (!exempt.has(id)) blockers.push(b);
-    const base: Box = {x: a.x - w / 2, y: a.y - h / 2, w, h};
-    if (!blockers.some((b) => hitsBox(base, b)) && !placedLabels.some((b) => hitsBox(base, b))) {
+    const at = (off: {x: number; y: number}): Box => ({x: a.x + off.x - w / 2, y: a.y + off.y - h / 2, w, h});
+    const base = at({x: 0, y: 0});
+    const borderOk = (L: Box) => groups.every((g) => labelClearsBorder(L, g));
+    const open = (L: Box) => !blockers.some((b) => hitsBox(L, b)) && !placedLabels.some((b) => hitsBox(L, b));
+    if (open(base) && borderOk(base)) {
       placedLabels.push(base);
       continue;
     }
-    /* perpendicular candidates: both sides, then stepping further out. */
-    let written = false;
+    /* Cumulative along-the-line pushes for one side: apply the minimal push
+       for the first violated group, re-check (a push can expose the next
+       group in a nested chain), repeat — bounded, so an impossible side
+       degrades to null instead of looping. */
+    const pushes = (side: 'outside' | 'inside'): {x: number; y: number} | null => {
+      let off = {x: 0, y: 0};
+      for (let round = 0; round <= groups.length; round++) {
+        const L = at(off);
+        const bad = groups.find((g) => !labelClearsBorder(L, g));
+        if (!bad) return off;
+        const p = borderPush(L, bad, side) ?? borderPush(L, bad, side === 'inside' ? 'outside' : 'inside');
+        if (!p) return null;
+        off = {x: off.x + p.x, y: off.y + p.y};
+      }
+      return null;
+    };
+    /* the preferred side is the one the box already (mostly) sits on: a
+       label that reads as "outside the group" stays outside. */
+    const viol = groups.filter((g) => !labelClearsBorder(base, g));
+    const cands: {x: number; y: number}[] = [];
+    if (viol.length) {
+      const g0 = viol[0];
+      const ix = Math.max(0, Math.min(base.x + base.w, g0.x + g0.w) - Math.max(base.x, g0.x));
+      const iy = Math.max(0, Math.min(base.y + base.h, g0.y + g0.h) - Math.max(base.y, g0.y));
+      const pref = ix * iy > (base.w * base.h) / 2 ? 'inside' : 'outside';
+      const first = pushes(pref);
+      if (first) cands.push(first);
+      const second = pushes(pref === 'inside' ? 'outside' : 'inside');
+      if (second) cands.push(second);
+    }
+    /* perpendicular candidates: both sides, then stepping further out — the
+       pre-border remedy, still first choice when no border is involved. */
     for (const k of [12, 34, 56]) {
       for (const sign of [1, -1]) {
-        const off = a.vertical ? {x: sign * (w / 2 + k), y: 0} : {x: 0, y: sign * (h / 2 + k)};
-        const cand: Box = {x: a.x + off.x - w / 2, y: a.y + off.y - h / 2, w, h};
-        if (!blockers.some((b) => hitsBox(cand, b)) && !placedLabels.some((b) => hitsBox(cand, b))) {
-          (e.data as Record<string, unknown>).labelOffset = off;
-          (e.data as Record<string, unknown>).labelPinned = true;
-          placedLabels.push(cand);
-          written = true;
-          break;
-        }
+        cands.push(a.vertical ? {x: sign * (w / 2 + k), y: 0} : {x: 0, y: sign * (h / 2 + k)});
       }
-      if (written) break;
+    }
+    const write = (off: {x: number; y: number}) => {
+      (e.data as Record<string, unknown>).labelOffset = off;
+      (e.data as Record<string, unknown>).labelPinned = true;
+      placedLabels.push(at(off));
+    };
+    let written = false;
+    for (const off of cands) {
+      const L = at(off);
+      if (open(L) && borderOk(L)) { write(off); written = true; break; }
+    }
+    /* fallback — clearance from the border outranks every other rule (the
+       card's own ordering): park it CLEAR of the line on the side with the
+       shorter push, accepting an odd position over a cut word. */
+    if (!written && viol.length) {
+      const outs = pushes('outside'), ins = pushes('inside');
+      const pick = outs && ins
+        ? (Math.abs(outs.x) + Math.abs(outs.y) <= Math.abs(ins.x) + Math.abs(ins.y) ? outs : ins)
+        : (outs ?? ins);
+      if (pick) { write(pick); written = true; }
     }
     if (!written) placedLabels.push(base);
   }

@@ -4,6 +4,8 @@
 import {useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode} from 'react';
 import {SHAPES, ShapePreview, type Shape} from '../nodes/shapes';
 import {COLOR_VAR} from '../colors';
+import {clampRotation, norm180} from '../rotation';
+import {ROTATION_MIN, ROTATION_MAX} from '../layoutConstants';
 import {usePopoverPlacement} from './popover';
 import {G} from './Art';
 
@@ -295,28 +297,34 @@ export function ToggleRow({value, onChange, options, title, wide, grid3, half}: 
    commit like every inspector field).
    =========================================================================== */
 export function RotationRow({value, onChange}: {value: number; onChange: (v: number) => void}) {
+  /* ROTATION-RANGE — display the NORMALISED angle: a legacy board may hold an
+   *  un-normalised value (999), and the field must never claim an angle the
+   *  node does not paint. Writes route through clampRotation, so what lands
+   *  in the board is always step-rounded and inside (-180, 180]. */
+  const shown = norm180(value);
   return (
     <div className="field">
       <label>rotation</label>
       <div className="field-row">
         <input
           type="number"
-          min={-180}
-          max={180}
+          min={ROTATION_MIN}
+          max={ROTATION_MAX}
           step={1}
-          value={value}
-          onChange={e => {
-            const n = Number(e.target.value);
-            onChange(e.target.value === '' || !Number.isFinite(n) ? 0 : n);
-          }}
+          value={shown}
+          onChange={e => onChange(clampRotation(e.target.value))}
         />
+        {/* ROTATION-RANGE — a WORD, not the old ↺ glyph (it read as "rotate
+            counter-clockwise", and Harvey pressed it without knowing what it
+            did); disabled at 0 so it never sits enabled doing nothing. */}
         <button
           type="button"
           className="mbtn"
           title="Reset rotation to 0"
           aria-label="Reset rotation to 0"
+          disabled={shown === 0}
           onClick={() => onChange(0)}
-        >↺</button>
+        >Reset</button>
       </div>
     </div>
   );

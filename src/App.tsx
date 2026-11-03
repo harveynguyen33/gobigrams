@@ -39,7 +39,7 @@ import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './e
 import DiagramNode, {type NodeKind} from './nodes/DiagramNode';
 import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
-import {useRotation} from './useRotation';
+import {useRotation, norm180} from './useRotation';
 import {ROTATE_SNAP_DEG} from './layoutConstants';
 import {GroupRotateGrip} from './components/GroupRotateGrip';
 import {SelectionBox} from './components/SelectionBox';
@@ -458,6 +458,9 @@ export default function App() {
     savePref('dbl-range', next);
   }, []);
   const [expOpen, setExpOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  /* MODAL-DOORS: ONE writer sets BOTH booleans — two doors can never be open at once. */
+  const openDoor = (d: 'export' | 'share') => { setExpOpen(d === 'export'); setShareOpen(d === 'share'); };
   // ---- D1: searchable insert palette (position = double-click point) ----
   const [searchPos, setSearchPos] = useState<{x: number; y: number} | null>(null);
   // ---- D2: cheat sheet popover ----
@@ -675,6 +678,9 @@ export default function App() {
   // ---- M1: the Settings dialog (the theme is one of its settings). ----
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
+  /* MODAL-DOORS: the two dialog triggers (focus returns to the opener). */
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
 
   /** The paint path. `theme` state and `applyTheme` both track `effectiveTheme`
    *  so there is exactly one place that decides what the document looks like. */
@@ -1091,10 +1097,10 @@ export default function App() {
   const [tip, setTip] = useState<{id: TipId; line: string} | null>(null);
   const pendingTip = useRef<TipId | null>(null);
   const fireTip = useCallback((id: TipId) => {
-    if (settingsOpen || !!boardDlg || tgOpen || feedbackOpen || expOpen) { pendingTip.current = id; return; }
+    if (settingsOpen || !!boardDlg || tgOpen || feedbackOpen || expOpen || shareOpen) { pendingTip.current = id; return; }
     const line = takeTip(id);
     if (line) setTip({id, line});
-  }, [settingsOpen, boardDlg, tgOpen, feedbackOpen, expOpen]);
+  }, [settingsOpen, boardDlg, tgOpen, feedbackOpen, expOpen, shareOpen]);
   useEffect(() => {
     const id = pendingTip.current;
     if (!id) return;
@@ -4311,8 +4317,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onOpenApp={dismissError}
           />
         )}
-        {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
-            in src/components/Toolbar.tsx; App threads every state/handler. */}
+        {/* ROUND BN-3 PHASE B: toolbar + selection bar live in Toolbar.tsx; App threads every prop. */}
         <Toolbar
           canUndo={canUndo}
           canRedo={canRedo}
@@ -4332,7 +4337,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           gridSize={gridSize}
           onDuplicate={() => duplicateSelection()}
           onAutoLayout={autoLayout}
-          onOpenExport={setExpOpen}
+          onOpenExport={() => openDoor('export')}
+          onOpenShare={() => openDoor('share')}
+          exportBtnRef={exportBtnRef}
+          shareBtnRef={shareBtnRef}
           settingsOpen={settingsOpen}
           onOpenSettings={setSettingsOpen}
           settingsBtnRef={settingsBtnRef}
@@ -4345,12 +4353,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {notice && <div className="toast">{notice}</div>}
 
-        {/* H2: getting-started checklist. Its state, its auto-hide and the
-            history of the removed completion toast live in Checklist.tsx. */}
+        {/* H2: getting-started checklist; its state and auto-hide live in Checklist.tsx. */}
         <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
 
-        {/* ONBOARD-P5 — the one-line tip. Conditionally mounted: with tips OFF
-            `tip` never becomes non-null, so nothing is even rendered. */}
+        {/* ONBOARD-P5 — the one-line tip; with tips OFF `tip` stays null and nothing renders. */}
         {tip && <TipToast line={tip.line} onDismiss={dismissTip} />}
 
         {/* F2: context menu (node / edge / pane right-click) */}
@@ -4362,11 +4368,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
-            Positioned absolute relative to the .react-flow container. */}
-        {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
-            (button + popover) lives in src/components/HelpSheet.tsx now;
-            App threads the open state, the two refs and the feedback opener. */}
+        {/* C5: zoom pill — inside ReactFlow so useStore resolves; absolute vs the .react-flow container. */}
+        {/* D2: keyboard cheat sheet — lives in src/components/HelpSheet.tsx; App threads the open state, refs and the feedback opener. */}
         <HelpSheet
           btnRef={helpBtnRef}
           popRef={helpRef}
@@ -4386,9 +4389,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* ROUND BN-3 PHASE B: the five modal mounts (BoardDialog, gallery,
-            Settings, FeedbackDialog, ExportModal + the hidden JSON input) live
-            in src/components/ModalMounts.tsx; App computes every prop. */}
+        {/* ROUND BN-3 PHASE B: the modal mounts (BoardDialog, gallery, Settings, FeedbackDialog, ExportModal, ShareDialog + JSON input) live in ModalMounts.tsx; App computes every prop. */}
         <ModalMounts
           boardDlg={boardDlg}
           curBoardName={curBoard?.name ?? ''}
@@ -4446,6 +4447,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           boardPng={nodes.length ? boardPngForFeedback : null}
           expOpen={expOpen}
           onCloseExport={() => setExpOpen(false)}
+          exportReturn={exportBtnRef}
+          shareOpen={shareOpen}
+          onCloseShare={() => setShareOpen(false)}
+          shareReturn={shareBtnRef}
           onExported={() => { tickTask('export'); fireTip('export'); }}
           nodes={nodes}
           edges={edges}
@@ -4461,13 +4466,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects
             (see `selectionOnDrag`), Shift+drag box-selects from a node too,
-            middle/right drag + Space+drag pan, plain scroll pans (free, both
-            axes), Ctrl/Cmd+scroll (trackpad pinch) zooms. ROUND AA, ITEM 2 — the
-            marquee's own mode is the `selectionMode` prop below, driven by
-            Settings → Canvas → Marquee selection. */}
-        {/* K1: ds-flow-wrap scopes the hover-choreography + perf-guard classes
-            to THIS React Flow instance. K3: ds-animating-layout (added/removed
-            around programmatic layouts) and ds-no-anim (animation gating). */}
+            middle/right drag + Space+drag pan, plain scroll pans, Ctrl/Cmd+scroll
+            zooms. ROUND AA, ITEM 2 — the marquee's mode is `selectionMode` below,
+            from Settings → Canvas → Marquee selection. */}
+        {/* K1: ds-flow-wrap scopes the hover-choreography + perf-guard classes to
+            THIS instance. K3: ds-animating-layout / ds-no-anim gate animations. */}
         <ReactFlow
           nodes={rfNodes} edges={rfEdges} /* badge hidden 2026-10-25; credit -> About */ proOptions={{hideAttribution: true}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange}
@@ -4477,18 +4480,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           onReconnect={onReconnect}
           // Q: gated exactly like the three element-touching props below, so
           // review mode has ONE source of truth for "nothing on the canvas can
-          // be changed". `edgesReconnectable` was the lone omission — the
-          // anchors are rendered whenever the prop is truthy and they are NOT
-          // read-only aware, so in review mode the user could still rip a wire
-          // off a node (and `onReconnect` would then push an undo entry for a
-          // change the mode promises is impossible). The grabber is invisible,
-          // so this is also the only arm of the gesture that could be started by
-          // accident. With the prop false RF renders no `EdgeUpdateAnchors` at
-          // all (`isReconnectable && …` in EdgeWrapper), i.e. the whole gesture
-          // is absent, not merely inert. That is the ONLY entry point — grep for
-          // `reconnect` in src/ returns this line, `onReconnect` above, and its
-          // `reconnectEdge` call, so no second path exists. `reconnectRadius` is
-          // a top-level `<ReactFlow>` prop and carries no behaviour of its own.
+          // be changed": the update anchors render whenever this prop is truthy
+          // and are NOT read-only aware, so without the gate a review-mode user
+          // could still rip a wire off a node (and `onReconnect` would push an
+          // undo entry for a change the mode promises is impossible). With the
+          // prop false RF renders no `EdgeUpdateAnchors` at all — the gesture
+          // is absent, not merely inert. It is the ONLY reconnect path: grep
+          // `reconnect` in src/ returns this line, `onReconnect` above and its
+          // `reconnectEdge` call, nothing else (`reconnectRadius` is inert).
           edgesReconnectable={!readOnly}
           reconnectRadius={RECONNECT_RADIUS}
           // B2: every connection point is usable in BOTH directions. Each node
@@ -5431,7 +5430,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     (a package-p invariant), and the row is presentational. */}
                 <RotationRow
                   value={(((selected.data as any).rotation as number | undefined) ?? 0)}
-                  onChange={v => update({rotation: v === 0 ? undefined : v} as any)}
+                  onChange={v => update({rotation: v === 0 ? undefined : norm180(v)} as any)}
                 />
                 {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
                     inner arcs (database / storeddata only). A key choice keeps

@@ -27,6 +27,16 @@ export const MAX_LAYER_WIDTH = 1600;
    the same measured crash layoutConstants.ts's header records. */
 export const ROTATE_SNAP_DEG = 15;
 
+/* ROTATION-RANGE — the ONE enforced range for a stored rotation, in degrees.
+   norm180 (src/rotation.ts) maps any angle into (-180, 180]; these constants
+   exist so the inspector's input attributes and any future consumer read ONE
+   pair of numbers instead of restating literals. The old min/max attributes
+   were decorative: they gate the spinner arrows, not a typed value, and
+   nothing clamped the write (measured: typing 999 stored 999 while the node
+   painted -81°). */
+export const ROTATION_MIN = -180;
+export const ROTATION_MAX = 180;
+
 /* ROUND GOBI-LAYOUT — the ONE default node size, sourced from the renderer's
    own documented floors (task: the engine's private `?? 190` / `?? 240` /
    `?? 60` / `?? 160` fallbacks disagreed with what nodes actually render at,

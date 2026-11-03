@@ -33,7 +33,7 @@
  */
 
 import {resolveColor, COLOR_VAR, isColorKey} from '../colors';
-import {asShape} from '../nodes/shapes';
+import {asShape, SHAPE_TOP_FACE} from '../nodes/shapes';
 import {rotatedExtent} from '../rotation';
 import {labelAnchor, labelPlatePaint, type LabelPos} from '../edgeLabel';
 import {
@@ -214,6 +214,17 @@ const BODY_PAD_X = 18;
  *  the sheet's queue/actor rows, so the two cannot drift. */
 const RAIL_FRACTION: Partial<Record<string, number>> = {queue: 0.36, actor: 0.34};
 
+/* GOBI-TEXT-FIT (R2) — where the decoration actually ENDS (the queue's
+ * divider x=62 of 200; the actor's badge path x=58), as a width fraction.
+ * The reserve alone does not guarantee AIR: at the 190px CSS floor
+ * 0.36·w − 0.31·w = 9.5px < 12px of clearance, so the text box also takes a
+ * hard 12px past the band end — whichever side is wider wins. */
+const RAIL_END_FRACTION: Partial<Record<string, number>> = {queue: 0.31, actor: 0.29};
+
+/* GOBI-WRAP-RULES N2 — the air a text block keeps BELOW a top face's rim
+ * (SHAPE_TOP_FACE); the harness floor is rim + 4, this buys one more. */
+const RIM_PAD = 5;
+
 /* ------------------------------------------------------- text row building */
 
 /** The wrap for ONE block, served through the item-1 cache. `measure` is the
@@ -270,7 +281,11 @@ export function buildNodeRows(
   let y = yTitleStart;
   const hasSub = d.sub && typeof d.sub === 'string';
   const hasMetric = d.metric && typeof d.metric === 'string';
-  const hasKicker = d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
+  /* GOBI-TEXT-FIT (R3) — a label-only body renders NO kicker row (the canvas'
+     label-only branch paints one centred sentence; the kind label is not
+     prose). The MEASURED path agrees by construction: that branch renders no
+     .node-kicker element, so the measurer reports no kicker row at all. */
+  const hasKicker = d.body !== 'label-only' && d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
 
   const kickerFont = t.rows?.kicker;
   const subFont = t.rows?.sub;
@@ -278,16 +293,34 @@ export function buildNodeRows(
   const titleFamily = t.family || '';
 
   if (hasKicker) {
-    const yKick = t.baselineTops?.kicker
+    /* GOBI-TEXT-FIT (R1) — a long authored kicker WRAPS like the title (one
+       long line painted past the box borders before). A kicker that already
+       fits emits BYTE-IDENTICAL rows, so no existing board changes. Extra
+       lines step the kicker's own line pitch and push the title down: the
+       trailing `y =` already carries the shift, exactly as the canvas' flex
+       column stacks a wrapped kicker above the title. */
+    const kickSize = kickerFont?.size ?? 9.5;
+    const kickWeight = kickerFont?.weight ?? 500;
+    const kickSpacing = kickerFont?.spacing ?? 1.1;
+    const kickLine = Math.round(kickSize * 1.35);
+    const kickX = runOf('kicker');
+    const kickText = String(d.kicker).toUpperCase();
+    const kickAvail = t.runs ? Math.max(12, t.x + t.w - kickX) : Math.max(12, t.w);
+    const kickLines = widthOf(kickText, {size: kickSize, weight: kickWeight, spacing: kickSpacing, family: kickerFont?.family}) <= kickAvail
+      ? [kickText]
+      : cachedWrap(kickText, kickAvail, {family: kickerFont?.family ?? '', size: kickSize, weight: kickWeight, spacing: kickSpacing}, widthOf, ascentOf).lines;
+    const yKick0 = t.baselineTops?.kicker
       ? t.baselineTops.kicker.top + t.baselineTops.kicker.ascent
       : yTitleStart - 15;
-    rows.push({
-      x: runOf('kicker'), baselineY: yKick, content: String(d.kicker).toUpperCase(),
-      size: kickerFont?.size ?? 9.5, weight: kickerFont?.weight ?? 500,
-      fill: t.fill || ink.dim, spacing: kickerFont?.spacing ?? 1.1,
-      family: kickerFont?.family,
+    kickLines.forEach((ln, i) => {
+      rows.push({
+        x: kickX, baselineY: yKick0 + i * kickLine, content: ln,
+        size: kickSize, weight: kickWeight,
+        fill: t.fill || ink.dim, spacing: kickSpacing,
+        family: kickerFont?.family,
+      });
     });
-    y = Math.max(y, yKick + 15);
+    y = Math.max(y, yKick0 + (kickLines.length - 1) * kickLine + 15);
   }
 
   const availW = Math.max(12, t.titleW ?? t.w);
@@ -318,11 +351,42 @@ export function buildNodeRows(
   y += (useWrapped.length - 1) * lineHeight;
 
   if (hasSub) {
-    y = topOf('sub', lineHeight);
-    rows.push({
-      x: runOf('sub'), baselineY: y, content: String(d.sub),
-      size: subFont?.size ?? 11.5, weight: subFont?.weight ?? 450,
-      fill: ink.dim, family: subFont?.family,
+    /* GOBI-TEXT-FIT (R1/R2) — the sub WRAPS like the title. It used to be one
+       long line: centred over its box it painted past both borders (measured
+       +7.3px each side on a 39-char sub) and straight across the queue's dot
+       rail (463px² on a 20-char sub at width 290). A line that already fits
+       emits BYTE-IDENTICAL rows. The wrap width is the row's own box: the
+       derived (DOM-less) box already reserves the rail band on both sides, a
+       measured box wraps from the sub's run x to the body's right edge — the
+       same width the DOM wraps .node-sub at. Extra lines clamp to the box's
+       remaining height (the canvas clips at the body bottom, so lines past
+       the budget are painted nowhere); ONE line always renders. */
+    const subSize = subFont?.size ?? 11.5;
+    const subWeight = subFont?.weight ?? 450;
+    const subLine = Math.round(subSize * 1.35);
+    const subX = runOf('sub');
+    const subAvail = t.runs ? Math.max(12, t.x + t.w - subX) : Math.max(12, t.w);
+    const subText = String(d.sub);
+    const subLines = widthOf(subText, {size: subSize, weight: subWeight, family: subFont?.family}) <= subAvail
+      ? [subText]
+      : cachedWrap(subText, subAvail, {family: subFont?.family ?? '', size: subSize, weight: subWeight, spacing: 0}, widthOf, ascentOf).lines;
+    /* A measured box clips at its own bottom (the real DOM body); the DOM-less
+       box's h is the stub's GUESS (61px, no element to read), so the node's own
+       height is the honest clip — vAlignRows re-centres the block in it. The
+       legacy first baseline sits one line under the TITLE'S LAST line (a
+       wrapped title or kicker pushes it down, exactly as the canvas' flex
+       column does); a 1-line block keeps today's exact number. */
+    y = t.baselineTops?.sub
+      ? t.baselineTops.sub.top + t.baselineTops.sub.ascent
+      : Math.max(y, yTitleStart) + lineHeight;
+    const subBudget = (t.runs ? t.y + t.h : box.h) - (y - subLine * 0.35);
+    const subMax = Math.max(1, Math.floor(subBudget / subLine));
+    subLines.slice(0, subMax).forEach((ln, i) => {
+      rows.push({
+        x: subX, baselineY: y + i * subLine, content: ln,
+        size: subSize, weight: subWeight,
+        fill: ink.dim, family: subFont?.family,
+      });
     });
   }
   if (hasMetric) {
@@ -391,19 +455,38 @@ export function buildSceneBody(input: ExportInput): Scene {
   const textBox = (n: ExportNode, s: {w: number; h: number}): TextRect | null => {
     const t = measurer.text(n.el);
     if (t && t.runs) return t;
-    const rail = RAIL_FRACTION[String(asShape(n.data?.shape) ?? '')] ?? null;
-    const side = rail != null ? Math.round(rail * s.w) : BODY_PAD_X;
-    return {...(t ?? {y: s.h * 0.02, h: s.h * 0.96, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}),
+    const shp = String(asShape(n.data?.shape) ?? '');
+    const rail = RAIL_FRACTION[shp] ?? null;
+    const side = rail != null
+      ? Math.max(Math.round(rail * s.w), Math.round((RAIL_END_FRACTION[shp] ?? rail) * s.w) + 12)
+      : BODY_PAD_X;
+    /* GOBI-WRAP-RULES N2 — a shape whose outline spends height on a TOP FACE
+       (the cylinder's rim, the storage lid: SHAPE_TOP_FACE) starts its text
+       band BELOW the rim (rim + RIM_PAD), not where the rect band starts —
+       the kicker otherwise sits on the cylinder's front arc (measured 47.8 vs
+       rim bottom 50.8 on a 145 px node). Shapes without a top face keep the
+       box they already had. */
+    const faceFrac = SHAPE_TOP_FACE[shp];
+    const faceTop = faceFrac != null ? Math.max(s.h * 0.02, faceFrac * s.h + RIM_PAD) : null;
+    const base = t ?? {y: s.h * 0.02, h: s.h * 0.96, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'};
+    return {...base,
+      y: faceTop ?? base.y, h: faceTop != null ? Math.max(12, s.h - faceTop - s.h * 0.02) : base.h,
       x: side, w: Math.max(12, s.w - side * 2)};
   };
 
   /** ROUND GOBI-TEXT3 — a DOM-LESS block is placed ARITHMETICALLY, from the
    *  node's own stored `vAlign` (see textVAlign.ts: the sheet's
    *  `justify-content` needs a layout engine the headless door has not got).
-   *  A measured rect already reflects the CSS, so it is left untouched. */
-  const placeRows = (n: ExportNode, s: {w: number; h: number}, t: TextRect | null, rows: SceneTextRow[]): SceneTextRow[] =>
-    t && t.runs ? rows
-      : vAlignRows(rows, s.h, (n.data?.textStyle as {vAlign?: string} | undefined)?.vAlign, ascentOf);
+   *  A measured rect already reflects the CSS, so it is left untouched.
+   *  GOBI-WRAP-RULES N2 — a top-face shape centres its block in the band
+   *  BELOW the rim (bandTop), not the full box, so the first row clears the
+   *  rim's arc by RIM_PAD. */
+  const placeRows = (n: ExportNode, s: {w: number; h: number}, t: TextRect | null, rows: SceneTextRow[]): SceneTextRow[] => {
+    if (t && t.runs) return rows;
+    const shp = String(asShape(n.data?.shape) ?? '');
+    const bandTop = SHAPE_TOP_FACE[shp] != null ? SHAPE_TOP_FACE[shp]! * s.h + RIM_PAD : 0;
+    return vAlignRows(rows, s.h, (n.data?.textStyle as {vAlign?: string} | undefined)?.vAlign, ascentOf, bandTop);
+  };
 
   /* ---- nodes */
   const sceneNodes: SceneNode[] = [];

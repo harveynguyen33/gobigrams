@@ -23,9 +23,9 @@ import type {BoardDoc} from '../boards';
 import type {ColorKey} from '../colors';
 import type {TableColumn} from '../nodes/TableNode';
 import {parseGobi} from './gobiParser';
-import {getBezierPath, Position} from '@xyflow/react';
+import {getBezierPath, Position} from './paths';
 import {gobiMemberOrder, packGroup, routeEdgeHandles, detourEdgeHandles, placeEdgeLabels, handlePoint} from './gobiLayout';
-import {gobiTextStyle} from './gobiText';
+import {gobiBodyOf, gobiTextStyle} from './gobiText';
 import {validateGobi} from './gobiValidator';
 import {
   GOBI_CARD_TOKENS,
@@ -318,6 +318,22 @@ function buildNodes(ast: GobiAst): {nodes: Node[]; order: string[]} {
       if (stmt.attrs.kicker) data.kicker = stmt.attrs.kicker;
       if (stmt.attrs.icon) data.icon = stmt.attrs.icon;
       if (stmt.attrs.color) data.colorKey = stmt.attrs.color;
+      /* GOBI-TEXT-FIT (R3) — the body layout is the AUTHOR's choice, and the
+         language reaches the model's own `body: 'card' | 'label-only'`
+         (DiagramNode renders the label-only branch as one centred sentence,
+         no kicker). `body:card` / `body:simple` wins verbatim; the DEFAULT is
+         content-driven, not "card always": a node the author gave neither a
+         `sub:` nor an authored `kicker:` renders SIMPLE (Harvey: "ko nhất bạn
+         phải dùng body là card layout"), and one line of prose — a sub or a
+         kicker — buys the card shell. The factory kicker (the kind label)
+         does NOT buy the shell by itself: it is not prose, so `service api`
+         stays a sentence while `service api sub:auth` is a card. Note and
+         group keep their own layouts (DiagramNode's note branch / GroupNode),
+         so the choice is written for the card kinds only. */
+      if (stmt.shape !== 'note' && stmt.shape !== 'group') {
+        data.body = gobiBodyOf(stmt.attrs.body)
+          ?? ((stmt.attrs.sub || stmt.attrs.kicker) ? 'card' : 'label-only');
+      }
     }
 
     /* ROUND GOBI-TEXT (§2.9) — the language's text alignment. Every non-table

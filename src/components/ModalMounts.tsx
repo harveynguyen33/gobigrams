@@ -18,6 +18,7 @@ import TemplatesGallery from '../dialogs/TemplatesGallery';
 import Settings from '../Settings';
 import FeedbackDialog from '../FeedbackDialog';
 import ExportModal from '../dialogs/ExportModal';
+import ShareDialog from '../dialogs/ShareDialog';
 import type {ThemeName} from '../theme';
 
 type ModalMountsProps = {
@@ -56,6 +57,15 @@ type ModalMountsProps = {
   buildPng: React.ComponentProps<typeof ExportModal>['buildPng'];
   printPdf: React.ComponentProps<typeof ExportModal>['printPdf'];
   onExported: React.ComponentProps<typeof ExportModal>['onExported'];
+  /* ---- ShareDialog (SHARE-DOOR 2026-11-03) ---- the share surface has its
+   *  own entrance; nodes/edges/boardName/onExported are the SAME props the
+   *  ExportModal mount already receives. */
+  shareOpen: boolean;
+  onCloseShare: () => void;
+  /* ---- MODAL-DOORS (2026-11-03) ---- each dialog returns focus to its own
+   *  toolbar trigger on close; App owns both refs. */
+  exportReturn: React.RefObject<HTMLButtonElement | null>;
+  shareReturn: React.RefObject<HTMLButtonElement | null>;
   /* ---- the hidden JSON import input ---- */
   fileRef: React.RefObject<HTMLInputElement | null>;
   onImportFile: React.ChangeEventHandler<HTMLInputElement>;
@@ -129,6 +139,7 @@ export function ModalMounts(p: ModalMountsProps) {
         <ExportModal
           open={p.expOpen}
           onClose={p.onCloseExport}
+          returnFocusTo={p.exportReturn}
           nodes={p.nodes}
           edges={p.edges}
           liveTheme={p.liveTheme}
@@ -138,6 +149,19 @@ export function ModalMounts(p: ModalMountsProps) {
           buildPng={p.buildPng}
           printPdf={p.printPdf}
           onImportJson={() => p.fileRef.current?.click()}
+          onExported={p.onExported}
+        />
+
+        {/* SHARE-DOOR — the share-by-link surface, same overlay vocabulary as
+            the export modal (z-index 60). Exactly one of the two dialogs is
+            ever open: each entrance opens its own and neither nests. */}
+        <ShareDialog
+          open={p.shareOpen}
+          onClose={p.onCloseShare}
+          returnFocusTo={p.shareReturn}
+          nodes={p.nodes}
+          edges={p.edges}
+          boardName={p.boardName}
           onExported={p.onExported}
         />
   </>;

@@ -947,7 +947,7 @@ body {
   max-width: calc(100% - 34px);
   background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px; padding: 6px;
-  height: 40px;
+  height: 42px;
 }
 .tbtn-label {
   font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.1em;
@@ -961,9 +961,11 @@ body {
 }
 .tbtn:hover { background: var(--elevated); border-color: var(--border-strong); }
 .tbtn:disabled { opacity: .5; cursor: not-allowed; }
-/* compact 28x28 icon button */
+/* compact icon button — TOOLBAR-V1: 30x30, the one rhythm every toolbar
+   control shares (the Import·Export entry and Settings used to be wider
+   text buttons; they are icon buttons now, see .tbtn-icon.pro). */
 .tbtn-icon {
-  width: 28px; height: 28px; padding: 0;
+  width: 30px; height: 30px; padding: 0;
   display: grid; place-items: center; flex: none;
   background: transparent; color: var(--fg);
   border: 1px solid transparent; border-radius: 6px;
@@ -971,6 +973,10 @@ body {
 }
 .tbtn-icon:hover { background: var(--elevated); border-color: var(--border-strong); }
 .tbtn-icon:disabled { opacity: .4; cursor: not-allowed; }
+/* TOOLBAR-V1 — the Import·Export entry keeps visual priority without a word:
+   the sketch's accent tint (docs/sketches/toolbar-variants.html, V1 `.pro`). */
+.tbtn-icon.pro { color: var(--acc); }
+.tbtn-icon.pro:hover { background: var(--acc-soft); border-color: var(--acc); }
 /* active-state icon toggle (Snap, etc.) — selection blue, never accent */
 .tbtn-icon.on {
   color: var(--sel); border-color: var(--sel); background: var(--sel-soft);
@@ -5438,7 +5444,8 @@ kbd {
    ============================================================ */
 .em-overlay { z-index: 60; }
 .em-modal {
-  display: flex; gap: var(--space-5, 20px);
+  position: relative; /* MODAL-DOORS: the .em-close X anchors to the card */
+  display: flex; flex-direction: column; gap: var(--space-3, 12px);
   background: var(--bg); color: var(--fg);
   border: 1px solid var(--border); border-radius: var(--r-lg, 14px);
   padding: var(--space-5, 20px);
@@ -5448,16 +5455,38 @@ kbd {
   height: min(84vh, 640px);
   box-shadow: 0 18px 50px rgba(0,0,0,.35);
 }
+/* TOOLBAR-V1 — the two columns sit in ONE row BELOW the segmented tabs
+   (the tabs used to live inside the left column). */
+.em-cols { display: flex; gap: var(--space-5, 20px); flex: 1 1 auto; min-height: 0; }
 .em-left { width: 250px; flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3, 12px); overflow-y: auto; min-height: 0; }
 .em-right { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2, 8px); }
 .em-title { font-size: var(--fs-lg); font-weight: 650; }
-.em-tabs { display: flex; gap: var(--space-1, 4px); }
+/* MODAL-DOORS (2026-11-03) — the ONE visible exit, shared by the export modal
+   and the share dialog so the two doors read as one family. Same geometry as
+   .bd-x (the board dialog's X), but ABSOLUTE in the card's top-right corner:
+   the export modal's top row is the segmented tabs and the share dialog's is
+   the title, so a header-row button would sit differently in each. Tokens only. */
+.em-close {
+  position: absolute; top: 12px; right: 12px; z-index: 1;
+  width: 24px; height: 24px; display: grid; place-items: center;
+  background: transparent; color: var(--dim);
+  border: 1px solid transparent; border-radius: 7px;
+  cursor: pointer; transition: all .12s;
+}
+.em-close:hover { color: var(--fg); border-color: var(--border-strong); }
+/* TOOLBAR-V1 — the tabs are a SEGMENTED control (the sketch's shape): one
+   plate, the active half lifted onto the surface tone. Not underline links. */
+.em-tabs {
+  display: inline-flex; align-self: flex-start; gap: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px); padding: 2px;
+}
 .em-tabs button {
   font: inherit; font-size: var(--fs-sm); font-weight: 650; color: var(--dim);
-  background: transparent; border: none; border-bottom: 2px solid transparent;
-  padding: var(--space-1, 4px) var(--space-2, 8px); cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: var(--space-1, 4px) var(--space-3, 12px); cursor: pointer;
 }
-.em-tabs button.on { color: var(--fg); border-bottom-color: var(--acc); }
+.em-tabs button.on { color: var(--fg); background: var(--elevated); border-color: var(--border-strong); }
 .em-label { font-size: var(--fs-2xs); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-top: var(--space-1, 4px); }
 .em-seg { display: flex; flex-wrap: wrap; gap: var(--space-1, 4px); }
 .em-seg button {
@@ -5519,6 +5548,13 @@ kbd {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-md, 8px); padding: var(--space-2, 8px);
   width: 100%; box-sizing: border-box; cursor: text;
+}
+/* SHARE-DOOR (2026-11-03) — the share dialog is a SMALL one-column modal: the
+   same .em-modal vocabulary, but the export modal's fixed 84vh height is a
+   two-pane concern. Tokens only. */
+.shr-modal {
+  width: min(540px, 92vw);
+  height: auto; max-height: 84vh; overflow-y: auto;
 }
 /* GOBI-S1 — the share view's banner: one row above the canvas (name + why
    read-only + the two exits), and the error-card variant for a broken link.

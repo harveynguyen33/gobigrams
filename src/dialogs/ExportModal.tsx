@@ -1,11 +1,9 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState, type RefObject} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
+import {X} from 'lucide-react';
 import {EXPORT_TOKENS, tokensFor} from '../theme';
 import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
 import {trackExport} from '../analytics';
-/* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
- * compiler (pinned by round-gobi-door A3/A4): no static import of src/share. */
-type ShareUrl = {payload: string; url: string; length: number};
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';
@@ -25,6 +23,9 @@ const THEME_CHOICES: {id: string; label: string}[] = [
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** MODAL-DOORS (2026-11-03) — the ⇅ toolbar trigger that opened this
+   * dialog; focus returns to it on close (the BoardDialog/Settings contract). */
+  returnFocusTo?: RefObject<HTMLElement | null>;
   nodes: Node[];
   edges: Edge[];
   liveTheme: string;
@@ -73,7 +74,20 @@ function Seg<T extends string>({value, set, options, aria, selCount, tabRef}: {
   );
 }
 
-export default function ExportModal({open, onClose, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson, onExported}: Props) {
+/* TOOLBAR-V1 — the tab the user last chose. A PREFERENCE (still applies on
+ * every visit), so it is kept in localStorage; a fresh profile has no key and
+ * falls back to the board-content default (empty -> Import, else Export). */
+const EXPORT_TAB_KEY = 'diagram-studio:export-tab';
+
+/** The remembered tab (a PREFERENCE), or null when this profile never chose one. */
+const storedTab = (): 'export' | 'import' | null => {
+  try {
+    const v = localStorage.getItem(EXPORT_TAB_KEY);
+    return v === 'import' || v === 'export' ? v : null;
+  } catch { return null; } /* private mode / SSR */
+};
+
+export default function ExportModal({open, onClose, returnFocusTo, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson, onExported}: Props) {
   const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
   const [format, setFormat] = useState<ExportFormat>('svg');
@@ -101,11 +115,6 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
   const [gobiText, setGobiText] = useState('');
   const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
   const [gobiNote, setGobiNote] = useState<string | null>(null);
-  /* GOBI-S1 — the Share door's state: the built link (shown + copied) and a
-   * copy confirmation. `null` = not built yet (the row starts collapsed to a
-   * single button so the long URL does not own the modal on open). */
-  const [shareUrl, setShareUrl] = useState<ShareUrl | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
   const tabRef = useRef<HTMLButtonElement>(null);
 
   const scoped = useMemo(() => {
@@ -152,12 +161,59 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     return () => window.clearTimeout(t);
   }, [open, scope, format, theme, nodes, edges, liveTheme, boardName, buildSvg, buildPng, scoped, outline]);
 
+  /* MODAL-DOORS (2026-11-03) — the focus lands on the active tab when the
+   * dialog opens; Escape closes on the DOCUMENT CAPTURE phase with
+   * stopPropagation (the BoardDialog/Settings contract). The old window-bubble
+   * listener was churned away mid-event by App's own Escape re-render
+   * (measured: a trusted Escape left the dialog open at HEAD); the capture
+   * form stops App's handler from ever seeing the key. The listener reads the
+   * ref, never its own deps, so it is bound once per open. */
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (open) window.setTimeout(() => tabRef.current?.focus(), 30);
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) onClose(); };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  }, [open, onClose]);
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeRef.current();
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open]);
+  /* MODAL-DOORS — this component stays mounted while closed, so the focus
+   * return fires on the open -> false EDGE (BoardDialog restores on unmount;
+   * that form cannot apply here). */
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !open) returnFocusTo?.current?.focus();
+    wasOpen.current = open;
+  }, [open, returnFocusTo]);
+
+  /* TOOLBAR-V1 — OPEN on the tab that matches the board. The user's last choice
+     is a PREFERENCE and wins on a returning visit; with no stored choice an
+     EMPTY board opens on Import (nothing to take out) and a board with content
+     opens on Export.
+     Resolved during RENDER on the `open` EDGE (React's adjust-state-on-a-prop-
+     change pattern), not in an effect: this component stays mounted while
+     closed, so an effect commits once with the PREVIOUS open's tab and then
+     flips — the first PAINTED frame showed the wrong tab and pane (measured
+     with a rAF sampler: Export before Import on an empty board). A `nodes`
+     dep would re-flip the tab while the user is mid-export. */
+  const [openSeen, setOpenSeen] = useState(false);
+  if (open !== openSeen) {
+    setOpenSeen(open);
+    if (open) setTab(storedTab() ?? (nodes.length === 0 ? 'import' : 'export'));
+  }
+
+  /** A tab click is a CHOICE: it becomes the persisted preference. */
+  const chooseTab = (t: 'export' | 'import') => {
+    setTab(t);
+    try { localStorage.setItem(EXPORT_TAB_KEY, t); } catch { /* private mode */ }
+  };
 
   if (!open) return null;
 
@@ -232,39 +288,23 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
     window.setTimeout(onClose, 900);
   };
 
-  /* GOBI-S1 — the Share door: the CURRENT scoped board → one URL whose
-   * fragment carries the whole doc (never a server). Copy on build; show the
-   * link and its length; warn past the big-board threshold where some chat
-   * tools truncate pasted URLs. Codec + URL helper arrive by import().
-   * ONBOARD-P7 DECISION — a built link COUNTS as "Export your diagram": P6's
-   * funnel already reads it as export {format:share}; the tick + this line move together (p7.1c). */
-  const doShare = async () => {
-    const {buildShareUrl} = await import('../share');
-    const doc = {
-      id: 'shared', name: boardName ?? 'Shared diagram',
-      nodes: scoped.nodes, edges: scoped.edges, updatedAt: Date.now(),
-    };
-    const built = await buildShareUrl(doc);
-    const url = {payload: built.payload, url: built.url, length: built.url.length};
-    setShareUrl(url);
-    trackExport('share'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
-    setShareCopied(false);
-    try {
-      await navigator.clipboard.writeText(url.url);
-      setShareCopied(true);
-    } catch { /* the link is still shown + selectable for manual copy */ }
-  };
-
   return (
     <div className="sp-overlay em-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="em-modal" role="dialog" aria-label="Export or import diagram">
+        {/* MODAL-DOORS — the one visible exit, same .em-close as the Share
+            dialog so the two doors read as one family. */}
+        <button type="button" className="em-close" aria-label="Close" onClick={onClose}><X size={14} /></button>
+        {/* TOOLBAR-V1 — the tabs are the FIRST thing you see: ONE segmented
+            control above both columns (before this they were two small
+            underline buttons buried in the left column). Export and Import are
+            the same dialog, two halves — the entry's tooltip says so. */}
+        <div className="em-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'export'} className={tab === 'export' ? 'on' : ''} onClick={() => chooseTab('export')}>Export</button>
+          <button role="tab" aria-selected={tab === 'import'} className={tab === 'import' ? 'on' : ''} onClick={() => chooseTab('import')}>Import</button>
+        </div>
+
+        <div className="em-cols">
         <div className="em-left">
-          {/* AQ21-G — Export and Import are SEPARATE tabs; mixing them in one
-              column read as noise. */}
-          <div className="em-tabs" role="tablist">
-            <button role="tab" aria-selected={tab === 'export'} className={tab === 'export' ? 'on' : ''} onClick={() => setTab('export')}>Export</button>
-            <button role="tab" aria-selected={tab === 'import'} className={tab === 'import' ? 'on' : ''} onClick={() => setTab('import')}>Import</button>
-          </div>
 
           {tab === 'import' && (
             <div className="em-import">
@@ -362,25 +402,6 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />
           <div className="em-note">Preview and file both use the chosen theme — what you see is what downloads.</div>
 
-          {/* GOBI-S1 — Share by link: the whole board rides the URL fragment,
-              so nothing touches a server. Beside the other doors, per spec §3.3. */}
-          <div className="em-label">Share</div>
-          <button className="em-go secondary" onClick={() => void doShare()}>
-            Build share link
-          </button>
-          {shareUrl && (
-            <>
-              <input className="em-share-url" readOnly value={shareUrl.url}
-                onFocus={e => e.currentTarget.select()} aria-label="Share link" />
-              <div className="em-note">
-                {shareCopied ? 'Copied to clipboard — ' : ''}{shareUrl.length.toLocaleString()} characters.
-              </div>
-              {shareUrl.length > 8000 && (
-                <div className="em-note" role="alert">This board is big — export JSON instead.</div>
-              )}
-            </>
-          )}
-
           {/* AR-3 — reads `exportBusy` only; a preview rebuild must not change
               this button's label or disabled state. */}
           <button className="em-go" onClick={doExport} disabled={exportBusy || !preview || (format === 'png' && !scoped.nodes.length)}>
@@ -397,6 +418,7 @@ export default function ExportModal({open, onClose, nodes, edges, liveTheme, boa
               : <pre className="em-code">{preview?.data ?? '…'}</pre>}
           </div>
           {preview?.sub && <div className="em-note">{preview.sub}</div>}
+        </div>
         </div>
       </div>
     </div>

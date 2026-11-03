@@ -28,6 +28,10 @@ import {
 
 type SetNodes = React.Dispatch<React.SetStateAction<Node[]>>;
 
+/* ROTATION-RANGE — re-exported so App's RotationRow write site can normalise
+   defensively without a new import cone (App.tsx may not grow a line). */
+export {norm180} from './rotation';
+
 export function useRotation(
   nodesRef: React.MutableRefObject<Node[]>,
   setNodes: SetNodes,

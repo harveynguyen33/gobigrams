@@ -51,6 +51,18 @@ export const GOBI_ALIGN_DEFAULT: TextAlign = 'center';
  *  ROUND GOBI-TEXT3, Harvey's ask: the text sits in the MIDDLE of the box. */
 export const GOBI_VALIGN_DEFAULT: TextVAlign = 'middle';
 
+/* GOBI-TEXT-FIT (R3) — the `body:` vocabulary. The app's model names the two
+ * layouts 'card' | 'label-only' (src/textStyle.ts, DiagramNode); the
+ * language's word for the simple one is `simple` — the word Harvey used
+ * ("simple tôi nhớ mình có option đó nữa"). Closed world like align/valign:
+ * the parser refuses anything else with a suggestion at the token. */
+export const GOBI_BODY_VALUES: string[] = ['card', 'simple'];
+
+/** The language word → the model's own body value (`simple` IS `label-only`). */
+export function gobiBodyOf(v: string | undefined): 'card' | 'label-only' | undefined {
+  return v === 'card' ? 'card' : v === 'simple' ? 'label-only' : undefined;
+}
+
 /** Node attributes → the ONE `TextStyle` the compiler stores on `data`.
  *  Values are validated by the PARSER (it holds the token, so it can point at
  *  the offending word); this function is the write, not a second gate. */

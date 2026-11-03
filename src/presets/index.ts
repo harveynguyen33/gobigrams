@@ -3,7 +3,10 @@
    presets that own their data sit next to it), followed by the ONE registry
    (`PRESETS`) and its helpers — re-exported below together with every slice, so
    `import ... from './presets'` sees exactly the union the old single file had. */
-import {MarkerType, type Edge, type Node} from '@xyflow/react';
+import {type Edge, type Node} from '@xyflow/react';
+/* CORE-STEP1: the marker ENUM is local plain data (src/markers.ts) — the
+   preset registry no longer imports @xyflow/react at runtime. Values verbatim. */
+import {MarkerType} from '../markers';
 import {type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
 import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';

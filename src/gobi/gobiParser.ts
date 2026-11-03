@@ -37,10 +37,10 @@ import {
   type GobiToken,
 } from './gobiTypes';
 /* ROUND GOBI-TEXT (§2.9) — the align/valign vocabulary, derived in gobiText. */
-import {GOBI_ALIGN_VALUES, GOBI_VALIGN_VALUES} from './gobiText';
+import {GOBI_ALIGN_VALUES, GOBI_VALIGN_VALUES, GOBI_BODY_VALUES} from './gobiText';
 
 const SHAPE_KINDS = new Set<string>(GOBI_KINDS);
-const ATTR_KEYS = new Set(['sub', 'icon', 'color', 'kicker', 'align', 'valign']);
+const ATTR_KEYS = new Set(['sub', 'icon', 'color', 'kicker', 'align', 'valign', 'body']);
 const EDGE_TAIL_KEYWORDS = new Set(['dashed', 'dotted', 'solid', 'flow', 'flowIcon', 'flowCount', 'card', 'techn', 'x']);
 
 type Declared = {kind: 'node' | 'group' | 'table' | 'text' | 'invalid'; line: number};
@@ -281,6 +281,14 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
       }
       if (key === 'valign' && !GOBI_VALIGN_VALUES.includes(val)) {
         err(valTok, `valign "${val}" isn't a vertical alignment. Try: ${GOBI_VALIGN_VALUES.join(', ')}.`);
+      }
+      /* GOBI-TEXT-FIT (R3) — the body layout is a closed world too: card |
+         simple, with a spelling suggestion at the offending token. */
+      if (key === 'body' && !GOBI_BODY_VALUES.includes(val)) {
+        const sug = gobiSuggest(val, GOBI_BODY_VALUES);
+        err(valTok, sug
+          ? `body "${val}" isn't a body layout. Did you mean "${sug}"? Try: ${GOBI_BODY_VALUES.join(', ')}.`
+          : `body "${val}" isn't a body layout. Try: ${GOBI_BODY_VALUES.join(', ')}.`);
       }
       if (key === 'kicker' && valTok.type === 'string' && val.includes(' ')) {
         // kicker is a single word by convention but a string is legal; no error.

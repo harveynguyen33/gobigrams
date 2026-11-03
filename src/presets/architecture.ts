@@ -1,5 +1,8 @@
 /* ROUND BN-4 — this file is one slice of the former `src/presets.ts` (split verbatim, 2026-10-25). `src/presets/index.ts` re-exports the union, so every import of './presets' is unchanged. */
-import {MarkerType, type Edge, Node} from '@xyflow/react';
+import {type Edge, type Node} from '@xyflow/react';
+/* CORE-STEP1: the marker ENUM is local plain data (src/markers.ts) — the
+   factory graph no longer imports @xyflow/react at runtime. Values verbatim. */
+import {MarkerType} from '../markers';
 import type {Node as _N} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {PALETTE, type PaletteItem, type PaletteCategory, type DiagramType} from '../palette';
@@ -352,9 +355,17 @@ const systemPipelineTemplate: TemplateSpec = {
     archCard('n1', 'External', {x: 20, y: 180}),
     /* A parent must precede its children in the array (React Flow's rule), and a
        child's position is PARENT-RELATIVE — n2/n3 keep their authored relative
-       points (30,74 / 350,84 inside g1 at 330,96); n1 sits at (20,180) so the
-       290px-wide card clears the group's left edge (330). */
-    {id: 'g1', type: 'goblin', position: {x: 330, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
+       points (30,74 / 350,84 inside g1 at 420,96); n1 sits at (20,180) so the
+       290px-wide card clears the group's left edge (420). EDGE-LABEL-BORDER
+       (2026-11-03): the boundary's left border used to sit at 330, only 20px
+       past n1 — the auto-centred "events" label (anchor = the edge midpoint)
+       straddled the dashed line (13 px outside / 21 px inside, measured on
+       production), and BOTH along-edge retreats were blocked (n1's box
+       outside, n2's box inside), so the card's fallback had nowhere to park
+       it. The gap is authored at 110px now: the anchor lands at x 380 and the
+       51.6px-wide estimated plate clears the border by 14.2px (>= 8) fully
+       OUTSIDE the boundary, no pin needed. */
+    {id: 'g1', type: 'goblin', position: {x: 420, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
       data: {...archItem('Group').make(), title: 'Your system', sub: 'boundary'} as any},
     archCard('n2', 'Queue', {x: 30, y: 74}, 'g1'),
     archCard('n3', 'Service', {x: 350, y: 84}, 'g1'),

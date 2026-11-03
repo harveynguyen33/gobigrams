@@ -11,12 +11,14 @@
  *
  * So the fallback now derives the REAL route from geometry the board already
  * carries — each edge's `sourceHandle`/`targetHandle` (the four midpoint ids the
- * canvas ships) and each node's absolute box — and hands it to the SAME path
+ * canvas ships) and each node's absolute box — and hands it to the path
  * generators `GoblinEdge` uses (`getBezierPath` / `getSmoothStepPath` /
- * `getStraightPath`). There is no second curve implementation here: the
- * generator that paints the canvas is the generator that paints the file, so a
- * headless render and a mounted export cannot disagree about the shape of a
- * curve.
+ * `getStraightPath`). CORE-STEP1: those now come from `src/gobi/paths.ts`, the
+ * local attributed copy of @xyflow/system's generators — byte-identical output
+ * to the library is PROVEN (round-gobi-core-decouple P2, >= 1000 randomized
+ * cases, max deviation <= 0.001 px), so there is still no second curve
+ * implementation here: the generator that paints the canvas and the generator
+ * that paints the file emit the same `d` for the same geometry.
  *
  * WHAT IT DELIBERATELY DOES NOT DO. A dragged bend (`data.bendX`/`bendY`) is
  * not replayed: the bend routes live in `edgeBend.ts`, they need both
@@ -27,7 +29,7 @@
  * keeps its own stub: a wrong guess would be worse than the honest fallback.
  */
 
-import {getBezierPath, getSmoothStepPath, getStraightPath, Position} from '@xyflow/react';
+import {getBezierPath, getSmoothStepPath, getStraightPath, Position} from '../gobi/paths';
 import {isSide4, type Side4} from '../edgeBend';
 
 export type RouteBox = {x: number; y: number; w: number; h: number};
