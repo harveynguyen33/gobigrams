@@ -1,7 +1,7 @@
 {
   "name": "gobigrams",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,7 @@
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
   },
-  "description": "Gobigrams — draw diagrams in your browser. Flowcharts, architecture and ER diagrams with real vector export.",
+  "description": "Gobigrams \u2014 draw diagrams in your browser. Flowcharts, architecture and ER diagrams with real vector export.",
   "homepage": "https://gobigrams.tech-goblin.com",
   "license": "MIT",
   "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)"

@@ -16,6 +16,38 @@ import {trackExport} from '../analytics';
  * static import of src/share in this dialog. */
 type ShareUrl = {payload: string; url: string; length: number};
 
+/* SHARE-STALE-LINK (2026-11-04) — a built link describes ONE board revision.
+ * This dialog stays mounted in App (only its BODY unmounts on close), so the
+ * built URL used to survive close -> reopen while the board changed under it:
+ * delete a node, reopen Share, and the dead link was still there — the reader
+ * got the OLD diagram and neither end could see the mistake. The link is now
+ * bound to a SIGNATURE of the exact input buildShareUrl consumes (name +
+ * nodes + edges — the doc minus its build-time `updatedAt` stamp); on
+ * mismatch the derived link is null and the collapsed build row returns
+ * exactly as if nothing had been built. CLEAR, never migrate or auto-rebuild
+ * (a rebuild per keystroke would rewrite the clipboard behind the user's
+ * back). Transient RF fields (selected/dragging/measured) are dropped:
+ * selecting a node is not an edit, and size lives in style/width/height.
+ * data keys starting with __ are dropped too — app bookkeeping written at
+ * insert and cleared by the settle pass (data.__dropAt); counting it killed
+ * a link built inside the settle window one second later (measured: add
+ * node -> Build immediately -> the link dies when __dropAt clears).
+ * Pure and exported so the harness EXECUTES it (round-toolbar-share K). */
+const scrubData = (d: Record<string, unknown> | undefined): Record<string, unknown> | undefined => {
+  if (!d) return d;
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(d)) if (!k.startsWith('__')) out[k] = d[k];
+  return out;
+};
+
+export const shareSignature = (nodes: readonly Node[], edges: readonly Edge[], boardName?: string): string =>
+  JSON.stringify({
+    name: boardName ?? 'Shared diagram',
+    nodes: nodes.map(({selected: _sel, dragging: _drag, measured: _m, ...n}) =>
+      ({...n, data: scrubData(n.data)})),
+    edges: edges.map(({selected: _s, ...e}) => ({...e, data: scrubData(e.data)})),
+  });
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -34,8 +66,10 @@ type Props = {
 export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges, boardName, onExported}: Props) {
   /* GOBI-S1 — the Share door's state: the built link (shown + copied) and a
    * copy confirmation. `null` = not built yet (the row starts collapsed to a
-   * single button so the long URL does not own the dialog on open). */
-  const [shareUrl, setShareUrl] = useState<ShareUrl | null>(null);
+   * single button so the long URL does not own the dialog on open).
+   * SHARE-STALE-LINK — the URL is stored BESIDE the signature of the input
+   * that produced it; the SHOWN link is derived below, never stored state. */
+  const [built, setBuilt] = useState<{url: ShareUrl; sig: string} | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   /* SHARE-COPY-BUTTON (2026-11-04) — the transient state of the Copy button
    * beside the field: 'ok' = copied (shows "Copied" ~1.5s), 'manual' = every
@@ -79,6 +113,16 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
   /* the Copied revert timer must never fire after the dialog is gone. */
   useEffect(() => () => { if (copyTimer.current !== null) window.clearTimeout(copyTimer.current); }, []);
 
+  /* SHARE-STALE-LINK — the shown link is a DERIVED value: the stored URL
+   * renders only while the live signature still equals the one it was built
+   * from. Any board change (delete/add/drag/rename) mismatches -> null ->
+   * the collapsed build row, exactly as if nothing had been built; an
+   * unchanged board keeps it (the copy-again path the Copy button exists
+   * for). Computed only while OPEN: a drag re-renders every frame and the
+   * modal blocks editing, so the comparison is owed on open, not per frame. */
+  const liveSig = open ? shareSignature(nodes, edges, boardName) : '';
+  const shareUrl = built && built.sig === liveSig ? built.url : null;
+
   if (!open) return null;
 
   /* GOBI-S1 — the Share door: the CURRENT board → one URL whose fragment
@@ -93,9 +137,11 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
       id: 'shared', name: boardName ?? 'Shared diagram',
       nodes, edges, updatedAt: Date.now(),
     };
-    const built = await buildShareUrl(doc);
-    const url = {payload: built.payload, url: built.url, length: built.url.length};
-    setShareUrl(url);
+    const res = await buildShareUrl(doc);
+    const url = {payload: res.payload, url: res.url, length: res.url.length};
+    /* SHARE-STALE-LINK — the URL and the signature of the exact input that
+     * produced it land in ONE write, so they can never disagree. */
+    setBuilt({ url, sig: shareSignature(nodes, edges, boardName) });
     trackExport('share'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
     setShareCopied(false); setCopyBtn('idle');
     /* SHARE-COPY-BUTTON — the build-time copy is KEPT (a courtesy) but goes
