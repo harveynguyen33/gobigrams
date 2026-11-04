@@ -11,6 +11,7 @@ import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';
 import {LAYOUTS, type LayoutSpec} from './presets';
 import type {LayoutDirection} from './layout';
+import type {ChecklistTaskId} from './nodes/Checklist';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useCanvasTools(
@@ -26,6 +27,7 @@ export function useCanvasTools(
   zOrderMode: string,
   preset: {layout: LayoutSpec},
   layoutDir: LayoutDirection,
+  tickTask: (id: ChecklistTaskId) => void,
 ) {
 
   // ---- F8: auto-layout with an eased move ----
@@ -46,6 +48,7 @@ export function useCanvasTools(
     const target = fn(nodes, edges, {...preset.layout, direction: layoutDir});
     if (!target.size) return;
     pushHistory();
+    tickTask('move');   // CHECKLIST-EDGE — auto-arrange MOVES everything
     animateLayout(() => {
       setNodes(ns => ns.map(n => {
         const to = target.get(n.id);
@@ -57,7 +60,7 @@ export function useCanvasTools(
          did nothing" (measured: y -340..756 on a 9-node board). */
       requestAnimationFrame(() => rf?.fitView({padding: 0.25, duration: 300}));
     });
-  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset, layoutDir]);
+  }, [nodes, edges, pushHistory, setNodes, animateLayout, rf, preset, layoutDir, tickTask]);
 
 /* ROUND BD, ITEM 1 — THE Z-ORDER PRIMITIVES. The app had NONE: a grep for
    zIndex / bringToFront / sendToBack across src/ found only React Flow's own

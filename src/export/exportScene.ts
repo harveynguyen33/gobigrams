@@ -33,7 +33,7 @@
  */
 
 import {resolveColor, COLOR_VAR, isColorKey} from '../colors';
-import {asShape} from '../nodes/shapes';
+import {asShape, SHAPE_TOP_FACE} from '../nodes/shapes';
 import {rotatedExtent} from '../rotation';
 import {labelAnchor, labelPlatePaint, type LabelPos} from '../edgeLabel';
 import {
@@ -204,6 +204,27 @@ export function stubEdgePath(e: ExportEdge, s: ExportNode, t: ExportNode,
  *  must use it too; the number lives here and nowhere else in this path. */
 const BODY_PAD_X = 18;
 
+/* NODE-TEXT-CENTER (2026-11-03) — the side-rail fractions the sheet's
+ * `--body-inset` registry reserves for the two DECORATED silhouettes (the
+ *  queue's dot rail, divider x=62 of 200; the actor's person badge, ends
+ *  x=58). Reserved on BOTH sides so the DOM-less text box stays centred in
+ *  the node while clearing the decoration; at the palette width 290 that
+ *  leaves >= 14px of air past each decoration. The sheet is the source of
+ *  truth — checks/round-node-text-center.mjs (nt4a) asserts this table equals
+ *  the sheet's queue/actor rows, so the two cannot drift. */
+const RAIL_FRACTION: Partial<Record<string, number>> = {queue: 0.36, actor: 0.34};
+
+/* GOBI-TEXT-FIT (R2) — where the decoration actually ENDS (the queue's
+ * divider x=62 of 200; the actor's badge path x=58), as a width fraction.
+ * The reserve alone does not guarantee AIR: at the 190px CSS floor
+ * 0.36·w − 0.31·w = 9.5px < 12px of clearance, so the text box also takes a
+ * hard 12px past the band end — whichever side is wider wins. */
+const RAIL_END_FRACTION: Partial<Record<string, number>> = {queue: 0.31, actor: 0.29};
+
+/* GOBI-WRAP-RULES N2 — the air a text block keeps BELOW a top face's rim
+ * (SHAPE_TOP_FACE); the harness floor is rim + 4, this buys one more. */
+const RIM_PAD = 5;
+
 /* ------------------------------------------------------- text row building */
 
 /** The wrap for ONE block, served through the item-1 cache. `measure` is the
@@ -243,8 +264,13 @@ export function buildNodeRows(
      and every stub) the exporter must place the runs itself, and the node's own
      `textStyle.align` is exactly what the canvas would honour: centre anchors
      the text block's MIDDLE, right anchors its END. A measured rect already
-     reflects the CSS, so the derivation is skipped there. */
-  const anchor = t.runs ? undefined : alignAnchor((d.textStyle as {align?: string} | undefined)?.align);
+     reflects the CSS, so the derivation is skipped there.
+     FIRST-VISIT (2026-11-01) — the fallback is now CENTER: the card body's
+     no-write value moved from left to center (alignForBody), so an UNALIGNED
+     node must anchor middle here too or the headless export would disagree
+     with the canvas it cannot see. */
+  const storedAlign = (d.textStyle as {align?: string} | undefined)?.align;
+  const anchor = t.runs ? undefined : alignAnchor(storedAlign ?? 'center');
   const place = (x: number) => (anchor === 'middle' ? x + t.w / 2 : anchor === 'end' ? x + t.w : x);
   const runOf = (row: 'kicker' | 'title' | 'sub' | 'metric'): number =>
     place(t.runs?.[row]?.x ?? xRow);
@@ -255,7 +281,11 @@ export function buildNodeRows(
   let y = yTitleStart;
   const hasSub = d.sub && typeof d.sub === 'string';
   const hasMetric = d.metric && typeof d.metric === 'string';
-  const hasKicker = d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
+  /* GOBI-TEXT-FIT (R3) — a label-only body renders NO kicker row (the canvas'
+     label-only branch paints one centred sentence; the kind label is not
+     prose). The MEASURED path agrees by construction: that branch renders no
+     .node-kicker element, so the measurer reports no kicker row at all. */
+  const hasKicker = d.body !== 'label-only' && d.kicker && typeof d.kicker === 'string' && d.kicker !== title;
 
   const kickerFont = t.rows?.kicker;
   const subFont = t.rows?.sub;
@@ -263,16 +293,34 @@ export function buildNodeRows(
   const titleFamily = t.family || '';
 
   if (hasKicker) {
-    const yKick = t.baselineTops?.kicker
+    /* GOBI-TEXT-FIT (R1) — a long authored kicker WRAPS like the title (one
+       long line painted past the box borders before). A kicker that already
+       fits emits BYTE-IDENTICAL rows, so no existing board changes. Extra
+       lines step the kicker's own line pitch and push the title down: the
+       trailing `y =` already carries the shift, exactly as the canvas' flex
+       column stacks a wrapped kicker above the title. */
+    const kickSize = kickerFont?.size ?? 9.5;
+    const kickWeight = kickerFont?.weight ?? 500;
+    const kickSpacing = kickerFont?.spacing ?? 1.1;
+    const kickLine = Math.round(kickSize * 1.35);
+    const kickX = runOf('kicker');
+    const kickText = String(d.kicker).toUpperCase();
+    const kickAvail = t.runs ? Math.max(12, t.x + t.w - kickX) : Math.max(12, t.w);
+    const kickLines = widthOf(kickText, {size: kickSize, weight: kickWeight, spacing: kickSpacing, family: kickerFont?.family}) <= kickAvail
+      ? [kickText]
+      : cachedWrap(kickText, kickAvail, {family: kickerFont?.family ?? '', size: kickSize, weight: kickWeight, spacing: kickSpacing}, widthOf, ascentOf).lines;
+    const yKick0 = t.baselineTops?.kicker
       ? t.baselineTops.kicker.top + t.baselineTops.kicker.ascent
       : yTitleStart - 15;
-    rows.push({
-      x: runOf('kicker'), baselineY: yKick, content: String(d.kicker).toUpperCase(),
-      size: kickerFont?.size ?? 9.5, weight: kickerFont?.weight ?? 500,
-      fill: t.fill || ink.dim, spacing: kickerFont?.spacing ?? 1.1,
-      family: kickerFont?.family,
+    kickLines.forEach((ln, i) => {
+      rows.push({
+        x: kickX, baselineY: yKick0 + i * kickLine, content: ln,
+        size: kickSize, weight: kickWeight,
+        fill: t.fill || ink.dim, spacing: kickSpacing,
+        family: kickerFont?.family,
+      });
     });
-    y = Math.max(y, yKick + 15);
+    y = Math.max(y, yKick0 + (kickLines.length - 1) * kickLine + 15);
   }
 
   const availW = Math.max(12, t.titleW ?? t.w);
@@ -303,11 +351,42 @@ export function buildNodeRows(
   y += (useWrapped.length - 1) * lineHeight;
 
   if (hasSub) {
-    y = topOf('sub', lineHeight);
-    rows.push({
-      x: runOf('sub'), baselineY: y, content: String(d.sub),
-      size: subFont?.size ?? 11.5, weight: subFont?.weight ?? 450,
-      fill: ink.dim, family: subFont?.family,
+    /* GOBI-TEXT-FIT (R1/R2) — the sub WRAPS like the title. It used to be one
+       long line: centred over its box it painted past both borders (measured
+       +7.3px each side on a 39-char sub) and straight across the queue's dot
+       rail (463px² on a 20-char sub at width 290). A line that already fits
+       emits BYTE-IDENTICAL rows. The wrap width is the row's own box: the
+       derived (DOM-less) box already reserves the rail band on both sides, a
+       measured box wraps from the sub's run x to the body's right edge — the
+       same width the DOM wraps .node-sub at. Extra lines clamp to the box's
+       remaining height (the canvas clips at the body bottom, so lines past
+       the budget are painted nowhere); ONE line always renders. */
+    const subSize = subFont?.size ?? 11.5;
+    const subWeight = subFont?.weight ?? 450;
+    const subLine = Math.round(subSize * 1.35);
+    const subX = runOf('sub');
+    const subAvail = t.runs ? Math.max(12, t.x + t.w - subX) : Math.max(12, t.w);
+    const subText = String(d.sub);
+    const subLines = widthOf(subText, {size: subSize, weight: subWeight, family: subFont?.family}) <= subAvail
+      ? [subText]
+      : cachedWrap(subText, subAvail, {family: subFont?.family ?? '', size: subSize, weight: subWeight, spacing: 0}, widthOf, ascentOf).lines;
+    /* A measured box clips at its own bottom (the real DOM body); the DOM-less
+       box's h is the stub's GUESS (61px, no element to read), so the node's own
+       height is the honest clip — vAlignRows re-centres the block in it. The
+       legacy first baseline sits one line under the TITLE'S LAST line (a
+       wrapped title or kicker pushes it down, exactly as the canvas' flex
+       column does); a 1-line block keeps today's exact number. */
+    y = t.baselineTops?.sub
+      ? t.baselineTops.sub.top + t.baselineTops.sub.ascent
+      : Math.max(y, yTitleStart) + lineHeight;
+    const subBudget = (t.runs ? t.y + t.h : box.h) - (y - subLine * 0.35);
+    const subMax = Math.max(1, Math.floor(subBudget / subLine));
+    subLines.slice(0, subMax).forEach((ln, i) => {
+      rows.push({
+        x: subX, baselineY: y + i * subLine, content: ln,
+        size: subSize, weight: subWeight,
+        fill: ink.dim, family: subFont?.family,
+      });
     });
   }
   if (hasMetric) {
@@ -363,21 +442,51 @@ export function buildSceneBody(input: ExportInput): Scene {
    *  without (`runs` absent — the `alignAnchor` signal) cannot, and a fixed box
    *  centres EVERY node at the same x (measured: -6px at 190, -56px at 290).
    *  So the SCENE derives it from the node's own width; BODY_PAD_X is the ONE
-   *  number. Every shape body is inset symmetrically, so this centres them all. */
-  const textBox = (el: unknown, s: {w: number; h: number}): TextRect | null => {
-    const t = measurer.text(el);
-    return t && t.runs ? t
-      : {...(t ?? {y: s.h * 0.18, h: s.h * 0.64, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'}),
-        x: BODY_PAD_X, w: Math.max(12, s.w - BODY_PAD_X * 2)};
+   *  number. Every shape body is inset symmetrically, so this centres them all.
+   *
+   *  NODE-TEXT-CENTER (2026-11-03) — the two DECORATED silhouettes reserve
+   *  their side rail on BOTH sides, exactly as the sheet's `--body-inset`
+   *  registry does (RAIL_FRACTION below mirrors its queue/actor rows; the
+   *  harness round-node-text-center nt4a asserts the two tables agree), so the
+   *  DOM-less door never paints text across the queue's dot rail or the
+   *  actor's badge. The vertical default is the rect band's own top (2%) —
+   *  where the canvas starts a `valign:top` block; a MIDDLE block is
+   *  re-centred by `vAlignRows` either way. */
+  const textBox = (n: ExportNode, s: {w: number; h: number}): TextRect | null => {
+    const t = measurer.text(n.el);
+    if (t && t.runs) return t;
+    const shp = String(asShape(n.data?.shape) ?? '');
+    const rail = RAIL_FRACTION[shp] ?? null;
+    const side = rail != null
+      ? Math.max(Math.round(rail * s.w), Math.round((RAIL_END_FRACTION[shp] ?? rail) * s.w) + 12)
+      : BODY_PAD_X;
+    /* GOBI-WRAP-RULES N2 — a shape whose outline spends height on a TOP FACE
+       (the cylinder's rim, the storage lid: SHAPE_TOP_FACE) starts its text
+       band BELOW the rim (rim + RIM_PAD), not where the rect band starts —
+       the kicker otherwise sits on the cylinder's front arc (measured 47.8 vs
+       rim bottom 50.8 on a 145 px node). Shapes without a top face keep the
+       box they already had. */
+    const faceFrac = SHAPE_TOP_FACE[shp];
+    const faceTop = faceFrac != null ? Math.max(s.h * 0.02, faceFrac * s.h + RIM_PAD) : null;
+    const base = t ?? {y: s.h * 0.02, h: s.h * 0.96, size: 14.5, weight: 650, fill: ink.fg, anchor: 'start'};
+    return {...base,
+      y: faceTop ?? base.y, h: faceTop != null ? Math.max(12, s.h - faceTop - s.h * 0.02) : base.h,
+      x: side, w: Math.max(12, s.w - side * 2)};
   };
 
   /** ROUND GOBI-TEXT3 — a DOM-LESS block is placed ARITHMETICALLY, from the
    *  node's own stored `vAlign` (see textVAlign.ts: the sheet's
    *  `justify-content` needs a layout engine the headless door has not got).
-   *  A measured rect already reflects the CSS, so it is left untouched. */
-  const placeRows = (n: ExportNode, s: {w: number; h: number}, t: TextRect | null, rows: SceneTextRow[]): SceneTextRow[] =>
-    t && t.runs ? rows
-      : vAlignRows(rows, s.h, (n.data?.textStyle as {vAlign?: string} | undefined)?.vAlign, ascentOf);
+   *  A measured rect already reflects the CSS, so it is left untouched.
+   *  GOBI-WRAP-RULES N2 — a top-face shape centres its block in the band
+   *  BELOW the rim (bandTop), not the full box, so the first row clears the
+   *  rim's arc by RIM_PAD. */
+  const placeRows = (n: ExportNode, s: {w: number; h: number}, t: TextRect | null, rows: SceneTextRow[]): SceneTextRow[] => {
+    if (t && t.runs) return rows;
+    const shp = String(asShape(n.data?.shape) ?? '');
+    const bandTop = SHAPE_TOP_FACE[shp] != null ? SHAPE_TOP_FACE[shp]! * s.h + RIM_PAD : 0;
+    return vAlignRows(rows, s.h, (n.data?.textStyle as {vAlign?: string} | undefined)?.vAlign, ascentOf, bandTop);
+  };
 
   /* ---- nodes */
   const sceneNodes: SceneNode[] = [];
@@ -402,18 +511,11 @@ export function buildSceneBody(input: ExportInput): Scene {
         : undefined,
     };
     if (kind === 'group') {
-      /* group children bounds (absolute space) — the ±12 frame inflation is
-       * painted geometry, applied by the EMITTER exactly as today */
-      const kids = nodes.filter(k => k.parentId === n.id && !isGroup(k));
-      let b = {minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity};
-      for (const k of kids) {
-        const ks = nodeSize(k);
-        const kp = abs.get(k.id)!;
-        b.minX = Math.min(b.minX, kp.x); b.minY = Math.min(b.minY, kp.y);
-        b.maxX = Math.max(b.maxX, kp.x + ks.w); b.maxY = Math.max(b.maxY, kp.y + ks.h);
-      }
-      if (!kids.length) b = {minX: p.x, minY: p.y, maxX: p.x + s.w, maxY: p.y + s.h};
-      (sn as SceneNode & {childBounds: typeof b}).childBounds = b;
+      /* ROUND GOBI-GROUP-BANNER — no childBounds re-fit here any more: the
+       * emitter paints the AUTHORED box (absX/absY + nodeSize), matching the
+       * canvas, so the compiled 68px banner inset survives every export door.
+       * The old members-bounds ± 12 computation is deleted with its only
+       * reader; a memberless group also paints its authored box. */
       const gt = measurer.text(n.el);
       const title = String(n.data?.title ?? n.id);
       const gtf = gt?.rows?.groupTitle;
@@ -483,7 +585,7 @@ export function buildSceneBody(input: ExportInput): Scene {
     const plain = n.data?.plainCylinder !== false;
     (sn as SceneNode & {plain?: boolean}).plain = plain;
     sn.icon = measurer.icon?.(n.el) ?? null;
-    const t = textBox(n.el, s);
+    const t = textBox(n, s);
     sn.textRect = t;
     sn.rows = placeRows(n, s, t, buildNodeRows(n, s, t as TextRect, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf));
     sceneNodes.push(sn);

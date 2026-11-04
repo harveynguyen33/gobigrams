@@ -311,12 +311,18 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      both this renderer and the panel use, so `mergeTextStyle` can never store a
      choice this function then refuses to paint.
      ROUND Z FIX 2 — the THIRD argument is the same idea on the vertical axis,
-     and it is why this is a function of `d.body` rather than a constant: a card
-     renders from its `padding-top` (so `top` is its no-write value) while this
-     same expression on a `label-only` node carries `.lo-body`, whose box
-     centres by design (so `middle` is). An untouched node therefore still emits
-     nothing AND still paints exactly what it painted before this round. */
-  const tsVars = textStyleVars(d.textStyle, alignForBody(d.body), vAlignForBody(d.body));
+     and it is why this is a function of `d.body` rather than a constant.
+     NODE-TEXT-CENTER (2026-11-03) — `d.body` is ABSENT on a card (only
+     label-only nodes carry it), and `undefined` is the TEXT annotation kind's
+     answer, not the card's: passing it raw made the card's no-write values
+     `left`/`top` while the sheet (and the panel, which normalizes through
+     `?? 'card'` in App) said `center`/`middle` — so an AUTHORED opt-out stored
+     by one of those (a .gobi `valign:top`, an `align:left`) equalled the
+     "default" here, emitted nothing, and the sheet's centred fallback silently
+     outvoted it (measured live: a compiled `valign:top` node rendered centred).
+     Normalizing with the same `?? 'card'` the inspector target uses makes this
+     renderer, the panel and the sheet one truth. */
+  const tsVars = textStyleVars(d.textStyle, alignForBody(d.body ?? 'card'), vAlignForBody(d.body ?? 'card'));
 
   /* AQ15 — AUTO-GROW ON CREATE. A fresh node has no explicit height, so a card
      whose text is taller than the shape's safe band clips its sub/metric

@@ -44,15 +44,24 @@ export function rowsExtent(rows: VRow[], ascentOf: AscentOf): {top: number; bott
 }
 
 /** Shift a row set to the stored vertical alignment inside `boxH`. Unknown
- *  values fall back to `middle`, the value the language writes. */
+ *  values fall back to `middle`, the value the language writes.
+ *  GOBI-WRAP-RULES N2 — `bandTop` (default 0) lowers the band's TOP for a
+ *  shape whose outline spends height on a top face (SHAPE_TOP_FACE): `middle`
+ *  then centres the block in the band BELOW the rim instead of the full box
+ *  (centring in the full box painted the kicker onto the cylinder's arc —
+ *  measured 47.8 vs rim 50.8 + 4 on a 145 px node), and a block taller than
+ *  the band clamps to the band's top rather than rising back over the rim. */
 export function vAlignRows<T extends VRow>(
   rows: T[], boxH: number, valign: string | undefined, ascentOf: AscentOf,
+  bandTop = 0,
 ): T[] {
   if (!rows.length || !(boxH > 0)) return rows;
   if (valign === 'top') return rows;
   const {top, bottom} = rowsExtent(rows, ascentOf);
   const h = bottom - top;
-  const target = valign === 'bottom' ? boxH - BODY_PAD_Y - h : (boxH - h) / 2;
+  const target = valign === 'bottom'
+    ? boxH - BODY_PAD_Y - h
+    : Math.max(bandTop, bandTop + (boxH - bandTop - h) / 2);
   const delta = target - top;
   return delta ? rows.map((r) => ({...r, baselineY: r.baselineY + delta})) : rows;
 }

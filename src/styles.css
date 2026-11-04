@@ -947,7 +947,7 @@ body {
   max-width: calc(100% - 34px);
   background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px; padding: 6px;
-  height: 40px;
+  height: 42px;
 }
 .tbtn-label {
   font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.1em;
@@ -961,9 +961,11 @@ body {
 }
 .tbtn:hover { background: var(--elevated); border-color: var(--border-strong); }
 .tbtn:disabled { opacity: .5; cursor: not-allowed; }
-/* compact 28x28 icon button */
+/* compact icon button — TOOLBAR-V1: 30x30, the one rhythm every toolbar
+   control shares (the Import·Export entry and Settings used to be wider
+   text buttons; they are icon buttons now, see .tbtn-icon.pro). */
 .tbtn-icon {
-  width: 28px; height: 28px; padding: 0;
+  width: 30px; height: 30px; padding: 0;
   display: grid; place-items: center; flex: none;
   background: transparent; color: var(--fg);
   border: 1px solid transparent; border-radius: 6px;
@@ -971,6 +973,10 @@ body {
 }
 .tbtn-icon:hover { background: var(--elevated); border-color: var(--border-strong); }
 .tbtn-icon:disabled { opacity: .4; cursor: not-allowed; }
+/* TOOLBAR-V1 — the Import·Export entry keeps visual priority without a word:
+   the sketch's accent tint (docs/sketches/toolbar-variants.html, V1 `.pro`). */
+.tbtn-icon.pro { color: var(--acc); }
+.tbtn-icon.pro:hover { background: var(--acc-soft); border-color: var(--acc); }
 /* active-state icon toggle (Snap, etc.) — selection blue, never accent */
 .tbtn-icon.on {
   color: var(--sel); border-color: var(--sel); background: var(--sel-soft);
@@ -3238,9 +3244,20 @@ kbd {
 .ce-or { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 
 /* ---------- H2: getting-started checklist ---------- */
+/* FIRST-VISIT rework (2026-11-01) — the panel used to sit at bottom:64px and
+   its 187px body grew DOWN over the zoom-control stack: the controls (bottom
+   15px, three 30px buttons + 2 borders = 92px tall) have their top edge 107px
+   above the canvas floor, so ANY expanded panel overlapped them by 43px (measured
+   at every height, not only short ones). The bottom anchor is now 15 + 92 + 13
+   clearance = 120px, so the panel ends ABOVE the control stack, and max-height
+   (120 bottom + 58 top clearance under the toolbar) plus the scrolling list
+   below keep it inside the canvas on short viewports — all six rows stay
+   reachable by scroll instead of painting over the canvas. */
 .gsc {
-  position: absolute; bottom: 64px; left: 16px; z-index: 6;
+  position: absolute; bottom: 120px; left: 16px; z-index: 6;
   width: 236px;
+  max-height: calc(100% - 178px);
+  display: flex; flex-direction: column;
   background: var(--panel-glass-strong); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px;
   box-shadow: var(--shadow-strong);
@@ -3271,7 +3288,10 @@ kbd {
   transition: all .15s;
 }
 .gsc-x:hover { color: var(--fg); background: var(--elevated); }
-.gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; }
+/* The scroll area when max-height binds (short viewports): the panel is a flex
+   column, so the list is the one member allowed to shrink — the head stays
+   pinned and the six rows scroll inside. */
+.gsc-list { list-style: none; margin: 2px 0 0; padding: 2px 10px 8px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; min-height: 0; }
 .gsc-item {
   display: flex; align-items: center; gap: 8px;
   font-size: var(--fs-md); color: var(--fg); padding: 4px 2px;
@@ -3683,7 +3703,11 @@ kbd {
 .node.shape-connector {
   display: grid; place-items: center;
 }
-.node.shape-connector .node-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); justify-content: var(--ts-justify, center); }
+/* FIRST-VISIT (2026-11-01) — the justify-content literal is GONE from this
+   rule: the base `.node-title` now centres by default, so the override said
+   the same thing twice. The font-size override (the connector's 12px title)
+   is the rule's whole job now. */
+.node.shape-connector .node-title { font-size: calc(var(--fs-md) * var(--ts-scale, 1)); }
 .node.shape-connector .node-kicker,
 .node.shape-connector .node-sub,
 .node.shape-connector .node-metric { display: none; }
@@ -4411,8 +4435,15 @@ kbd {
    `nowrap` + ellipsis + a fixed column layout.
    ===================================================================== */
 /* The card's text container. `box-sizing: border-box` is global (line 268), so
-   `max-height: 100%` includes the padding and the padding stays inside the box. */
-.node-body { overflow: hidden; max-height: 100%; overflow-wrap: anywhere; }
+   `max-height: 100%` includes the padding and the padding stays inside the box.
+   FIRST-VISIT (2026-11-01) — WORD BOUNDARIES on the card rows: `anywhere` broke
+   'Queue' into 'Queu'/'e' on the queue card's own DEFAULT content (measured:
+   body band 66px inside a 191px node, span squeezed to 27px by the 17px icon +
+   7px gap). `break-word` only breaks a word when it cannot fit a whole line of
+   its own, and the `min-width: 0` belt below (the other measured-good pair in
+   the ROUND V table) keeps a 43-char word contained — see the queue band fix
+   at --body-inset for the SIZE half of that defect. */
+.node-body { overflow: hidden; max-height: 100%; overflow-wrap: break-word; word-break: normal; }
 /* The chain that makes that percentage bind — see the header.
    ROUND AI, ITEM 1 — THE MECHANISM, AND THE TWO THAT WERE REJECTED. The
    label-only body was 37px tall inside a 145px node, so `justify-content` had
@@ -4449,11 +4480,11 @@ kbd {
 .node-title > span:last-child,
 .node .lo-title > span:last-child,
 .group-label > span { min-width: 0; }
-.node-kicker, .node-title, .node-sub, .node-metric { overflow-wrap: anywhere; }
+.node-kicker, .node-title, .node-sub, .node-metric { overflow-wrap: break-word; word-break: normal; }
 /* label-only flowchart body: clipped horizontally by its own box; its
    `min-height: 100%` stays declared and stays inert (see the header). */
-.node .lo-body { overflow: hidden; overflow-wrap: anywhere; }
-.node .lo-title, .node .lo-sub { overflow-wrap: anywhere; }
+.node .lo-body { overflow: hidden; overflow-wrap: break-word; word-break: normal; }
+.node .lo-title, .node .lo-sub { overflow-wrap: break-word; word-break: normal; }
 /* the note kind is resizable too. Its text goes into an inner box, NOT onto the
    root: the root hosts the four connect dots and, when selected, the four resize
    grips, all centred on its border, and it has `height: 100%` (so it can never
@@ -4567,12 +4598,16 @@ kbd {
 .label-node { color: var(--ts-color, var(--fg)); }
 .label-node .node-label-input { color: var(--ts-color, var(--fg)); }
 
-.node-body { text-align: var(--ts-align, left); }
+/* FIRST-VISIT (2026-11-01) — the CARD body centres by default (was left):
+   `.node-body` and `.node .lo-title` join `.lo-body` on center, matching
+   `alignForBody` (src/textStyle.ts). The TEXT annotation kind (`.label-node`)
+   and the note body keep their left default — they are margin notes. */
+.node-body { text-align: var(--ts-align, center); }
 .node .lo-body { text-align: var(--ts-align, center); }
 .note-body { text-align: var(--ts-align, left); }
 .label-node { text-align: var(--ts-align, left); }
 .label-node .node-label-input { text-align: var(--ts-align, left); }
-.node-title { justify-content: var(--ts-justify, flex-start); }
+.node-title { justify-content: var(--ts-justify, center); }
 .node .lo-title { justify-content: var(--ts-justify, center); }
 
 /* ===========================================================================
@@ -4912,14 +4947,20 @@ kbd {
    at-rest position is untouched: with neither property emitted the fallback
    below is the literal that renders today.
 
-   THE FALLBACKS ARE THE BOXES' CURRENT VALUES, one per consumer — the same
-   discipline every other `--ts-*` consumer in this sheet follows:
-     .node-body              flex-start   (block layout put the rows at the top)
-     .node .lo-body          center       (its own rule already centred, 2471)
-     .note-body              flex-start
-     .label-node             flex-start
-   `middle` is the stored default and stores ABSENCE, so an untouched node emits
-   nothing and every box resolves to the literal it renders with today.
+   THE FALLBACKS, one per consumer — the same discipline every other `--ts-*`
+   consumer in this sheet follows. NODE-TEXT-CENTER (2026-11-03, Harvey: "the
+   text should always be center in both ways") moved the CARD and NOTE boxes to
+   `center`: an untouched node now centres its block vertically, and
+   `vAlignForBody('card')` answers `middle` on the model's side (the two halves
+   are asserted to agree, as before). The TEXT annotation kind keeps `top` — a
+   `.label-node` is content-sized, so there is no dead space to centre, and a
+   margin note reads better flush-left:
+     .node-body              center       (was flex-start until 2026-11-03)
+     .note-body              center       (was flex-start until 2026-11-03)
+     .label-node             flex-start   (unchanged — content-sized)
+   `middle` on a card now stores ABSENCE, so an untouched node emits nothing
+   and resolves to the literal above; an authored `top`/`bottom` still emits
+   `--ts-align-items` and wins.
 
    THE LABEL'S EDITOR NEEDS NO TWIN, and that is a measurement rather than an
    omission: the editor is a flex ITEM of `.label-node`, so the root's own
@@ -4948,8 +4989,13 @@ kbd {
    natural size nothing changes anywhere, because `min-height: 100%` against an
    automatic height is automatic.
    =========================================================================== */
-.node-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
-.note-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, flex-start); }
+/* NODE-TEXT-CENTER (2026-11-03) — the vertical no-write value is CENTRE for a
+   card and a note (Harvey: "the text should always be center in both ways";
+   measured pre-fix on the sys-pipeline template: padTop 2 / padBottom 36 at
+   the 190x95 floor). `.label-node` keeps flex-start — see the ROUND Z header
+   above. `vAlignForBody` answers the same per target. */
+.node-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, center); }
+.note-body { display: flex; flex-direction: column; min-height: 100%; justify-content: var(--ts-align-items, center); }
 /* ROUND Z FIX 2 — THE FALLBACK IS THE BOX'S OWN NO-WRITE VALUE, and for this one
    it is `flex-start` (top): before this round the root had no `display: flex` at
    all, so its text began at `padding-top`, and `top` is what it must keep for a
@@ -5369,8 +5415,26 @@ kbd {
 .node.shape-database.body-inset,
 .node.shape-storeddata.body-inset { --body-inset: 35% 6% 20% 6%; }
 .node.shape-storage.body-inset    { --body-inset: 24% 3% 26% 3%; }
-.node.shape-queue.body-inset      { --body-inset: 2% 34% 2% 36%; }
-.node.shape-actor.body-inset      { --body-inset: 2% 3% 2% 33%; }
+/* FIRST-VISIT (2026-11-01) — the RIGHT inset was 34% with nothing painted
+   there (the queue silhouette decorates only the LEFT side, x<62 of 200), so
+   the band was 30% of the node — too narrow for the card's own DEFAULT title
+   ('Queue' + icon: 80px needed, 66px supplied → 'Queu'/'e'). 8% cleared the
+   rx=14 corner; the band is now 56%.
+   NODE-TEXT-CENTER (2026-11-03) — Harvey: "the text should always be center in
+   both ways". Subtracting the rail from the LEFT only pushed the text +27px
+   right of centre (measured at 190 wide). The rail is now reserved on BOTH
+   sides (36%/36%): the band is 28% — 81px at the palette width 290, which
+   still holds the 80px default title — the text block is centred in the node
+   box, and the divider at x=62 keeps 14.5px of clear air at 290 (9.5px on a
+   legacy 190-wide unsized card, which auto-grow widens the moment its content
+   wraps). The exporter's DOM-less box reserves the same fraction
+   (RAIL_FRACTION, src/export/exportScene.ts) — round-node-text-center nt4a
+   asserts the two tables agree. */
+.node.shape-queue.body-inset      { --body-inset: 2% 36% 2% 36%; }
+/* NODE-TEXT-CENTER (2026-11-03) — the actor's person badge (ends x=58 of 200)
+   is the same class of side decoration: symmetric 34%/34% centres the band
+   (92.8px at 290) with 14.5px of clear air past the badge. */
+.node.shape-actor.body-inset      { --body-inset: 2% 34% 2% 34%; }
 .node.shape-subprocess.body-inset,
 .node.shape-internalstorage.body-inset { --body-inset: 2% 16% 2% 16%; }
 /* ============================================================
@@ -5380,7 +5444,8 @@ kbd {
    ============================================================ */
 .em-overlay { z-index: 60; }
 .em-modal {
-  display: flex; gap: var(--space-5, 20px);
+  position: relative; /* MODAL-DOORS: the .em-close X anchors to the card */
+  display: flex; flex-direction: column; gap: var(--space-3, 12px);
   background: var(--bg); color: var(--fg);
   border: 1px solid var(--border); border-radius: var(--r-lg, 14px);
   padding: var(--space-5, 20px);
@@ -5390,16 +5455,38 @@ kbd {
   height: min(84vh, 640px);
   box-shadow: 0 18px 50px rgba(0,0,0,.35);
 }
+/* TOOLBAR-V1 — the two columns sit in ONE row BELOW the segmented tabs
+   (the tabs used to live inside the left column). */
+.em-cols { display: flex; gap: var(--space-5, 20px); flex: 1 1 auto; min-height: 0; }
 .em-left { width: 250px; flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3, 12px); overflow-y: auto; min-height: 0; }
 .em-right { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2, 8px); }
 .em-title { font-size: var(--fs-lg); font-weight: 650; }
-.em-tabs { display: flex; gap: var(--space-1, 4px); }
+/* MODAL-DOORS (2026-11-03) — the ONE visible exit, shared by the export modal
+   and the share dialog so the two doors read as one family. Same geometry as
+   .bd-x (the board dialog's X), but ABSOLUTE in the card's top-right corner:
+   the export modal's top row is the segmented tabs and the share dialog's is
+   the title, so a header-row button would sit differently in each. Tokens only. */
+.em-close {
+  position: absolute; top: 12px; right: 12px; z-index: 1;
+  width: 24px; height: 24px; display: grid; place-items: center;
+  background: transparent; color: var(--dim);
+  border: 1px solid transparent; border-radius: 7px;
+  cursor: pointer; transition: all .12s;
+}
+.em-close:hover { color: var(--fg); border-color: var(--border-strong); }
+/* TOOLBAR-V1 — the tabs are a SEGMENTED control (the sketch's shape): one
+   plate, the active half lifted onto the surface tone. Not underline links. */
+.em-tabs {
+  display: inline-flex; align-self: flex-start; gap: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px); padding: 2px;
+}
 .em-tabs button {
   font: inherit; font-size: var(--fs-sm); font-weight: 650; color: var(--dim);
-  background: transparent; border: none; border-bottom: 2px solid transparent;
-  padding: var(--space-1, 4px) var(--space-2, 8px); cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: var(--space-1, 4px) var(--space-3, 12px); cursor: pointer;
 }
-.em-tabs button.on { color: var(--fg); border-bottom-color: var(--acc); }
+.em-tabs button.on { color: var(--fg); background: var(--elevated); border-color: var(--border-strong); }
 .em-label { font-size: var(--fs-2xs); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-top: var(--space-1, 4px); }
 .em-seg { display: flex; flex-wrap: wrap; gap: var(--space-1, 4px); }
 .em-seg button {
@@ -5461,6 +5548,28 @@ kbd {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-md, 8px); padding: var(--space-2, 8px);
   width: 100%; box-sizing: border-box; cursor: text;
+}
+/* SHARE-COPY-BUTTON (2026-11-04) — the built link's row: the field flexes,
+   the Copy button is a FIXED sibling stretched to the field's height (same
+   row, same rhythm — not a floating chip). The copied state is the acc tint
+   + check glyph. Tokens only. */
+.em-share-row { display: flex; gap: var(--space-2, 8px); align-items: stretch; }
+.em-share-row .em-share-url { flex: 1 1 auto; width: auto; min-width: 0; }
+.em-copy {
+  font: inherit; font-size: var(--fs-2xs); font-weight: 600; color: var(--fg);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px); padding: 0 var(--space-3, 12px);
+  min-height: 30px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.em-copy:hover { border-color: var(--acc); color: var(--acc); }
+.em-copy.ok { color: var(--acc); border-color: var(--acc); background: var(--acc-soft); }
+/* SHARE-DOOR (2026-11-03) — the share dialog is a SMALL one-column modal: the
+   same .em-modal vocabulary, but the export modal's fixed 84vh height is a
+   two-pane concern. Tokens only. */
+.shr-modal {
+  width: min(540px, 92vw);
+  height: auto; max-height: 84vh; overflow-y: auto;
 }
 /* GOBI-S1 — the share view's banner: one row above the canvas (name + why
    read-only + the two exits), and the error-card variant for a broken link.
@@ -5612,3 +5721,39 @@ kbd {
 .embed-shell .ds-share-banner {
   margin: 16px;
 }
+
+/* ===========================================================================
+   ONBOARD-P5 — the one-line tip. Its own band between the toolbar
+   (top:14px, 40px tall) and the bottom strip that already carries the notice
+   toast, the zoom pill and the getting-started checklist — so it collides with
+   none of them at 1280x577. Pointer events are declared ONLY on the toast
+   itself: no wrapper, no scrim, no full-bleed layer, so the canvas stays fully
+   usable for the ~12s it is on screen. Tokens only (hex cap holds).
+=========================================================================== */
+.tip-toast {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+  z-index: 7;
+  display: flex; align-items: center; gap: 10px;
+  width: max-content; max-width: min(460px, calc(100% - 32px));
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+  padding: 7px 8px 7px 12px;
+  font-size: var(--fs-md); line-height: 1.35;
+  pointer-events: auto;
+  animation: toast-in .18s ease-out;
+}
+.tip-toast-line { flex: 1; }
+.tip-toast-x {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; background: transparent;
+  border: none; border-radius: 6px; color: var(--dim); cursor: pointer;
+  transition: all .15s;
+}
+.tip-toast-x:hover { color: var(--fg); background: var(--elevated); }
+/* The SHARE-VIEW state: `.canvas-wrap:has(.ds-share-banner) .toolbar` above
+   drops the toolbar to top:64, exactly where this band starts, so the toast
+   covered the toolbar by 13,813 px^2 (measured at 1280x577 with a banner in
+   place). The same `:has()` coupling the toolbar uses fixes it here — the tip
+   follows the toolbar down instead of needing a second state flag. */
+.canvas-wrap:has(.ds-share-banner) .tip-toast { top: 114px; }

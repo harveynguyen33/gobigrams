@@ -31,9 +31,20 @@ function freshId(id: string, taken: Set<string>): string {
 export function gobiInsert(
   board: {nodes?: Node[] | null; edges?: Edge[] | null},
   canvas: {nodes: {id: string}[]; edges: {id: string}[]},
+  /** ROUND IMPORT-ONCE — ids already promised to an insert whose commit has
+   *  not landed yet (useExportActions owns the set). Treated as taken, and
+   *  every id THIS insert emits is recorded into it, so a duplicate delivery
+   *  of the same event (two active listeners, a double dispatch before the
+   *  next render) cannot mint colliding ids — collisions are what stop React
+   *  Flow resolving edge endpoints (ZERO rendered edges). Optional: pure
+   *  callers need no bookkeeping. */
+  reserved?: Set<string>,
 ): GobiInsert {
   const nodeIds = new Set(canvas.nodes.map((n) => n.id));
   const edgeIds = new Set(canvas.edges.map((e) => e.id));
+  /* one namespace for the reservation: over-suffixing a duplicate is
+     harmless — unique beats pretty. */
+  if (reserved) for (const id of reserved) { nodeIds.add(id); edgeIds.add(id); }
 
   const nodesIn = board.nodes ?? [];
   const remap = new Map<string, string>();
@@ -56,6 +67,13 @@ export function gobiInsert(
     source: ref(e.source),
     target: ref(e.target),
   }));
+
+  /* ROUND IMPORT-ONCE — record what this insert emitted, so the NEXT call
+     seeing the same stale snapshot reserves past these ids. */
+  if (reserved) {
+    for (const n of nodes) reserved.add(n.id);
+    for (const e of edges) reserved.add(e.id);
+  }
 
   return {nodes, edges};
 }

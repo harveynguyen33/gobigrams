@@ -14,7 +14,8 @@ import {Row, ToolbarChip, Toggle, Segmented, gridSizeOptions} from './Controls';
 export function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
   marquee, onMarquee, zOrder, onZOrder, layoutDir, onLayoutDir, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave'>) {
+  tips, onTips,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave' | 'tips' | 'onTips'>) {
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -101,6 +102,12 @@ export function CanvasPane({
         </Row>
         <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">
           <Toggle label="Highlight connections" value={highlight} onToggle={() => onHighlight()} />
+        </Row>
+        {/* ONBOARD-P5 — the one-line tips. Frequency rule: a tip is a first-use
+            nudge the user turns off once, so its switch lives here, not on the
+            toolbar. Off = nothing is scheduled and the toast does not mount. */}
+        <Row label="Tips" hint="one-line hints the first time you use a feature">
+          <Toggle label="Tips" value={tips} onToggle={() => onTips(!tips)} />
         </Row>
       </div>
     </>
@@ -222,10 +229,11 @@ export function AboutPane({onOpenFeedback}: {onOpenFeedback: (from: HTMLElement 
           </a>
           {' (MIT)'}
         </Row>
-        {/* SUPPORT (2026-10-25) — donate row, Harvey's BMC account exists
-            (buymeacoffee.com/harveynguyen33, live-verified). GitHub Sponsors
-            link already resolves via FUNDING.yml once his profile is
-            approved; both links pinned by checks/round-bg-feedback-entry. */}
+        {/* SUPPORT — Buy Me a Coffee is the chosen primary (Harvey, 2026-11-02: "Cứ dùng BMC,
+            đây là link chính"), which reverses the earlier Ko-fi plan. The handle is
+            harveynguyen33; an earlier FUNDING.yml said "harveynguyen", a different account.
+            GitHub Sponsors is enabled as well and needs no link here. Pinned by
+            checks/round-bg-feedback-entry. */}
         <Row label="Support">
           <a
             className="settings-link"

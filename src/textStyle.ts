@@ -100,10 +100,12 @@ export type TextStyle = {
   /** ROUND Z, ITEM 2 — the vertical position of the text INSIDE its padded
    *  box. The value that renders anyway stores ABSENCE, exactly like `size:
    *  'md'`, `weight: 'regular'` and `font: 'jetbrains'` — but WHICH value that
-   *  is depends on the TARGET (`vAlignForBody`): `top` for a card, a note and a
-   *  label, `middle` for a label-only node, whose box is centred by design.
-   *  ROUND Z FIX 2 corrected this from one global `middle`; a single constant
-   *  cannot describe a box that renders from its own `padding-top`. */
+   *  is depends on the TARGET (`vAlignForBody`). NODE-TEXT-CENTER (2026-11-03)
+   *  moved the card (and the note) to `middle`: every box that fills its node
+   *  now CENTRES by default (Harvey: "the text should always be center in both
+   *  ways"), and only the TEXT annotation kind (`body === undefined`,
+   *  `.label-node`) keeps `top` — it is content-sized, so there is no dead
+   *  space to centre, and a margin note reads better flush-left. */
   vAlign?: TextVAlign;
   /** ROUND W, ITEM 3 — a CUSTOM multiplier beside the four steps, 0.5..2.0.
    *  Mutually exclusive with `size` by construction: setting one clears the
@@ -120,14 +122,20 @@ export const TEXT_DEFAULT_SIZE: TextSize = 'md';
 export const TEXT_DEFAULT_WEIGHT: TextWeight = 'regular';
 
 /** The align a target renders with when NOTHING is stored. It is a property of
- *  the TARGET, not a global constant: `.node .lo-body { text-align: center }`
- *  centres the label-only sentence BY DESIGN (`styles.css`, L3a), so `center`
- *  is that target's inherited value and `left` is everyone else's. App derives
- *  it from `inspTarget` with this helper; the sheet's fallbacks below are the
- *  other half of the same statement (`.node-body` → left, `.lo-body` → center),
- *  and `checks/package-p-inspector.mjs` asserts the two halves agree. */
+ *  the TARGET, not a global constant: `.node .lo-body` has centred the
+ *  label-only sentence BY DESIGN since L3a, and FIRST-VISIT (2026-11-01) made
+ *  `center` the CARD body's no-write value too — Harvey's complaint "card text
+ *  is not centred" plus the .gobi round's own record ("liệu các chữ center đc
+ *  ko") settled the intent: a card centres its rows unless the user opts out,
+ *  the same default draw.io gives a fresh shape. `left` survives for the TEXT
+ *  annotation kind (`body === undefined`, `.label-node`), which is a margin
+ *  note and reads better flush-left. App derives the value from `inspTarget`
+ *  with this helper; the sheet's fallbacks below are the other half of the
+ *  same statement (`.node-body` → center, `.lo-body` → center,
+ *  `.label-node` → left), and `checks/package-p-inspector.mjs` asserts the
+ *  two halves agree. */
 export const alignForBody = (body: 'card' | 'label-only' | undefined): TextAlign =>
-  body === 'label-only' ? 'center' : 'left';
+  body === undefined ? 'left' : 'center';
 
 /** The option tables (§E.1). Plain data — `ToggleRow` renders `o.art ?? o.label`,
  *  so labels alone are enough and this file stays JSX-free. COLOUR has no table
@@ -315,19 +323,20 @@ export const TEXT_VALIGN_FLEX: Record<TextVAlign, string> = {
 /** THE NO-WRITE VALUE, BY TARGET — the vertical half of `alignForBody`, and read
  *  the same way by the panel, the merge and the emitter.
  *
- *  `.node .lo-body` centres its one sentence BY DESIGN (`styles.css`, L3a) and is
- *  `flex-direction: column`, so `center`/`middle` is what THAT box renders with
- *  nothing stored. Every other target renders from its `padding-top`
- *  (`.node-body`, `.note-body` and `.label-node` were plain blocks until this
- *  round), so for them the value that renders with nothing stored is `top` —
- *  which is also what draw.io's `.node-body`-shaped boxes do unpadded, and what
- *  every existing board's pixels already show.
+ *  NODE-TEXT-CENTER (2026-11-03, Harvey: "the text should always be center in
+ *  both ways") made `middle` the no-write value for EVERY target whose box
+ *  fills its node: the card, the note and the label-only sentence all centre
+ *  by default now, and measured pre-fix they did not (the sys-pipeline
+ *  template sat padTop 2 / padBottom 36 at the 190x95 floor). The TEXT
+ *  annotation kind (`body === undefined`, `.label-node`) keeps `top`: its box
+ *  is content-sized — there is no free space for `justify-content` to
+ *  distribute — and a margin note reads better flush-left.
  *
- *  So a card reads back as Top and a label-only node as Middle. Each box's own
+ *  So a card reads back as Middle and a Text caption as Top. Each box's own
  *  `justify-content` fallback is the other half of this same statement, and
  *  `checks/package-p-inspector.mjs` asserts the two halves agree per box. */
 export const vAlignForBody = (body: 'card' | 'label-only' | undefined): TextVAlign =>
-  body === 'label-only' ? 'middle' : 'top';
+  body === undefined ? 'top' : 'middle';
 
 export {COLOR_KEYS, COLOR_VAR};
 
@@ -524,9 +533,10 @@ export function readTextStyle(
     font: resolveFontKey(ts?.font),
     /* ROUND Z, ITEM 2 — a missing field reads as the inherited default, never
      *  as a blank, exactly like `weight` and `align` above. ROUND Z FIX 2 — the
-     *  inherited default is the TARGET's (`vAlignForBody`), so the panel reads
-     *  back Top on a card — which is what that card paints — and Middle on a
-     *  label-only node, which is the only box that centres. */
+     *  inherited default is the TARGET's (`vAlignForBody`). NODE-TEXT-CENTER
+     *  (2026-11-03) made that default `middle` for a card — which is what that
+     *  card now paints — and `top` for the TEXT annotation kind, the one
+     *  content-sized box. */
     vAlign: ts?.vAlign ?? vAlignDefault,
     scale: painted,
   };
@@ -537,15 +547,15 @@ export function readTextStyle(
  *  so the sheet's `var(--ts-*, <own default>)` fallbacks apply and nothing
  *  moves. Spread into the same style object that already carries `--nc`.
  *
- *  `alignDefault` IS A PARAMETER, NOT A CONSTANT. align has no global default:
- *  `.node .lo-body` is centred BY DESIGN and `.node-body`/`.label-node` are
- *  left (`styles.css:3304-3308`), so "the value that renders anyway" differs
- *  per target. The caller passes what `alignForBody` already answers — the same
- *  function the panel and `mergeTextStyle` use — so a stored align and its
- *  painted property can never disagree. Hard-coding `left` here was the defect:
- *  on a `label-only` node, which inherits `center`, a stored `align:'left'` is
- *  a REAL choice, and dropping it left the user's Left indistinguishable from
- *  an untouched node.
+ *  `alignDefault` IS A PARAMETER, NOT A CONSTANT. align has no single global
+ *  default: `.node-body` and `.node .lo-body` centre BY DESIGN (FIRST-VISIT
+ *  2026-11-01 moved the card from left to center) while `.label-node` — the
+ *  TEXT annotation kind — stays left, so "the value that renders anyway"
+ *  differs per target. The caller passes what `alignForBody` already answers —
+ *  the same function the panel and `mergeTextStyle` use — so a stored align
+ *  and its painted property can never disagree. Hard-coding one value here was
+ *  the defect: it made a real user choice indistinguishable from an untouched
+ *  node for one of the targets.
  *
  *  `size` and `weight` take no such default because they have none to take:
  *  `TEXT_SCALE['md'] === 1` is the multiplicative identity and `'regular'` is
@@ -596,13 +606,12 @@ export function textStyleVars(
   /* ROUND Z, ITEM 2 — ONE MORE property beside `--ts-align`/`--ts-justify`, on
      the node root, consumed by each text box's own rule in the sheet with that
      box's CURRENT literal as the fallback.
-     ROUND Z FIX 2 — THE NO-WRITE TEST IS PER-TARGET (`vAlignForBody`). The value
-     that renders anyway is `top` for a card, a note and a label (they render from
-     `padding-top` and did so before this round) and `middle` for a label-only
-     node (`.node .lo-body` centres by design). Testing against a global `middle`
-     was the defect: it dropped a card's Top — a real choice that moves the
-     pixels — and it emitted nothing for `middle` on a card, where the sheet's
-     `flex-start` fallback then painted TOP under a panel reporting Middle. */
+     ROUND Z FIX 2 — THE NO-WRITE TEST IS PER-TARGET (`vAlignForBody`).
+     NODE-TEXT-CENTER (2026-11-03) — the card's no-write value is now `middle`
+     (the sheet's `.node-body` fallback centred with it), so `middle` stores
+     absence and `top`/`bottom` are the authored opt-outs that still emit
+     `--ts-valign` + `--ts-align-items` and move pixels. The TEXT annotation
+     kind keeps `top` as its no-write value (`.label-node` is content-sized). */
   if (ts.vAlign && ts.vAlign !== vAlignDefault) {
     out['--ts-valign'] = ts.vAlign;
     out['--ts-align-items'] = TEXT_VALIGN_FLEX[ts.vAlign];

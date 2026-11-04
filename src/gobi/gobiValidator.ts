@@ -13,7 +13,7 @@
  * The §3.4 allows-list is deliberately NOT re-checked here: edge cycles,
  * self-edges, orphans and group-referencing edges pass through untouched. */
 
-import {ICON_NAMES} from '../lucideIcons';
+import {ICON_NAMES} from './iconNames';
 import {
   GOBI_COLOR_KEYS,
   GOBI_ICON_NAMES,
@@ -49,6 +49,17 @@ export function validateGobi(ast: GobiAst): GobiError[] {
       errors.push({
         line: n.line, col: n.col,
         message: `color "${color}" isn't a board colour. Try: ${GOBI_COLOR_KEYS.join(', ')}.`,
+      });
+    }
+    /* GOBI-TEXT-FIT (R3) — `body:` reaches `data.body`, which only the card
+       shapes read (DiagramNode's note branch and GroupNode keep their own
+       layouts; the label and table kinds are their own node types). A body
+       word on those kinds would be silently ignored — refuse it instead. */
+    const bodyKindBad = ['group', 'note', 'table', 'text'].includes(n.nodeKind);
+    if (n.attrs?.body && bodyKindBad) {
+      errors.push({
+        line: n.line, col: n.col,
+        message: `body: does nothing on a ${n.nodeKind} — it picks the card layout of a shape node (service, database, queue, …).`,
       });
     }
   }

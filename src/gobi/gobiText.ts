@@ -10,12 +10,14 @@
  * checks/round-gobi-text.mjs asserts they are equal sets.
  *
  * THE DEFAULT IS THE LANGUAGE'S OWN, AND IT IS NOT THE APP'S.
- * `alignForBody('card')` is `left` — the canvas's no-write value for a card —
- * and that stays true for the palette drag path, which is a different surface
- * and out of scope. A `.gobi` document is a different author: Harvey asked for
- * a text-authored diagram to come out CENTRED without saying so on every line
- * ("liệu các chữ center đc ko"), so the compiler WRITES `align: 'center'` and
- * `align:left` is the opt-out.
+ * FIRST-VISIT (2026-11-01): `alignForBody('card')` is now `center` — the
+ * canvas centred the card body the same day — so the compiler's explicit
+ * `align: 'center'` write is now redundant for fresh nodes but still correct
+ * (it travels in `data.textStyle`, and `align:left` remains the opt-out).
+ * History: when this file landed, the canvas no-write value for a card was
+ * `left`, and Harvey asked for a text-authored diagram to come out CENTRED
+ * without saying so on every line ("liệu các chữ center đc ko"), so the
+ * compiler WRITES `align: 'center'` while the palette drag path stayed left.
  *
  * ROUND GOBI-TEXT3 — `vAlign` NOW HAS A LANGUAGE DEFAULT TOO: `middle`
  * (`GOBI_VALIGN_DEFAULT`). Harvey, looking at the render: "chữ chỉ đang ở top
@@ -48,6 +50,18 @@ export const GOBI_ALIGN_DEFAULT: TextAlign = 'center';
 /** The vertical align a `.gobi` node gets when the document says nothing —
  *  ROUND GOBI-TEXT3, Harvey's ask: the text sits in the MIDDLE of the box. */
 export const GOBI_VALIGN_DEFAULT: TextVAlign = 'middle';
+
+/* GOBI-TEXT-FIT (R3) — the `body:` vocabulary. The app's model names the two
+ * layouts 'card' | 'label-only' (src/textStyle.ts, DiagramNode); the
+ * language's word for the simple one is `simple` — the word Harvey used
+ * ("simple tôi nhớ mình có option đó nữa"). Closed world like align/valign:
+ * the parser refuses anything else with a suggestion at the token. */
+export const GOBI_BODY_VALUES: string[] = ['card', 'simple'];
+
+/** The language word → the model's own body value (`simple` IS `label-only`). */
+export function gobiBodyOf(v: string | undefined): 'card' | 'label-only' | undefined {
+  return v === 'card' ? 'card' : v === 'simple' ? 'label-only' : undefined;
+}
 
 /** Node attributes → the ONE `TextStyle` the compiler stores on `data`.
  *  Values are validated by the PARSER (it holds the token, so it can point at

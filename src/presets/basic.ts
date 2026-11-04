@@ -1,5 +1,7 @@
 /* ROUND BN-4 — this file is one slice of the former `src/presets.ts` (split verbatim, 2026-10-25). `src/presets/index.ts` re-exports the union, so every import of './presets' is unchanged. */
-import {MarkerType, type Edge} from '@xyflow/react';
+import {type Edge} from '@xyflow/react';
+/* CORE-STEP1: the marker enum is local plain data (src/markers.ts), values verbatim. */
+import {MarkerType} from '../markers';
 import type {EdgeMarkerType} from '@xyflow/system';
 import {COLOR_VAR, type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';

@@ -1,5 +1,8 @@
 /* ROUND BN-4 — this file is one slice of the former `src/presets.ts` (split verbatim, 2026-10-25). `src/presets/index.ts` re-exports the union, so every import of './presets' is unchanged. */
-import {MarkerType, type Edge, Node} from '@xyflow/react';
+import {type Edge, type Node} from '@xyflow/react';
+/* CORE-STEP1: the marker ENUM is local plain data (src/markers.ts) — the
+   factory graph no longer imports @xyflow/react at runtime. Values verbatim. */
+import {MarkerType} from '../markers';
 import type {Node as _N} from '@xyflow/react';
 import {type ColorKey} from '../colors';
 import {PALETTE, type PaletteItem, type PaletteCategory, type DiagramType} from '../palette';
@@ -308,12 +311,77 @@ export function libraryFor(id: PresetId): PaletteItem[] {
    THE PRESETS
 =========================================================================== */
 
+/* FIRST-VISIT (2026-11-01) — THE SEED BECAME A TEMPLATE. A brand-new visitor
+   now lands on an EMPTY canvas (the empty-state panel is the orientation
+   surface, not a finished diagram), so the teaching pipeline moved here from
+   `src/boardConstants.ts`'s `initialNodes`/`initialEdges` VERBATIM: same node
+   ids, same authored positions, same two edges (the labelled `e1` carries the
+   dots flow payload, `e2` is dashed), same group boundary around Queue +
+   Service. Everything is still built by the preset's own factories (palette
+   `make()` / `makeEdge`), so the template cannot drift from what the creation
+   paths produce — the ONBOARD-P4 invariant, moved not weakened. Resolved by
+   LABEL (not by index) so a palette re-order cannot silently re-aim it. */
+const ARCH_EDGES: EdgeDefaults = {
+  path: 'bezier',
+  strokeKey: 'slate',
+  dash: 'solid',
+  markerStart: null,
+  markerEnd: MarkerType.ArrowClosed,
+  flowAllowed: true,
+};
+const ARCH_PAL = libraryFor('architecture');
+const archItem = (label: string) => ARCH_PAL.find(p => p.label === label)!;
+/* NODE-TEXT-CENTER (2026-11-03) — the three cards now carry the palette's own
+   CARD_SIZE (290x145), the convention every OTHER template already follows
+   (flowchart's flowNode) and the palette insert path stamps (App.tsx). The
+   template was the one creation path that forgot GOBI-SIZE, so its cards fell
+   back to the 190x95 CSS floor — the geometry Harvey's "not centred"
+   screenshot was measured on. n1 moves 60 -> 20 so the wider card keeps its
+   clearance of the group's left edge (authored gap 80px, kept >= 20px); the
+   authored child positions already clear the 145px height inside the 250px
+   group (74/84 + 145 <= 250) and the K5 banner (>= 68). */
+const archCard = (id: string, label: string, position: {x: number; y: number}, parentId?: string): Node => ({
+  id, type: 'goblin', ...(parentId ? {parentId, extent: 'parent' as const} : null),
+  position,
+  width: CARD_SIZE.width, height: CARD_SIZE.height,
+  style: {width: CARD_SIZE.width, height: CARD_SIZE.height},
+  data: archItem(label).make() as any,
+});
+const systemPipelineTemplate: TemplateSpec = {
+  id: 'sys-pipeline',
+  label: 'System pipeline',
+  hint: 'external → queue → service · boundary, flowing edge, dashed edge',
+  nodes: [
+    archCard('n1', 'External', {x: 20, y: 180}),
+    /* A parent must precede its children in the array (React Flow's rule), and a
+       child's position is PARENT-RELATIVE — n2/n3 keep their authored relative
+       points (30,74 / 350,84 inside g1 at 420,96); n1 sits at (20,180) so the
+       290px-wide card clears the group's left edge (420). EDGE-LABEL-BORDER
+       (2026-11-03): the boundary's left border used to sit at 330, only 20px
+       past n1 — the auto-centred "events" label (anchor = the edge midpoint)
+       straddled the dashed line (13 px outside / 21 px inside, measured on
+       production), and BOTH along-edge retreats were blocked (n1's box
+       outside, n2's box inside), so the card's fallback had nowhere to park
+       it. The gap is authored at 110px now: the anchor lands at x 380 and the
+       51.6px-wide estimated plate clears the border by 14.2px (>= 8) fully
+       OUTSIDE the boundary, no pin needed. */
+    {id: 'g1', type: 'goblin', position: {x: 420, y: 96}, width: 690, height: 250, style: {width: 690, height: 250},
+      data: {...archItem('Group').make(), title: 'Your system', sub: 'boundary'} as any},
+    archCard('n2', 'Queue', {x: 30, y: 74}, 'g1'),
+    archCard('n3', 'Service', {x: 350, y: 84}, 'g1'),
+  ],
+  edges: [
+    makeEdge('n1', 'n2', ARCH_EDGES, 'e1', {label: 'events', flow: 'dots'}),
+    makeEdge('n2', 'n3', {...ARCH_EDGES, dash: 'dashed'}, 'e2'),
+  ],
+};
+
 /** 1 — `architecture`: today's behaviour, the default for every old board. */
 export const ARCHITECTURE_PRESET: DiagramPreset = {
   id: 'architecture',
   label: 'Architecture',
   hint: 'services · datastores · boundaries',
-  palette: libraryFor('architecture'),
+  palette: ARCH_PAL,
   edges: {
     path: 'bezier',
     strokeKey: 'slate',
@@ -328,6 +396,9 @@ export const ARCHITECTURE_PRESET: DiagramPreset = {
   // Truthful to today's behaviour: all three toggles ship OFF, so adopting this
   // preset cannot change an existing board (L2: architecture is byte-identical).
   caps: {subflow: true, cyclePrevention: false, oneInput: false, resizable: true},
+  /* FIRST-VISIT (2026-11-01) — the former first-run seed, now reachable from
+     `Start from a template` (see systemPipelineTemplate above). */
+  templates: [systemPipelineTemplate],
   legend: [
     {colorKey: 'accent', label: 'External system'},
     {colorKey: 'cyan', label: 'Service'},

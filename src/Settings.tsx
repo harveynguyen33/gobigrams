@@ -233,6 +233,7 @@ export default function Settings({
   layoutDir, onLayoutDir,
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
+  tips, onTips,
   returnFocusTo,
   boardPng,
   onOpenFeedback,
@@ -346,6 +347,8 @@ export default function Settings({
           onPngPad={onPngPad}
           autosave={autosave}
           onAutosave={onAutosave}
+          tips={tips}
+          onTips={onTips}
         />
       );
       case 'connections': return (

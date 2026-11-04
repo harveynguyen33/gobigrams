@@ -101,6 +101,24 @@ export function asShape(v: unknown): Shape {
   return typeof v === 'string' && (SHAPE_IDS as string[]).includes(v) ? (v as Shape) : 'service';
 }
 
+/* GOBI-WRAP-RULES N2 (2026-11-03) — shapes whose outline spends real height
+ * on a TOP FACE, as a fraction of the 0 0 200 100 viewBox's height:
+ *   · database / storeddata — the cylinder's elliptical rim: ellipse cy=20
+ *     ry=15, so the rim's bottom arc crosses y=35 of 100 → 0.35 (ROUND AD
+ *     gave both kinds ONE drawing);
+ *   · storage — the bin's lid band: rect y=2 height=19 → ends y=21 of 100.
+ * The DOM-less export's text band starts BELOW this line (exportScene
+ * textBox), so a kicker clears the rim instead of sitting on its arc. The
+ * canvas needs no twin: its `.node-body` inset registry already insets the
+ * cylinder band. checks/round-gobi-text-fit.mjs C1/C2 enumerates this set
+ * FROM the frame markup (top ellipse / top pill band) and asserts the table
+ * equals it — no hand-maintained list on either side. */
+export const SHAPE_TOP_FACE: Partial<Record<Shape, number>> = {
+  database: 0.35,
+  storeddata: 0.35,
+  storage: 0.21,
+};
+
 /* ROUND AG (recorded, unchanged — round-ag-colors ag15 reads this declaration
    verbatim): the 9% mix as a presentation VALUE. It cannot ride a fill
    ATTRIBUTE (var() is invalid there), which is exactly how the canvas ended

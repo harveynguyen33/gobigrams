@@ -265,7 +265,7 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
         rowEl ? rowFontOf(rowEl) : undefined;
       const rows: TextRect['rows'] = {};
       const kickEl = el.querySelector('.node-kicker');
-      const subEl = el.querySelector('.node-sub');
+      const subEl = el.querySelector('.node-sub') ?? el.querySelector('.lo-sub');
       const metricEl = el.querySelector('.node-metric');
       if (kickEl) rows.kicker = rowFont(kickEl);
       if (subEl) rows.sub = rowFont(subEl);
@@ -539,42 +539,14 @@ function estimateTextWidth(text: string, o: {size: number; spacing?: number}): n
   return text.length * o.size * 0.6 + Math.max(0, text.length - 1) * (o.spacing ?? 0);
 }
 
-/** Pure greedy word wrap — DEFECT-2's whole mechanism.
- *
- *  Inputs: the text, the box it must fit, and a WIDTH FUNCTION. It knows
- *  nothing about SVG, nodes or the DOM, so the stub measurer drives it in the
- *  harness exactly as the browser's does in the app. `overflow-wrap:
- *  anywhere` semantics: break BETWEEN words first; a word wider than the box
- *  is hard-broken at the character that overflows rather than escaping the
- *  box (matching the `.node-title` CSS rule). */
-export function wrapText(
-  text: string,
-  availableWidth: number,
-  measure: (s: string) => number,
-): string[] {
-  const t = text.trim().replace(/\s+/g, ' ');
-  if (!t || availableWidth <= 0) return [text];
-  if (measure(t) <= availableWidth) return [t];
-
-  const words = t.split(' ');
-  const lines: string[] = [];
-  let cur = '';
-  for (const word of words) {
-    const candidate = cur ? cur + ' ' + word : word;
-    if (measure(candidate) <= availableWidth) { cur = candidate; continue; }
-    if (cur) { lines.push(cur); cur = ''; }
-    if (measure(word) <= availableWidth) { cur = word; continue; }
-    /* single word too long: hard-break at the last fitting character */
-    let piece = '';
-    for (const ch of word) {
-      if (piece && measure(piece + ch) > availableWidth) { lines.push(piece); piece = ch; }
-      else piece += ch;
-    }
-    cur = piece;
-  }
-  if (cur) lines.push(cur);
-  return lines;
-}
+/** Pure greedy word wrap — DEFECT-2's whole mechanism. MOVED to
+ *  src/export/textWrap.ts (GOBI-WRAP-RULES 2026-11-03): exportSvg.ts is a
+ *  hard-capped file and the wrap's break ladder grew its own rules (break
+ *  after an intra-token hyphen/slash, never leave a lone separator dangling
+ *  at a line end). Imported for this file's own call sites and re-exported so
+ *  every import site (textMetrics) still reads one home. */
+import {wrapText} from './textWrap';
+export {wrapText};
 
 /** Max lines a text row may occupy inside the node box — the exporter's twin
  *  of the live canvas' clip: `.node-body { overflow: hidden; max-height: 100% }`
@@ -944,10 +916,10 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
   const rowEl = (r: SceneTextRow): string => rowMarkup(r, outline);
   /* groups first (behind everything) */
   for (const g of scene.groups) {
-    const cb = (g as SceneNode & {childBounds?: Bounds}).childBounds
-      ?? {minX: g.absX, minY: g.absY, maxX: g.absX + g.w, maxY: g.absY + g.h};
-    const left = cb.minX + off.x - 12, top = cb.minY + off.y - 12;
-    const lw = (cb.maxX - cb.minX) + 24, lh = (cb.maxY - cb.minY) + 24;
+    /* ROUND GOBI-GROUP-BANNER — the rect is the group node's own AUTHORED geometry,
+     * as the canvas paints; the childBounds ±12 re-fit collapsed the 68px banner inset. */
+    const left = g.absX + off.x, top = g.absY + off.y;
+    const lw = g.w, lh = g.h;
     parts.push(`<g data-ar-node="${escAttr(g.id)}" transform="translate(${left},${top})">`);
     parts.push(`<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(g.accent)}" stroke-width="1.2" stroke-dasharray="8 5"/>`);
     for (const r of g.rows) parts.push(rowEl(r));

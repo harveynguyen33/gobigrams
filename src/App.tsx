@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
-import {createPortal} from 'react-dom';
 import {
   ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
@@ -7,15 +6,15 @@ import {
   type ReactFlowInstance, type XYPosition,
 } from '@xyflow/react';
 import {
-  Copy, ChevronDown, ChevronLeft, ChevronRight, Trash2,
-  LayoutGrid, Plus, Pencil, Save,
+  Copy, ChevronDown, ChevronLeft, ChevronRight,
+  LayoutGrid, Save,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   BringToFront, SendToBack,
-  LayoutTemplate,
   X,
 } from 'lucide-react';
+import {fitPaddingFor} from './checklistFit';
 import '@xyflow/react/dist/style.css';
 import {
   // ROUND T — the bend rules (`SIDE_OUT`, `OPPOSITE_SIDE`, `STEP_GAP_PX`,
@@ -40,7 +39,7 @@ import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from './e
 import DiagramNode, {type NodeKind} from './nodes/DiagramNode';
 import LabelNode, {type LabelKind} from './nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture} from './resizeHistory';
-import {useRotation} from './useRotation';
+import {useRotation, norm180} from './useRotation';
 import {ROTATE_SNAP_DEG} from './layoutConstants';
 import {GroupRotateGrip} from './components/GroupRotateGrip';
 import {SelectionBox} from './components/SelectionBox';
@@ -114,7 +113,11 @@ import {RotateInternalsBridge} from './components/RotateInternalsBridge';
 import {ModalMounts} from './components/ModalMounts';
 import {CanvasEmptyPanel} from './components/CanvasEmptyPanel';
 import {Toolbar} from './components/Toolbar';
-import Checklist, {type ChecklistTaskId, isChecklistComplete} from './nodes/Checklist';
+import Checklist, {type ChecklistTaskId, isChecklistComplete, readChecklistDone, readChecklistDismissed} from './nodes/Checklist';
+/* ONBOARD-P5 — the one-line tips: the four gates live in the pure module, the
+ * render in src/components/TipToast.tsx. */
+import {takeTip, markTipSeen, tipsOn, setTipsOn, type TipId} from './tips';
+import TipToast from './components/TipToast';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
@@ -182,7 +185,6 @@ import {
 
 const nodeTypes = {goblin: DiagramNode, label: LabelNode, table: TableNode, customshape: CustomShapeNode};
 let idc = 100;
-
 
 /** Per-edge extras that are not part of React Flow's Edge type. */
 export type EdgeData = {
@@ -456,6 +458,9 @@ export default function App() {
     savePref('dbl-range', next);
   }, []);
   const [expOpen, setExpOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  /* MODAL-DOORS: ONE writer sets BOTH booleans — two doors can never be open at once. */
+  const openDoor = (d: 'export' | 'share') => { setExpOpen(d === 'export'); setShareOpen(d === 'share'); };
   // ---- D1: searchable insert palette (position = double-click point) ----
   const [searchPos, setSearchPos] = useState<{x: number; y: number} | null>(null);
   // ---- D2: cheat sheet popover ----
@@ -673,6 +678,9 @@ export default function App() {
   // ---- M1: the Settings dialog (the theme is one of its settings). ----
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
+  /* MODAL-DOORS: the two dialog triggers (focus returns to the opener). */
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
 
   /** The paint path. `theme` state and `applyTheme` both track `effectiveTheme`
    *  so there is exactly one place that decides what the document looks like. */
@@ -784,10 +792,19 @@ export default function App() {
          gate is closed — a flush landing mid-switch writes nothing. */
       setBoardLoadedDocId(doc.id);
       boards.cacheLastBoard(doc.id);
-      /* HARVEY 2026-10-13 — maxZoom 1: a 1-node board must not zoom to 250%. */
-      setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
+      /* HARVEY 2026-10-13 — maxZoom 1: a 1-node board must not zoom to 250%.
+         FIRST-VISIT rework — the load fit is panel-aware (checklistFit.ts);
+         presence comes from the panel's own storage readers, NOT a DOM query —
+         see checklistFit.ts for the boot-timing reason. */
+      setTimeout(() => rf?.fitView({maxZoom: 1,
+        padding: fitPaddingFor(!readChecklistDismissed() && !isChecklistComplete(readChecklistDone()))}), 30);
     });
   }, [setNodes, setEdges, rf, animateLayout, adoptBoardPreset]);
+
+  /** FIRST-VISIT rework — the same panel-aware padding for the `fitView` PROP: on
+   *  boot RF's first-content fit lands AFTER applyBoard's and used to revert it. */
+  const fitOpts = useMemo(() => ({maxZoom: 1,
+    padding: fitPaddingFor(!readChecklistDismissed() && !isChecklistComplete(readChecklistDone()))}), []);
 
   /* ROUND BN-2 — the save/load cluster now lives in usePersistence.ts
      (moved verbatim). applyBoard stays HERE (it owns the module-level idc
@@ -922,10 +939,11 @@ export default function App() {
   const nudge = useCallback((dx: number, dy: number) => {
     const ids = new Set(nodesRef.current.filter(n => n.selected).map(n => n.id));
     if (!ids.size) return;
+    tickTask('move');   // CHECKLIST-EDGE — the arrows ARE a move gesture
     setNodes(ns => ns.map(n => ids.has(n.id)
       ? {...n, position: {x: n.position.x + dx, y: n.position.y + dy}}
       : n));
-  }, [setNodes]);
+  }, [setNodes, tickTask]);
 
   /** Delete every selected node (and its attached edges). */
   const deleteSelection = useCallback(() => {
@@ -935,8 +953,6 @@ export default function App() {
     setNodes(ns => ns.filter(n => !ids.has(n.id)));
     setEdges(es => es.filter(e => !ids.has(e.source) && !ids.has(e.target)));
   }, [pushHistory, setNodes, setEdges]);
-
-
 
   // ---- F2: context menu actions ----
   /** Absolute flow position of a node (parent-relative resolved up the tree). */
@@ -1068,6 +1084,38 @@ export default function App() {
   // key or the context menu it always had (see the mapping in DiagramNode.tsx);
   // `ctxAction` in particular is still the context menu's dispatcher.
 
+  /* =====================================================================
+     ONBOARD-P5 — ONE-LINE TIPS AT FIRST USE (src/tips.ts owns the gates).
+
+     App only decides WHEN to ask and WHERE a tip may land. The four gates (one
+     per session, once ever, claimed on show, the Settings switch) all live in
+     the pure module, so the harness executes them instead of reading them.
+
+     A TIP NEVER LANDS ON TOP OF A DIALOG — and one of its own triggers is fired
+     from INSIDE the ExportModal, so a blocked fire is QUEUED rather than
+     dropped, then shown once the last surface closes. */
+  const [tip, setTip] = useState<{id: TipId; line: string} | null>(null);
+  const pendingTip = useRef<TipId | null>(null);
+  const fireTip = useCallback((id: TipId) => {
+    if (settingsOpen || !!boardDlg || tgOpen || feedbackOpen || expOpen || shareOpen) { pendingTip.current = id; return; }
+    const line = takeTip(id);
+    if (line) setTip({id, line});
+  }, [settingsOpen, boardDlg, tgOpen, feedbackOpen, expOpen, shareOpen]);
+  useEffect(() => {
+    const id = pendingTip.current;
+    if (!id) return;
+    pendingTip.current = null;
+    fireTip(id);   // re-runs the same gate: shows now, or queues again
+  }, [fireTip]);
+  /** The × and the 12s auto-hide are the SAME act: both write the forever key. */
+  const dismissTip = useCallback(() => {
+    if (tip) markTipSeen(tip.id);
+    setTip(null);
+  }, [tip]);
+  /** gate 4's UI half — App state mirrors the pref so the Settings row repaints. */
+  const [tipsPref, setTipsPref] = useState(() => tipsOn());
+  const changeTips = useCallback((v: boolean) => { setTipsPref(v); setTipsOn(v); }, []);
+
   // ---- F3 + F9 + F1: drag lifecycle ----
   const absNodes = useCallback((ns: Node[]) => {
     // cache absolute positions for helper lines / proximity / reparenting
@@ -1086,7 +1134,7 @@ export default function App() {
   const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules] = useConnections(
     nodesRef, edgesRef, setEdges, setGuides, pushHistory, tickTask, flash, rf, wrap,
     readOnlyRef, pendingDrop, connectOrigin, shiftDown, absNodes, noCycles, oneIn,
-    dblConnect, dblRange, preset, defaultPath, () => idc++);
+    dblConnect, dblRange, preset, defaultPath, () => idc++, fireTip);
 
   const onNodeDrag = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     const ns = nodesRef.current;
@@ -1205,7 +1253,7 @@ export default function App() {
      distribute) now lives in useCanvasTools.ts, moved verbatim. */
   const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
     nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
-    rf, sel, zOrderMode, preset, layoutDir);
+    rf, sel, zOrderMode, preset, layoutDir, tickTask);
 
 
   const selected = nodes.find(n => n.id === sel);
@@ -1878,11 +1926,18 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           colorKey: 'cyan',
         } as any,
       }]);
+      /* ONBOARD-P5 — the first table the user creates. The keys below (pk/fk)
+         are the one thing a fresh table cannot show them. */
+      fireTip('table');
       return;
     }
 
     const data = item.make() as any;
     const shape = asShape(data?.shape);
+    /* ONBOARD-P5 — the first frame the user drops teaches what a frame DOES
+       (it adopts what you drag into it), which is not visible from the empty
+       boundary on screen. */
+    if (data.shape === 'group') fireTip('group');
     // C3: the palette item owns the box, so NodeResizer's baseline and the
     // persisted style agree by construction. GOBI-SIZE (src/nodeSizes.ts) gave
     // every kind an explicit size, which RETIRES the group/note fallbacks that
@@ -4262,8 +4317,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onOpenApp={dismissError}
           />
         )}
-        {/* ROUND BN-3 PHASE B: the toolbar + the 2+-selection action bar live
-            in src/components/Toolbar.tsx; App threads every state/handler. */}
+        {/* ROUND BN-3 PHASE B: toolbar + selection bar live in Toolbar.tsx; App threads every prop. */}
         <Toolbar
           canUndo={canUndo}
           canRedo={canRedo}
@@ -4283,7 +4337,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           gridSize={gridSize}
           onDuplicate={() => duplicateSelection()}
           onAutoLayout={autoLayout}
-          onOpenExport={setExpOpen}
+          onOpenExport={() => openDoor('export')}
+          onOpenShare={() => openDoor('share')}
+          exportBtnRef={exportBtnRef}
+          shareBtnRef={shareBtnRef}
           settingsOpen={settingsOpen}
           onOpenSettings={setSettingsOpen}
           settingsBtnRef={settingsBtnRef}
@@ -4296,9 +4353,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {notice && <div className="toast">{notice}</div>}
 
-        {/* H2: getting-started checklist. Its state, its auto-hide and the
-            history of the removed completion toast live in Checklist.tsx. */}
+        {/* H2: getting-started checklist; its state and auto-hide live in Checklist.tsx. */}
         <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
+
+        {/* ONBOARD-P5 — the one-line tip; with tips OFF `tip` stays null and nothing renders. */}
+        {tip && <TipToast line={tip.line} onDismiss={dismissTip} />}
 
         {/* F2: context menu (node / edge / pane right-click) */}
         {ctx && (
@@ -4309,11 +4368,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* C5: zoom pill — rendered inside ReactFlow so useStore resolves.
-            Positioned absolute relative to the .react-flow container. */}
-        {/* D2: keyboard cheat sheet — ROUND BN-3 PHASE B: the whole block
-            (button + popover) lives in src/components/HelpSheet.tsx now;
-            App threads the open state, the two refs and the feedback opener. */}
+        {/* C5: zoom pill — inside ReactFlow so useStore resolves; absolute vs the .react-flow container. */}
+        {/* D2: keyboard cheat sheet — lives in src/components/HelpSheet.tsx; App threads the open state, refs and the feedback opener. */}
         <HelpSheet
           btnRef={helpBtnRef}
           popRef={helpRef}
@@ -4333,9 +4389,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           />
         )}
 
-        {/* ROUND BN-3 PHASE B: the five modal mounts (BoardDialog, gallery,
-            Settings, FeedbackDialog, ExportModal + the hidden JSON input) live
-            in src/components/ModalMounts.tsx; App computes every prop. */}
+        {/* ROUND BN-3 PHASE B: the modal mounts (BoardDialog, gallery, Settings, FeedbackDialog, ExportModal, ShareDialog + JSON input) live in ModalMounts.tsx; App computes every prop. */}
         <ModalMounts
           boardDlg={boardDlg}
           curBoardName={curBoard?.name ?? ''}
@@ -4381,6 +4435,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onPngPad,
             autosave,
             onAutosave,
+            tips: tipsPref,
+            onTips: changeTips,
             returnFocusTo: settingsBtnRef,
             boardPng: nodes.length ? boardPngForFeedback : null,
             onOpenFeedback: openFeedback,
@@ -4391,7 +4447,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           boardPng={nodes.length ? boardPngForFeedback : null}
           expOpen={expOpen}
           onCloseExport={() => setExpOpen(false)}
-          onExported={() => tickTask('export')}
+          exportReturn={exportBtnRef}
+          shareOpen={shareOpen}
+          onCloseShare={() => setShareOpen(false)}
+          shareReturn={shareBtnRef}
+          onExported={() => { tickTask('export'); fireTip('export'); }}
           nodes={nodes}
           edges={edges}
           liveTheme={theme}
@@ -4406,13 +4466,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects
             (see `selectionOnDrag`), Shift+drag box-selects from a node too,
-            middle/right drag + Space+drag pan, plain scroll pans (free, both
-            axes), Ctrl/Cmd+scroll (trackpad pinch) zooms. ROUND AA, ITEM 2 — the
-            marquee's own mode is the `selectionMode` prop below, driven by
-            Settings → Canvas → Marquee selection. */}
-        {/* K1: ds-flow-wrap scopes the hover-choreography + perf-guard classes
-            to THIS React Flow instance. K3: ds-animating-layout (added/removed
-            around programmatic layouts) and ds-no-anim (animation gating). */}
+            middle/right drag + Space+drag pan, plain scroll pans, Ctrl/Cmd+scroll
+            zooms. ROUND AA, ITEM 2 — the marquee's mode is `selectionMode` below,
+            from Settings → Canvas → Marquee selection. */}
+        {/* K1: ds-flow-wrap scopes the hover-choreography + perf-guard classes to
+            THIS instance. K3: ds-animating-layout / ds-no-anim gate animations. */}
         <ReactFlow
           nodes={rfNodes} edges={rfEdges} /* badge hidden 2026-10-25; credit -> About */ proOptions={{hideAttribution: true}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange}
@@ -4422,18 +4480,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           onReconnect={onReconnect}
           // Q: gated exactly like the three element-touching props below, so
           // review mode has ONE source of truth for "nothing on the canvas can
-          // be changed". `edgesReconnectable` was the lone omission — the
-          // anchors are rendered whenever the prop is truthy and they are NOT
-          // read-only aware, so in review mode the user could still rip a wire
-          // off a node (and `onReconnect` would then push an undo entry for a
-          // change the mode promises is impossible). The grabber is invisible,
-          // so this is also the only arm of the gesture that could be started by
-          // accident. With the prop false RF renders no `EdgeUpdateAnchors` at
-          // all (`isReconnectable && …` in EdgeWrapper), i.e. the whole gesture
-          // is absent, not merely inert. That is the ONLY entry point — grep for
-          // `reconnect` in src/ returns this line, `onReconnect` above, and its
-          // `reconnectEdge` call, so no second path exists. `reconnectRadius` is
-          // a top-level `<ReactFlow>` prop and carries no behaviour of its own.
+          // be changed": the update anchors render whenever this prop is truthy
+          // and are NOT read-only aware, so without the gate a review-mode user
+          // could still rip a wire off a node (and `onReconnect` would push an
+          // undo entry for a change the mode promises is impossible). With the
+          // prop false RF renders no `EdgeUpdateAnchors` at all — the gesture
+          // is absent, not merely inert. It is the ONLY reconnect path: grep
+          // `reconnect` in src/ returns this line, `onReconnect` above and its
+          // `reconnectEdge` call, nothing else (`reconnectRadius` is inert).
           edgesReconnectable={!readOnly}
           reconnectRadius={RECONNECT_RADIUS}
           // B2: every connection point is usable in BOTH directions. Each node
@@ -4537,7 +4591,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             setSelCount(s.length);
             setSelEdgeId(se.length === 1 ? se[0].id : null);
           }}
-          fitView fitViewOptions={{padding: 0.25, maxZoom: 1}}
+          fitView fitViewOptions={fitOpts}
           minZoom={0.2} maxZoom={2.5}
           // M3/S3.7 — KEEP false. React Flow's own warning: double-click zoom
           // bypasses the gesture filter entirely (no `isWrappedWithClass` guard
@@ -5376,7 +5430,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     (a package-p invariant), and the row is presentational. */}
                 <RotationRow
                   value={(((selected.data as any).rotation as number | undefined) ?? 0)}
-                  onChange={v => update({rotation: v === 0 ? undefined : v} as any)}
+                  onChange={v => update({rotation: v === 0 ? undefined : norm180(v)} as any)}
                 />
                 {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
                     inner arcs (database / storeddata only). A key choice keeps

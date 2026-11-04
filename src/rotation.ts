@@ -51,6 +51,10 @@ export type Rotatable = {rotation?: number};
  *  site. Grepped by checks/round-rotate.mjs (e1). */
 export {ROTATE_SNAP_DEG} from './layoutConstants';
 
+/* ROTATION-RANGE — the enforced range pair, re-exported beside the snap step
+   for the same one-import-site reason. */
+export {ROTATION_MIN, ROTATION_MAX} from './layoutConstants';
+
 /** Normalise any degree value into (-180, 180]. 0 stays 0; -180 -> 180. */
 export function norm180(deg: number): number {
   if (!Number.isFinite(deg)) return 0;
@@ -58,6 +62,24 @@ export function norm180(deg: number): number {
   if (d > 180) d -= 360;
   if (d <= -180) d += 360;
   return d === 0 ? 0 : d; /* kill -0 */
+}
+
+/** ROTATION-RANGE — the input-side clamp: whatever the inspector field (or
+ *  any other caller) produces, the value that reaches the board is
+ *  step-rounded and normalised into (-180, 180], so the stored angle is
+ *  ALWAYS the angle the node paints. Garbage — empty, non-numeric text,
+ *  exponential notation — is refused the way an empty field always was: 0.
+ *  Goldens in checks/round-rotation-range.mjs (a4). */
+export function clampRotation(raw: number | string, step = 1): number {
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    /* exponential notation ('1e9') is a magnitude, not a degrees value the
+     * field can legibly hold — refused, not wrapped */
+    if (s === '' || /[eE]/.test(s) || !Number.isFinite(Number(s))) return 0;
+    return clampRotation(Number(s), step);
+  }
+  if (!Number.isFinite(raw)) return 0;
+  return norm180(Math.round(raw / step) * step);
 }
 
 /** The K5 post-it tilt, in degrees, now data-driven instead of a CSS rule.

@@ -8,7 +8,7 @@
 import type * as React from 'react';
 import type {Node, ReactFlowInstance} from '@xyflow/react';
 import {
-  Undo2, Redo2, Maximize, Magnet, Copy, Upload,
+  Undo2, Redo2, Maximize, Magnet, Copy, ArrowDownUp, Share2,
   Trash2, LayoutGrid, AlignCenter, Eye,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
@@ -40,6 +40,13 @@ type ToolbarProps = {
   onDuplicate: () => void;
   onAutoLayout: () => void;
   onOpenExport: (v: boolean) => void;
+  /** SHARE-DOOR — opens the Share dialog directly (its own entrance, NOT a
+   * tab inside the Import·Export dialog). */
+  onOpenShare: () => void;
+  /** MODAL-DOORS (2026-11-03) — the two dialog triggers; closing a dialog
+   * returns focus to the button that opened it (the Settings-button contract). */
+  exportBtnRef: React.RefObject<HTMLButtonElement | null>;
+  shareBtnRef: React.RefObject<HTMLButtonElement | null>;
   settingsOpen: boolean;
   onOpenSettings: (v: boolean) => void;
   settingsBtnRef: React.RefObject<HTMLButtonElement | null>;
@@ -111,30 +118,50 @@ export function Toolbar(p: ToolbarProps) {
             <button className="tbtn-icon" aria-label="Duplicate selection" onClick={p.onDuplicate}><Copy size={15} /></button>
           </Tooltip>
           {p.sep()}
-          <Tooltip label="Auto-arrange into clean layers (animated, undoable)">
+          <Tooltip label="Auto-layout diagram — clean layers, animated, undoable">
             <button className="tbtn-icon" aria-label="Auto-layout diagram" onClick={p.onAutoLayout}><LayoutGrid size={15} /></button>
           </Tooltip>
           {p.sep()}
 
-          <div style={{position: 'relative'}}>
-            <Tooltip label="Export / Import — scope, format, theme, live preview">
-              <button className="tbtn-dd" aria-label="Import and export menu" onClick={() => p.onOpenExport(true)}>
-                <Upload size={13} style={{verticalAlign: -2}} /> Export
-              </button>
-            </Tooltip>
-          </div>
+          {/* TOOLBAR-V1 (Harvey picked V1 from docs/sketches/toolbar-variants.html)
+              — ONE icon language: the Import·Export entry is a 30px icon button
+              like the rest, carrying the ⇅ glyph and the accent .pro tint for
+              priority. The words live in the tooltip (and the aria-label, which
+              seven harnesses pin verbatim — tooltip and aria must stay in step).
+              It is the FILE door: import and export. */}
+          <Tooltip label="Import and export menu — scope, format, theme, live preview">
+            <button ref={p.exportBtnRef} className="tbtn-icon pro" aria-label="Import and export menu" onClick={() => p.onOpenExport(true)}>
+              <ArrowDownUp size={15} />
+            </button>
+          </Tooltip>
+
+          {/* SHARE-DOOR — the third verb gets its own entrance: Import and
+              Export move a FILE (one dialog, the ⇅ entry above); Share
+              produces a LINK — the product's growth loop (draw, send a link,
+              someone else opens the board) — so it must be reachable without
+              opening a file dialog. NEUTRAL on purpose: the accent tint means
+              "the file door", and giving it to a second button destroys the
+              meaning (two highlights = no highlight). No keyboard shortcut
+              exists for share; none is invented here. */}
+          <Tooltip label="Share — copy a link to this board; no account, nothing stored on a server">
+            <button ref={p.shareBtnRef} className="tbtn-icon" aria-label="Share" onClick={p.onOpenShare}>
+              <Share2 size={15} />
+            </button>
+          </Tooltip>
 
           {p.sep()}
-          <button
-            type="button"
-            ref={p.settingsBtnRef}
-            className="tbtn-dd settings-btn"
-            data-settings-btn
-            aria-label="Settings"
-            aria-haspopup="dialog"
-            aria-expanded={p.settingsOpen}
-            onClick={() => p.onOpenSettings(true)}
-          ><SettingsIcon size={14} /> Settings</button>
+          <Tooltip label="Settings — appearance, canvas, connections, shortcuts, about">
+            <button
+              type="button"
+              ref={p.settingsBtnRef}
+              className="tbtn-icon settings-btn"
+              data-settings-btn
+              aria-label="Settings"
+              aria-haspopup="dialog"
+              aria-expanded={p.settingsOpen}
+              onClick={() => p.onOpenSettings(true)}
+            ><SettingsIcon size={15} /></button>
+          </Tooltip>
 
           {/* AQ12 — align/distribute moved OFF the toolbar: they only mean
               something WITH a selection, so they live on the selection bar

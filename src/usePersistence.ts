@@ -14,7 +14,6 @@ import type {Edge, Node} from '@xyflow/react';
 import * as boards from './boards';
 import type {BoardDoc, BoardMeta} from './boards';
 import {isQuotaError, QUOTA_MESSAGE, isVolatile} from './localStore';
-import {initialNodes, initialEdges} from './boardConstants';
 import type {PresetId} from './presets';
 
 /* Positional parameters, not an opts object: the bundle ratchet is raw bytes
@@ -247,12 +246,12 @@ export function usePersistence(
         let target: BoardDoc | null = null;
         const lastId = boards.lastBoardId();
         if (list.length === 0) {
-          const doc = await boards.createBoard('My first board');
-          target = {...doc, nodes: initialNodes, edges: initialEdges};
-          try {
-            const saved = await boards.saveBoard({id: doc.id, name: doc.name, nodes: initialNodes, edges: initialEdges});
-            target = {...target, updatedAt: saved.updatedAt};
-          } catch { /* keep in-memory copy */ }
+          /* FIRST-VISIT (2026-11-01) — the first board is EMPTY. The former
+             seeded pipeline (ONBOARD-P4) moved to the `sys-pipeline` TEMPLATE
+             in src/presets/architecture.ts: `CanvasEmptyPanel` — not a finished
+             diagram — is what orients a first-time visitor, and no creation
+             path may resurrect the seed (checks/round-first-visit.mjs). */
+          target = await boards.createBoard('My first board');
           list = await boards.listBoards();
         } else {
           const want = list.find(b => b.id === lastId) ?? list[0];
