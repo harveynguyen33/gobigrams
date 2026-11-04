@@ -127,7 +127,8 @@ export default function Checklist({
           </div>
           <ul className="gsc-list">
             {TASKS.map(t => (
-              <li key={t.id} className={`gsc-item${done.has(t.id) ? ' done' : ''}`}>
+              /* ONBOARD-P7: data-task/data-done is the harness's assert surface — the `.done` class is paint. */
+              <li key={t.id} data-task={t.id} data-done={done.has(t.id) ? 'true' : 'false'} className={`gsc-item${done.has(t.id) ? ' done' : ''}`}>
                 <span className="gsc-check"><Check size={11} strokeWidth={3} /></span>
                 <span>{t.label}</span>
               </li>

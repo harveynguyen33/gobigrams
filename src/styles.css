@@ -5549,6 +5549,21 @@ kbd {
   border-radius: var(--r-md, 8px); padding: var(--space-2, 8px);
   width: 100%; box-sizing: border-box; cursor: text;
 }
+/* SHARE-COPY-BUTTON (2026-11-04) — the built link's row: the field flexes,
+   the Copy button is a FIXED sibling stretched to the field's height (same
+   row, same rhythm — not a floating chip). The copied state is the acc tint
+   + check glyph. Tokens only. */
+.em-share-row { display: flex; gap: var(--space-2, 8px); align-items: stretch; }
+.em-share-row .em-share-url { flex: 1 1 auto; width: auto; min-width: 0; }
+.em-copy {
+  font: inherit; font-size: var(--fs-2xs); font-weight: 600; color: var(--fg);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px); padding: 0 var(--space-3, 12px);
+  min-height: 30px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.em-copy:hover { border-color: var(--acc); color: var(--acc); }
+.em-copy.ok { color: var(--acc); border-color: var(--acc); background: var(--acc-soft); }
 /* SHARE-DOOR (2026-11-03) — the share dialog is a SMALL one-column modal: the
    same .em-modal vocabulary, but the export modal's fixed 84vh height is a
    two-pane concern. Tokens only. */

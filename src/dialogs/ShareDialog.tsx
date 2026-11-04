@@ -8,7 +8,7 @@
  * task, and nothing touches a server. */
 import {useEffect, useRef, useState, type RefObject} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
-import {X} from 'lucide-react';
+import {Check, Copy, X} from 'lucide-react';
 import {trackExport} from '../analytics';
 
 /* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
@@ -37,6 +37,13 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
    * single button so the long URL does not own the dialog on open). */
   const [shareUrl, setShareUrl] = useState<ShareUrl | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  /* SHARE-COPY-BUTTON (2026-11-04) — the transient state of the Copy button
+   * beside the field: 'ok' = copied (shows "Copied" ~1.5s), 'manual' = every
+   * automatic path failed and the dialog says so. The FIELD stays the one
+   * source of truth for the string; the ref is how the handler reads it. */
+  const [copyBtn, setCopyBtn] = useState<'ok' | 'manual' | 'idle'>('idle');
+  const urlRef = useRef<HTMLInputElement>(null);
+  const copyTimer = useRef<number | null>(null);
   const goRef = useRef<HTMLButtonElement>(null);
   /* MODAL-DOORS — the document listener reads the ref, never its own deps, so
    * it is bound once per open and cannot be churned mid-event by a re-render
@@ -69,6 +76,8 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
     if (wasOpen.current && !open) returnFocusTo?.current?.focus();
     wasOpen.current = open;
   }, [open, returnFocusTo]);
+  /* the Copied revert timer must never fire after the dialog is gone. */
+  useEffect(() => () => { if (copyTimer.current !== null) window.clearTimeout(copyTimer.current); }, []);
 
   if (!open) return null;
 
@@ -88,11 +97,45 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
     const url = {payload: built.payload, url: built.url, length: built.url.length};
     setShareUrl(url);
     trackExport('share'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
-    setShareCopied(false);
+    setShareCopied(false); setCopyBtn('idle');
+    /* SHARE-COPY-BUTTON — the build-time copy is KEPT (a courtesy) but goes
+     * through the SAME degrade ladder, so even its failure is stated, never
+     * the old empty catch. The select needs the input rendered: one tick. */
+    if (await writeClipboard(url.url)) setShareCopied(true);
+    else { setCopyBtn('manual'); window.setTimeout(() => urlRef.current?.select(), 0); }
+  };
+
+  /* SHARE-COPY-BUTTON (2026-11-04) — ONE copy ladder, shared by the
+   * copy-on-BUILD courtesy and the Copy button (never two copies of this
+   * logic, and never in a shared util: it lives HERE):
+   *   1. navigator.clipboard (unavailable or rejected ->)
+   *   2. select() + document.execCommand('copy') (false or throws ->)
+   *   3. the caller states the manual way out. */
+  const writeClipboard = async (text: string): Promise<boolean> => {
     try {
-      await navigator.clipboard.writeText(url.url);
-      setShareCopied(true);
-    } catch { /* the link is still shown + selectable for manual copy */ }
+      if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch { /* fall through to the legacy path */ }
+    const el = urlRef.current;
+    if (el) {
+      try { el.select(); if (document.execCommand('copy')) return true; } catch { /* manual path */ }
+    }
+    return false;
+  };
+
+  /* the button copies the FIELD's value verbatim — the shown string IS the
+   * copied string, so the two can never drift (a rebuilt URL would be a
+   * second source of truth). */
+  const doCopy = async () => {
+    const text = urlRef.current?.value ?? '';
+    if (!text) return;
+    if (await writeClipboard(text)) {
+      setCopyBtn('ok');
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => { copyTimer.current = null; setCopyBtn('idle'); }, 1500);
+    } else {
+      urlRef.current?.select();
+      setCopyBtn('manual');
+    }
   };
 
   return (
@@ -117,10 +160,27 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
         )}
         {shareUrl && (
           <>
-            <input className="em-share-url" readOnly value={shareUrl.url}
-              onFocus={e => e.currentTarget.select()} aria-label="Share link" />
+            <div className="em-share-row">
+              <input ref={urlRef} className="em-share-url" readOnly value={shareUrl.url}
+                onFocus={e => e.currentTarget.select()} aria-label="Share link" />
+              <button type="button" className={'em-copy' + (copyBtn === 'ok' ? ' ok' : '')}
+                aria-label="Copy share link" onClick={() => void doCopy()}>
+                {copyBtn === 'ok' ? <Check size={13} /> : <Copy size={13} />}
+                <span>{copyBtn === 'ok' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
             <div className="em-note">
-              {shareCopied ? 'Copied to clipboard — ' : ''}{shareUrl.length.toLocaleString()} characters.
+              {/* data-shr-copy is the probe handle; aria-live announces the
+               * copy outcome to a screen reader (the text CHANGES on every
+               * copy, which is what makes the live region actually speak). */}
+              <span data-shr-copy="" aria-live="polite">{
+                copyBtn === 'manual'
+                  ? 'Copy blocked by the browser — the link is selected; press ⌘C / Ctrl+C. '
+                  : copyBtn === 'ok' || shareCopied
+                    ? 'Copied to clipboard — '
+                    : ''
+              }</span>
+              {shareUrl.length.toLocaleString()} characters.
             </div>
             {shareUrl.length > 8000 && (
               <div className="em-note" role="alert">This board is big — export JSON instead.</div>
