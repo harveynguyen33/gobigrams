@@ -1,0 +1,2 @@
+board "A text node paints its label"
+cap = text "Diagram: rebalance storm"

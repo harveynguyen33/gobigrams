@@ -50,7 +50,7 @@ import {alignAnchor} from '../textStyle';
  * anchor arithmetic + the generator call for a DOM-less export. */
 import {edgeRoute} from './edgeRoute';
 /* ROUND GOBI-TEXT3 — the DOM-less vertical placement (a leaf: no cycle). */
-import {vAlignRows} from './textVAlign';
+import {vAlignRows, rowsExtent} from './textVAlign';
 
 /* ------------------------------------------------------------------ types */
 
@@ -99,6 +99,10 @@ export type SceneEdge = {
   d: string;
   color: string;
   strokeWidth: number;
+  /** DASHED-EXPORT (t_4a50be14) — the edge's own stroke pattern, read from
+   *  `style.strokeDasharray` (makeEdge's EDGE_DASH table) so the file paints
+   *  the same dash the canvas does. Absent = solid. */
+  dashArray?: string;
   marker: {w: number; h: number};
   label?: {
     x: number; y: number; row: SceneTextRow;
@@ -224,6 +228,10 @@ const RAIL_END_FRACTION: Partial<Record<string, number>> = {queue: 0.31, actor: 
 /* GOBI-WRAP-RULES N2 — the air a text block keeps BELOW a top face's rim
  * (SHAPE_TOP_FACE); the harness floor is rim + 4, this buys one more. */
 const RIM_PAD = 5;
+
+/* NOTE-TEXT-RENDER (t_8fbc6234) — the air a grown note keeps below its last
+ * line, mirroring the canvas note's own bottom padding (`.note-node` 12px). */
+const NOTE_FIT_PAD = 10;
 
 /* ------------------------------------------------------- text row building */
 
@@ -532,7 +540,9 @@ export function buildSceneBody(input: ExportInput): Scene {
     }
     if (kind === 'label') {
       const lt = measurer.text(n.el);
-      sn.title = String(n.data?.title ?? n.id);
+      /* NOTE-TEXT-RENDER (bug 2, t_8fbc6234) — a label node's text lives in
+       * data.text (adapter + canvas LabelNode read it); the id used to win. */
+      sn.title = String(n.data?.text ?? n.data?.title ?? n.id);
       sn.sub = n.data?.sub ? String(n.data.sub) : undefined;
       sn.textRect = lt ?? null;
       sn.rows = [{
@@ -565,10 +575,26 @@ export function buildSceneBody(input: ExportInput): Scene {
         : nt;
       sn.frame = 'note';
       sn.textRect = noteText ?? null;
-      sn.rows = noteText
-        ? placeRows(n, s, noteText, buildNodeRows(n, s, noteText, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf))
-        : placeRows(n, s, null, buildNodeRows(n, s, {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'},
-            {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf));
+      if (noteText?.runs) {
+        /* NOTE-TEXT-RENDER — a MEASURED note: the rows are the truth, but the
+         * canvas paints the post-it at CONTENT height, so the rect grows. */
+        const rows = buildNodeRows(n, s, noteText, {fg: ink.fg, dim: ink.dim}, accent, widthOf, ascentOf);
+        sn.h = Math.max(s.h, Math.ceil(rowsExtent(rows, ascentOf).bottom) + NOTE_FIT_PAD);
+        sn.rows = placeRows(n, s, noteText, rows);
+      } else {
+        /* NOTE-TEXT-RENDER (bug 1, t_8fbc6234) — the DOM-less note's box was
+         * sized (180x64) BEFORE any wrap existed, so wrapped lines painted
+         * below the rect. Build UNCLAMPED, grow to the painted extent
+         * (+NOTE_FIT_PAD), rebuild against the FINAL box (a clamped-away sub
+         * line comes back), re-centre; a fitting note keeps its box. */
+        const base: TextRect = noteText ?? {x: 10, y: 8, w: s.w - 20, h: s.h - 16, size: 12, weight: 500, fill: ink.fg, anchor: 'start'};
+        const noteInk = {fg: ink.fg, dim: ink.dim};
+        const unclamped = buildNodeRows(n, {w: s.w, h: 1e6}, {...base, h: 1e6}, noteInk, accent, widthOf, ascentOf);
+        const h = Math.max(s.h, Math.ceil(rowsExtent(unclamped, ascentOf).bottom) + NOTE_FIT_PAD);
+        const text = h > s.h ? {...base, h: Math.max(base.h, h - base.y)} : base;
+        sn.h = h;
+        sn.rows = placeRows(n, {w: s.w, h}, text, buildNodeRows(n, {w: s.w, h}, text, noteInk, accent, widthOf, ascentOf));
+      }
       sceneNodes.push(sn);
       continue;
     }
@@ -609,8 +635,15 @@ export function buildSceneBody(input: ExportInput): Scene {
     const me = (typeof e.markerEnd === 'object' && e.markerEnd !== null ? e.markerEnd : {}) as {width?: unknown; height?: unknown};
     const mw = typeof me.width === 'number' && isFinite(me.width) && me.width > 0 ? me.width : 14;
     const mh = typeof me.height === 'number' && isFinite(me.height) && me.height > 0 ? me.height : 14;
+    /* DASHED-EXPORT (t_4a50be14) — the canvas stroke pattern travels ON the
+     * edge (style.strokeDasharray, written by makeEdge's EDGE_DASH table and
+     * by the gobi adapter); the scene carries it verbatim so the emitter
+     * paints the same dash the canvas does. Absent/empty = solid. */
+    const rawDash = e.style?.strokeDasharray;
+    const dashArray = rawDash == null || rawDash === '' ? undefined : String(rawDash);
     const se: SceneEdge = {
       id: e.id, d: route.d, color, strokeWidth: 1.8, marker: {w: mw, h: mh},
+      ...(dashArray ? {dashArray} : {}),
     };
     const label = e.label;
     if (typeof label === 'string' && label) {
@@ -655,18 +688,20 @@ export function buildSceneBody(input: ExportInput): Scene {
    * harness path). When the caller can measure the mounted content group,
    * the bbox replaces it — the emitter hands buildScene the emitted content
    * through ctx.measureContentBounds in a SECOND pass (see emitSvg's compose
-   * in exportSvg.ts). */
+   * in exportSvg.ts).
+   * NOTE-TEXT-RENDER (t_8fbc6234) — reads the SCENE's nodes: a grown note is
+   * taller than its compiled box, and the viewBox must contain its rect. */
   let bounds: Bounds = {minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity};
-  for (const n of nodes) {
-    const s = nodeSize(n);
-    const p = abs.get(n.id)!;
+  for (const cn of [...sceneGroups, ...sceneNodes]) {
+    const s = {w: cn.w, h: cn.h};
+    const p = {x: cn.absX, y: cn.absY};
     /* ROUND ROTATE — a rotated node's paint extent is the orbit of its four
      * corners, which can exceed the w×h AABB (a 100×50 box at 90° paints a
      * 50×100 footprint whose corners stick out along BOTH axes). Union the
      * rotated corners — exactly the AABB at 0°. Geometry rotation only, same
      * as the emitter (the K5 tilt is canvas-only, as it always was). */
-    const rotDeg = typeof (n.data as {rotation?: unknown} | null)?.rotation === 'number'
-      ? (n.data as {rotation: number}).rotation
+    const rotDeg = typeof (cn.data as {rotation?: unknown} | null)?.rotation === 'number'
+      ? (cn.data as {rotation: number}).rotation
       : 0;
     if (rotDeg === 0) {
       bounds.minX = Math.min(bounds.minX, p.x);

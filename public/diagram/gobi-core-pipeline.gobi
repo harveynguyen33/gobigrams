@@ -1,0 +1,15 @@
+board "gobi-core: text to SVG"
+direction LR
+
+src_  = terminator ".gobi text"
+comp  = process    "compileGobi()"          sub:"lex → parse → validate → layout"
+json  = document   "GobiDocument"           sub:"nodes · edges · positions"
+rend  = process    "renderGobiDocument()"   sub:"theme tokens + metrics table"
+out   = terminator "SVG"
+bad   = note       "any error: all of them at once — line, col, message, hint"
+
+src_ -> comp
+comp -> json
+json -> rend
+rend -> out
+comp ..> bad   "not ok"

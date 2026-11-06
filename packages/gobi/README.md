@@ -34,12 +34,30 @@
 
 ## What this package actually is
 
-Two functions and the inputs they need:
+Two functions and the inputs they need. **This diagram is rendered by the package itself** from the
+`.gobi` source underneath it — dogfooding, in the same dark theme the editor ships:
 
-```
-        .gobi text  ──compileGobi──►  GobiDocument  ──renderGobiDocument──►  <svg>
-        (what you write)              (plain JSON: nodes,      (with a theme and a
-                                       edges, positions)        text measurer you pass in)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/gobigrams/main/public/diagram/gobi-core-pipeline.png"
+       alt="gobi-core: .gobi text → compileGobi() → GobiDocument → renderGobiDocument() → SVG" width="100%">
+</p>
+
+```gobi
+board "gobi-core: text to SVG"
+direction LR
+
+src_  = terminator ".gobi text"
+comp  = process    "compileGobi()"          sub:"lex → parse → validate → layout"
+json  = document   "GobiDocument"           sub:"nodes · edges · positions"
+rend  = process    "renderGobiDocument()"   sub:"theme tokens + metrics table"
+out   = terminator "SVG"
+bad   = note       "any error: all of them at once — line, col, message, hint"
+
+src_ -> comp
+comp -> json
+json -> rend
+rend -> out
+comp ..> bad   "not ok"
 ```
 
 Everything else in the package exists so those two calls work with **zero** dependencies and **zero**
@@ -90,7 +108,7 @@ nothing.
 ```js
 // fail CI when a diagram no longer compiles
 const res = compileGobi(readFileSync('docs/architecture.gobi', 'utf8'));
-if (!res.ok) throw new Error(res.errors.map(e => `${e.line}:${e.column} ${e.message}`).join('\n'));
+if (!res.ok) throw new Error(res.errors.map(e => `${e.line}:${e.col} ${e.message}`).join('\n'));
 ```
 
 ### 3. Let an AI agent draw the diagram
@@ -158,7 +176,7 @@ console.log(svg.slice(0, 4), svg.length);                          // <svg 2402
 | Promise | What it means in practice |
 |---|---|
 | **Byte-identical output** | The corpus ships inside the package (`test/corpus/`): 24 fixtures, each with its committed `.svg` and `.sha256`. You can verify your own install without trusting a changelog. |
-| **Every error in one round** | `compileGobi` collects **all** problems in one pass — `line`, `column`, `message`, and a `suggestion` where one exists. A human or a model repairs once, not N times. |
+| **Every error in one round** | `compileGobi` collects **all** problems in one pass — each `{line, col, message, hint?}`. (`hint` is the compiler's own field; the MCP server projects it to `suggestion`.) A human or a model repairs once, not N times. |
 | **Closed world** | Nothing is invented at render time: node kinds and icons come from a closed registry, colours come from tokens **you** pass, text widths come from a measurer **you** pass. A missing measurer throws `GobiMeasurerMissing` instead of guessing a width. |
 
 ## One core, six doors
@@ -188,9 +206,9 @@ api    = service  "Checkout API"  color:red
 q      = queue    "payments"      sub:"retry 3x"
 db     = database "orders"        sub:"primary"
 cache  = storage  "sessions"
+edge   = group    "edge"          # a group is DECLARED, then filled
 
-group "edge" { cf }
-grp        { api q }
+edge { cf }                       # membership: group { members }
 
 cf  -> api  "HTTPS"      flow:dots
 api -> q    "publish"

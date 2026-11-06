@@ -1,0 +1,25 @@
+{
+  "docVersion": 1,
+  "name": "A long note fits its box",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "bad",
+      "kind": "note",
+      "label": "any error: all of them at once — line, col, message, hint, suggestion and the span it came from",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -125,
+        "y": 88
+      }
+    }
+  ],
+  "edges": []
+}

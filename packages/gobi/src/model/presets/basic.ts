@@ -235,7 +235,12 @@ export const LAYOUTS = {
    through App.tsx (initial seed, proximity connect, connect-end drop, connect).
 =========================================================================== */
 
-const DASH: Record<string, string | undefined> = {solid: undefined, dashed: '6 4', dotted: '1.5 3.5'};
+/* DASHED-EXPORT (t_4a50be14) — the ONE dash-pattern table in the codebase.
+ * makeEdge writes it into edge.style.strokeDasharray (the exact field the
+ * canvas paints), the gobi adapter resolves doc `dash` words through it, and
+ * the SVG emitter reads the SAME style field back — so no door can invent a
+ * second pattern. Exported since DASHED-EXPORT; was a module-private `DASH`. */
+export const EDGE_DASH: Record<string, string | undefined> = {solid: undefined, dashed: '6 4', dotted: '1.5 3.5'};
 
 /** Marker object for a plain (React Flow built-in) end. The colour is the
  *  symbolic var, so the arrowhead follows the theme with no data edit. */
@@ -261,7 +266,7 @@ export type EdgeSeed = {
  */
 export function makeEdge(source: string, target: string, e: EdgeDefaults, id: string, seed: EdgeSeed = {}): FlowEdge {
   const color = COLOR_VAR[e.strokeKey];
-  const dash = DASH[e.dash ?? 'solid'];
+  const dash = EDGE_DASH[e.dash ?? 'solid'];
   const typeId = e.path === 'bezier' ? 'goblinEdge' : e.path;
 
   const crowStart = seed.crowStart ?? e.crowStart ?? undefined;

@@ -21,7 +21,7 @@ import type {FlowNode, FlowEdge} from './flowTypes';
 import {PALETTE, type PaletteItem} from './palette';
 import {FLOWCHART_PALETTE} from './presets/flowchart';
 import {TABLE_PALETTE_ITEM} from './presets/dataStorage';
-import {makeEdge} from './presets/basic';
+import {makeEdge, EDGE_DASH} from './presets/basic';
 import {CUSTOM_PRESET} from './presets/index';
 import type {BoardDoc} from './boardDoc';
 import type {ColorKey} from './colors';
@@ -41,9 +41,9 @@ const itemFor = (kind: string): PaletteItem | undefined => {
   return meta ? ITEMS.find((p) => p.label === meta.label) : undefined;
 };
 
-/** The dash vocabulary — the canvas stroke pattern each language dash word
- * paints (§2.4). */
-const DASH: Record<string, string | undefined> = {solid: undefined, dashed: '6 4', dotted: '1.5 3.5'};
+/* DASHED-EXPORT (t_4a50be14) — the dash vocabulary is EDGE_DASH from
+ * presets/basic (the ONE table); the local copy this file kept was deleted so
+ * the adapter and makeEdge cannot drift apart. */
 
 export type ToBoardDocOptions = {now?: number; id?: string};
 
@@ -123,7 +123,7 @@ export function toBoardDoc(doc: GobiDocument, opts: ToBoardDocOptions = {}): Boa
     const edge = makeEdge(d.from, d.to, CUSTOM_PRESET.edges, d.id, seed);
     /* the resolved dash (§2.4: the explicit keyword won over the operator
        on the language side; here it becomes the stroke pattern). */
-    const dash = DASH[d.dash];
+    const dash = EDGE_DASH[d.dash];
     if (dash) {
       edge.style = {...edge.style, strokeDasharray: dash};
     } else if (edge.style?.strokeDasharray) {

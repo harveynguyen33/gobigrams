@@ -157,6 +157,10 @@ export type ExportEdge = {
    *  (`GoblinEdge`'s `shown`); the exporter reads it and nothing else, so a
    *  label row exists in the file if and only if the canvas painted one. */
   label?: string;
+  /** DASHED-EXPORT (t_4a50be14) — the canvas stroke pattern (makeEdge's
+   *  EDGE_DASH, written by every creation path). The emitter paints exactly
+   *  this field as `stroke-dasharray`; absent/null = solid. */
+  style?: {strokeDasharray?: number | string} | null;
   el?: unknown;
 };
 
@@ -938,7 +942,7 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
   };
   for (const e of scene.edges) {
     const marker = markerId(e.color, e.marker.w, e.marker.h);
-    parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}" marker-end="url(#${marker})"/>`);
+    parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}"${e.dashArray ? ` stroke-dasharray="${escAttr(e.dashArray)}"` : ''} marker-end="url(#${marker})"/>`);
     if (e.label) {
       const lw = Math.max(24, e.label.row.content.length * 6.6 + 12); /* = labelMetrics.estimateEdgeLabelWidth, pinned by M1 */
       const mid = {x: e.label.x, y: e.label.y}; /* GOBI-TEXT2 - FLOW space, like the path above: this group ALREADY carries translate(off), so adding the offset here shifted the plate by (off,off) a second time (measured +24,+24 on the door's own render). The plate below is the canvas label's own box: 5px radius (`.edge-label`), 2*LABEL_HALF_H_PX tall, and it is painted ONLY for the plate states (labelPlatePaint): the `none` default has no background. */

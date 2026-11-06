@@ -3,4 +3,4 @@
    dialog itself is unchanged. */
 /** The About pane's version. Bump this together with package.json's `version`
  *  (tsconfig.json has no `resolveJsonModule`, so it cannot be imported). */
-export const APP_VERSION = '0.4.1';
+export const APP_VERSION = '0.4.2';

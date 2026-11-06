@@ -1,0 +1,25 @@
+{
+  "docVersion": 1,
+  "name": "A text node paints its label",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "cap",
+      "kind": "text",
+      "label": "Diagram: rebalance storm",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -125,
+        "y": 88
+      }
+    }
+  ],
+  "edges": []
+}

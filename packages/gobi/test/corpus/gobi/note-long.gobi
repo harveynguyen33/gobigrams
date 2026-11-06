@@ -1,0 +1,2 @@
+board "A long note fits its box"
+bad = note "any error: all of them at once — line, col, message, hint, suggestion and the span it came from"

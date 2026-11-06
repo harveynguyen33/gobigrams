@@ -1,0 +1,30 @@
+{
+  "id": "corpus-text-short",
+  "name": "A text node paints its label",
+  "nodes": [
+    {
+      "id": "cap",
+      "type": "label",
+      "position": {
+        "x": -125,
+        "y": 88
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "text": "Diagram: rebalance storm",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}
