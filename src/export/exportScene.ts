@@ -1,4 +1,4 @@
-/* CORE-STEP4A-FIX (2026-11-05) — this module's code MOVED into the
+/* feature-map home: src/export/exportScene.ts */ /* CORE-STEP4A-FIX (2026-11-05) — this module's code MOVED into the
  * @techgoblin/gobi-core workspace package (packages/gobi/src/model/export/exportScene.ts);
  * this file is the app-side re-export so every existing importer (app code and
  * the checks/ harnesses that read these paths) is unchanged. The ONE home is

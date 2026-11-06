@@ -22,7 +22,7 @@
  * future font swap lawful.
  */
 
-import {fontFileForFamily, SHIPPED_FAMILIES} from '../fontManifest';
+import {fontFileForFamily, SHIPPED_FAMILIES} from '../theme/fontManifest';
 
 export type FontBytes = {
   bytes: Uint8Array;

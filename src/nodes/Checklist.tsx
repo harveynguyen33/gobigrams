@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {Check, ChevronDown, X} from 'lucide-react';
-import {trackSurface} from '../analytics';
+import {trackSurface} from '../app/analytics';
 
 const KEY = 'diagram-studio:checklist-done';
 const DISMISS_KEY = 'diagram-studio:checklist-dismissed';

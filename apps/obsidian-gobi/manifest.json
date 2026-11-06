@@ -1,0 +1,10 @@
+{
+  "id": "gobi",
+  "name": "Gobigrams",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Render ```gobi code blocks as diagrams (render only — no editing).",
+  "author": "Harvey Nguyen",
+  "authorUrl": "https://github.com/harveynguyen33",
+  "isDesktopOnly": false
+}

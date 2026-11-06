@@ -1,8 +1,8 @@
 import {memo} from 'react';
 import {Handle, Position, useStore, type NodeProps} from '@xyflow/react';
 import {KeyRound, Link, Table2, ChevronDown, ChevronRight, Eye} from 'lucide-react';
-import {resolveColor, type ColorKey} from '../colors';
-import {paintRotation, rotateTransform} from '../rotation';
+import {resolveColor, type ColorKey} from '../theme/colors';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
 import {RotateGrip} from '../components/RotateGrip';
 
 /* ---------------------------------------------------------------------------

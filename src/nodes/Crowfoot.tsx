@@ -24,7 +24,7 @@
    theme switch (no stale marker) while still recolouring.
 --------------------------------------------------------------------------- */
 
-import {COLOR_VAR, type ColorKey} from '../colors';
+import {COLOR_VAR, type ColorKey} from '../theme/colors';
 
 /* CORE-STEP4A-FIX — the CrowFoot union moved to the package
  * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */

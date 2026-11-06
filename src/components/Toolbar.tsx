@@ -15,8 +15,8 @@ import {
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   Settings as SettingsIcon,
 } from 'lucide-react';
-import Tooltip from '../Tooltip';
-import type {HelperGuides} from '../helperLines';
+import Tooltip from '../ui/Tooltip';
+import type {HelperGuides} from '../canvas/helperLines';
 
 type ToolbarProps = {
   canUndo: boolean;

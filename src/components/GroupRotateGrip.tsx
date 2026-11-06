@@ -27,9 +27,9 @@
  */
 import {useRef} from 'react';
 import {useReactFlow, useStore} from '@xyflow/react';
-import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../rotation';
-import {rotatedExtent} from '../rotation';
-import type {RotateBegin} from '../rotation';
+import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../canvas/rotation';
+import {rotatedExtent} from '../canvas/rotation';
+import type {RotateBegin} from '../canvas/rotation';
 
 type Props = {
   /** The GROUP gesture writer (useRotation): `delta` is the TOTAL angle

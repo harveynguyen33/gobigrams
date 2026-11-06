@@ -3,10 +3,10 @@
    so the mounted UI is unchanged.  (feature-map home: src/src/settings/Panes.tsx)
  */
 import {useRef} from 'react';
-import {MARQUEE_OPTS} from '../marqueeMode';
-import {ZORDER_OPTS} from '../zOrderMode';
-import {LAYOUT_DIR_OPTS} from '../layoutMode';
-import {ROADMAP, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from '../roadmap';
+import {MARQUEE_OPTS} from '../canvas/marqueeMode';
+import {ZORDER_OPTS} from '../board/zOrderMode';
+import {LAYOUT_DIR_OPTS} from '../layout/layoutMode';
+import {ROADMAP, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from '../ui/roadmap';
 import {APP_VERSION} from './version';
 import type {Props} from './shared';
 import {Row, ToolbarChip, Toggle, Segmented, gridSizeOptions} from './Controls';

@@ -20,8 +20,8 @@
  */
 import {useRef} from 'react';
 import {useReactFlow} from '@xyflow/react';
-import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../rotation';
-import type {RotateBegin} from '../rotation';
+import {beginRotate, rotateDelta, snapRotation, ROTATE_SNAP_DEG} from '../canvas/rotation';
+import type {RotateBegin} from '../canvas/rotation';
 
 type Props = {
   nodeId: string;

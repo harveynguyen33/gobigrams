@@ -15,8 +15,8 @@
 import {useEffect} from 'react';
 import type * as React from 'react';
 import {ListChecks, MessageSquarePlus} from 'lucide-react';
-import Tooltip from '../Tooltip';
-import {trackHelpOpen, trackSurface} from '../analytics';
+import Tooltip from '../ui/Tooltip';
+import {trackHelpOpen, trackSurface} from '../app/analytics';
 
 type HelpSheetProps = {
   /** the `?` toolbar button — feedback returns focus here when it closes. */

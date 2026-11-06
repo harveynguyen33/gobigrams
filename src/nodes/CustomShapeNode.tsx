@@ -46,11 +46,11 @@
  */
 import {memo} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
-import {paintRotation, rotateTransform} from '../rotation';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
 import {RotateGrip} from '../components/RotateGrip';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
-import {resolveColor} from '../colors';
-import type {ColorKey} from '../colors';
+import {resolveColor} from '../theme/colors';
+import type {ColorKey} from '../theme/colors';
 
 export type CustomShapeKind = {
   svg: string;          // the sanitised inline SVG markup (CustomShape.data)

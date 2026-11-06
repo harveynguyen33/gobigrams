@@ -7,7 +7,7 @@
 import type * as React from 'react';
 import {createPortal} from 'react-dom';
 import {LayoutTemplate, Pencil, Plus, Copy, Trash2, Save} from 'lucide-react';
-import type {BoardDoc, BoardMeta} from '../boards';
+import type {BoardDoc, BoardMeta} from '../board/boards';
 import {getPreset} from '../presets';
 
 type Props = {

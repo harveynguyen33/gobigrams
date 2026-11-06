@@ -15,11 +15,11 @@ import type {Node, Edge} from '@xyflow/react';
 import BoardDialog from '../dialogs/BoardDialog';
 import type {BoardDialogMode, BoardDialogResult} from '../dialogs/BoardDialog';
 import TemplatesGallery from '../dialogs/TemplatesGallery';
-import Settings from '../Settings';
-import FeedbackDialog from '../FeedbackDialog';
+import Settings from '../ui/Settings';
+import FeedbackDialog from '../ui/FeedbackDialog';
 import ExportModal from '../dialogs/ExportModal';
 import ShareDialog from '../dialogs/ShareDialog';
-import type {ThemeName} from '../theme';
+import type {ThemeName} from '../theme/theme';
 
 type ModalMountsProps = {
   /* ---- BoardDialog ---- */

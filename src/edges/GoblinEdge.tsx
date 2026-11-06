@@ -9,7 +9,7 @@ import {
   type EdgeProps,
   type EdgeMarkerType,
 } from '@xyflow/react';
-import {COLOR_VAR, type ColorKey} from '../colors';
+import {COLOR_VAR, type ColorKey} from '../theme/colors';
 import {
   // ROUND T — the midpoint drag. A STORED waypoint routes through our own path
   // for the edge's own kind (they all read both coordinates); no waypoint routes
@@ -24,7 +24,7 @@ import {
   bendAxisFor, drawnMid, freePath, isFreeBendKind, needsCustom,
   bezierPath, straightPath,
   type BendAxis, type BendGeo, type BendPhase, type Pt, type Side4,
-} from '../edgeBend';
+} from '../canvas/edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules, all pure, all executed by the
    harness: the anchor + its 2-D offset (AK-10), the three plate states (AK-12)
    and the reverse mirror (AK-15). ROUND AL's AL-2 deleted the rails that the
@@ -34,17 +34,17 @@ import {
   HANDLE_CLEAR_PX, LABEL_HALF_H_PX, anchorWrite, labelAnchor, labelBgClass,
   CENTRED, labelDragLockPx, movedBy, nudgeAlongPath, pathPoints,
   type LabelWrite,
-} from '../edgeLabel';
+} from '../canvas/edgeLabel';
 /* ROUND AK, PASS 2 — ONE gesture for both affordances on this edge. See the
    file: it is the machinery `onBendDown` already owned (ROUND S/T/U), factored
    out so the bend handle and the label can never both start from one
    pointerdown. `GestureDown` is the shape a `claim`ed handler receives. */
-import {beginGesture, useEdgeGesture, type GestureDown} from '../useEdgeGesture';
+import {beginGesture, useEdgeGesture, type GestureDown} from '../hooks/useEdgeGesture';
 /* ROUND AM, AM-2 — the label's TEXT STYLE, through the ONE emitter. `TextStyle`
    is the stored shape (`data.labelStyle`) and `edgeTextStyleVars` is the
    edge-label subset of `textStyleVars` — the same module the node path uses, so
    the label's Text section cannot become a second text vocabulary. */
-import {edgeTextStyleVars, type TextStyle} from '../textStyle';
+import {edgeTextStyleVars, type TextStyle} from '../layout/textStyle';
 
 /* ROUND AM, AM-3 — THE GLYPHS MOVED OUT, AND THIS FILE IS THE REASON. The six
    paths lived here, which meant the inspector could not show what the edge

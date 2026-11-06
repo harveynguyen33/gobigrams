@@ -27,7 +27,7 @@
  */
 import {useStore} from '@xyflow/react';
 import {ViewportPortal} from '@xyflow/react';
-import {rotatedExtent} from '../rotation';
+import {rotatedExtent} from '../canvas/rotation';
 
 export function SelectionBox() {
   /* ONE comparable string per concern (the RotateInternalsBridge pattern):

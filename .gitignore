@@ -69,3 +69,7 @@ research/
 # a crashed run can leave one behind (five leaked into a commit once)
 .gs-*.ts
 .gs-*.mjs
+# checks/package-p-inspector.mjs writes these two entries at the repo root and does
+# not remove them; they are probe litter, never shipped
+.ai-ts-entry.ts
+.p-inspector-model.ts

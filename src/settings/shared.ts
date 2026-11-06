@@ -2,10 +2,10 @@
    2026-10-25). src/Settings.tsx keeps the shell and imports these back,
    so the mounted UI is unchanged. */
 import type React from 'react';
-import {type Mode, type ThemeName} from '../theme';
-import {type MarqueeMode} from '../marqueeMode';
-import {type ZOrderMode} from '../zOrderMode';
-import {type LayoutDirection} from '../layout';
+import {type Mode, type ThemeName} from '../theme/theme';
+import {type MarqueeMode} from '../canvas/marqueeMode';
+import {type ZOrderMode} from '../board/zOrderMode';
+import {type LayoutDirection} from '../layout/layout';
 
 export type Props = {
   open: boolean;

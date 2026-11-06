@@ -1,9 +1,9 @@
 import {useEffect, useMemo, useRef, useState, type RefObject} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {X} from 'lucide-react';
-import {EXPORT_TOKENS, tokensFor} from '../theme';
-import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
-import {trackExport} from '../analytics';
+import {EXPORT_TOKENS, tokensFor} from '../theme/theme';
+import {toMermaid, toMermaidSequence, fromMermaid} from '../gobi/mermaid';
+import {trackExport} from '../app/analytics';
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';

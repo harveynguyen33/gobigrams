@@ -1,0 +1,20 @@
+{
+  "name": "@techgoblin/obsidian-gobi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "The .gobi Obsidian door — renders ```gobi code blocks as diagrams through @techgoblin/gobi-core. Render only: no canvas, no editing, no sync-back.",
+  "license": "MIT",
+  "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node test/corpus.mjs"
+  },
+  "dependencies": {
+    "@techgoblin/gobi-core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  }
+}

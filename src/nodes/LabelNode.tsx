@@ -1,7 +1,7 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
-import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
-import {paintRotation, rotateTransform} from '../rotation';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../layout/textStyle';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
 import {RotateGrip} from '../components/RotateGrip';
 
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.

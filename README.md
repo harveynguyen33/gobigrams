@@ -19,7 +19,7 @@ visitors with a cookieless, self-hosted tally counter and otherwise keeps his
 nose out of your business. Your boards live in your browser until *you* decide
 to export them.
 
-> Status: v0.4.0 — feature-complete enough for daily use, still occasionally
+> Status: v0.4.1 — feature-complete enough for daily use, still occasionally
 > bumping into furniture. Report the bumps → [Support](./SUPPORT.md).
 
 ## What it looks like
@@ -55,6 +55,40 @@ npm run build        # -> dist/ (fully static, host it anywhere)
 
 Node.js 20+ and a modern browser. `dist/` runs behind any web server or CDN,
 or even `file://`-style local serving.
+
+## Build with it
+
+The editor is not the only way in. The `.gobi` language is a package, and the app
+you are looking at is just one of its doors — the same compiler, the same layout,
+the same SVG, so a diagram made in code is byte-identical to one exported from the
+canvas.
+
+| Package | What it does | Get it |
+|---|---|---|
+| **[`@techgoblin/gobi-core`](./packages/gobi)** | `.gobi` text → SVG. No browser, no React, no canvas, zero dependencies. Build-time rendering, diagram-as-code in CI, an SVG endpoint, OG cards. | `npm i @techgoblin/gobi-core` |
+| **[`@techgoblin/gobi-mcp`](./packages/gobi-mcp)** | An [MCP](https://modelcontextprotocol.io) server, so any AI agent can draw: `gobi_validate`, `gobi_render`, `gobi_png`, `gobi_describe`. | in this repo — publish pending |
+
+**[Gobigrams for Obsidian](./apps/obsidian-gobi)** renders ` ```gobi ` blocks inside a
+vault — reading view and live preview, themed by your vault's own CSS variables. It
+bundles the same core, so a note and a board agree. Source is here; install it into a
+vault from the release channel with
+[BRAT](https://github.com/TfTHacker/obsidian42-brat) —
+[`harveynguyen33/gobigrams-obsidian`](https://github.com/harveynguyen33/gobigrams-obsidian)
+carries `manifest.json`, `main.js` and `styles.css`, one release per version.
+
+```js
+import {compileGobi, renderGobiDocument, tokensFromCss, tableMeasurer,
+        EXPORT_TOKENS, THEME_CSS, DEFAULT_METRICS} from '@techgoblin/gobi-core';
+
+const res = compileGobi('board "orders"\napi = service "API"\ndb = database "orders"\napi -> db');
+if (!res.ok) throw new Error(JSON.stringify(res.errors));   // every error, at once
+
+const svg = renderGobiDocument(res.doc, {
+  theme: 'dark',
+  tokens: tokensFromCss(THEME_CSS, 'dark', EXPORT_TOKENS),
+  measureText: tableMeasurer(DEFAULT_METRICS),
+});
+```
 
 ## How your data is stored
 

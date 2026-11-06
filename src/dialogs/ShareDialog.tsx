@@ -9,7 +9,7 @@
 import {useEffect, useRef, useState, type RefObject} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {Check, Copy, X} from 'lucide-react';
-import {trackExport} from '../analytics';
+import {trackExport} from '../app/analytics';
 
 /* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
  * compiler (pinned by round-gobi-door A3/A4 + round-gobi-share S5a): no

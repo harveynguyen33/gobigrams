@@ -3,9 +3,9 @@
    src/InspectorPickers.tsx re-exports the union, so no importer changes. */
 import {useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode} from 'react';
 import {SHAPES, ShapePreview, type Shape} from '../nodes/shapes';
-import {COLOR_VAR} from '../colors';
-import {clampRotation, norm180} from '../rotation';
-import {ROTATION_MIN, ROTATION_MAX} from '../layoutConstants';
+import {COLOR_VAR} from '../theme/colors';
+import {clampRotation, norm180} from '../canvas/rotation';
+import {ROTATION_MIN, ROTATION_MAX} from '../layout/layoutConstants';
 import {usePopoverPlacement} from './popover';
 import {G} from './Art';
 
