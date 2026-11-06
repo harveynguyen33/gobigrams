@@ -1,0 +1,7 @@
+board "Defaults only"
+a = service
+b = database
+a -> b
+c = note
+t = text
+g = group

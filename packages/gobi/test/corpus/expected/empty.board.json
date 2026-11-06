@@ -1,0 +1,8 @@
+{
+  "id": "corpus-empty",
+  "name": "Empty doc",
+  "nodes": [],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

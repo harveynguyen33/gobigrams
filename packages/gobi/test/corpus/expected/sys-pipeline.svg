@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="778" height="470" viewBox="0 0 778 470" data-theme="dark"><rect width="778" height="470" fill="#0b0b0d"/><style>
+  :root, svg {
+    --bg:#0b0b0d;
+    --surface:#131316;
+    --elevated:#1a1b1f;
+    --border:#26272c;
+    --border-strong:#33343a;
+    --fg:#e8e8ea;
+    --dim:#8a8a92;
+    --dim2:#63636b;
+    --acc:#f54e00;
+    --acc-soft:rgba(245, 78, 0, 0.14);
+    --sel:#3b82f6;
+    --sel-soft:rgba(59, 130, 246, 0.14);
+    --green:#4ade80;
+    --red:#f87171;
+    --danger:#ef4444;
+    --card:#1a1b1f;
+    --c-accent:#f54e00;
+    --c-green:#4ade80;
+    --c-cyan:#22d3ee;
+    --c-violet:#a78bfa;
+    --c-amber:#fbbf24;
+    --c-slate:#94a3b8;
+    --c-red:#ff6b6b;
+    --c-blue:#7aa2ff;
+    --c-pink:#f783ac;
+    --c-black:#000000;
+    --c-white:#ffffff;
+  }
+</style><defs><marker id="ar-mk-ba568u" markerWidth="14" markerHeight="14" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse"><polyline points="-5,-4 0,0 -5,4 -5,-4" fill="#94a3b8" stroke="#94a3b8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g data-ar-node="grp" transform="translate(384,24)"><rect x="0" y="0" width="370" height="422" rx="10" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="8 5"/><text x="10" y="14" font-size="10.5" font-weight="550" fill="#e8e8ea" letter-spacing="1">Your system boundary</text></g><g transform="translate(24,24)"><path d="M290,72.5 C345,72.5 345,140.5 400,140.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="305.40000000000003" y="110.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">events</text><path d="M545,213 C545,225 545,225 545,237" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/></g><g data-ar-node="ext" transform="translate(24,24)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#4ade80" fill-opacity="0.09" stroke="#4ade80" stroke-width="1.5" stroke-linejoin="round"/><circle cx="36" cy="42" r="13" fill="none" stroke="#4ade80" stroke-width="2.4"/><path d="M14 84 C 14 66 24 59 36 59 C 48 59 58 66 58 84" fill="none" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">External</text></g><g data-ar-node="q" transform="translate(424,92)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#fbbf24" fill-opacity="0.09" stroke="#fbbf24" stroke-width="1.5" stroke-linejoin="round"/><path d="M62 10 V90" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.35"/><path d="M28 26 H50" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/><path d="M28 50 H50" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/><path d="M28 74 H50" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/><circle cx="16" cy="26" r="4.5" fill="#fbbf24" opacity="0.9"/><circle cx="16" cy="50" r="4.5" fill="#fbbf24" opacity="0.9"/><circle cx="16" cy="74" r="4.5" fill="#fbbf24" opacity="0.9"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Queue</text></g><g data-ar-node="svc" transform="translate(424,261)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Service</text></g></svg>

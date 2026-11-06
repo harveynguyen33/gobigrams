@@ -1,0 +1,7 @@
+board "Kafka rebalance storm"
+direction LR
+consumer = group "Consumers"
+broker   = service "Broker" icon:server color:amber
+orders   = database "orders"
+broker -> orders "append" flow:dots
+orders ..> consumer card:1..n

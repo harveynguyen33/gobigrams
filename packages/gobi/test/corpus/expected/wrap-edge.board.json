@@ -1,0 +1,38 @@
+{
+  "id": "corpus-wrap-edge",
+  "name": "Wrap edge",
+  "nodes": [
+    {
+      "id": "ship",
+      "type": "goblin",
+      "position": {
+        "x": -180,
+        "y": 169
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "shipment consolidation worker",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

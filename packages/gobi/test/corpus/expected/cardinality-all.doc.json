@@ -1,0 +1,163 @@
+{
+  "docVersion": 1,
+  "name": "Cardinality vocabulary",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "b",
+      "kind": "service",
+      "label": "B",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 226
+      }
+    },
+    {
+      "id": "c",
+      "kind": "service",
+      "label": "C",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 452
+      }
+    },
+    {
+      "id": "d",
+      "kind": "service",
+      "label": "D",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 677
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "card": [
+        "1",
+        "n"
+      ],
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "card": [
+        "n",
+        "1"
+      ],
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "b",
+      "to": "c",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "card": [
+        "0",
+        "1",
+        "0",
+        "n"
+      ],
+      "dash": "solid"
+    },
+    {
+      "id": "e4",
+      "from": "c",
+      "to": "d",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "card": [
+        "0",
+        "n",
+        "1"
+      ],
+      "dash": "solid"
+    },
+    {
+      "id": "e5",
+      "from": "d",
+      "to": "a",
+      "fromHandle": "right",
+      "toHandle": "right",
+      "card": [
+        "1",
+        "1"
+      ],
+      "dash": "dashed"
+    },
+    {
+      "id": "e6",
+      "from": "a",
+      "to": "c",
+      "fromHandle": "right",
+      "toHandle": "right",
+      "label": "optional",
+      "card": [
+        "0",
+        "1",
+        "0",
+        "1"
+      ],
+      "dash": "dotted",
+      "labelOffset": {
+        "x": 44.4,
+        "y": 0
+      }
+    }
+  ]
+}

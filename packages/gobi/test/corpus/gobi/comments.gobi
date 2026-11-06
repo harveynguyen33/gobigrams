@@ -1,0 +1,6 @@
+# a full-line comment
+board "Comment handling" # trailing comment
+# another
+a = service "A" # after attrs
+b = service "B"
+a -> b "label # not comment" # after edge

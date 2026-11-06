@@ -86,7 +86,7 @@ import {
   createLucideIcon,
   type LucideIcon,
 } from 'lucide-react';
-import {ICON_NAMES} from './gobi/iconNames';
+import {ICON_NAMES} from '@techgoblin/gobi-core';
 
 /* AQ10 — the minimal drum: lucide's `database` minus its inner arc. Built with
    the same createLucideIcon factory the library itself uses, so it inherits

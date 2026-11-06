@@ -1,0 +1,9 @@
+board "System pipeline"
+direction LR
+ext = actor "External"
+grp = group "Your system boundary"
+q = queue "Queue"
+svc = service "Service"
+grp { q svc }
+ext -> q "events" flow:dots
+q -> svc

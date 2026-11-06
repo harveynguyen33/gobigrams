@@ -1,0 +1,35 @@
+board "Every flowchart kind in one walk"
+direction LR
+prep = preparation "Initialise"
+s = terminator "Start"
+p = process "Process"
+d = decision "valid?"
+io = io "read input"
+doc = document "Report"
+sub = subprocess "Subprocess"
+man = manual "Manual step"
+wait = delay "Wait"
+conn = connector "A"
+off = offpage "Off page"
+mi = manualinput "Manual input"
+disp = display "Show result"
+sd = storeddata "Stored data"
+ll = looplimit "Loop"
+is = internalstorage "In memory"
+prep -> s
+s -> p
+p -> d
+d -> io "yes"
+io -> doc
+doc -> sub
+sub -> man
+man -> wait
+wait -> conn
+conn -> off
+off -> mi
+mi -> disp
+disp -> sd
+sd -> ll
+ll -> is
+is -> p "again"
+d -> prep "no"

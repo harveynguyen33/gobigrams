@@ -1,0 +1,7 @@
+[
+  {
+    "line": 2,
+    "col": 1,
+    "message": "\"a\" is declared twice. Rename one of them."
+  }
+]

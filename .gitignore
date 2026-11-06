@@ -7,6 +7,11 @@ node_modules/
 # build output
 dist/
 
+# STEP-6-OBSIDIAN — the plugin's built bundle. A release build is copied into
+# the plugin's own distribution repo (BRAT layout) as a deliberate act; it is
+# not tracked here (same rule as packages/*/dist).
+apps/obsidian-gobi/main.js
+
 # logs / editor / OS noise
 *.log
 .DS_Store
@@ -60,3 +65,7 @@ research/
 .selbox-live/
 .rc-entry.ts
 .rc-out.mjs
+# CORE-STEP4A: round-gobi-size.mjs writes its esbuild entries at the repo root;
+# a crashed run can leave one behind (five leaked into a commit once)
+.gs-*.ts
+.gs-*.mjs

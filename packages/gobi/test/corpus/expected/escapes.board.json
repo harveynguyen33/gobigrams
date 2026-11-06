@@ -1,0 +1,67 @@
+{
+  "id": "corpus-escapes",
+  "name": "Escapes",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "goblin",
+      "position": {
+        "x": -360,
+        "y": 169
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "He said \"hi\" \\ twice",
+        "sub": "escaped \" quote",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "b",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 169
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "hash # inside is not a comment",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

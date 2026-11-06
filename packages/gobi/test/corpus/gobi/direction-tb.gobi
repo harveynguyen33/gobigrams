@@ -1,0 +1,10 @@
+board "Direction TB with labels"
+direction TB
+web = service "Web tier"
+api = service "API"
+db = database "Primary"
+cache = queue "Cache"
+web -> api "request"
+api -> db "query" techn:"SQL"
+api -> cache "warm"
+db ..> cache "invalidate"

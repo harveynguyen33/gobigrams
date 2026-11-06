@@ -1,0 +1,321 @@
+{
+  "docVersion": 1,
+  "name": "Flowchart kinds",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "terminator",
+      "label": "Start",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -685,
+        "y": 0
+      }
+    },
+    {
+      "id": "step",
+      "kind": "process",
+      "label": "Normalize",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 528
+      }
+    },
+    {
+      "id": "ask",
+      "kind": "decision",
+      "label": "valid?",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 697
+      }
+    },
+    {
+      "id": "read",
+      "kind": "io",
+      "label": "read input",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 866
+      }
+    },
+    {
+      "id": "sub",
+      "kind": "subprocess",
+      "label": "Subprocess",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -2091,
+        "y": 1035
+      }
+    },
+    {
+      "id": "doc",
+      "kind": "document",
+      "label": "Report",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -1731,
+        "y": 1035
+      }
+    },
+    {
+      "id": "prep",
+      "kind": "preparation",
+      "label": "Initialise",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -1371,
+        "y": 1035
+      }
+    },
+    {
+      "id": "man",
+      "kind": "manual",
+      "label": "Manual step",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -1011,
+        "y": 1035
+      }
+    },
+    {
+      "id": "wait",
+      "kind": "delay",
+      "label": "Wait",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -651,
+        "y": 1035
+      }
+    },
+    {
+      "id": "conn",
+      "kind": "connector",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 152,
+        "h": 152
+      },
+      "position": {
+        "x": -291,
+        "y": 1035
+      }
+    },
+    {
+      "id": "off",
+      "kind": "offpage",
+      "label": "Off page",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -69,
+        "y": 1035
+      }
+    },
+    {
+      "id": "mi",
+      "kind": "manualinput",
+      "label": "Manual input",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 291,
+        "y": 1035
+      }
+    },
+    {
+      "id": "disp",
+      "kind": "display",
+      "label": "Show result",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 651,
+        "y": 1035
+      }
+    },
+    {
+      "id": "sd",
+      "kind": "storeddata",
+      "label": "Stored data",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1011,
+        "y": 1035
+      }
+    },
+    {
+      "id": "ll",
+      "kind": "looplimit",
+      "label": "Loop",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1371,
+        "y": 1035
+      }
+    },
+    {
+      "id": "is",
+      "kind": "internalstorage",
+      "label": "In memory",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1731,
+        "y": 1035
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "step",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "step",
+      "to": "ask",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "ask",
+      "to": "read",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid"
+    }
+  ]
+}

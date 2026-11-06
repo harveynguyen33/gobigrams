@@ -1,0 +1,104 @@
+{
+  "docVersion": 1,
+  "name": "System pipeline",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "ext",
+      "kind": "actor",
+      "label": "External",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "grp",
+      "kind": "group",
+      "label": "Your system boundary",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 370,
+        "h": 422
+      },
+      "position": {
+        "x": 360,
+        "y": 0
+      }
+    },
+    {
+      "id": "q",
+      "kind": "queue",
+      "label": "Queue",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "grp"
+    },
+    {
+      "id": "svc",
+      "kind": "service",
+      "label": "Service",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 237
+      },
+      "parent": "grp"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "ext",
+      "to": "q",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "events",
+      "dash": "solid",
+      "flow": "dots",
+      "labelOffset": {
+        "x": -19.799999999999955,
+        "y": 0
+      }
+    },
+    {
+      "id": "e2",
+      "from": "q",
+      "to": "svc",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid"
+    }
+  ]
+}

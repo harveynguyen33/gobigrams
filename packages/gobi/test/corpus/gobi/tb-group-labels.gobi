@@ -1,0 +1,14 @@
+board "TB group with member labels"
+direction TB
+cluster = group "Order pipeline"
+ingest = service "Ingest"
+matcher = service "Matcher"
+writer = service "Writer"
+sink = database "Sink"
+audit = note "Audit trail"
+cluster { ingest matcher writer }
+ingest -> matcher "parse"
+matcher -> writer "route"
+writer -> sink "commit"
+sink ..> audit "trail"
+ingest -> sink "bypass"

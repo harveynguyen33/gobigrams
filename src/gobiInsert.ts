@@ -1,6 +1,7 @@
 /* ROUND GOBI-2 — the .gobi door's INSERT, as a pure function.
  *
- * `compileGobi(text)` returns a WHOLE board; the app door ADDS that board to
+ * `toBoardDoc(doc)` (src/gobi/adapterCanvas.ts, CORE-STEP2) returns a WHOLE
+ * board; the app door ADDS that board to
  * the one the user is already looking at, so the two id spaces have to be
  * reconciled before anything reaches React Flow:
  *

@@ -1,0 +1,559 @@
+{
+  "id": "corpus-flowchart-kinds",
+  "name": "Flowchart kinds",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "goblin",
+      "position": {
+        "x": -685,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "terminator",
+        "kicker": "",
+        "title": "Start",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "green",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "step",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 528
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "process",
+        "kicker": "",
+        "title": "Normalize",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 697
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "decision",
+        "kicker": "",
+        "title": "valid?",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "amber",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 866
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "io",
+        "kicker": "",
+        "title": "read input",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "violet",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "sub",
+      "type": "goblin",
+      "position": {
+        "x": -2091,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "subprocess",
+        "kicker": "",
+        "title": "Subprocess",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "doc",
+      "type": "goblin",
+      "position": {
+        "x": -1731,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "document",
+        "kicker": "",
+        "title": "Report",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "violet",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "prep",
+      "type": "goblin",
+      "position": {
+        "x": -1371,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "preparation",
+        "kicker": "",
+        "title": "Initialise",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "man",
+      "type": "goblin",
+      "position": {
+        "x": -1011,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "manual",
+        "kicker": "",
+        "title": "Manual step",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "green",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "wait",
+      "type": "goblin",
+      "position": {
+        "x": -651,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "delay",
+        "kicker": "",
+        "title": "Wait",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "amber",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "conn",
+      "type": "goblin",
+      "position": {
+        "x": -291,
+        "y": 1035
+      },
+      "width": 152,
+      "height": 152,
+      "style": {
+        "width": 152,
+        "height": 152
+      },
+      "data": {
+        "shape": "connector",
+        "kicker": "",
+        "title": "A",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "off",
+      "type": "goblin",
+      "position": {
+        "x": -69,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "offpage",
+        "kicker": "",
+        "title": "Off page",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "mi",
+      "type": "goblin",
+      "position": {
+        "x": 291,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "manualinput",
+        "kicker": "",
+        "title": "Manual input",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "green",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "disp",
+      "type": "goblin",
+      "position": {
+        "x": 651,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "display",
+        "kicker": "",
+        "title": "Show result",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "violet",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "sd",
+      "type": "goblin",
+      "position": {
+        "x": 1011,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "storeddata",
+        "kicker": "",
+        "title": "Stored data",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "violet",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "ll",
+      "type": "goblin",
+      "position": {
+        "x": 1371,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "looplimit",
+        "kicker": "",
+        "title": "Loop",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "amber",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "is",
+      "type": "goblin",
+      "position": {
+        "x": 1731,
+        "y": 1035
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "internalstorage",
+        "kicker": "",
+        "title": "In memory",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "violet",
+        "body": "label-only",
+        "handles": "tb",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "start",
+      "target": "step",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "step",
+      "target": "ask",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "ask",
+      "target": "read",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

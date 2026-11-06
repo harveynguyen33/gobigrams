@@ -20,42 +20,13 @@ import {RotateGrip} from '../components/RotateGrip';
        and not to the card's vertical centre
 --------------------------------------------------------------------------- */
 
-export type TableColumn = {
-  id: string;
-  name: string;
-  type: string;
-  pk?: boolean;
-  fk?: boolean;
-  notNull?: boolean;
-  unique?: boolean;
-};
+/* CORE-STEP4A-FIX — TableColumn/ShowMode/TableKind moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */
+export type {TableColumn, ShowMode, TableKind} from '../../packages/gobi/src/model/nodeData';
+import type {TableColumn, ShowMode, TableKind} from '../../packages/gobi/src/model/nodeData';
 
-/** Liam ERD's `showMode` — the cheapest large-schema lever. */
-export type ShowMode = 'ALL_FIELDS' | 'TABLE_NAME' | 'KEY_ONLY';
 
-export type TableKind = {
-  /** Table name (schema-qualified shown when `schema` is set). */
-  name: string;
-  schema?: string;
-  columns: TableColumn[];
-  /** Symbolic accent key (L1) — resolved per theme. */
-  colorKey?: ColorKey;
-  /** Literal user-typed hex escape hatch. */
-  color?: string;
-  /** Column list collapsed to the header only. */
-  collapsed?: boolean;
-  /** injected by App: the board's ERD show-mode */
-  __showMode?: ShowMode;
-  /** injected by App: called with the new collapsed flag */
-  __onToggle?: (id: string, collapsed: boolean) => void;
-  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
-  rotation?: number;
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
-  __rotateSel?: boolean;
-  /** injected by App: called when a column is clicked (inspector focus) */
-  __onPickColumn?: (id: string, col: TableColumn) => void;
-};
+
 
 /** Handle ids: one source + one target per column, plus extra target handles so
  *  N incoming FKs to the same column never stack on one point (ChartDB's trick). */

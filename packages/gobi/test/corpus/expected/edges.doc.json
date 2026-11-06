@@ -1,0 +1,259 @@
+{
+  "docVersion": 1,
+  "name": "Edge vocabulary",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -325,
+        "y": 0
+      }
+    },
+    {
+      "id": "b",
+      "kind": "service",
+      "label": "B",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 265
+      }
+    },
+    {
+      "id": "c",
+      "kind": "service",
+      "label": "C",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 531
+      }
+    },
+    {
+      "id": "d",
+      "kind": "service",
+      "label": "D",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 796
+      }
+    },
+    {
+      "id": "e",
+      "kind": "service",
+      "label": "E",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 1062
+      }
+    },
+    {
+      "id": "f",
+      "kind": "service",
+      "label": "F",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 1327
+      }
+    },
+    {
+      "id": "g",
+      "kind": "service",
+      "label": "G",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -180,
+        "y": 1592
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "solid labelled",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "b",
+      "to": "c",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "dashed",
+      "dash": "dashed"
+    },
+    {
+      "id": "e3",
+      "from": "c",
+      "to": "d",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "dotted",
+      "dash": "dotted"
+    },
+    {
+      "id": "e4",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e5",
+      "from": "d",
+      "to": "e",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid",
+      "flow": "dots"
+    },
+    {
+      "id": "e6",
+      "from": "e",
+      "to": "f",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid",
+      "flow": "icon",
+      "flowIcon": "mail",
+      "flowCount": 3
+    },
+    {
+      "id": "e7a",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "many",
+      "dash": "solid",
+      "labelOffset": {
+        "x": 75.2,
+        "y": 0
+      }
+    },
+    {
+      "id": "e7b",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "many",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -75.2,
+        "y": 0
+      }
+    },
+    {
+      "id": "e7c",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "many",
+      "dash": "solid"
+    },
+    {
+      "id": "e8",
+      "from": "b",
+      "to": "c",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "techn": "JDBC",
+      "dash": "solid"
+    },
+    {
+      "id": "e9",
+      "from": "a",
+      "to": "a",
+      "fromHandle": "left",
+      "toHandle": "right",
+      "label": "self",
+      "dash": "solid"
+    },
+    {
+      "id": "e10",
+      "from": "c",
+      "to": "c",
+      "fromHandle": "left",
+      "toHandle": "right",
+      "dash": "solid"
+    },
+    {
+      "id": "e11",
+      "from": "b",
+      "to": "a",
+      "fromHandle": "left",
+      "toHandle": "right",
+      "dash": "solid"
+    }
+  ]
+}

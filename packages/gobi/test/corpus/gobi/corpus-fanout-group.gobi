@@ -1,0 +1,13 @@
+board "Fan-out with a group and an outside coordinator"
+direction LR
+coord = actor "Coordinator" icon:users
+team = group "Worker pool"
+w1 = service "Worker 1"
+w2 = service "Worker 2"
+w3 = queue "Backlog" sub:"retry queue"
+team { w1 w2 }
+coord -> w1 "dispatch"
+coord -> w2 "dispatch"
+w1 -> w3 "done"
+w2 -> w3 "done"
+w3 ..> coord "report"

@@ -1,0 +1,147 @@
+{
+  "docVersion": 1,
+  "name": "Body layout choices",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "bare",
+      "kind": "service",
+      "label": "Bare service",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -270,
+        "y": 0
+      }
+    },
+    {
+      "id": "carded",
+      "kind": "service",
+      "label": "Carded",
+      "sub": "one line of prose buys the shell",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 399
+      }
+    },
+    {
+      "id": "forced",
+      "kind": "service",
+      "label": "Forced card",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -845,
+        "y": 598
+      }
+    },
+    {
+      "id": "simple",
+      "kind": "service",
+      "label": "Forced simple",
+      "sub": "explicit simple wins",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -485,
+        "y": 598
+      }
+    },
+    {
+      "id": "kick",
+      "kind": "service",
+      "label": "Kicker buys card",
+      "kicker": "CUSTOM",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -125,
+        "y": 598
+      }
+    },
+    {
+      "id": "gate",
+      "kind": "gateway",
+      "label": "GW",
+      "sub": "routes",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 235,
+        "y": 598
+      }
+    },
+    {
+      "id": "lbl",
+      "kind": "text",
+      "label": "A caption never carries a body",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": 595,
+        "y": 598
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "bare",
+      "to": "carded",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "link",
+      "dash": "solid"
+    }
+  ]
+}

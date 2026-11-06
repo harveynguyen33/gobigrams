@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {pruneBoardRetention} from './scripts/boardRetention.mjs';
 
 const BOARDS_DIR = path.resolve(__dirname, 'boards');
 /** PACKAGE-N §7 — the user library is a SINGLETON document in the same
@@ -37,6 +38,26 @@ function readBody(req: any): Promise<string> {
 function boardFile(id: string) {
   if (!ID_RE.test(id)) return null; // also blocks path traversal (no / or . allowed)
   return path.join(BOARDS_DIR, `${id}.json`);
+}
+
+/* BOARD-RETENTION (task t_59671f6a) — boards/ tombstones and .bak generations
+   are bounded by the policy in scripts/boardRetention.mjs (the ONE home of
+   the numbers; checks/round-board-retention.mjs asserts the bound). The
+   sweep runs OFF the request path (setTimeout 0) and is unref'd, so it never
+   delays a response, never blocks boot, and never keeps the process alive.
+   It only ever removes files matching the two exact archive/backup name
+   shapes — a live board, the library or a crash leftover is data. */
+function scheduleRetentionSweep(delayMs = 0) {
+  setTimeout(() => {
+    try {
+      const s = pruneBoardRetention(BOARDS_DIR);
+      if (s.removed.tombstones || s.removed.baks) {
+        console.log(`[boards] retention: removed ${s.removed.tombstones} tombstone(s), ${s.removed.baks} .bak(s); kept ${s.kept.tombstones} tombstone(s), ${s.kept.baks} .bak(s) of ${s.scanned} file(s)`);
+      }
+    } catch (e: any) {
+      console.warn('[boards] retention sweep failed:', e?.message ?? e);
+    }
+  }, delayMs).unref?.();
 }
 
 function readBoard(id: string) {
@@ -174,6 +195,11 @@ function boardsApi(): Plugin {
      dev server. TRUE static hosting (dumb CDN, file://) remains unsupported —
      a server process is required, stated in README/DEV-NOTES. */
   const registerMiddlewares = (server: {middlewares: {use: (fn: (req: any, res: any, next: any) => void) => void}}) => {
+    /* BOARD-RETENTION — one sweep shortly after boot (dev AND preview), so a
+       backlog left by a long-dead process is cleared without any board
+       operation having to happen first. Deferred + unref'd: never blocks the
+       first render or holds the process open. */
+    scheduleRetentionSweep(1500);
     server.middlewares.use((req: any, res: any, next: any) => {
       const url = new URL(req.url, 'http://localhost');
         if (!url.pathname.startsWith('/api/')) return next();
@@ -317,11 +343,13 @@ function boardsApi(): Plugin {
           // generation saved it) showed any caller that sweeps the board list
           // can destroy a real board. The file is RENAMED to
           // `<id>.deleted-<UTC-stamp>.json` instead, so every delete leaves a
-          // recoverable artefact and no code path here removes bytes. The
-          // archive stays until a human (or an explicit purge step,
-          // scripts/purge-deleted-boards.mjs — dry-run by default) removes
-          // archives older than a stated age. Nothing is ever deleted
-          // automatically.
+          // recoverable artefact and no code path here removes the board's
+          // bytes. BOARD-RETENTION (t_59671f6a) now bounds the archive class:
+          // a fresh tombstone always survives; stale/orphaned tombstones and
+          // .baks are pruned by scripts/boardRetention.mjs (see that file for
+          // the policy; scripts/purge-deleted-boards.mjs remains the explicit
+          // human tool). The sweep is deferred and unref'd — the response
+          // never waits on it.
           if (method === 'DELETE') {
             if (!fs.existsSync(file)) return send(404, {error: 'not found'});
             const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -331,6 +359,7 @@ function boardsApi(): Plugin {
             } catch (e: any) {
               return send(500, {error: String(e)});
             }
+            scheduleRetentionSweep();
             return send(200, {ok: true, archived: path.basename(archive)});
           }
 

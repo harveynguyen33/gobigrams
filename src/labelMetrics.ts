@@ -1,42 +1,8 @@
-/* ROUND GOBI-LAYOUT — the ONE label-width metric for LAYOUT-time room
- * reservation, in a leaf module that imports NOTHING.
- *
- * WHY THIS EXISTS. Harvey's complaint on a real .gobi render — the edge labels
- * sat ON the node boxes. The layout must reserve room for the widest label
- * crossing each cut, which needs a text WIDTH estimate in a pure module the
- * layout engine can import without cycles (exportSvg's estimateTextWidth is
- * not exported AND lives in a LAZY chunk — importing it from the main-chunk
- * layout would drag the export pipeline onto the boot path: exportSvg-*.js is
- * its own lazy chunk in dist/, measured).
- *
- * THE NUMBER IS NOT INVENTED — it is the export door's own shipped formula,
- * lifted verbatim (exportSvg.ts emitContentInto): a label row measures
- * `length * 6.6 + 12` px, floored at 24. That is 11px mono at the stub's
- * 0.6em advance width (11 * 0.6 = 6.6) plus the label plate's 2 * 6px
- * horizontal padding. M1 in checks/round-gobi-layout.mjs pins the agreement
- * on real labels, and exportSvg.ts now CALLS this helper at its emit site so
- * the two cannot drift apart again.
- *
- * It deliberately OVER-estimates nothing and UNDER-estimates nothing: the
- * same estimate the renderer paints with is the one the layout reserves by. */
-
-/** Estimated width of an edge label's plate in px: `length * 6.6 + 12`,
- *  floored at 24 — the export door's own formula (see the header). */
-export function estimateEdgeLabelWidth(text: string): number {
-  return Math.max(24, text.length * 6.6 + 12);
-}
-
-/** ROUND GOBI-TEXT — the edge label's FONT, as the canvas sheet declares it.
- *
- *  `.edge-label` (`src/styles.css`) reads `font-size: calc(var(--fs-sm) *
- *  var(--ts-scale, 1))` and `font-weight: var(--ts-weight, 600)`: 11px
- *  SEMIBOLD, and it has been semibold since long before the text section
- *  existed. A browser export MEASURES those off the live element, but the
- *  headless door (`.gobi` render, blog fence, /embed) has no DOM to measure, so
- *  the emitter used to fall back to 10.5 / 500 — a deliberately different pair
- *  that made an exported label read as a disabled chip instead of as the
- *  canvas label. These two numbers are the sheet's, kept in the ONE leaf module
- *  the layout and the emitter already share; `checks/round-gobi-text.mjs` pins
- *  them against `--fs-sm` and the rule's own weight fallback parsed out of
- *  `src/styles.css`, so a restated literal here cannot drift. */
-export const EDGE_LABEL_FONT = {size: 11, weight: 600} as const;
+/* CORE-STEP4A-FIX (2026-11-05) — this module's code MOVED into the
+ * @techgoblin/gobi-core workspace package (packages/gobi/src/model/labelMetrics.ts);
+ * this file is the app-side re-export so every existing importer (app code and
+ * the checks/ harnesses that read these paths) is unchanged. The ONE home is
+ * the package — never re-add implementation here. The import is RELATIVE (not
+ * the package name) so bundlers always inline it — an externalised bare
+ * specifier would be unresolvable for plain-node consumers of a subpath. */
+export * from '../packages/gobi/src/model/labelMetrics.ts';

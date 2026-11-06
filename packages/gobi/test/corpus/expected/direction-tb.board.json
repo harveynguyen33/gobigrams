@@ -1,0 +1,229 @@
+{
+  "id": "corpus-direction-tb",
+  "name": "Direction TB with labels",
+  "nodes": [
+    {
+      "id": "web",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Web tier",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "api",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 239
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "API",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "db",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 478
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "database",
+        "kicker": "database",
+        "title": "Primary",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "database",
+        "colorKey": "violet",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "cache",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 717
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "queue",
+        "kicker": "stream",
+        "title": "Cache",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "layers",
+        "colorKey": "amber",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "web",
+      "target": "api",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "request",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "api",
+      "target": "db",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "techn": "SQL"
+      },
+      "label": "query",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "api",
+      "target": "cache",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": 31.2,
+          "y": 0
+        },
+        "labelPinned": true
+      },
+      "label": "warm",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "right"
+    },
+    {
+      "id": "e4",
+      "type": "goblinEdge",
+      "source": "db",
+      "target": "cache",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "invalidate",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

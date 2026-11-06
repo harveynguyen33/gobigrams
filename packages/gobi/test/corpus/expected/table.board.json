@@ -1,0 +1,158 @@
+{
+  "id": "corpus-table",
+  "name": "Tables and edges",
+  "nodes": [
+    {
+      "id": "users",
+      "type": "table",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 250,
+      "height": 170,
+      "style": {
+        "width": 250,
+        "height": 170
+      },
+      "data": {
+        "name": "users",
+        "columns": [
+          {
+            "id": "c1",
+            "name": "id",
+            "type": "uuid",
+            "pk": true,
+            "notNull": true
+          },
+          {
+            "id": "c2",
+            "name": "email",
+            "type": "varchar",
+            "notNull": true,
+            "unique": true
+          },
+          {
+            "id": "c3",
+            "name": "name",
+            "type": "varchar"
+          }
+        ],
+        "colorKey": "cyan"
+      }
+    },
+    {
+      "id": "orders",
+      "type": "table",
+      "position": {
+        "x": 0,
+        "y": 231
+      },
+      "width": 250,
+      "height": 170,
+      "style": {
+        "width": 250,
+        "height": 170
+      },
+      "data": {
+        "name": "orders",
+        "columns": [
+          {
+            "id": "c1",
+            "name": "id",
+            "type": "uuid",
+            "pk": true
+          },
+          {
+            "id": "c2",
+            "name": "user_id",
+            "type": "uuid",
+            "fk": true
+          }
+        ],
+        "colorKey": "cyan"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "users",
+      "target": "orders",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerStart": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "markerEnd": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "orders",
+      "target": "users",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "orders",
+      "target": "users",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "1.5 3.5"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "audit",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

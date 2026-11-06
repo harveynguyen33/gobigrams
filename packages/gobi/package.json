@@ -1,0 +1,59 @@
+{
+  "name": "@techgoblin/gobi-core",
+  "version": "0.4.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "The .gobi diagram language core — compile and render gobigrams with no browser, no React, no canvas.",
+  "license": "MIT",
+  "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)",
+  "homepage": "https://gobigrams.tech-goblin.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harveynguyen33/gobigrams.git",
+    "directory": "packages/gobi"
+  },
+  "bugs": {
+    "url": "https://github.com/harveynguyen33/gobigrams/issues"
+  },
+  "keywords": [
+    "diagram",
+    "diagram-as-code",
+    "dsl",
+    "svg",
+    "architecture-diagram",
+    "flowchart",
+    "gobi",
+    "gobigrams"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./src/index.ts",
+      "module": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./model/*": {
+      "types": "./src/model/*.ts",
+      "browser": "./src/model/*.ts",
+      "module": "./src/model/*.ts",
+      "import": "./src/model/*.ts",
+      "default": "./src/model/*.ts"
+    }
+  },
+  "files": ["dist", "src", "README.md", "LICENSE", "test/corpus"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "npm run build && node prepublish-guard.mjs",
+    "test": "node ../../checks/round-gobi-doc-parity.mjs && node ../../checks/round-gobi-render.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.21.5",
+    "typescript": "^5.9.3"
+  }
+}

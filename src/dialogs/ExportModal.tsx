@@ -271,11 +271,13 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
    * the compiler is the app's own (so a bad paste comes back as structured
    * errors instead of a re-parse). The compiler arrives through import(): the
    * modal never statically imports src/gobi, so this door costs the main
-   * bundle nothing until someone pastes. */
+   * bundle nothing until someone pastes. CORE-STEP2: the compiler returns
+   * the neutral GobiDocument and the canvas adapter (also lazy, also off
+   * the boot path) is the ONE place that maps it to a React-Flow board. */
   const doImportGobi = async () => {
     setGobiErrors([]);
     setGobiNote(null);
-    const {compileGobi} = await import('../gobi');
+    const {compileGobi} = await import('@techgoblin/gobi-core');
     const res = compileGobi(gobiText);
     if (res.ok === false) {
       /* NOTHING is dispatched: the board is untouched and the errors ARE the
@@ -283,8 +285,10 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
       setGobiErrors(res.errors);
       return;
     }
-    window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board: res.board}}));
-    setGobiNote(`Compiled ${count(res.board.nodes.length, 'node')} · ${count(res.board.edges.length, 'edge')} — inserting onto the board…`);
+    const {toBoardDoc} = await import('../gobi/adapterCanvas');
+    const board = toBoardDoc(res.doc);
+    window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board}}));
+    setGobiNote(`Compiled ${count(board.nodes.length, 'node')} · ${count(board.edges.length, 'edge')} — inserting onto the board…`);
     window.setTimeout(onClose, 900);
   };
 

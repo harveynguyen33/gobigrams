@@ -1,0 +1,348 @@
+{
+  "id": "corpus-fanout-b",
+  "name": "Consumer group protocol",
+  "nodes": [
+    {
+      "id": "gw",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "actor",
+        "kicker": "actor",
+        "title": "client gateway",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "user",
+        "colorKey": "green",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "topic",
+      "type": "goblin",
+      "position": {
+        "x": 364,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "queue",
+        "kicker": "stream",
+        "title": "events",
+        "sub": "3 partitions",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "layers",
+        "colorKey": "amber",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "grp",
+      "type": "goblin",
+      "position": {
+        "x": 728,
+        "y": 0
+      },
+      "width": 370,
+      "height": 591,
+      "style": {
+        "width": 370,
+        "height": 591
+      },
+      "data": {
+        "shape": "group",
+        "kicker": "boundary",
+        "title": "consumer group v1",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "c1",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "consumer-1",
+        "sub": "P0 · P1",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "grp"
+    },
+    {
+      "id": "coord",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 237
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "group coordinator",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "grp"
+    },
+    {
+      "id": "c2",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 406
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "consumer-2",
+        "sub": "P2",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "grp"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "gw",
+      "target": "topic",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "publish",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "topic",
+      "target": "c1",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": -21.100000000000023,
+          "y": 0
+        },
+        "labelPinned": true
+      },
+      "label": "P0 · P1",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "topic",
+      "target": "c2",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": -4.600000000000023,
+          "y": 0
+        },
+        "labelPinned": true
+      },
+      "label": "P2",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e4",
+      "type": "goblinEdge",
+      "source": "coord",
+      "target": "c1",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "assignment",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
+    },
+    {
+      "id": "e5",
+      "type": "goblinEdge",
+      "source": "c1",
+      "target": "coord",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": 91.7,
+          "y": 0
+        },
+        "labelPinned": true
+      },
+      "label": "heartbeat",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e6",
+      "type": "goblinEdge",
+      "source": "c2",
+      "target": "coord",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "heartbeat",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

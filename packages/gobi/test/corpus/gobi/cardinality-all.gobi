@@ -1,0 +1,11 @@
+board "Cardinality vocabulary"
+a = service "A"
+b = service "B"
+c = service "C"
+d = service "D"
+a -> b card:1..n
+a -> b card:n..1
+b -> c card:0..1..0..n
+c -> d card:0..n..1
+d -> a card:1..1 dashed
+a -> c "optional" card:0..1..0..1 dotted

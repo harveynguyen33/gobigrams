@@ -26,7 +26,10 @@
 
 import {COLOR_VAR, type ColorKey} from '../colors';
 
-export type CrowFoot = 'one' | 'many' | 'zeroOrOne' | 'zeroOrMany';
+/* CORE-STEP4A-FIX — the CrowFoot union moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */
+export type {CrowFoot} from '../../packages/gobi/src/model/nodeData';
+import type {CrowFoot} from '../../packages/gobi/src/model/nodeData';
 
 export const CROW_FOOT_IDS = ['one', 'many', 'zeroOrOne', 'zeroOrMany'] as const;
 export const isCrowFoot = (v: unknown): v is CrowFoot =>

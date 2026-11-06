@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1046" height="592" viewBox="0 0 1046 592" data-theme="dark"><rect width="1046" height="592" fill="#0b0b0d"/><style>
+  :root, svg {
+    --bg:#0b0b0d;
+    --surface:#131316;
+    --elevated:#1a1b1f;
+    --border:#26272c;
+    --border-strong:#33343a;
+    --fg:#e8e8ea;
+    --dim:#8a8a92;
+    --dim2:#63636b;
+    --acc:#f54e00;
+    --acc-soft:rgba(245, 78, 0, 0.14);
+    --sel:#3b82f6;
+    --sel-soft:rgba(59, 130, 246, 0.14);
+    --green:#4ade80;
+    --red:#f87171;
+    --danger:#ef4444;
+    --card:#1a1b1f;
+    --c-accent:#f54e00;
+    --c-green:#4ade80;
+    --c-cyan:#22d3ee;
+    --c-violet:#a78bfa;
+    --c-amber:#fbbf24;
+    --c-slate:#94a3b8;
+    --c-red:#ff6b6b;
+    --c-blue:#7aa2ff;
+    --c-pink:#f783ac;
+    --c-black:#000000;
+    --c-white:#ffffff;
+  }
+</style><defs><marker id="ar-mk-ba568u" markerWidth="14" markerHeight="14" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse"><polyline points="-5,-4 0,0 -5,4 -5,-4" fill="#94a3b8" stroke="#94a3b8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g data-ar-node="cluster" transform="translate(24,24)"><rect x="0" y="0" width="998" height="253" rx="10" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="8 5"/><text x="10" y="14" font-size="10.5" font-weight="550" fill="#e8e8ea" letter-spacing="1">Order pipeline</text></g><g transform="translate(24,24)"><path d="M330,140.5 C342,140.5 342,140.5 354,140.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="325.5" y="144.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">parse</text><path d="M644,140.5 C656,140.5 656,140.5 668,140.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="639.5" y="144.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">route</text><path d="M813,213 C813,276.75 551.5,340.5 290,340.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="531.7" y="280.75" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">commit</text><path d="M145,413 C145,446.5 90,446.5 90,480" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="101" y="450.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">trail</text><path d="M185,213 C185,240.5 145,240.5 145,268" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="145.2" y="274.40250000000003" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">bypass</text></g><g data-ar-node="ingest" transform="translate(64,92)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Ingest</text></g><g data-ar-node="matcher" transform="translate(378,92)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Matcher</text></g><g data-ar-node="writer" transform="translate(692,92)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Writer</text></g><g data-ar-node="sink" transform="translate(24,292)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><ellipse cx="100" cy="20" rx="96" ry="15" fill="#a78bfa" fill-opacity="0.09" stroke="#a78bfa" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" fill="#a78bfa" fill-opacity="0.09" stroke="#a78bfa" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="104.435" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Sink</text></g><g data-ar-node="audit" transform="translate(24,504)"><rect x="1" y="1" width="178" height="62" rx="4" fill="#131316" stroke="#8a8a92" stroke-width="1"/><path d="M164 1 L179 16 L179 1 Z" fill="#8a8a92" opacity="0.25"/><text x="89" y="28.560000000000002" font-size="14.5" font-weight="650" fill="#e8e8ea" font-family="&#39;JetBrains Mono&#39;, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0">NOTE</text><text x="89" y="43.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">Audit trail</text></g></svg>

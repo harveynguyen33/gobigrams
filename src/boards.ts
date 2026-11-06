@@ -1,4 +1,10 @@
 /* feature-map home: src/boards.ts */
+/* CORE-STEP4A-FIX — the BoardDoc TYPE lives in @techgoblin/gobi-core now
+ * (model/boardDoc.ts, on the package's own flow types): the adapter needs it
+ * and the package must not import this file (serverBoards/localStore are
+ * server-side app code that never reaches the tarball). */
+export type {BoardDoc} from '../packages/gobi/src/model/boardDoc';
+import type {BoardDoc} from '../packages/gobi/src/model/boardDoc';
 import type {Node, Edge} from '@xyflow/react';
 import {type PresetId, type TemplateSpec, getPreset, asPreset} from './presets';
 import {type ThemeName} from './theme';
@@ -23,26 +29,6 @@ export type BoardMeta = {
   preset?: PresetId;
 };
 
-export type BoardDoc = {
-  id: string;
-  name: string;
-  nodes: Node[];
-  edges: Edge[];
-  updatedAt: number;
-  /** L2 — the board's diagram type. Absent on old boards → 'architecture'. */
-  preset?: PresetId;
-  /** PACKAGE-M fix — boards no longer store a theme. A preset may suggest one
-   *  (and the user's global preference still wins); this field is LEGACY/IGNORED
-   *  and kept only so old board files on disk still parse. */
-  /** @deprecated (PACKAGE-M fix) — boards no longer store a theme; the preset suggests it and the
-   *  user's global preference wins. Kept only so old files still parse. */
-  theme?: ThemeName;
-  /** L2 — the on-canvas legend/key toggle this used to control was removed on
-   *  2026-09-17 (harvey: not wanted). The KEY IS PERSISTED DATA: nothing renders
-   *  it, but `saveBoard` writes the value back unchanged, so a board that carries
-   *  it round-trips instead of losing a key this type still declares. */
-  legend?: boolean;
-};
 
 const LAST_KEY = 'diagram-studio:last-board';
 

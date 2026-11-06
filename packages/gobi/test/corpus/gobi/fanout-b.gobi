@@ -1,0 +1,15 @@
+board "Consumer group protocol"
+direction LR
+gw = actor "client gateway"
+topic = queue "events" sub:"3 partitions"
+grp = group "consumer group v1"
+c1 = service "consumer-1" sub:"P0 · P1"
+c2 = service "consumer-2" sub:"P2"
+coord = service "group coordinator"
+grp { c1 c2 coord }
+gw -> topic "publish"
+topic -> c1 "P0 · P1"
+topic -> c2 "P2"
+coord ..> c1 "assignment"
+c1 ..> coord "heartbeat"
+c2 ..> coord "heartbeat"

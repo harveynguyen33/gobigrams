@@ -1,0 +1,24 @@
+{
+  "name": "@techgoblin/gobi-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The .gobi AI-agent door — a stdio MCP server over @techgoblin/gobi-core: gobi_validate / gobi_render / gobi_png / gobi_describe.",
+  "license": "MIT",
+  "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)",
+  "bin": {
+    "gobi-mcp": "./dist/server.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@techgoblin/gobi-core": "*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0"
+  }
+}

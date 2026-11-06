@@ -1,0 +1,26 @@
+{
+  "docVersion": 1,
+  "name": "Wrap edge",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "ship",
+      "kind": "service",
+      "label": "shipment consolidation worker",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -180,
+        "y": 169
+      }
+    }
+  ],
+  "edges": []
+}

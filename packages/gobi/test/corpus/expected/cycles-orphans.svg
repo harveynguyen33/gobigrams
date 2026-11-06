@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="608" height="619" viewBox="0 0 608 619" data-theme="dark"><rect width="608" height="619" fill="#0b0b0d"/><style>
+  :root, svg {
+    --bg:#0b0b0d;
+    --surface:#131316;
+    --elevated:#1a1b1f;
+    --border:#26272c;
+    --border-strong:#33343a;
+    --fg:#e8e8ea;
+    --dim:#8a8a92;
+    --dim2:#63636b;
+    --acc:#f54e00;
+    --acc-soft:rgba(245, 78, 0, 0.14);
+    --sel:#3b82f6;
+    --sel-soft:rgba(59, 130, 246, 0.14);
+    --green:#4ade80;
+    --red:#f87171;
+    --danger:#ef4444;
+    --card:#1a1b1f;
+    --c-accent:#f54e00;
+    --c-green:#4ade80;
+    --c-cyan:#22d3ee;
+    --c-violet:#a78bfa;
+    --c-amber:#fbbf24;
+    --c-slate:#94a3b8;
+    --c-red:#ff6b6b;
+    --c-blue:#7aa2ff;
+    --c-pink:#f783ac;
+    --c-black:#000000;
+    --c-white:#ffffff;
+  }
+</style><defs><marker id="ar-mk-ba568u" markerWidth="14" markerHeight="14" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse"><polyline points="-5,-4 0,0 -5,4 -5,-4" fill="#94a3b8" stroke="#94a3b8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g transform="translate(294,24)"><path d="M20,72.5 C47.95084971874737,72.5 -27.95084971874737,241.5 0,241.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><path d="M145,314 C145,326 145,326 145,338" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><path d="M0,410.5 C-62.5,410.5 -125,277.75 -125,145" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><path d="M0,241.5 C-106.43366478704002,241.5 396.43366478704,241.5 290,241.5" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="131.8" y="245.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">self</text></g><g data-ar-node="a" transform="translate(24,24)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">A</text></g><g data-ar-node="b" transform="translate(294,193)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">B</text></g><g data-ar-node="c" transform="translate(294,362)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">C</text></g><g data-ar-node="d" transform="translate(169,531)"><rect x="1" y="1" width="178" height="62" rx="4" fill="#131316" stroke="#8a8a92" stroke-width="1"/><path d="M164 1 L179 16 L179 1 Z" fill="#8a8a92" opacity="0.25"/><text x="89" y="28.560000000000002" font-size="14.5" font-weight="650" fill="#e8e8ea" font-family="&#39;JetBrains Mono&#39;, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0">NOTE</text><text x="89" y="43.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">D</text></g></svg>

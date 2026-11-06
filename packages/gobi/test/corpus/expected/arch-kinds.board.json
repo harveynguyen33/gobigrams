@@ -1,0 +1,289 @@
+{
+  "id": "corpus-arch-kinds",
+  "name": "Architecture kinds",
+  "nodes": [
+    {
+      "id": "broker",
+      "type": "goblin",
+      "position": {
+        "x": -1635,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Broker",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "amber",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "orders",
+      "type": "goblin",
+      "position": {
+        "x": -1275,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "database",
+        "kicker": "database",
+        "title": "orders",
+        "sub": "primary",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "database",
+        "colorKey": "violet",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "events",
+      "type": "goblin",
+      "position": {
+        "x": -915,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "queue",
+        "kicker": "stream",
+        "title": "events",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "layers",
+        "colorKey": "amber",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "stripe",
+      "type": "goblin",
+      "position": {
+        "x": -555,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "external",
+        "kicker": "external",
+        "title": "Stripe",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "cloud",
+        "colorKey": "accent",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "harvey",
+      "type": "goblin",
+      "position": {
+        "x": -195,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "actor",
+        "kicker": "actor",
+        "title": "Customer",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "user",
+        "colorKey": "green",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "assets",
+      "type": "goblin",
+      "position": {
+        "x": 165,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "storage",
+        "kicker": "object store",
+        "title": "assets",
+        "sub": "bucket",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "package",
+        "colorKey": "amber",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "edgelb",
+      "type": "goblin",
+      "position": {
+        "x": 525,
+        "y": 507
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "gateway",
+        "kicker": "ingress",
+        "title": "Edge LB",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "router",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "memo",
+      "type": "goblin",
+      "position": {
+        "x": 885,
+        "y": 507
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "shape": "note",
+        "kicker": "note",
+        "title": "Kafka 3.7 rebalance protocol",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "sticky-note",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "caption",
+      "type": "label",
+      "position": {
+        "x": 1135,
+        "y": 507
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "text": "Diagram: rebalance storm",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "st",
+      "type": "goblin",
+      "position": {
+        "x": 1385,
+        "y": 507
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "shape": "note",
+        "kicker": "enum",
+        "title": "order_status",
+        "sub": "pending · paid · shipped",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "sticky-note",
+        "colorKey": "amber",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

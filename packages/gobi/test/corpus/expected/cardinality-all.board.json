@@ -1,0 +1,290 @@
+{
+  "id": "corpus-cardinality-all",
+  "name": "Cardinality vocabulary",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "A",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "b",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 226
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "B",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "c",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 452
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "C",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "d",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 677
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "D",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "a",
+      "target": "b",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerStart": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "markerEnd": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "a",
+      "target": "b",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerStart": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "markerEnd": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "b",
+      "target": "c",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e4",
+      "type": "goblinEdge",
+      "source": "c",
+      "target": "d",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e5",
+      "type": "goblinEdge",
+      "source": "d",
+      "target": "a",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerStart": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "markerEnd": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "right",
+      "targetHandle": "right"
+    },
+    {
+      "id": "e6",
+      "type": "goblinEdge",
+      "source": "a",
+      "target": "c",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "1.5 3.5"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": 44.4,
+          "y": 0
+        },
+        "labelPinned": true
+      },
+      "label": "optional",
+      "markerEnd": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "right",
+      "targetHandle": "right"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

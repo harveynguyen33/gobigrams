@@ -1,0 +1,7 @@
+[
+  {
+    "line": 2,
+    "col": 6,
+    "message": "edge mentions \"b\", which is never declared. Declare it first: b = service \"…\""
+  }
+]

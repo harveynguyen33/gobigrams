@@ -1,0 +1,192 @@
+{
+  "docVersion": 1,
+  "name": "Architecture kinds",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "broker",
+      "kind": "service",
+      "label": "Broker",
+      "icon": "server",
+      "color": "amber",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -1635,
+        "y": 507
+      }
+    },
+    {
+      "id": "orders",
+      "kind": "database",
+      "label": "orders",
+      "sub": "primary",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -1275,
+        "y": 507
+      }
+    },
+    {
+      "id": "events",
+      "kind": "queue",
+      "label": "events",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -915,
+        "y": 507
+      }
+    },
+    {
+      "id": "stripe",
+      "kind": "external",
+      "label": "Stripe",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -555,
+        "y": 507
+      }
+    },
+    {
+      "id": "harvey",
+      "kind": "actor",
+      "label": "Customer",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -195,
+        "y": 507
+      }
+    },
+    {
+      "id": "assets",
+      "kind": "storage",
+      "label": "assets",
+      "sub": "bucket",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 165,
+        "y": 507
+      }
+    },
+    {
+      "id": "edgelb",
+      "kind": "gateway",
+      "label": "Edge LB",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 525,
+        "y": 507
+      }
+    },
+    {
+      "id": "memo",
+      "kind": "note",
+      "label": "Kafka 3.7 rebalance protocol",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": 885,
+        "y": 507
+      }
+    },
+    {
+      "id": "caption",
+      "kind": "text",
+      "label": "Diagram: rebalance storm",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": 1135,
+        "y": 507
+      }
+    },
+    {
+      "id": "st",
+      "kind": "note",
+      "label": "order_status",
+      "sub": "pending · paid · shipped",
+      "kicker": "enum",
+      "color": "amber",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": 1385,
+        "y": 507
+      }
+    }
+  ],
+  "edges": []
+}

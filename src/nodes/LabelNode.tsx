@@ -57,27 +57,10 @@ import {RotateGrip} from '../components/RotateGrip';
    border on top of the `.label-node.selected` ring — the "2 borders" defect.
    Different class names would silently re-enable it. */
 
-/** Free-text annotation node. No handles, no chrome — plain text on the canvas. */
-export type LabelKind = {
-  text: string;
-  /** ROUND S — injected per-node by App's `rfNodes` memo, exactly like the
-   *  edge label's `onCommitLabel` in `rfEdges`. Props do NOT reach inside a
-   *  custom node component, so a callback has to travel through `data`. */
-  onCommitText?: (id: string, v: string) => void;
-  /** ROUND S — review mode, threaded through `data` for the same reason (the
-   *  read-only flag had to reach the edge renderer this way too — fix L). */
-  readOnly?: boolean;
-  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
-  rotation?: number;
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
-  __rotateSel?: boolean;
-  /** PACKAGE-P §E.2 — the Text section's stored style, same shape and same
-   *  lazy-write discipline as the goblin kind (`src/textStyle.ts`). Absent on
-   *  every board written before PACKAGE-P, and an absent one renders exactly as
-   *  today: `textStyleVars` returns `{}` and the sheet's fallbacks win. */
-  textStyle?: TextStyle;
-};
+/* CORE-STEP4A-FIX — LabelKind moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */
+export type {LabelKind} from '../../packages/gobi/src/model/nodeData';
+import type {LabelKind} from '../../packages/gobi/src/model/nodeData';
 
 /** PACKAGE-P §E.3(b) — the inspector panel, as a selector.
  *  The Text section's controls live inside this element, so "the pointer is

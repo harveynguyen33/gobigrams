@@ -1,0 +1,144 @@
+{
+  "docVersion": 1,
+  "name": "Consumer group",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "topic",
+      "kind": "queue",
+      "label": "orders",
+      "sub": "6 partitions",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "grp",
+      "kind": "group",
+      "label": "group orders-v1",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 370,
+        "h": 591
+      },
+      "position": {
+        "x": 364,
+        "y": 0
+      }
+    },
+    {
+      "id": "c1",
+      "kind": "service",
+      "label": "consumer-1",
+      "sub": "P0 · P1",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "grp"
+    },
+    {
+      "id": "c2",
+      "kind": "service",
+      "label": "consumer-2",
+      "sub": "P2 · P3",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 237
+      },
+      "parent": "grp"
+    },
+    {
+      "id": "c3",
+      "kind": "service",
+      "label": "consumer-3",
+      "sub": "P4 · P5",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 406
+      },
+      "parent": "grp"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "topic",
+      "to": "c1",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "P0 · P1",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -21.099999999999966,
+        "y": 0
+      }
+    },
+    {
+      "id": "e2",
+      "from": "topic",
+      "to": "c2",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "P2 · P3",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -21.099999999999966,
+        "y": 0
+      }
+    },
+    {
+      "id": "e3",
+      "from": "topic",
+      "to": "c3",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "P4 · P5",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -21.099999999999966,
+        "y": 0
+      }
+    }
+  ]
+}

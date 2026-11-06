@@ -1,0 +1,11 @@
+board "Consumer group"
+direction LR
+topic = queue "orders" sub:"6 partitions"
+grp = group "group orders-v1"
+c1 = service "consumer-1" sub:"P0 · P1"
+c2 = service "consumer-2" sub:"P2 · P3"
+c3 = service "consumer-3" sub:"P4 · P5"
+grp { c1 c2 c3 }
+topic -> c1 "P0 · P1"
+topic -> c2 "P2 · P3"
+topic -> c3 "P4 · P5"

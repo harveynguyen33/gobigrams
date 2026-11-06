@@ -1,0 +1,100 @@
+{
+  "docVersion": 1,
+  "name": "Groups nesting",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "cluster",
+      "kind": "group",
+      "label": "Cluster",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 1078,
+        "h": 333
+      },
+      "position": {
+        "x": -245,
+        "y": 224
+      }
+    },
+    {
+      "id": "consumers",
+      "kind": "group",
+      "label": "Consumers",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 684,
+        "h": 253
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "cluster"
+    },
+    {
+      "id": "orders",
+      "kind": "database",
+      "label": "orders",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 748,
+        "y": 68
+      },
+      "parent": "cluster"
+    },
+    {
+      "id": "c1",
+      "kind": "service",
+      "label": "C1",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "consumers"
+    },
+    {
+      "id": "c2",
+      "kind": "service",
+      "label": "C2",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 354,
+        "y": 68
+      },
+      "parent": "consumers"
+    }
+  ],
+  "edges": []
+}

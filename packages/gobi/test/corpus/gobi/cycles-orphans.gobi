@@ -1,0 +1,9 @@
+board "Cycles and orphans"
+a = service "A"
+b = service "B"
+c = service "C"
+d = note "D"
+a -> b
+b -> c
+c -> a
+b -> b "self"
