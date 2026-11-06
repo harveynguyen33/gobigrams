@@ -1,6 +1,6 @@
 {
   "name": "@techgoblin/gobi-core",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "type": "module",
   "sideEffects": false,
   "description": "The .gobi diagram language core — compile and render gobigrams with no browser, no React, no canvas.",

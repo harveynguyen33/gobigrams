@@ -8,7 +8,7 @@
  * Type-check first (tsc --noEmit, own tsconfig), then bundle. */
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
-import {rmSync, mkdirSync} from 'node:fs';
+import {rmSync, mkdirSync, chmodSync, readFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -30,7 +30,20 @@ execFileSync(esbuildBin, [
   join(pkg, 'src/server.ts'),
   '--bundle', '--format=esm', '--platform=node', '--target=node18',
   '--log-level=error',
+  /* THE SHEBANG IS PART OF THE PRODUCT. package.json declares this file as
+   * `bin`, so npm symlinks it into node_modules/.bin and the OS executes it
+   * directly — without a shebang the kernel hands a JS file to /bin/sh and
+   * every user gets `var: not found` (and, worse, exit code 0). Measured
+   * 2026-11-06 on the packed tarball: `./node_modules/.bin/gobi-mcp` printed
+   * three shell errors and returned success. */
+  '--banner:js=#!/usr/bin/env node',
   `--outfile=${join(pkg, 'dist/server.mjs')}`,
 ], {stdio: 'inherit'});
+chmodSync(join(pkg, 'dist/server.mjs'), 0o755);
 
-console.log('@techgoblin/gobi-mcp built: dist/server.mjs (self-contained)');
+const built = readFileSync(join(pkg, 'dist/server.mjs'), 'utf8');
+if (!built.startsWith('#!/usr/bin/env node\n')) {
+  throw new Error('build produced a bundle without the node shebang — bin would be unrunnable');
+}
+
+console.log('@techgoblin/gobi-mcp built: dist/server.mjs (self-contained, executable)');

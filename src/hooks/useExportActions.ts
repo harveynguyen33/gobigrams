@@ -311,11 +311,17 @@ export function useExportActions(
           .map(ce => [ce.getAttribute('data-id') ?? '', ce]),
       );
       const exportEdgeOf = (model: unknown): ExportEdge => {
-        const m = model as {id: string; source: string; target: string; label?: unknown; data?: Record<string, unknown> | null; el?: unknown};
+        const m = model as {id: string; source: string; target: string; label?: unknown; data?: Record<string, unknown> | null; style?: {strokeDasharray?: number | string} | null; el?: unknown};
         return {
           id: m.id, source: m.source, target: m.target,
           label: typeof m.label === 'string' && m.label ? m.label : undefined,
           data: m.data ?? null,
+          /* EXPORT-DASH-STARVED (t_3b88028c) — the model edge's style rides
+             along exactly like the node branch's `style: st ?? null` above:
+             the emitter reads style.strokeDasharray (makeEdge's EDGE_DASH
+             table) to paint the same dash the canvas paints. Without this
+             copy every dashed/dotted edge exported solid. */
+          style: m.style ?? null,
           /* the CLONE's edge element (never the model's): its path is drawn in
              flow coordinates, which is exactly the emitter's edge space. */
           el: cloneEdgeById.get(m.id) ?? undefined,

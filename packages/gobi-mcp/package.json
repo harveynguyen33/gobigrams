@@ -1,21 +1,51 @@
 {
   "name": "@techgoblin/gobi-mcp",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "The .gobi AI-agent door — a stdio MCP server over @techgoblin/gobi-core: gobi_validate / gobi_render / gobi_png / gobi_describe.",
   "license": "MIT",
   "author": "Harvey Nguyen <harvey.nguyen33@gmail.com> (https://github.com/harveynguyen33)",
+  "homepage": "https://gobigrams.tech-goblin.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harveynguyen33/gobigrams.git",
+    "directory": "packages/gobi-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/harveynguyen33/gobigrams/issues"
+  },
   "bin": {
     "gobi-mcp": "./dist/server.mjs"
   },
+  "files": [
+    "dist/server.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "diagram",
+    "diagrams-as-code",
+    "svg",
+    "architecture-diagram",
+    "gobi",
+    "gobigrams"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs",
+    "prepublishOnly": "node scripts/build.mjs && node test/smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "@techgoblin/gobi-core": "*",
+    "@techgoblin/gobi-core": "^0.4.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

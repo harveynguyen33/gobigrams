@@ -73,3 +73,6 @@ research/
 # not remove them; they are probe litter, never shipped
 .ai-ts-entry.ts
 .p-inspector-model.ts
+
+# npm pack output — artifacts, never source
+*.tgz
