@@ -72,7 +72,10 @@ screenshots, no image generation, no layout guesswork — the output is determin
 
 ### 4. A picture for a chat or an issue
 
-`gobi_png` returns a real PNG (base64) an agent can attach to a message or a ticket. If the rasteriser is
+`gobi_png` returns a real PNG as an MCP **image content block** (`mimeType: "image/png"`), so image-capable
+clients show the diagram and the token cost is image tokens — not tens of thousands of base64 characters in
+the text context. A small text block alongside carries the facts only:
+`{ "ok": true, "bytes": 26436, "width": 1000, "height": 388, "scale": 2 }`. If the rasteriser is
 unavailable in that environment it says so and **still returns the SVG**, rather than failing:
 
 ```jsonc
@@ -90,7 +93,7 @@ agent reads the structure first and changes only what you asked for.
 |---|---|---|---|
 | `gobi_validate` | `{ text }` | `{ ok, errors: [{line, column, message, suggestion?}], doc? }` | **every** error in one response |
 | `gobi_render` | `{ text, theme? }` | `{ ok, svg }` or `{ ok: false, errors }` | themes: `dark` `light` `paper` `midnight` `contrast` |
-| `gobi_png` | `{ text, theme?, scale? 1-4 }` | `{ ok, pngBase64 }` or `{ ok: false, reason, svg }` | degrades to SVG, never throws |
+| `gobi_png` | `{ text, theme?, scale? 1-4 }` | image block + `{ ok, bytes, width, height, scale }` or `{ ok: false, reason, svg }` | degrades to SVG, never throws |
 | `gobi_describe` | `{ text }` | compact document summary | ids, kinds, labels, edges, groups |
 
 Plus one MCP **prompt**, `write-gobi`, which encodes the intended loop so a model does not have to be told:
@@ -139,6 +142,11 @@ then `gobi_render` returns `{ok, svg}`.
 
 The server does not read your filesystem, does not open sockets, and does not fetch anything. It takes a
 string and returns a string. The only thing it can do is draw.
+
+**Input bound** — every tool's `text` argument is capped at **100,000 characters**. The largest realistic
+board we could construct (156 nodes, runbook-length notes, 250 labelled edges) measures ~17 KB, so the cap
+sits ~6x above it; an over-limit input is refused by the tool schema with a message naming the limit,
+before it ever reaches the compiler.
 
 ---
 

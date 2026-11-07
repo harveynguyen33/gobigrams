@@ -11,6 +11,11 @@ export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';
    branch hand-writes its own. */
 const count = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'}`;
 
+/* MERMAID-OFF (t_d616040c, 2026-11-07) — the ⇅ → Import → "From Mermaid text"
+ * door does not do what the UI promises (Harvey's verdict after real use).
+ * ONE flag: flip to true and the whole door returns with no other edit. */
+const MERMAID_IMPORT_ENABLED = false;
+
 const THEME_CHOICES: {id: string; label: string}[] = [
   {id: 'live', label: 'live'},
   {id: 'dark', label: 'dark'},
@@ -115,6 +120,14 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
   const [gobiText, setGobiText] = useState('');
   const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
   const [gobiNote, setGobiNote] = useState<string | null>(null);
+  /* IMPORT-REENTRY — one dispatch per dialog session. The ref is the real
+   * latch (it must engage SYNCHRONOUSLY: a double-click's second activation
+   * can land before the first handler's `await import()` resolves, so a
+   * state-only guard races); the state only renders it as disabled. The
+   * error branch resets both so a failed paste can be fixed and retried,
+   * and the unmount-on-close resets them for the next session. */
+  const [gobiSent, setGobiSent] = useState(false);
+  const gobiSentRef = useRef(false);
   const tabRef = useRef<HTMLButtonElement>(null);
 
   const scoped = useMemo(() => {
@@ -275,13 +288,23 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
    * the neutral GobiDocument and the canvas adapter (also lazy, also off
    * the boot path) is the ONE place that maps it to a React-Flow board. */
   const doImportGobi = async () => {
+    /* IMPORT-REENTRY — the synchronous latch: ONE dispatch per dialog
+     * session. Without it the 900ms success-note window leaves the button
+     * live with the compiled text still in the box, and the second click of
+     * a double-click re-imports the same document (measured 4n/2e). */
+    if (gobiSentRef.current) return;
+    gobiSentRef.current = true;
+    setGobiSent(true);
     setGobiErrors([]);
     setGobiNote(null);
     const {compileGobi} = await import('@techgoblin/gobi-core');
     const res = compileGobi(gobiText);
     if (res.ok === false) {
       /* NOTHING is dispatched: the board is untouched and the errors ARE the
-       * answer — one row per error, line:column first. */
+       * answer — one row per error, line:column first. The latch releases:
+       * the user fixes the text and clicks again. */
+      gobiSentRef.current = false;
+      setGobiSent(false);
       setGobiErrors(res.errors);
       return;
     }
@@ -312,6 +335,9 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
 
           {tab === 'import' && (
             <div className="em-import">
+              {/* MERMAID-OFF — gated, not deleted; the flag comment at the top
+                  of this file says why and what flipping it restores. */}
+              {MERMAID_IMPORT_ENABLED && (<>
               <div className="em-label">From Mermaid text</div>
               <textarea
                 className="em-ta"
@@ -326,6 +352,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
               </button>
               {importMsg && <div className="em-note">{importMsg}</div>}
               <div className="em-note">Flowchart subset: node shapes, edge labels, subgraphs. Styling (classDef) is not imported.</div>
+              </>)}
 
               {/* GOBI-2 — the .gobi door, beside Mermaid (same tab, same import
                   event, same one-undo-step contract). Errors replace the note
@@ -340,7 +367,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
                 rows={8}
                 spellCheck={false}
               />
-              <button className="em-go" onClick={doImportGobi} disabled={!gobiText.trim()}>
+              <button className="em-go" onClick={doImportGobi} disabled={!gobiText.trim() || gobiSent}>
                 Import .gobi
               </button>
               {gobiErrors.length > 0 && (

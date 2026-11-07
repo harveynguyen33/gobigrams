@@ -17,7 +17,18 @@
  *       compiler has one);
  *   S5  describe parity: gobi_describe ids === the committed .doc.json ids
  *       (nodes and edges), and group membership reads parent correctly;
- *   S6  the error contract: a bad theme argument is refused by the schema.
+ *   S6  the error contract: a bad theme argument is refused by the schema;
+ *   S7  gobi_png ships the raster as an IMAGE content block (mimeType
+ *       image/png, base64 PNG magic) plus a small text block with the facts —
+ *       and NO base64 run of 500+ characters in any text item (MCP-PNG-IMAGE,
+ *       t_196db9fc: the regression was 26 KB of PNG as ~35k chars of text
+ *       context) — or degrades to {ok:false, reason, svg} with no Chromium;
+ *   S8  the input bound: an over-limit text is REFUSED by the schema with a
+ *       message naming the 100,000-character limit — a -32602 tool result,
+ *       never a stack trace;
+ *   S9  large-but-legal: a deterministically generated 156-node / 250-edge
+ *       document (~16.5 KB — the largest realistic board, measured) still
+ *       renders (MCP-AUDIT, task t_4c22bdbf).
  *
  * Run: node packages/gobi-mcp/test/smoke.mjs   (from anywhere; resolves the
  * repo relative to its own file). Exit 0 = all green. */
@@ -176,19 +187,93 @@ try {
   ok('S6 a bad theme is refused by the tool schema (-32602)', refusal.includes('-32602') || refusal.includes('Invalid enum value'),
     refusal.slice(0, 200));
 
-  /* gobi_png — exercised when a Chromium exists, honestly skipped otherwise */
-  const chrome = process.env.CHROME_BIN && existsSync(process.env.CHROME_BIN);
-  if (chrome || existsSync('/usr/bin/chromium') || existsSync('/usr/bin/google-chrome')
-    || existsSync(join(process.env.HOME || '', '.cache/ms-playwright'))) {
-    const png = await call('gobi_png', {text: good[0].text, scale: 2});
-    const isPng = png.ok && /^iVBORw0KGgo/.test(png.pngBase64); /* PNG magic in base64 */
-    ok('S7 gobi_png returns a real PNG (base64 PNG magic)', isPng,
-      isPng ? '' : JSON.stringify(png).slice(0, 200));
+  /* gobi_png — MCP-PNG-IMAGE (t_196db9fc). Asserted on the RAW tools/call
+     result, not the parsed `call` helper: the whole point is the CONTENT SHAPE.
+     The raster must arrive as an image block; the text block carries the facts
+     only; and no text item anywhere may carry a base64 run of 500+ characters
+     (that is the shipped defect this pins: 26 KB of PNG as ~35k chars of
+     base64 inside the model's text context). */
+  const base64Run = /[A-Za-z0-9+/]{500,}/;
+  const chromeAvailable = !!(process.env.CHROME_BIN && existsSync(process.env.CHROME_BIN))
+    || existsSync('/usr/bin/chromium') || existsSync('/usr/bin/google-chrome')
+    || existsSync(join(process.env.HOME || '', '.cache/ms-playwright'));
+  if (chromeAvailable) {
+    const raw = await request('tools/call', {name: 'gobi_png', arguments: {text: good[0].text, scale: 2}});
+    const items = raw.result?.content ?? [];
+    const image = items.find((c) => c.type === 'image');
+    const texts = items.filter((c) => c.type === 'text');
+    ok('S7a gobi_png returns an image content block with mimeType image/png',
+      !!image && image.mimeType === 'image/png',
+      `content types: ${items.map((c) => c.type).join(', ')}`);
+    const bytes = image ? Buffer.from(image.data, 'base64').length : 0;
+    ok('S7b the image block decodes to a real PNG (magic bytes, sane size)',
+      !!image && /^iVBORw0KGgo/.test(image.data) && bytes > 1000,
+      image ? `${bytes} bytes` : 'no image block');
+    let facts = null;
+    try { facts = JSON.parse(texts.map((c) => c.text).join('')); } catch { /* asserted below */ }
+    ok('S7c the text block carries the facts (ok/bytes/width/height/scale), no image data',
+      !!facts && facts.ok === true && facts.bytes === bytes && facts.bytes > 1000
+        && Number.isInteger(facts.width) && facts.width > 0
+        && Number.isInteger(facts.height) && facts.height > 0 && facts.scale === 2,
+      texts.map((c) => c.text).join('').slice(0, 200));
+    ok('S7d no base64 run of 500+ chars in ANY text item (the old defect)',
+      texts.length > 0 && texts.every((c) => !base64Run.test(c.text)));
   } else {
     const png = await call('gobi_png', {text: good[0].text});
     ok('S7 gobi_png degrades to {ok:false, reason, svg} with no Chromium',
       png.ok === false && png.reason === 'rasteriser unavailable' && typeof png.svg === 'string');
   }
+
+  /* S8 — the input bound (MCP-AUDIT): an over-limit document must be refused
+     by the SCHEMA, with a message that names the limit. The same refusal
+     shapes S6 accepts (-32602 in a tool result, or a protocol error); a
+     stack trace or a silent compile of the padding is a failure. */
+  const overLimit = await request('tools/call', {
+    name: 'gobi_validate',
+    arguments: {text: good[0].text + '\n' + 'x'.repeat(100_000)},
+  });
+  const refusal8 = JSON.stringify(overLimit.error ?? overLimit.result ?? {});
+  ok('S8a an over-limit text is refused (-32602), not compiled',
+    refusal8.includes('-32602') || refusal8.includes('Invalid'),
+    refusal8.slice(0, 200));
+  ok('S8b the refusal message names the 100,000-character limit',
+    refusal8.includes('100,000') && refusal8.includes('character'),
+    refusal8.slice(0, 300));
+  ok('S8c the refusal is a message, not a stack trace',
+    !refusal8.includes('at async') && !refusal8.includes('SyntaxError') && !refusal8.includes('\\n    at '),
+    refusal8.slice(0, 300));
+
+  /* S9 — large-but-legal input still renders. The generator is the measured
+     "largest realistic board" (156 nodes, runbook-length notes, 250 labelled
+     edges ≈ 16.5 KB — ~6x under the limit). Deterministic by construction. */
+  const bigDoc = (() => {
+    const KINDS = ['service', 'database', 'queue', 'external', 'actor', 'gateway', 'storage', 'note', 'text'];
+    const COLORS = ['amber', 'violet', 'red', 'blue', 'green', 'cyan'];
+    const lines = ['board "Large realistic enterprise estate"', 'direction LR'];
+    const ids = [];
+    for (let i = 0; i < 150; i++) {
+      const id = `n${i}`;
+      ids.push(id);
+      let l = `${id} = ${KINDS[i % KINDS.length]} "Component ${i} — order pipeline stage ${Math.floor(i / 10)}"`;
+      if (i % 4 === 0) l += ` sub:"owner=team-${i % 9} · region=ap-southeast-1 · tier=${1 + (i % 3)}"`;
+      if (i % 5 === 0) l += ` color:${COLORS[i % COLORS.length]}`;
+      lines.push(l);
+    }
+    for (let j = 0; j < 6; j++) {
+      lines.push(`note${j} = note "Runbook ${j}: when the rebalance storm recurs, drain the partition handoff first, snapshot the consumer offsets, then restart the broker fleet one rack at a time. Escalate to the on-call architect if lag exceeds 30 minutes of consumer time."`);
+    }
+    for (let i = 0; i < 250; i++) {
+      const a = ids[i % ids.length];
+      const b = ids[(i * 7 + 3) % ids.length];
+      if (a === b) continue;
+      lines.push(i % 3 === 0 ? `${a} -> ${b} "edge ${i} async"` : `${a} -> ${b}`);
+    }
+    return lines.join('\n') + '\n';
+  })();
+  const big = await call('gobi_render', {text: bigDoc});
+  ok(`S9 a ${bigDoc.length.toLocaleString('en-US')}-char document (156 nodes) still renders`,
+    big.ok === true && typeof big.svg === 'string' && big.svg.length > 100_000,
+    big.ok ? `svg ${big.svg.length} bytes` : JSON.stringify(big).slice(0, 200));
 } catch (e) {
   fail++;
   failures.push('S0 ' + String((e && e.message) || e));

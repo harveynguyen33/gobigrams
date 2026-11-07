@@ -14,7 +14,18 @@ import {trackExport} from '../app/analytics';
 /* GOBI-S1 — the share codec arrives by DYNAMIC import, same law as the .gobi
  * compiler (pinned by round-gobi-door A3/A4 + round-gobi-share S5a): no
  * static import of src/share in this dialog. */
-type ShareUrl = {payload: string; url: string; length: number};
+type ShareUrl = {payload: string; url: string; length: number; base: string};
+
+/* EMBED-DOOR (2026-11-07) — the ONE embed-code builder: pure and exported so
+ * the harness EXECUTES it (round-toolbar-share d5/d6), like shareSignature.
+ * It consumes the SAME payload the link was built from plus the SAME base
+ * constant the share URL uses (SHARE_BASE_URL, captured at build time from
+ * the codec's dynamic import) — never a second encoder, never a retyped
+ * host. One line, no wrapper markup: the string is paste-ready. The literal
+ * border colour is the SNIPPET's own content (it must render on someone
+ * else's page, with none of our tokens) — not dialog styling. */
+export const embedSnippet = (base: string, payload: string): string =>
+  `<iframe src="${base}embed#b=${payload}" width="800" height="450" frameborder="0" loading="lazy" style="border:1px solid #2a2a2e;border-radius:8px"></iframe>`;
 
 /* SHARE-STALE-LINK (2026-11-04) — a built link describes ONE board revision.
  * This dialog stays mounted in App (only its BODY unmounts on close), so the
@@ -76,8 +87,14 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
    * automatic path failed and the dialog says so. The FIELD stays the one
    * source of truth for the string; the ref is how the handler reads it. */
   const [copyBtn, setCopyBtn] = useState<'ok' | 'manual' | 'idle'>('idle');
+  /* EMBED-DOOR (2026-11-07) — the embed row's own transient state, the same
+   * three-value contract as copyBtn; separate so copying one never repaints
+   * the other button. */
+  const [embedBtn, setEmbedBtn] = useState<'ok' | 'manual' | 'idle'>('idle');
   const urlRef = useRef<HTMLInputElement>(null);
+  const embedRef = useRef<HTMLInputElement>(null);
   const copyTimer = useRef<number | null>(null);
+  const embedTimer = useRef<number | null>(null);
   const goRef = useRef<HTMLButtonElement>(null);
   /* MODAL-DOORS — the document listener reads the ref, never its own deps, so
    * it is bound once per open and cannot be churned mid-event by a re-render
@@ -110,8 +127,11 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
     if (wasOpen.current && !open) returnFocusTo?.current?.focus();
     wasOpen.current = open;
   }, [open, returnFocusTo]);
-  /* the Copied revert timer must never fire after the dialog is gone. */
-  useEffect(() => () => { if (copyTimer.current !== null) window.clearTimeout(copyTimer.current); }, []);
+  /* the Copied revert timers must never fire after the dialog is gone. */
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    if (embedTimer.current !== null) window.clearTimeout(embedTimer.current);
+  }, []);
 
   /* SHARE-STALE-LINK — the shown link is a DERIVED value: the stored URL
    * renders only while the live signature still equals the one it was built
@@ -122,6 +142,10 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
    * modal blocks editing, so the comparison is owed on open, not per frame. */
   const liveSig = open ? shareSignature(nodes, edges, boardName) : '';
   const shareUrl = built && built.sig === liveSig ? built.url : null;
+  /* EMBED-DOOR — the snippet is a DERIVED value off the same gated link: it
+   * appears, dies and revives with it (SHARE-STALE-LINK's contract), and is
+   * built by the ONE exported builder — never inline JSX string surgery. */
+  const snippet = shareUrl ? embedSnippet(shareUrl.base, shareUrl.payload) : null;
 
   if (!open) return null;
 
@@ -132,18 +156,18 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
    * ONBOARD-P7 DECISION — a built link COUNTS as "Export your diagram": P6's
    * funnel already reads it as export {format:share}; the tick + this line move together (p7.1c). */
   const doShare = async () => {
-    const {buildShareUrl} = await import('../share');
+    const {buildShareUrl, SHARE_BASE_URL} = await import('../share');
     const doc = {
       id: 'shared', name: boardName ?? 'Shared diagram',
       nodes, edges, updatedAt: Date.now(),
     };
     const res = await buildShareUrl(doc);
-    const url = {payload: res.payload, url: res.url, length: res.url.length};
+    const url = {payload: res.payload, url: res.url, length: res.url.length, base: SHARE_BASE_URL};
     /* SHARE-STALE-LINK — the URL and the signature of the exact input that
      * produced it land in ONE write, so they can never disagree. */
     setBuilt({ url, sig: shareSignature(nodes, edges, boardName) });
     trackExport('share'); onExported();   // ONBOARD-P6 funnel · ONBOARD-P7 checklist tick
-    setShareCopied(false); setCopyBtn('idle');
+    setShareCopied(false); setCopyBtn('idle'); setEmbedBtn('idle');
     /* SHARE-COPY-BUTTON — the build-time copy is KEPT (a courtesy) but goes
      * through the SAME degrade ladder, so even its failure is stated, never
      * the old empty catch. The select needs the input rendered: one tick. */
@@ -152,16 +176,18 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
   };
 
   /* SHARE-COPY-BUTTON (2026-11-04) — ONE copy ladder, shared by the
-   * copy-on-BUILD courtesy and the Copy button (never two copies of this
-   * logic, and never in a shared util: it lives HERE):
+   * copy-on-BUILD courtesy, the Copy button and the embed-code button (never
+   * three copies of this logic, and never in a shared util: it lives HERE):
    *   1. navigator.clipboard (unavailable or rejected ->)
    *   2. select() + document.execCommand('copy') (false or throws ->)
-   *   3. the caller states the manual way out. */
-  const writeClipboard = async (text: string): Promise<boolean> => {
+   *   3. the caller states the manual way out.
+   * EMBED-DOOR: the legacy select() step must target the field that holds the
+   * string being copied, so the element is a parameter — the default stays
+   * the link field (the c5b build-time call shape is pinned by harness). */
+  const writeClipboard = async (text: string, el: HTMLInputElement | null = urlRef.current): Promise<boolean> => {
     try {
       if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
     } catch { /* fall through to the legacy path */ }
-    const el = urlRef.current;
     if (el) {
       try { el.select(); if (document.execCommand('copy')) return true; } catch { /* manual path */ }
     }
@@ -181,6 +207,22 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
     } else {
       urlRef.current?.select();
       setCopyBtn('manual');
+    }
+  };
+
+  /* EMBED-DOOR — the embed twin: same ladder, same feedback contract, its
+   * own field + timer so the two buttons never repaint each other. It does
+   * NOT touch the share-link state (the built URL is untouched by copying). */
+  const doCopyEmbed = async () => {
+    const text = embedRef.current?.value ?? '';
+    if (!text) return;
+    if (await writeClipboard(text, embedRef.current)) {
+      setEmbedBtn('ok');
+      if (embedTimer.current !== null) window.clearTimeout(embedTimer.current);
+      embedTimer.current = window.setTimeout(() => { embedTimer.current = null; setEmbedBtn('idle'); }, 1500);
+    } else {
+      embedRef.current?.select();
+      setEmbedBtn('manual');
     }
   };
 
@@ -230,6 +272,37 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
             </div>
             {shareUrl.length > 8000 && (
               <div className="em-note" role="alert">This board is big — export JSON instead.</div>
+            )}
+            {/* EMBED-DOOR (2026-11-07) — the iframe twin of the link, its own
+             * row in the same vocabulary (data-shr-embed is the probe
+             * handle). Below the 8000 threshold only: past it most sites
+             * truncate a URL that long, so the row is REPLACED by an honest
+             * refusal — never a snippet that looks fine and renders nothing. */}
+            {shareUrl.length <= 8000 && snippet && (
+              <>
+                <div className="em-share-row" data-shr-embed="">
+                  <input ref={embedRef} className="em-share-url" readOnly value={snippet}
+                    onFocus={e => e.currentTarget.select()} aria-label="Embed code" />
+                  <button type="button" className={'em-copy' + (embedBtn === 'ok' ? ' ok' : '')}
+                    aria-label="Copy embed code" onClick={() => void doCopyEmbed()}>
+                    {embedBtn === 'ok' ? <Check size={13} /> : <Copy size={13} />}
+                    <span>{embedBtn === 'ok' ? 'Copied' : 'Copy embed code'}</span>
+                  </button>
+                </div>
+                <div className="em-note">
+                  <span data-shr-embed-copy="" aria-live="polite">{
+                    embedBtn === 'manual'
+                      ? 'Copy blocked by the browser — the code is selected; press ⌘C / Ctrl+C. '
+                      : ''
+                  }</span>
+                  Paste into any page's HTML — the diagram renders read-only, nothing is stored.
+                </div>
+              </>
+            )}
+            {shareUrl.length > 8000 && (
+              <div className="em-note" role="alert" data-shr-embed-big="">
+                Too big to embed — most sites cut a URL this long. Use the share link, or export JSON.
+              </div>
             )}
           </>
         )}

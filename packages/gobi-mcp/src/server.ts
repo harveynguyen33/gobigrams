@@ -19,9 +19,12 @@
  *
  * PNG: rasterised by the machine's own Chromium (the exact rasteriser path
  * scripts/gobi-render.mjs uses — CHROME_BIN, the Playwright cache, then the
- * usual system names) with no new npm dependency. When no Chromium exists the
- * tool answers { ok:false, reason:'rasteriser unavailable', svg } so the
- * agent still gets a vector fallback.
+ * usual system names) with no new npm dependency. The raster ships as an
+ * IMAGE content block (protocol 2024-11-05) with a small text block carrying
+ * the facts — base64 NEVER enters a text item, where 26 KB of PNG becomes
+ * ~35k characters inside the model's context (MCP-PNG-IMAGE, t_196db9fc).
+ * When no Chromium exists the tool answers { ok:false, reason:'rasteriser
+ * unavailable', svg } so the agent still gets a vector fallback.
  */
 
 import {execFile} from 'node:child_process';
@@ -169,9 +172,19 @@ svg{display:block}
 
 /* --------------------------------------------------------------- server --- */
 
-const server = new McpServer({name: 'gobi-mcp', version: '0.1.0'});
+const server = new McpServer({name: 'gobi-mcp', version: '0.1.2'});
 
-const textArg = z.string().describe('The full .gobi document text (not a path).');
+/* MCP-AUDIT (t_4c22bdbf): a hard input bound. z.string() alone let a buggy or
+ * hostile client hand the compiler an arbitrarily large document. The largest
+ * realistic board we could construct — 156 nodes, runbook-length notes, 250
+ * labelled edges — measures ~16.5 KB (rendered: 197 KB SVG in 460 ms), so
+ * 100,000 characters is ~6x that ceiling. The refusal is a SCHEMA error, so it
+ * never reaches the compiler; the message names the limit for the agent. */
+const TEXT_LIMIT = 100_000;
+const textArg = z
+  .string()
+  .max(TEXT_LIMIT, {message: `text is over the 100,000-character limit for a .gobi document (the largest realistic boards measure ~17 KB — split the document or trim it)`})
+  .describe('The full .gobi document text (not a path). Max 100,000 characters.');
 const themeArg = z.enum(THEMES).optional().describe('Render theme (default: dark).');
 
 server.registerTool('gobi_validate', {
@@ -196,8 +209,12 @@ server.registerTool('gobi_render', {
 
 server.registerTool('gobi_png', {
   title: 'Rasterise a .gobi document to PNG',
-  description: 'Compile, render, then rasterise to PNG (base64) via the local '
-    + 'Chromium. If no Chromium is available the tool returns the SVG instead '
+  description: 'Compile, render, then rasterise to PNG via the local Chromium, '
+    + 'returned as an image content block (the token cost is image tokens, not '
+    + 'tens of thousands of text characters). Prefer gobi_render (SVG) when you '
+    + 'need to reason about the drawing and gobi_describe for structure — call '
+    + 'this only when the user must SEE the diagram. If no Chromium is '
+    + 'available the tool returns the SVG instead '
     + '({ ok:false, reason:"rasteriser unavailable", svg }).',
   inputSchema: {text: textArg, theme: themeArg, scale: z.number().int().min(1).max(4).optional().describe('Pixel scale 1-4 (default 2).')},
 }, async ({text, theme, scale}) => {
@@ -208,8 +225,16 @@ server.registerTool('gobi_png', {
     return {content: [{type: 'text' as const, text: JSON.stringify({ok: false, reason: 'rasteriser unavailable', svg: r.svg})}]};
   }
   try {
-    const pngBase64 = await rasterPng(r.svg, scale ?? 2);
-    return {content: [{type: 'text' as const, text: JSON.stringify({ok: true, pngBase64})}]};
+    const image = await rasterPng(r.svg, scale ?? 2);
+    const png = Buffer.from(image, 'base64');
+    /* IHDR (bytes 16..24) carries the raster's true pixel size — measured from
+     * the file, never asserted from the requested window size. */
+    const width = png.length >= 24 ? png.readUInt32BE(16) : 0;
+    const height = png.length >= 24 ? png.readUInt32BE(20) : 0;
+    return {content: [
+      {type: 'image' as const, data: image, mimeType: 'image/png' as const},
+      {type: 'text' as const, text: JSON.stringify({ok: true, bytes: png.length, width, height, scale: scale ?? 2})},
+    ]};
   } catch (e) {
     console.error('gobi_png: raster failed — serving the SVG fallback:', String((e as Error)?.message ?? e));
     return {content: [{type: 'text' as const, text: JSON.stringify({ok: false, reason: 'rasteriser unavailable', svg: r.svg})}]};

@@ -9,7 +9,7 @@
 import {Copy, ExternalLink} from 'lucide-react';
 
 type Props = {
-  mode: 'viewing' | 'error';
+  mode: 'viewing' | 'error' | 'empty';
   boardName: string;
   reason?: string;
   onEditCopy: () => void;
@@ -17,6 +17,23 @@ type Props = {
 };
 
 export function ShareBanner({mode, boardName, reason, onEditCopy, onOpenApp}: Props) {
+  /* EMBED-DOOR (2026-11-07) — /embed with NO payload is not an error, it is
+   * the door's EMPTY state, and silence read as "broken". Same card family
+   * as the error variant (same classes, not a fork): one teaching line, the
+   * TWO ways to get a payload (Share → Copy embed code in the app, or swap
+   * /#b= for /embed#b= in a share link you already hold), and one exit to
+   * the app root. No editor offer — an embed page stays read-only. */
+  if (mode === 'empty') {
+    return (
+      <div className="ds-share-banner ds-share-error" data-embed-empty="">
+        <span className="ds-share-title">This page embeds a Gobigrams diagram. It needs a diagram to show.</span>
+        <span className="ds-share-sub">Build a board in Gobigrams and use Share → Copy embed code, or take a share link and change /#b= to /embed#b=.</span>
+        <span className="ds-share-actions">
+          <a className="ds-share-btn secondary" href="/"><ExternalLink size={13} /> Open Gobigrams</a>
+        </span>
+      </div>
+    );
+  }
   if (mode === 'error') {
     return (
       <div className="ds-share-banner ds-share-error" role="alert">

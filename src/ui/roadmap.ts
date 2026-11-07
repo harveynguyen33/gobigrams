@@ -127,7 +127,7 @@ export const SHIPPED: ShippedEntry[] = [
   {label: 'round AZ', what: 'Shipped fonts (Inter, JetBrains Mono) embedded in exports \u2014 files render the same on machines that have nothing installed', when: '2026-10'},
   {label: 'round BA/AY', what: 'Real vector SVG and PNG export \u2014 text as text or outlined paths, measured pixel-accurate against the canvas', when: '2026-10'},
   {label: 'round AT', what: 'Boards saved in the browser itself \u2014 the editor runs on a plain static host with no server', when: '2026-10'},
-  {label: 'round AS', what: 'Mermaid import that survives round-trips, and one-undo imports', when: '2026-10'},
+  {label: 'round AS', what: 'Mermaid import round-trips (door hidden — coming back later), and one-undo imports', when: '2026-10'},
   {label: 'round AR', what: 'SVG export became real vector \u2014 selectable text, no flicker', when: '2026-10'},
   {label: 'package 7', what: 'Settings completion \u2014 export defaults (PNG scale, padding), autosave control, persisted canvas preferences', when: '2026-10'},
   {label: 'package 6', what: 'Roadmap surface \u2014 what the tool does today, next, and is exploring, in Settings \u2192 About', when: '2026-09'},

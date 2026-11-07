@@ -1,6 +1,6 @@
 {
   "name": "@techgoblin/gobi-mcp",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "type": "module",
   "description": "The .gobi AI-agent door — a stdio MCP server over @techgoblin/gobi-core: gobi_validate / gobi_render / gobi_png / gobi_describe.",
   "license": "MIT",
@@ -46,7 +46,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@techgoblin/gobi-core": "^0.4.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.0"

@@ -92,9 +92,15 @@ function EmbedFlow() {
     return <div className="embed-shell" data-embed="decoding" />;
   }
   if (state.phase === 'error') {
+    /* EMBED-DOOR (2026-11-07) — a MISSING payload is not corruption: it is
+       the empty door, and it teaches (the ShareBanner 'empty' variant) rather
+       than claiming the link was cut off. Everything else keeps the SAME
+       error card the share view shows. */
     return (
       <div className="embed-shell">
-        <ShareBanner mode="error" boardName="" reason={state.reason} onEditCopy={() => {}} onOpenApp={() => {}} />
+        {state.reason === 'missing'
+          ? <ShareBanner mode="empty" boardName="" onEditCopy={() => {}} onOpenApp={() => {}} />
+          : <ShareBanner mode="error" boardName="" reason={state.reason} onEditCopy={() => {}} onOpenApp={() => {}} />}
       </div>
     );
   }
