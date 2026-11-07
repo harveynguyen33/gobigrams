@@ -121,11 +121,11 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
   const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
   const [gobiNote, setGobiNote] = useState<string | null>(null);
   /* IMPORT-REENTRY — one dispatch per dialog session. The ref is the real
-   * latch (it must engage SYNCHRONOUSLY: a double-click's second activation
-   * can land before the first handler's `await import()` resolves, so a
-   * state-only guard races); the state only renders it as disabled. The
-   * error branch resets both so a failed paste can be fixed and retried,
-   * and the unmount-on-close resets them for the next session. */
+     latch (it must engage SYNCHRONOUSLY: a double-click's second activation
+     can land before the first handler's `await import()` resolves, so a
+     state-only guard races); the state only renders it as disabled. The
+     error branch resets both so a failed paste can be fixed and retried —
+     and IMPORT-SESSION below resets them on the dialog's close edge. */
   const [gobiSent, setGobiSent] = useState(false);
   const gobiSentRef = useRef(false);
   const tabRef = useRef<HTMLButtonElement>(null);
@@ -202,7 +202,19 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
    * that form cannot apply here). */
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (wasOpen.current && !open) returnFocusTo?.current?.focus();
+    if (wasOpen.current && !open) {
+      returnFocusTo?.current?.focus();
+      /* IMPORT-SESSION (t_0a89d013) — the close edge ENDS the import session.
+       * This modal never unmounts while closed, so IMPORT-REENTRY's latch
+       * stayed engaged after ONE import and the button was dead until a full
+       * page reload (round-gobi-import-once L6b, red pre-fix). The pasted
+       * text survives on purpose: the latch, not an empty box, is what
+       * guards the double dispatch. */
+      gobiSentRef.current = false;
+      setGobiSent(false);
+      setGobiNote(null);
+      setGobiErrors([]);
+    }
     wasOpen.current = open;
   }, [open, returnFocusTo]);
 

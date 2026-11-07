@@ -3307,15 +3307,8 @@ kbd {
   background: var(--green); border-color: var(--green); color: var(--bg);
 }
 
-/* ONBOARD-P2/3 — the `?` sheet's capability block: what the deleted step-by-step
-   overlay uniquely named, as four scannable rows. Plain rows — no numbering, no
-   step chain, no controls — so it reads as a list, not a walkthrough. Tokens only. */
-.help-cap { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 14px; }
-.help-cap-row { display: flex; flex-direction: column; gap: 1px; }
-.help-cap-row b { font-size: var(--fs-md); font-weight: 600; color: var(--fg); }
-.help-cap-row span { font-size: var(--fs-sm); color: var(--dim); line-height: 1.45; }
-
-/* help popover: the one action row (Send feedback) under the Shortcuts heading */
+/* help popover: the one action row (Send feedback) under the Shortcuts heading.
+   (HELP-CAPS 2026-11-07 deleted the capability block + its rules that lived here.) */
 .help-action-btn {
   display: flex; align-items: center; gap: 8px; width: 100%;
   /* Spacing lives BELOW the button: it sits directly under the <h4>, and this

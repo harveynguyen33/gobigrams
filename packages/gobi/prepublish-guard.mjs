@@ -49,7 +49,12 @@ for (const [rel, minBytes] of mustExist) {
 let shipped = [];
 try {
   const out = execFileSync('npm', ['pack', '--dry-run', '--json'], {cwd: PKG, encoding: 'utf8'});
-  shipped = JSON.parse(out)[0].files.map((f) => f.path);
+  /* npm <=11 prints [{...}], npm 12 prints {"<pkg name>": {...}} — one shape per version, so accept both
+     rather than pinning the gate to the npm that happened to be installed the day this was written. */
+  const parsed = JSON.parse(out);
+  const pack = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+  if (!pack || !Array.isArray(pack.files)) throw new Error('npm pack reported no file list');
+  shipped = pack.files.map((f) => f.path);
 } catch (e) {
   ok(false, 'npm pack --dry-run --json ran', e.message);
 }

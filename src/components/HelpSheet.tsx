@@ -5,9 +5,10 @@
  *  (it needs App state), so they stay props/refs threaded from App. No context,
  *  no store; `MessageSquarePlus` moved with the block (its only use).
  *
- *  ONBOARD-P2/3 (2026-10-31) — the four capabilities the deleted step-by-step
- *  overlay was the ONLY surface for live here as plain rows above the shortcuts.
- *  Facts about the product, not steps: no numbering, no order, no control.
+ *  ONBOARD-P2/3 (2026-10-31) shipped the four capability rows here; HELP-CAPS
+ *  (2026-11-07) removed them — Harvey: the sheet is recall mid-task, and the
+ *  rows were abstraction-first nouns with no door. Shortcuts is the first
+ *  thing in the sheet; the brand/onboarding story lives elsewhere.
  *
  *  The help-row lines are single-line on purpose: package-o-metrics measures
  *  their widths from the source text (label/hint/keys/gestures regexes) —
@@ -35,8 +36,9 @@ type HelpSheetProps = {
   onRestoreChecklist: () => void;
 };
 
-/** The `?` cheat sheet: what the product can do + the keyboard and mouse-gesture
- *  reference. Mounted inside `.canvas-wrap` beside the toolbar; `.help-pop`
+/** The `?` cheat sheet: the keyboard and mouse-gesture reference. Shortcuts
+ *  are the first thing in it (HELP-CAPS removed the capability block that used
+ *  to sit above). Mounted inside `.canvas-wrap` beside the toolbar; `.help-pop`
  *  z-index (30) sits below the Settings modal (70) and the feedback overlay (80). */
 export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback, canRestoreChecklist, onRestoreChecklist}: HelpSheetProps) {
   /* ONBOARD-P6 — the counter-metric. BOTH doors into this sheet (the ? button
@@ -59,13 +61,6 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback, canRe
         </Tooltip>
         {open && (
           <div className="help-pop" ref={popRef}>
-            <h4>What Gobigrams can do</h4>
-            <div className="help-cap">
-              <div className="help-cap-row"><b>Animated flow</b><span>dots, dashes, pulses or an icon moving along a connection</span></div>
-              <div className="help-cap-row"><b>Cardinality</b><span>crow's foot on either end, including on plain connections</span></div>
-              <div className="help-cap-row"><b>Tables as nodes</b><span>columns, keys and checklists as first-class shapes</span></div>
-              <div className="help-cap-row"><b>Autosave</b><span>server board when the API exists, browser storage otherwise — the UI says which</span></div>
-            </div>
             <h4>Shortcuts</h4>
             {/* ROUND BI, ITEM 3 — the feedback form, one click from the shortcuts
                 sheet. It closes the popover FIRST so the dialog's own autofocus

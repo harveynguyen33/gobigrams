@@ -17,15 +17,24 @@ import {trackExport} from '../app/analytics';
 type ShareUrl = {payload: string; url: string; length: number; base: string};
 
 /* EMBED-DOOR (2026-11-07) — the ONE embed-code builder: pure and exported so
- * the harness EXECUTES it (round-toolbar-share d5/d6), like shareSignature.
- * It consumes the SAME payload the link was built from plus the SAME base
- * constant the share URL uses (SHARE_BASE_URL, captured at build time from
- * the codec's dynamic import) — never a second encoder, never a retyped
- * host. One line, no wrapper markup: the string is paste-ready. The literal
+ * the harness EXECUTES it (round-toolbar-share d5/d6 + round-embed-fit f1),
+ * like shareSignature. It consumes the SAME payload the link was built from
+ * plus the SAME base constant the share URL uses (SHARE_BASE_URL, captured at
+ * build time from the codec's dynamic import) — never a second encoder, never
+ * a retyped host. ONE line: an inline HTML comment that says what the frame
+ * does (EMBED-FIT: the diagram scales to fit; raise the attributes for a
+ * bigger rendering — the hint must travel WITH the paste, not live only in
+ * our dialog) directly followed by the iframe. One line ON PURPOSE: the
+ * field is an <input>, and input.value SANITIZES LINE BREAKS AWAY (measured:
+ * assigning 'a\nb' reads back 'ab') — a two-line builder output would drift
+ * from the field, breaking this dialog's shown-==-copied invariant, and
+ * '--><iframe' is valid HTML so the comment needs no separator. The literal
  * border colour is the SNIPPET's own content (it must render on someone
  * else's page, with none of our tokens) — not dialog styling. */
+export const EMBED_FRAME = {w: 800, h: 450} as const;
 export const embedSnippet = (base: string, payload: string): string =>
-  `<iframe src="${base}embed#b=${payload}" width="800" height="450" frameborder="0" loading="lazy" style="border:1px solid #2a2a2e;border-radius:8px"></iframe>`;
+  `<!-- Gobigrams embed: the diagram scales to fit the ${EMBED_FRAME.w}x${EMBED_FRAME.h} frame. Raise the width and height attributes for a bigger rendering. -->`
+  + `<iframe src="${base}embed#b=${payload}" width="${EMBED_FRAME.w}" height="${EMBED_FRAME.h}" frameborder="0" loading="lazy" style="border:1px solid #2a2a2e;border-radius:8px"></iframe>`;
 
 /* SHARE-STALE-LINK (2026-11-04) — a built link describes ONE board revision.
  * This dialog stays mounted in App (only its BODY unmounts on close), so the
@@ -296,6 +305,16 @@ export default function ShareDialog({open, onClose, returnFocusTo, nodes, edges,
                       : ''
                   }</span>
                   Paste into any page's HTML — the diagram renders read-only, nothing is stored.
+                </div>
+                {/* EMBED-FIT (2026-11-07) — the note that matches what the
+                 * frame now DOES: fit-to-frame. Never promise a size the
+                 * reader will not get, and never leave a tall board's author
+                 * wondering why the frame cuts it (the card's defect: a fixed
+                 * height with no hint it is wrong). data-shr-embed-fit is the
+                 * probe handle (round-embed-fit f2): assert the attribute,
+                 * never the wording. */}
+                <div className="em-note" data-shr-embed-fit="">
+                  The diagram scales to fit the {EMBED_FRAME.w}×{EMBED_FRAME.h} frame — raise the width and height attributes for a bigger rendering.
                 </div>
               </>
             )}
