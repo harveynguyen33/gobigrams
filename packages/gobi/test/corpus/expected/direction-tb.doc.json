@@ -1,0 +1,122 @@
+{
+  "docVersion": 1,
+  "name": "Direction TB with labels",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "web",
+      "kind": "service",
+      "label": "Web tier",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "api",
+      "kind": "service",
+      "label": "API",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 239
+      }
+    },
+    {
+      "id": "db",
+      "kind": "database",
+      "label": "Primary",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 478
+      }
+    },
+    {
+      "id": "cache",
+      "kind": "queue",
+      "label": "Cache",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 717
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "web",
+      "to": "api",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "request",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "api",
+      "to": "db",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "query",
+      "techn": "SQL",
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "api",
+      "to": "cache",
+      "fromHandle": "right",
+      "toHandle": "right",
+      "label": "warm",
+      "dash": "solid",
+      "labelOffset": {
+        "x": 31.2,
+        "y": 0
+      }
+    },
+    {
+      "id": "e4",
+      "from": "db",
+      "to": "cache",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "invalidate",
+      "dash": "dashed"
+    }
+  ]
+}

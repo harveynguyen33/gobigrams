@@ -1,0 +1,7 @@
+[
+  {
+    "line": 4,
+    "col": 1,
+    "message": "the board statement must come first — move it above every node, edge and group"
+  }
+]

@@ -1,0 +1,11 @@
+board "Architecture kinds"
+broker = service "Broker" icon:server color:amber
+orders = database "orders" sub:primary
+events = queue "events"
+stripe = external "Stripe"
+harvey = actor "Customer"
+assets = storage "assets" sub:bucket
+edgelb = gateway "Edge LB"
+memo = note "Kafka 3.7 rebalance protocol"
+caption = text "Diagram: rebalance storm"
+st = note "order_status" kicker:enum sub:"pending · paid · shipped" color:amber

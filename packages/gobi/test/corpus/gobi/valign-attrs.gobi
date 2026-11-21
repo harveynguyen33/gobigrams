@@ -1,0 +1,12 @@
+board "Alignment attributes"
+left = service "Left top" align:left valign:top
+mid = service "Centre middle"
+right = service "Right bottom" align:right valign:bottom
+memo = note "Note bottom" valign:bottom
+cap = text "Caption left" align:left
+tb = table "t" {
+  id uuid pk;
+}
+tb2 = table "t2" align:right
+left -> mid "label"
+mid -> right

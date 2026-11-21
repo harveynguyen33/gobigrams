@@ -1,0 +1,8 @@
+board "Groups nesting"
+cluster = group "Cluster"
+consumers = group "Consumers"
+c1 = service "C1"
+c2 = service "C2"
+orders = database "orders"
+consumers { c1 c2 }
+cluster { orders consumers }

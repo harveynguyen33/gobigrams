@@ -6,9 +6,10 @@
  * code so the history stays where the code is.  (feature-map home: src/components/BoardsPopover.tsx) */
 import type * as React from 'react';
 import {createPortal} from 'react-dom';
-import {LayoutTemplate, Pencil, Plus, Copy, Trash2, Save} from 'lucide-react';
-import type {BoardDoc, BoardMeta} from '../boards';
+import {LayoutTemplate, Pencil, Plus, Copy, Trash2, Save, History} from 'lucide-react';
+import type {BoardDoc, BoardMeta} from '../board/boards';
 import {getPreset} from '../presets';
+import {fmtDate} from '../ui/relTime';
 
 type Props = {
   open: boolean;
@@ -18,12 +19,13 @@ type Props = {
   storageEstimate: string;
   boardList: BoardMeta[];
   curBoard: BoardDoc | null;
-  fmtDate: (ts: number) => string;
   onOpenBoard: (id: string) => void;
   onClose: () => void;
   onNewBoard: () => void;
   onTemplates: () => void;
   onRename: () => void;
+  /** HISTORY-V3 — opens the version-history dialog (closing this menu). */
+  onHistory: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onSaveNow: () => void;
@@ -35,6 +37,10 @@ type Props = {
  *  computed by `boardsPopClamp` (left = button right + 6, top = button top,
  *  max-width = viewport − anchor − 8). */
 export default function BoardsPopover(p: Props) {
+  /* TABLE-STYLE-RELOCATE (t_2f3039c6) — the "Board style…" row and its inline
+     panel were RETIRED to Settings → Canvas → "Table style": the row restyled
+     only table nodes, so both the name and the home were wrong, and the writer
+     (setBoardStyle) is unchanged. This popover keeps board lifecycle rows. */
   if (!p.open || !p.pos) return null;
   return createPortal(
     <div
@@ -74,7 +80,7 @@ export default function BoardsPopover(p: Props) {
             <span className="boards-item-name">{b.name}</span>
             <span className="boards-item-preset">{getPreset(b.preset).label}</span>
             <span className="boards-item-meta">
-              {b.nodeCount}n · {b.edgeCount}e · {p.fmtDate(b.updatedAt)}
+              {b.nodeCount}n · {b.edgeCount}e · {fmtDate(b.updatedAt)}
             </span>
           </button>
         ))}
@@ -102,6 +108,17 @@ export default function BoardsPopover(p: Props) {
         </button>
         <button type="button" className="pop-item" disabled={!p.curBoard} onClick={p.onRename}>
           <Pencil size={14} /> Rename
+        </button>
+        {/* HISTORY-V3 (t_37f23a89) — the ONE entry to the version-history
+            dialog, in Harvey's chosen accent. HISTORY-V4 (t_1b538662): the
+            row is now live in BOTH storage modes — the local IndexedDB
+            versions store answers the same listing — so it is disabled
+            only without a board, like every other row. Focus still returns
+            to the BOARDS button (ITEM 6b precedent above: the row unmounts
+            with the menu). */}
+        <button type="button" className="pop-item acc" disabled={!p.curBoard}
+          onClick={p.onHistory}>
+          <History size={14} /> History…
         </button>
         <button type="button" className="pop-item" disabled={!p.curBoard} onClick={p.onDuplicate}>
           <Copy size={14} /> Duplicate

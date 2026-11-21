@@ -1,0 +1,311 @@
+{
+  "id": "corpus-tb-group-labels",
+  "name": "TB group with member labels",
+  "nodes": [
+    {
+      "id": "cluster",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 998,
+      "height": 253,
+      "style": {
+        "width": 998,
+        "height": 253
+      },
+      "data": {
+        "shape": "group",
+        "kicker": "boundary",
+        "title": "Order pipeline",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "ingest",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Ingest",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "cluster"
+    },
+    {
+      "id": "matcher",
+      "type": "goblin",
+      "position": {
+        "x": 354,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Matcher",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "cluster"
+    },
+    {
+      "id": "writer",
+      "type": "goblin",
+      "position": {
+        "x": 668,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Writer",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "cluster"
+    },
+    {
+      "id": "sink",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 268
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "database",
+        "kicker": "database",
+        "title": "Sink",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "database",
+        "colorKey": "violet",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "audit",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "shape": "note",
+        "kicker": "note",
+        "title": "Audit trail",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "sticky-note",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "ingest",
+      "target": "matcher",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "parse",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "matcher",
+      "target": "writer",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "route",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "writer",
+      "target": "sink",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "commit",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "right"
+    },
+    {
+      "id": "e4",
+      "type": "goblinEdge",
+      "source": "sink",
+      "target": "audit",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "trail",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e5",
+      "type": "goblinEdge",
+      "source": "ingest",
+      "target": "sink",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "labelOffset": {
+          "x": 0,
+          "y": 29.902500000000003
+        },
+        "labelPinned": true
+      },
+      "label": "bypass",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

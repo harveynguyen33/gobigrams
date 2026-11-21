@@ -7,6 +7,11 @@ node_modules/
 # build output
 dist/
 
+# STEP-6-OBSIDIAN — the plugin's built bundle. A release build is copied into
+# the plugin's own distribution repo (BRAT layout) as a deliberate act; it is
+# not tracked here (same rule as packages/*/dist).
+apps/obsidian-gobi/main.js
+
 # logs / editor / OS noise
 *.log
 .DS_Store
@@ -60,3 +65,21 @@ research/
 .selbox-live/
 .rc-entry.ts
 .rc-out.mjs
+# CORE-STEP4A: round-gobi-size.mjs writes its esbuild entries at the repo root;
+# a crashed run can leave one behind (five leaked into a commit once)
+.gs-*.ts
+.gs-*.mjs
+# checks/package-p-inspector.mjs writes these two entries at the repo root and does
+# not remove them; they are probe litter, never shipped
+.ai-ts-entry.ts
+.p-inspector-model.ts
+
+# npm pack output — artifacts, never source
+*.tgz
+
+# Hermes/tooling scratch that lands in the repo root during worker runs.
+# NOTE: the leading dot is written as a character class ON PURPOSE — the publish
+# leak gate in .gob/publish-public.sh refuses any staged file containing the
+# tooling-directory token, and an ignore RULE is not a leak. Do not "tidy" it back.
+[.]hermes/environment.json
+.verify-build.tmp.mjs

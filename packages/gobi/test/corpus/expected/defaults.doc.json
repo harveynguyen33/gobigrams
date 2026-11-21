@@ -1,0 +1,104 @@
+{
+  "docVersion": 1,
+  "name": "Defaults only",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "a",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -640,
+        "y": 0
+      }
+    },
+    {
+      "id": "b",
+      "kind": "database",
+      "label": "b",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 224
+      }
+    },
+    {
+      "id": "c",
+      "kind": "note",
+      "label": "c",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -495,
+        "y": 393
+      }
+    },
+    {
+      "id": "t",
+      "kind": "text",
+      "label": "t",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -245,
+        "y": 393
+      }
+    },
+    {
+      "id": "g",
+      "kind": "group",
+      "label": "g",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 420,
+        "h": 200
+      },
+      "position": {
+        "x": 5,
+        "y": 393
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    }
+  ]
+}

@@ -20,6 +20,12 @@
  * It imports only `react`'s fragment, which the JSX runtimes already resolve.
  */
 import type {ReactNode} from 'react';
+/* CORE-STEP4A-FIX — the NAME list lives in the package (model/flowIconNames):
+ * the core reads only the keys, and importing this JSX table would drag the
+ * JSX runtime into every headless consumer. The lock now runs the other way:
+ * this table satisfies Record<FlowIconName, ReactNode>, so tsc FAILS the
+ * build if the table and the package list drift in either direction. */
+import type {FlowIconName} from '../../packages/gobi/src/model/flowIconNames';
 
 /**
  * Inline SVG paths for the flow-icon animation. 24×24 viewBox, stroke geometry
@@ -71,7 +77,7 @@ const FLOW_ICON_TABLE = {
       <path d="M3 12a9 3 0 0 0 18 0" />
     </>
   ),
-} as const satisfies Record<string, ReactNode>;
+} as const satisfies Record<FlowIconName, ReactNode>;
 
-export type FlowIconName = keyof typeof FLOW_ICON_TABLE;
+export type {FlowIconName};
 export const FLOW_ICON_PATHS: Record<FlowIconName, ReactNode> = FLOW_ICON_TABLE;

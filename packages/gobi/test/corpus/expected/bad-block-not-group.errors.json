@@ -1,0 +1,7 @@
+[
+  {
+    "line": 3,
+    "col": 1,
+    "message": "\"a\" is a node, not a group — only groups take a { members } block"
+  }
+]

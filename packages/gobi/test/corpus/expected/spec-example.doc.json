@@ -1,0 +1,86 @@
+{
+  "docVersion": 1,
+  "name": "Kafka rebalance storm",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "broker",
+      "kind": "service",
+      "label": "Broker",
+      "icon": "server",
+      "color": "amber",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "orders",
+      "kind": "database",
+      "label": "orders",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 360,
+        "y": 0
+      }
+    },
+    {
+      "id": "consumer",
+      "kind": "group",
+      "label": "Consumers",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 420,
+        "h": 200
+      },
+      "position": {
+        "x": 720,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "broker",
+      "to": "orders",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "append",
+      "dash": "solid",
+      "flow": "dots"
+    },
+    {
+      "id": "e2",
+      "from": "orders",
+      "to": "consumer",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "card": [
+        "1",
+        "n"
+      ],
+      "dash": "dashed"
+    }
+  ]
+}

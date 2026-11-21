@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="338" height="491" viewBox="0 0 338 491" data-theme="dark"><rect width="338" height="491" fill="#0b0b0d"/><style>
+  :root, svg {
+    --bg:#0b0b0d;
+    --surface:#131316;
+    --elevated:#1a1b1f;
+    --border:#26272c;
+    --border-strong:#33343a;
+    --fg:#e8e8ea;
+    --dim:#8a8a92;
+    --dim2:#63636b;
+    --acc:#f54e00;
+    --acc-soft:rgba(245, 78, 0, 0.14);
+    --sel:#3b82f6;
+    --sel-soft:rgba(59, 130, 246, 0.14);
+    --green:#4ade80;
+    --red:#f87171;
+    --danger:#ef4444;
+    --card:#1a1b1f;
+    --c-accent:#f54e00;
+    --c-green:#4ade80;
+    --c-cyan:#22d3ee;
+    --c-violet:#a78bfa;
+    --c-amber:#fbbf24;
+    --c-slate:#94a3b8;
+    --c-red:#ff6b6b;
+    --c-blue:#7aa2ff;
+    --c-pink:#f783ac;
+    --c-black:#000000;
+    --c-white:#ffffff;
+  }
+</style><defs><marker id="ar-mk-ba568u" markerWidth="14" markerHeight="14" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse"><polyline points="-5,-4 0,0 -5,4 -5,-4" fill="#94a3b8" stroke="#94a3b8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g transform="translate(24,24)"><path d="M145,145 C145,221.5 145,221.5 145,298" fill="none" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar-mk-ba568u)"/><text x="82.30000000000001" y="225.5" font-size="11" font-weight="600" fill="#e8e8ea" stroke="#0b0b0d" stroke-width="2" stroke-linejoin="round" paint-order="stroke">label # not comment</text></g><g data-ar-node="a" transform="translate(24,24)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">A</text></g><g data-ar-node="b" transform="translate(24,322)"><svg x="0" y="0" width="290" height="145" viewBox="0 0 200 100" preserveAspectRatio="none"><rect x="1" y="1" width="198" height="98" rx="14" fill="#22d3ee" fill-opacity="0.09" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/></svg><text x="145" y="76.56" font-size="14.5" font-weight="650" fill="#e8e8ea" text-anchor="middle">B</text></g></svg>

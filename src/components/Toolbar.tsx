@@ -9,18 +9,19 @@ import type * as React from 'react';
 import type {Node, ReactFlowInstance} from '@xyflow/react';
 import {
   Undo2, Redo2, Maximize, Magnet, Copy, ArrowDownUp, Share2,
-  Trash2, LayoutGrid, AlignCenter, Eye,
+  Trash2, LayoutGrid, AlignCenter, Eye, Braces,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   Settings as SettingsIcon,
 } from 'lucide-react';
-import Tooltip from '../Tooltip';
-import type {HelperGuides} from '../helperLines';
+import Tooltip from '../ui/Tooltip';
+import type {HelperGuides} from '../canvas/helperLines';
 
 type ToolbarProps = {
   canUndo: boolean;
   canRedo: boolean;
+  lock: boolean; /* UNISURF-S8 — canvas locked (stale/review); App's handler refuses */
   onUndo: () => void;
   onRedo: () => void;
   onFitView: () => void;
@@ -49,6 +50,9 @@ type ToolbarProps = {
   shareBtnRef: React.RefObject<HTMLButtonElement | null>;
   settingsOpen: boolean;
   onOpenSettings: (v: boolean) => void;
+  /** UNISURF-S3 — the code pane's rail flag (App owns it + its storage key). */
+  codeOpen: boolean;
+  onToggleCode: () => void;
   settingsBtnRef: React.RefObject<HTMLButtonElement | null>;
   selCount: number;
   onAlign: (kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => void;
@@ -62,10 +66,10 @@ export function Toolbar(p: ToolbarProps) {
   return (<>
         <div className="toolbar">
           <Tooltip label="Undo — Cmd/Ctrl+Z">
-            <button className="tbtn-icon" aria-label="Undo" disabled={!p.canUndo} onClick={p.onUndo}><Undo2 size={15} /></button>
+            <button className="tbtn-icon" aria-label="Undo" disabled={!p.canUndo} aria-disabled={p.lock || undefined} onClick={p.onUndo}><Undo2 size={15} /></button>
           </Tooltip>
           <Tooltip label="Redo — Cmd/Ctrl+Shift+Z">
-            <button className="tbtn-icon" aria-label="Redo" disabled={!p.canRedo} onClick={p.onRedo}><Redo2 size={15} /></button>
+            <button className="tbtn-icon" aria-label="Redo" disabled={!p.canRedo} aria-disabled={p.lock || undefined} onClick={p.onRedo}><Redo2 size={15} /></button>
           </Tooltip>
           {p.sep()}
           <Tooltip label="Fit view — Shift+1">
@@ -119,9 +123,21 @@ export function Toolbar(p: ToolbarProps) {
           </Tooltip>
           {p.sep()}
           <Tooltip label="Auto-layout diagram — clean layers, animated, undoable">
-            <button className="tbtn-icon" aria-label="Auto-layout diagram" onClick={p.onAutoLayout}><LayoutGrid size={15} /></button>
+            <button className="tbtn-icon" aria-label="Auto-layout diagram" aria-disabled={p.lock || undefined} onClick={p.onAutoLayout}><LayoutGrid size={15} /></button>
           </Tooltip>
           {p.sep()}
+
+          {/* UNISURF-S3 — the { } code door: a VIEW toggle like the eye above,
+              not a file door. Its name (INSPECTOR-DOORS) says what it shows. */}
+          <Tooltip label={p.codeOpen ? 'Diagram as Code — close (Cmd/Ctrl+/)' : 'Diagram as Code — every node as .gobi source (Cmd/Ctrl+/)'}>
+            <button
+              type="button"
+              className={`tbtn-icon${p.codeOpen ? ' on' : ''}`}
+              aria-label="Diagram as Code"
+              aria-pressed={p.codeOpen}
+              onClick={p.onToggleCode}
+            ><Braces size={15} /></button>
+          </Tooltip>
 
           {/* TOOLBAR-V1 (Harvey picked V1 from docs/sketches/toolbar-variants.html)
               — ONE icon language: the Import·Export entry is a 30px icon button
@@ -150,7 +166,7 @@ export function Toolbar(p: ToolbarProps) {
           </Tooltip>
 
           {p.sep()}
-          <Tooltip label="Settings — appearance, canvas, connections, shortcuts, about">
+          <Tooltip label="Settings — appearance, canvas, code, connections, shortcuts, about">
             <button
               type="button"
               ref={p.settingsBtnRef}

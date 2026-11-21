@@ -1,0 +1,5 @@
+board "Headers and themes"
+theme paper
+a = service "A"
+b = service "B"
+a -> b

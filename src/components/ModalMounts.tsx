@@ -15,11 +15,13 @@ import type {Node, Edge} from '@xyflow/react';
 import BoardDialog from '../dialogs/BoardDialog';
 import type {BoardDialogMode, BoardDialogResult} from '../dialogs/BoardDialog';
 import TemplatesGallery from '../dialogs/TemplatesGallery';
-import Settings from '../Settings';
-import FeedbackDialog from '../FeedbackDialog';
+import HistoryDialog from '../dialogs/HistoryDialog';
+import Settings from '../ui/Settings';
+import FeedbackDialog from '../ui/FeedbackDialog';
 import ExportModal from '../dialogs/ExportModal';
 import ShareDialog from '../dialogs/ShareDialog';
-import type {ThemeName} from '../theme';
+import type {ThemeName} from '../theme/theme';
+import type {BoardDoc} from '../board/boards';
 
 type ModalMountsProps = {
   /* ---- BoardDialog ---- */
@@ -36,6 +38,14 @@ type ModalMountsProps = {
   tgOpen: boolean;
   onCloseGallery: () => void;
   onUseTemplate: (id: string) => void;
+  /* ---- HistoryDialog (HISTORY-V3, t_37f23a89) ---- the version ledger.
+   *  Server-mode only by construction (the Boards menu row is disabled in
+   *  local mode); `onRestored` is App's applyBoard — adoption + the
+   *  undo/redo stack reset in the one board-adoption write. */
+  historyOpen: boolean;
+  onCloseHistory: () => void;
+  historyBoard: {id: string; name: string} | null;
+  onRestored: (doc: BoardDoc) => void;
   /* ---- Settings (the pane props, verbatim from App's mount) ---- */
   settingsOpen: boolean;
   onCloseSettings: () => void;
@@ -103,6 +113,21 @@ export function ModalMounts(p: ModalMountsProps) {
           <TemplatesGallery
             onCancel={p.onCloseGallery}
             onUse={p.onUseTemplate}
+            returnFocusTo={p.returnFocusTo}
+          />
+        )}
+
+        {/* HISTORY-V3 (t_37f23a89) — the version-history ledger, mounted in
+            the boards-menu family (the menu closes before this opens, so it
+            never shares the screen with the board dialog or gallery). Same
+            overlay vocabulary (`.bd-overlay`), same focus contract: the
+            dialog returns the caret to the BOARDS button via the very
+            returnFocusTo the dialog and gallery above already use. */}
+        {p.historyOpen && p.historyBoard && (
+          <HistoryDialog
+            board={p.historyBoard}
+            onClose={p.onCloseHistory}
+            onRestored={p.onRestored}
             returnFocusTo={p.returnFocusTo}
           />
         )}

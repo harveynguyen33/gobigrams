@@ -3,8 +3,19 @@ import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {pruneBoardRetention, pruneBoardHistory, dropBoardHistory, newestHistoryStamp} from './scripts/boardRetention.mjs';
+/* HISTORY-V1 — the sampling predicate and the retention numbers live in ONE
+   dependency-free home under src/board (importable by this file, the .mjs
+   harnesses, and later the browser-side local adapter without any node:
+   specifier riding along). */
+import {HISTORY_PIN_KEEP, HISTORY_RE, shouldCheckpoint} from './src/board/historyPolicy.ts';
 
 const BOARDS_DIR = path.resolve(__dirname, 'boards');
+/** HARNESS-ISOLATION-2 F2 — the rolling save history (`boards/.history/`).
+ *  A subdirectory of the already-gitignored `boards/`, so `listBoards()` never
+ *  sees it (its readdir filters files) and the retention sweep's own file scan
+ *  skips it (a directory is not a file). */
+const HISTORY_DIR = path.join(BOARDS_DIR, '.history');
 /** PACKAGE-N §7 — the user library is a SINGLETON document in the same
  *  already-gitignored `boards/` dir, with ONE `.bak` generation beside it. */
 const LIBRARY_FILE = path.join(BOARDS_DIR, 'library.json');
@@ -39,6 +50,85 @@ function boardFile(id: string) {
   return path.join(BOARDS_DIR, `${id}.json`);
 }
 
+/* BOARD-RETENTION (task t_59671f6a) — boards/ tombstones and .bak generations
+   are bounded by the policy in scripts/boardRetention.mjs (the ONE home of
+   the numbers; checks/round-board-retention.mjs asserts the bound). The
+   sweep runs OFF the request path (setTimeout 0) and is unref'd, so it never
+   delays a response, never blocks boot, and never keeps the process alive.
+   It only ever removes files matching the two exact archive/backup name
+   shapes — a live board, the library or a crash leftover is data. */
+function scheduleRetentionSweep(delayMs = 0) {
+  setTimeout(() => {
+    try {
+      const s = pruneBoardRetention(BOARDS_DIR);
+      if (s.removed.tombstones || s.removed.baks) {
+        console.log(`[boards] retention: removed ${s.removed.tombstones} tombstone(s), ${s.removed.baks} .bak(s); kept ${s.kept.tombstones} tombstone(s), ${s.kept.baks} .bak(s) of ${s.scanned} file(s)`);
+      }
+      /* HARNESS-ISOLATION-2 F2 — the same sweep bounds the save history: the
+         newest 10 per board, and nothing at all for a board that no longer has
+         a live file (its tombstone is the recovery copy, exactly like its
+         `.bak`). There is deliberately NO global cap — a global one let harness
+         scratch churn evict a real board's window, measured. */
+      const h = pruneBoardHistory(HISTORY_DIR, {
+        liveIds: liveBoardIds(),
+        log: (m: string) => console.warn(m),
+      });
+      if (h.removed) {
+        console.log(`[boards] history: removed ${h.removed} generation(s); kept ${h.keep.length} (${h.other.length} non-matching file(s) untouched)`);
+      }
+    } catch (e: any) {
+      console.warn('[boards] retention sweep failed:', e?.message ?? e);
+    }
+  }, delayMs).unref?.();
+}
+
+/** HARNESS-ISOLATION-2 F2 — the next free `<epoch-ms>` stamp for one board's
+ *  history. Two saves can land in the same millisecond (harness PUTs do); a
+ *  bump keeps every generation a distinct file — history is never overwritten. */
+function nextHistoryStamp(dir: string, id: string) {
+  let ts = Date.now();
+  for (let i = 0; i < 1000; i++) {
+    if (!fs.existsSync(path.join(dir, `${id}.${ts}.json`))) return ts;
+    ts += 1;
+  }
+  throw new Error(`no free history stamp for ${id} in ${dir}`);
+}
+
+/** HISTORY-V3 (t_37f23a89) — the pinned stamps one labels sidecar holds.
+ *  An entry counts only when it is the object shape the READ path decorates
+ *  from (a broken sidecar degrades to zero pins, same as it degrades to
+ *  plain stamps on the read). The cap VALUE comes from the ONE policy home
+ *  (HISTORY_PIN_KEEP — never a literal here). */
+function pinCountOf(labels: Record<string, any>): number {
+  return Object.values(labels).filter(v => v && typeof v === 'object' && !Array.isArray(v)).length;
+}
+
+/** HISTORY-V3 — read one board's labels sidecar tolerantly: absent or
+ *  unparsable degrades to `{}` (the read half's own rule — never a 500 for
+ *  a decoration). */
+function readLabelsSidecar(dir: string, id: string): Record<string, any> {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, `${id}.labels.json`), 'utf8'));
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  } catch { /* absent or broken — start from {} */ }
+  return {};
+}
+
+
+/** HARNESS-ISOLATION-2 F2 — the ids that currently have a live board file.
+ *  `<id>.json` where the id carries no dot: tombstones (`<id>.deleted-…`) and
+ *  crash leftovers are excluded by construction (the same ID_RE the board
+ *  routes use). */
+function liveBoardIds(): Set<string> {
+  try {
+    return new Set(fs.readdirSync(BOARDS_DIR)
+      .filter(f => f.endsWith('.json') && ID_RE.test(f.slice(0, -5)))
+      .map(f => f.slice(0, -5)));
+  } catch {
+    return new Set();
+  }
+}
+
 function readBoard(id: string) {
   const f = boardFile(id);
   if (!f || !fs.existsSync(f)) return null;
@@ -59,6 +149,11 @@ function validateDoc(doc: any): string | null {
   if (doc.preset !== undefined && typeof doc.preset !== 'string') return 'preset must be a string';
   if (doc.theme !== undefined && typeof doc.theme !== 'string') return 'theme must be a string';
   if (doc.legend !== undefined && typeof doc.legend !== 'boolean') return 'legend must be a boolean';
+  /* BOARD-STYLE — the two per-board values are plain strings; the CLIENT's
+     resolveTableStyle/resolveDensity owns vocabulary, so an unknown token is
+     stored and read back as the default rather than refusing the write. */
+  if (doc.style !== undefined && typeof doc.style !== 'string') return 'style must be a string';
+  if (doc.density !== undefined && typeof doc.density !== 'string') return 'density must be a string';
   for (const n of doc.nodes) {
     if (!n || typeof n.id !== 'string' || !n.position ||
         typeof n.position.x !== 'number' || typeof n.position.y !== 'number')
@@ -174,6 +269,11 @@ function boardsApi(): Plugin {
      dev server. TRUE static hosting (dumb CDN, file://) remains unsupported —
      a server process is required, stated in README/DEV-NOTES. */
   const registerMiddlewares = (server: {middlewares: {use: (fn: (req: any, res: any, next: any) => void) => void}}) => {
+    /* BOARD-RETENTION — one sweep shortly after boot (dev AND preview), so a
+       backlog left by a long-dead process is cleared without any board
+       operation having to happen first. Deferred + unref'd: never blocks the
+       first render or holds the process open. */
+    scheduleRetentionSweep(1500);
     server.middlewares.use((req: any, res: any, next: any) => {
       const url = new URL(req.url, 'http://localhost');
         if (!url.pathname.startsWith('/api/')) return next();
@@ -261,6 +361,112 @@ function boardsApi(): Plugin {
           const file = boardFile(id);
           if (!file) return send(400, {error: 'invalid id'});
 
+          /* HISTORY-V2 (t_ed1282a5) — the READ half of the save history. No
+             index file: the directory listing is the truth; the labels
+             sidecar (V3 owns its writer) may only DECORATE rows. Both
+             routes answer 404 for a board whose live file is gone, the
+             same answer the plain GET gives. */
+          if (method === 'GET' && seg[3] === 'history') {
+            if (!readBoard(id)) return send(404, {error: 'not found'});
+            if (seg[4] === undefined) {
+              const rows: {stamp: string; at: number; bytes: number; label?: string; source?: string}[] = [];
+              let names: string[] = [];
+              try { names = fs.readdirSync(HISTORY_DIR); } catch { names = []; /* no .history yet */ }
+              for (const name of names) {
+                const m = HISTORY_RE.exec(name);
+                if (!m || m[1] !== id) continue;
+                let bytes = 0;
+                try { bytes = fs.statSync(path.join(HISTORY_DIR, name)).size; } catch { continue; }
+                rows.push({stamp: m[2], at: Number(m[2]), bytes});
+              }
+              rows.sort((a, b) => b.at - a.at); // newest first
+              /* sidecar: missing / unparsable / wrong-shaped degrades to
+                 plain stamps — never a 500, never an invented row. */
+              let labels: Record<string, any> | null = null;
+              try {
+                const raw = JSON.parse(fs.readFileSync(path.join(HISTORY_DIR, `${id}.labels.json`), 'utf8'));
+                if (raw && typeof raw === 'object' && !Array.isArray(raw)) labels = raw;
+              } catch { /* absent or broken — plain stamps */ }
+              if (labels) for (const row of rows) {
+                const e = labels[row.stamp];
+                if (e && typeof e === 'object' && !Array.isArray(e)) {
+                  if (typeof e.label === 'string') row.label = e.label;
+                  if (typeof e.source === 'string') row.source = e.source;
+                }
+              }
+              return send(200, rows);
+            }
+            /* one generation, the exact stored bytes. PATH SAFETY is layered
+               and each layer stops its own class of attempt: the id was
+               ID_RE-validated above (boardFile — no dots or slashes), the
+               STAMP regex below stops traversal (`../`, %-encoded dots, a
+               short or long stamp) BEFORE the name is concatenated, and the
+               resolved-path assert proves the join stayed inside
+               HISTORY_DIR. */
+            const stamp = seg[4];
+            if (seg[5] !== undefined) return send(404, {error: 'not found'});
+            if (!/^\d{13}$/.test(stamp)) return send(400, {error: 'invalid stamp'});
+            const versionFile = path.resolve(HISTORY_DIR, `${id}.${stamp}.json`);
+            if (!versionFile.startsWith(HISTORY_DIR + path.sep)) return send(400, {error: 'invalid path'});
+            if (!fs.existsSync(versionFile)) return send(404, {error: 'not found'});
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(fs.readFileSync(versionFile));
+            return;
+          }
+
+          /* HISTORY-V3 (t_37f23a89) — the pins sidecar's WRITE half:
+             PUT | DELETE /api/boards/:id/history/:stamp/label. A pin is
+             DECORATION on a row the listing already produced, so the stamp
+             must name a real generation file (404 otherwise), and a board
+             whose live file is gone answers the V2 read half's own 404. The
+             guards mirror the version route exactly: 13-digit stamp regex
+             BEFORE the name is concatenated, resolved-path assert after —
+             the same traversal layers, the same answers. The label is
+             trimmed, ≤80 chars; '' is LEGAL (pinned without a name — the
+             pin is the label slot). The cap counts pins, not edits: a
+             re-label of an already-pinned stamp is always a 200, a NEW pin
+             at cap HISTORY_PIN_KEEP is a 409 carrying the count. */
+          if ((method === 'PUT' || method === 'DELETE') && seg[3] === 'history' && seg[5] === 'label') {
+            const stamp = seg[4];
+            if (stamp === undefined || !/^\d{13}$/.test(stamp)) return send(400, {error: 'invalid stamp'});
+            const versionFile = path.resolve(HISTORY_DIR, `${id}.${stamp}.json`);
+            if (!versionFile.startsWith(HISTORY_DIR + path.sep)) return send(400, {error: 'invalid path'});
+            if (!fs.existsSync(versionFile)) return send(404, {error: 'not found'});
+            if (!readBoard(id)) return send(404, {error: 'not found'});
+            const labelsFile = path.join(HISTORY_DIR, `${id}.labels.json`);
+            const labels = readLabelsSidecar(HISTORY_DIR, id);
+            const entry = labels[stamp];
+            const isPin = !!(entry && typeof entry === 'object' && !Array.isArray(entry));
+            if (method === 'DELETE') {
+              if (!isPin) return send(404, {error: 'not pinned'});
+              delete labels[stamp];
+              try {
+                fs.mkdirSync(HISTORY_DIR, {recursive: true});
+                writeJsonAtomic(labelsFile, labels);
+              } catch (e: any) { return send(500, {error: String(e)}); }
+              return send(200, {ok: true, pinned: pinCountOf(labels)});
+            }
+            let body: any;
+            try {
+              body = JSON.parse(await readBody(req));
+            } catch (e: any) {
+              return send(e === 'too_large' ? 413 : 400, {error: e === 'too_large' ? 'body too large' : 'invalid JSON'});
+            }
+            if (typeof body?.label !== 'string') return send(400, {error: 'label must be a string'});
+            const label = body.label.trim();
+            if (label.length > 80) return send(400, {error: 'label must be at most 80 characters'});
+            if (!isPin && pinCountOf(labels) >= HISTORY_PIN_KEEP) {
+              return send(409, {error: `pin cap reached (${HISTORY_PIN_KEEP})`, pinned: pinCountOf(labels)});
+            }
+            labels[stamp] = {...(isPin ? entry : {}), label};
+            try {
+              fs.mkdirSync(HISTORY_DIR, {recursive: true});
+              writeJsonAtomic(labelsFile, labels);
+            } catch (e: any) { return send(500, {error: String(e)}); }
+            return send(200, {ok: true, pinned: pinCountOf(labels)});
+          }
+
           // GET /api/boards/:id
           if (method === 'GET') {
             const doc = readBoard(id);
@@ -299,6 +505,14 @@ function boardsApi(): Plugin {
               // it back, so a re-save drops the stale key. Do not restore the
               // `doc.theme`/`prev.theme` forward here.
               ...(typeof doc.legend === 'boolean' ? {legend: doc.legend} : null),
+              /* BOARD-STYLE (2026-11-09) — the board's own table style + density.
+                 Absent on boards authored before the round: kept absent (the
+                 reader falls back to the Settings default), and a re-save of an
+                 old board never invents a value. */
+              ...(typeof doc.style === 'string' ? {style: doc.style}
+                : typeof prev?.style === 'string' ? {style: prev.style} : null),
+              ...(typeof doc.density === 'string' ? {density: doc.density}
+                : typeof prev?.density === 'string' ? {density: prev.density} : null),
             };
             // AS-6 — ONE `.bak` generation before the new document lands, the
             // exact treatment the library document already gets above: the
@@ -306,8 +520,44 @@ function boardsApi(): Plugin {
             // emptied canvas, a stale tab) must not destroy the ONLY copy of a
             // board. The backup holds the PREVIOUS generation; the write below
             // is atomic (temp + rename).
-            if (fs.existsSync(file)) fs.renameSync(file, `${file}.bak`);
+            //
+            // HISTORY-V1 — a save SAMPLES a checkpoint instead of shadowing
+            // every write. The ring used to count saves (a full ten
+            // generations could span 23 seconds — measured), so one autosave
+            // burst erased the state before it. A generation is taken only
+            // when the bytes about to be written differ from the live file's
+            // raw bytes AND the sampling gap has passed since this board's
+            // newest stored generation (src/board/historyPolicy.ts owns the
+            // number; the newest stamp comes from a readdir + name scan —
+            // no index file). A body carrying historyReason 'pre-restore'
+            // bypasses the gap: the restore itself must land in history. A
+            // save is never blocked by its history — a checkpoint failure is
+            // logged once and the write proceeds. Pruning is generational
+            // (10 ring + 14 daily + 4 pins, per board, oldest-first, no
+            // global cap; scripts/boardRetention.mjs + the policy module own
+            // it), and the .bak rotation + writeJsonAtomic below are
+            // unchanged.
+            if (fs.existsSync(file)) {
+              fs.mkdirSync(HISTORY_DIR, {recursive: true});
+              try {
+                const prevRaw = fs.readFileSync(file);
+                const outRaw = Buffer.from(JSON.stringify(out, null, 2), 'utf8');
+                if (shouldCheckpoint({
+                      now: Date.now(),
+                      newestStamp: newestHistoryStamp(HISTORY_DIR, id),
+                      bytesDiffer: !outRaw.equals(prevRaw),
+                      reason: doc.historyReason,
+                    })) {
+                  const stamp = nextHistoryStamp(HISTORY_DIR, id);
+                  fs.copyFileSync(file, path.join(HISTORY_DIR, `${id}.${stamp}.json`));
+                }
+              } catch (e: any) {
+                console.warn('[boards] history checkpoint skipped:', e?.message ?? e);
+              }
+              fs.renameSync(file, `${file}.bak`);
+            }
             writeJsonAtomic(file, out);
+            pruneBoardHistory(HISTORY_DIR, {log: (m: string) => console.warn(m)});
             return send(200, out);
           }
 
@@ -317,11 +567,13 @@ function boardsApi(): Plugin {
           // generation saved it) showed any caller that sweeps the board list
           // can destroy a real board. The file is RENAMED to
           // `<id>.deleted-<UTC-stamp>.json` instead, so every delete leaves a
-          // recoverable artefact and no code path here removes bytes. The
-          // archive stays until a human (or an explicit purge step,
-          // scripts/purge-deleted-boards.mjs — dry-run by default) removes
-          // archives older than a stated age. Nothing is ever deleted
-          // automatically.
+          // recoverable artefact and no code path here removes the board's
+          // bytes. BOARD-RETENTION (t_59671f6a) now bounds the archive class:
+          // a fresh tombstone always survives; stale/orphaned tombstones and
+          // .baks are pruned by scripts/boardRetention.mjs (see that file for
+          // the policy; scripts/purge-deleted-boards.mjs remains the explicit
+          // human tool). The sweep is deferred and unref'd — the response
+          // never waits on it.
           if (method === 'DELETE') {
             if (!fs.existsSync(file)) return send(404, {error: 'not found'});
             const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -331,6 +583,17 @@ function boardsApi(): Plugin {
             } catch (e: any) {
               return send(500, {error: String(e)});
             }
+            /* HARNESS-ISOLATION-2 F2 — the board is gone, so its ten history
+               generations go with it: the tombstone above is the recovery copy
+               (the same rule the `.bak` class follows). Without this a harness
+               night of one-shot scratch boards leaves ten files per board
+               forever. Only exact `<id>.<epoch-ms>.json` names can go. */
+            try {
+              dropBoardHistory(HISTORY_DIR, id);
+            } catch (e: any) {
+              console.warn('[boards] history drop failed:', e?.message ?? e);
+            }
+            scheduleRetentionSweep();
             return send(200, {ok: true, archived: path.basename(archive)});
           }
 

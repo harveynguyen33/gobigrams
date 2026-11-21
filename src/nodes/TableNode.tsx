@@ -1,9 +1,9 @@
 import {memo} from 'react';
-import {Handle, Position, useStore, type NodeProps} from '@xyflow/react';
-import {KeyRound, Link, Table2, ChevronDown, ChevronRight, Eye} from 'lucide-react';
-import {resolveColor, type ColorKey} from '../colors';
-import {paintRotation, rotateTransform} from '../rotation';
-import {RotateGrip} from '../components/RotateGrip';
+import {NodeResizer, type NodeProps} from '@xyflow/react';
+import {Table2, ChevronDown, ChevronRight, Eye} from 'lucide-react';
+import {resolveColor, type ColorKey} from '../theme/colors';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
+import TableRowList from './TableRowList';
 
 /* ---------------------------------------------------------------------------
    L3c — the ERD `table` node. The one genuinely new node type in the package
@@ -18,44 +18,27 @@ import {RotateGrip} from '../components/RotateGrip';
      · the mono type is right-aligned and faded until the row is hovered
      · one invisible handle per column row, so an FK edge attaches to the COLUMN
        and not to the card's vertical centre
+
+   UNISURF-S5: the column rows (now EDITABLE — name input, type chip, not-null,
+   FK picker; SPEC-UNIFIED-SURFACE §3) live in src/nodes/TableRowList.tsx so
+   this file stays in its 171-line budget; every handle is a ROW handle there.
+
+   TABLEROW-LEGIBILITY (2026-11-09): the node-level target+source pair that
+   used to sit here is GONE. It was centred on the CARD (50% of the height) and
+   carried the FIRST column's own ids (`left_rel_<c1>`) a second time, so a
+   4-column table rendered 10 handles with one id twice and the duplicate pair
+   floated beside whichever row crossed the card's midpoint — "in the second
+   field, it always show 2 handles" (Harvey). The adapter now resolves every
+   table endpoint to a column handle, so the pair had no consumer left.
 --------------------------------------------------------------------------- */
 
-export type TableColumn = {
-  id: string;
-  name: string;
-  type: string;
-  pk?: boolean;
-  fk?: boolean;
-  notNull?: boolean;
-  unique?: boolean;
-};
+/* CORE-STEP4A-FIX — TableColumn/ShowMode/TableKind moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */
+export type {TableColumn, ShowMode, TableKind} from '../../packages/gobi/src/model/nodeData';
+import type {ShowMode, TableKind, TableColumn} from '../../packages/gobi/src/model/nodeData';
+import {resolveTableScale} from '../../packages/gobi/src/model/tableStyle';
 
-/** Liam ERD's `showMode` — the cheapest large-schema lever. */
-export type ShowMode = 'ALL_FIELDS' | 'TABLE_NAME' | 'KEY_ONLY';
 
-export type TableKind = {
-  /** Table name (schema-qualified shown when `schema` is set). */
-  name: string;
-  schema?: string;
-  columns: TableColumn[];
-  /** Symbolic accent key (L1) — resolved per theme. */
-  colorKey?: ColorKey;
-  /** Literal user-typed hex escape hatch. */
-  color?: string;
-  /** Column list collapsed to the header only. */
-  collapsed?: boolean;
-  /** injected by App: the board's ERD show-mode */
-  __showMode?: ShowMode;
-  /** injected by App: called with the new collapsed flag */
-  __onToggle?: (id: string, collapsed: boolean) => void;
-  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
-  rotation?: number;
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
-  __rotateSel?: boolean;
-  /** injected by App: called when a column is clicked (inspector focus) */
-  __onPickColumn?: (id: string, col: TableColumn) => void;
-};
 
 /** Handle ids: one source + one target per column, plus extra target handles so
  *  N incoming FKs to the same column never stack on one point (ChartDB's trick). */
@@ -64,44 +47,53 @@ export const relHandleId = (side: 'left' | 'right', colId: string) =>
 export const extraTargetHandleId = (i: number, colId: string) => `target_rel_${i}_${colId}`;
 
 /** Should this column be visible under the given show-mode? */
-export function visibleColumns(cols: TableColumn[], mode: ShowMode): TableColumn[] {
+export function visibleColumns(cols: TableColumn[], mode: ShowMode) {
   if (mode === 'TABLE_NAME') return [];
   if (mode === 'KEY_ONLY') return cols.filter(c => c.pk || c.fk);
   return cols;
 }
 
-const Node = memo(({id, data, selected}: NodeProps) => {
+const Node = memo(({id, data, selected, width, height}: NodeProps) => {
   const d = data as unknown as TableKind;
+  /* UNISURF-S4 — render-only stale marks from App (never persisted): the
+     card outline plus, per offending row, a marker (spec §4.3). */
+  const staleCols = (d as {__staleCols?: string[]}).__staleCols;
   const nc = resolveColor(d);
   const mode: ShowMode = d.__showMode ?? 'ALL_FIELDS';
   const collapsed = !!d.collapsed || mode === 'TABLE_NAME';
   const shown = collapsed ? [] : visibleColumns(d.columns ?? [], mode);
   const hidden = (d.columns?.length ?? 0) - shown.length;
 
-  // extra target handles: this many incoming edges already attach to a column
-  const edges = useStore(s => s.edges);
-  const incoming = new Map<string, number>();
-  edges.forEach(e => {
-    if (e.target !== id || !e.targetHandle) return;
-    incoming.set(e.targetHandle, (incoming.get(e.targetHandle) ?? 0) + 1);
-  });
-
   /* ROUND ROTATE — same root transform scheme as DiagramNode (see there);
      the column handles are children, so FK edges follow the rotated rows. */
   const rot = rotateTransform(paintRotation(d as {rotation?: number}));
-  /* GROUP-ROTATE: sole-selection token — no per-node grip in a multi. */
-  const grip = selected && d.__rotateSel && d.__rotate ? (
-    <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
-      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+  /* TABLE-SCALE (t_cdd8e4f6) — this table's OWN scale, published as `--ts` so
+     the density block's numbers (row height, fonts, padding, gaps) multiply it
+     for THIS card only. The width is not painted from here: useTableWidth asks
+     the core for the box at the same scale (one number, in the document). */
+  const ts = resolveTableScale(d.scale);
+  /* CHROME-ABOVE (t_31a9bec9): the rotate grip and the desc badge render in
+     App's NodeChrome (top layer), not in the card's stacking context. */
+  /* TABLE-GRIP (t_ef4b3f8a) — the SAME resize affordance every other node has
+     (8 controls, `resize-line` + `resize-handle`, so it looks and feels
+     identical). A table's box is DERIVED, so the gesture writes NOTHING of its
+     own: `tableGripChanges` (src/board/resizeHistory.ts) converts the width it
+     emits into the node's `scale` — the 0.75-1.5 ladder the inspector offers —
+     and drops the dimensions change before it can be persisted. No min/max here
+     on purpose: React Flow re-reads `params.boundaries` at every drag event, and
+     a boundary derived from a width that MOVES with the scale would re-clamp the
+     gesture mid-drag. The clamp is the ladder's, in one place. */
+  const resizer = selected && !d.__lock && !(d as any).__locked ? (
+    <NodeResizer lineClassName="resize-line" handleClassName="resize-handle" />
   ) : null;
+  /* CHROME-ABOVE (t_31a9bec9): a desc table's badge renders in App's
+     NodeChrome (top layer) — the card's stacking context no longer owns it. */
   return (
     <div
-      className={`tnode${selected ? ' selected' : ''}${collapsed ? ' collapsed' : ''}`}
-      style={{'--nc': nc, ...(rot ? {transform: rot} as React.CSSProperties : {})} as React.CSSProperties}
+      className={`tnode${selected ? ' selected' : ''}${collapsed ? ' collapsed' : ''}${staleCols ? ' stale-card' : ''}${d.__lock ? ' locked' : ''}`}
+      style={{'--nc': nc, '--ts': String(ts), ...(rot ? {transform: rot} as React.CSSProperties : {})} as React.CSSProperties}
     >
-      {grip}
-      <Handle type="target" position={Position.Left} id={`left_rel_${d.columns?.[0]?.id ?? 'h'}`} className="tnode-h tnode-h-head" />
-      <Handle type="source" position={Position.Right} id={`right_rel_${d.columns?.[0]?.id ?? 'h'}`} className="tnode-h tnode-h-head" />
+      {resizer}
 
       <div className="tnode-head">
         <Table2 size={13} className="tnode-ico" />
@@ -121,40 +113,17 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         </button>
       </div>
 
-      {shown.map(col => {
-        const n = incoming.get(relHandleId('left', col.id)) ?? 0;
-        return (
-          <div
-            key={col.id}
-            className={`tnode-col${col.fk ? ' is-fk' : ''}`}
-            onClick={e => { e.stopPropagation(); d.__onPickColumn?.(id, col); }}
-          >
-            <Handle type="target" position={Position.Left} id={relHandleId('left', col.id)} className="tnode-h" />
-            {Array.from({length: Math.max(0, n - 1)}).map((_, i) => (
-              <Handle
-                key={i}
-                type="target"
-                position={Position.Left}
-                id={extraTargetHandleId(i, col.id)}
-                className="tnode-h"
-                style={{top: `${((i + 1) / (n + 1)) * 100}%`}}
-              />
-            ))}
-            <span className="tnode-flags">
-              {col.pk && <KeyRound size={11} className="tnode-pk" aria-label="primary key" />}
-              {col.fk && <Link size={11} className="tnode-fkico" aria-label="foreign key" />}
-            </span>
-            <span className="tnode-cname">{col.name}</span>
-            {col.unique && <span className="tnode-u" title="unique">U</span>}
-            <span
-              className={`tnode-nn${col.notNull ? ' on' : ''}`}
-              title={col.notNull ? 'NOT NULL' : 'nullable'}
-            />
-            <span className="tnode-ctype">{col.type}</span>
-            <Handle type="source" position={Position.Right} id={relHandleId('right', col.id)} className="tnode-h" />
-          </div>
-        );
-      })}
+      <TableRowList
+        nodeId={id}
+        columns={d.columns ?? []}
+        shown={shown}
+        lock={d.__lock}
+        staleCols={staleCols}
+        hl={(d as {__hl?: string}).__hl}
+        seam={d.__onColumns}
+        onPickColumn={d.__onPickColumn}
+        onFk={d.__onFk}
+      />
 
       {!collapsed && hidden > 0 && (
         <div className="tnode-more" onClick={() => d.__onToggle?.(id, true)}>

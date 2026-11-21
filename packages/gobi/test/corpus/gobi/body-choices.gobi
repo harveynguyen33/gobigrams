@@ -1,0 +1,9 @@
+board "Body layout choices"
+bare = service "Bare service"
+carded = service "Carded" sub:"one line of prose buys the shell"
+forced = service "Forced card" body:card
+simple = service "Forced simple" sub:"explicit simple wins" body:simple
+kick = service "Kicker buys card" kicker:CUSTOM
+gate = gateway "GW" sub:"routes" body:simple
+lbl = text "A caption never carries a body"
+bare -> carded "link"

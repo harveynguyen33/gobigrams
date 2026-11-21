@@ -32,6 +32,14 @@
   --acc: #f54e00;
   --sel: #3b82f6;
   --sel-soft: rgba(59, 130, 246, 0.14);
+  /* HIGHLIGHT-WEIGHT (2026-11-15): hover-highlight halo strength as tokens.
+     Dark themes get a stronger 3-layer halo because the dark canvas ring a
+     12px pad samples saturates well below the acceptance bar with the lighter
+     universal values; measured dark lit dL 0.1237 (bar 0.06). */
+  --hl-b: 1.5; --hl-r1: 3px; --hl-a1: 95%;
+  --hl-r2: 12px; --hl-a2: 85%;
+  --hl-r3: 24px; --hl-a3: 70%;
+  --hl-pb: 1.12; --hl-pr1: 4px; --hl-pa1: 95%; --hl-pr2: 16px; --hl-pa2: 85%;
   /* M / D2 — this pair used to be a self-reference cycle (var(--acc-tint)),
      so BOTH resolved to the empty string and every `--acc-soft` fill in the
      dark theme painted transparent. Real values now. INTENTIONAL visual
@@ -117,6 +125,12 @@
   --acc-soft: color-mix(in srgb, var(--acc) 10%, transparent);
   --sel: #2563eb;
   --sel-soft: color-mix(in srgb, var(--sel) 12%, transparent);
+  /* HIGHLIGHT-WEIGHT (2026-11-15): light-theme halo; layer 3 stays alpha-0
+     so all themes share one filter shape. Measured dL in the round harness. */
+  --hl-b: 1.22; --hl-r1: 3px; --hl-a1: 55%;
+  --hl-r2: 16px; --hl-a2: 30%;
+  --hl-r3: 24px; --hl-a3: 0%;
+  --hl-pb: 1.1; --hl-pr1: 3px; --hl-pa1: 15%; --hl-pr2: 14px; --hl-pa2: 31%;
   --green: #15803d;
   --red: #b91c1c;
   --danger: #b91c1c;
@@ -175,6 +189,16 @@
   --acc-soft: color-mix(in srgb, var(--acc) 10%, transparent);
   --sel: #1e3a8a;
   --sel-soft: color-mix(in srgb, var(--sel) 12%, transparent);
+  /* HIGHLIGHT-WEIGHT (2026-11-15): paper halo — same shape as light; the peer
+     wide layer is bumped vs the old 12px@20% because paper peer measured just
+     under the 0.02 bar with it. */
+  --hl-b: 1.22; --hl-r1: 3px; --hl-a1: 55%;
+  --hl-r2: 16px; --hl-a2: 30%;
+  --hl-r3: 24px; --hl-a3: 0%;
+  /* HL-PEER-BRIGHT: paper's peer needs its OWN values — the shared light
+     values measured paper peer at 0.0578, over the hierarchy cap
+     (lit 0.1061 - 0.05 = 0.0561); these land it just inside. */
+  --hl-pb: 1.1; --hl-pr1: 3px; --hl-pa1: 15%; --hl-pr2: 14px; --hl-pa2: 31%;
   --green: #14532d;
   --red: #991b1b;
   --danger: #991b1b;
@@ -972,7 +996,7 @@ body {
   cursor: pointer; transition: all .15s;
 }
 .tbtn-icon:hover { background: var(--elevated); border-color: var(--border-strong); }
-.tbtn-icon:disabled { opacity: .4; cursor: not-allowed; }
+.tbtn-icon:disabled, .tbtn-icon[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
 /* TOOLBAR-V1 — the Import·Export entry keeps visual priority without a word:
    the sketch's accent tint (docs/sketches/toolbar-variants.html, V1 `.pro`). */
 .tbtn-icon.pro { color: var(--acc); }
@@ -1031,6 +1055,10 @@ body {
 .pop-item:hover { background: var(--elevated); }
 .pop-item.primary { background: var(--acc); color: var(--on-acc); font-weight: 600; }
 .pop-item.primary:hover { background: var(--on-acc-hover); }
+/* HISTORY-V3 (t_37f23a89) — the accent TEXT row (the Boards menu's
+   "History…"): `.primary` above is the FILLED accent (Save now); this is its
+   quieter sibling — accent ink, same padding/hover rhythm as every row. */
+.pop-item.acc { color: var(--acc); }
 
 /* ---------- toast ---------- */
 .toast {
@@ -2511,6 +2539,8 @@ kbd {
   margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* TABLE-SCALE — a range paints its own track; the unquoted attribute keeps round-s-edge-bend's `type="range"` pin about INPUTS. */
+.field input[type=range] { height: 30px; padding: 0; border-color: transparent; background: transparent; accent-color: var(--sel); }
 
 /* ---------- C3: node resize ----------
    ITEM 1 (2026-09-17) — THE SELECTED NODE MUST SHOW ONE BORDER, NOT TWO.
@@ -2550,53 +2580,33 @@ kbd {
    The shape's own 1.5px border is NOT part of the selection signal and keeps its
    normal weight in BOTH states — there is deliberately no `.selected` override
    on `.shape-frame` or on the `ShapeFrame` stroke. */
-/* ITEM 1 (2026-09-18, approved mockup "A — wide edge band") — the mid-edge
-   controls get a real hit target. The corner grips were already reachable; the
-   four LINE controls were a 1px strip with NO hit area at all, and they were
-   ALSO buried: `elementFromPoint()` at an edge midpoint returned `.node-body`,
-   because `.node-body` is `position: relative` with no z-index and comes AFTER
-   the resize controls in the DOM, so it won the z-index:auto group on tree
-   order — the same class of bug FIX 3b fixed for the grips. Widening a control
-   that is still under the body would have changed nothing.
-   Z-INDEX 1, AND WHY IT IS THE ONLY VALUE. The control must clear the body but
-   stay under the two things it must never steal, so the band's z-index is
-   bounded on BOTH sides: `.node-body` paints in the positioned z-index:auto
-   group (0, and it wins ties on tree order because it comes later), the corner
-   grip is `z-index: 2` and the connect dot is `z-index: 5`. There is exactly
-   one integer strictly between those, so the ordering is:
-     connect dot (5)  >  corner grip (2)  >  line band (1)  >  node body (auto)
-   `position: absolute` is not restated here: RF's own `.react-flow__resize-control
-   { position: absolute }` (installed style.css:528) already supplies it, which
-   is what makes a z-index take effect at all. */
+/* ITEM 1 (2026-09-18) — the mid-edge controls get a real hit target. The four
+   LINE controls were a 1px strip with no hit area AND were buried under
+   `.node-body` (`position: relative`, z-index auto, later in the DOM). Z-INDEX
+   1 is the one integer that clears the body and stays under both things the
+   band must never steal — so connect dot (5) > corner grip (2) > line band (1)
+   > node body (auto). The TABLE override is the scoped exception, documented
+   at its own rule next to `.tnode-h` (TABLE-GRIP-Z, t_0ad11a52). */
 .resize-line {
   border-width: 0 !important;
   z-index: 1;
 }
-/* The INVISIBLE hit band. `::after` is a pseudo-element, so it takes part in
-   HIT TESTING — the same device the corner grip below (inset: -6px) and the
-   coarse-pointer handle ring at EOF (inset: -5px) already use. `outline` and
-   `box-shadow` are paint-only and would NOT have worked here. The band paints
-   NOTHING at all — no background, no border, no box-shadow, no outline — so
-   the "exactly ONE selection-coloured painted line" invariant this file guards
-   is untouched: it adds a hit box, not a painted box.
-   PERPENDICULAR, AND CENTRED ON THE NODE'S EDGE. RF sizes these controls as a
-   cross: `.line.left/.right { width: 1px; height: 100% }` and
-   `.line.top/.bottom { height: 1px; width: 100% }` (installed style.css:590-617),
-   so the band must grow along the axis the control is thin in — horizontally
-   for the left/right pair, vertically for the top/bottom pair — and must grow
-   NOTHING along the other axis, where the parent already spans the full edge.
-   The parent box is already centred on the node's edge by RF's own transform
-   (`translate(-50%, 0)` on left/right, `translate(0, -50%)` on top/bottom), so
-   a 50% offset pulled back by half the band's own size centres the band on
-   that same edge line.
-   10px TOTAL, matching the corner grip's painted 10px above so the two
-   affordances feel the same size. NOTE the unit difference: RF keeps the
-   HANDLE variant screen-constant by writing `scale: max(1/zoom, 1)` inline
-   (`scaleSelector`, @xyflow/react/dist/esm/index.js:4851) but writes nothing
-   for the LINE variant, so the band is in node-local px and shrinks on screen
-   with the node at zoom < 1 while the grip does not. Kept node-local on
-   purpose: the band must track the node whose edge it grabs, exactly like the
-   node's own border, not the viewport. */
+/* The INVISIBLE hit band. `::after` takes part in HIT TESTING — the device the
+   corner grip (inset: -6px) and the coarse handle ring (inset: -5px) use;
+   `outline` / `box-shadow` are paint-only. It paints NOTHING, so the "exactly
+   ONE selection-coloured painted line" invariant is untouched.
+   PERPENDICULAR and CENTRED ON THE EDGE: RF sizes the controls as a cross
+   (`.line.left/.right { width:1px; height:100% }`, `.line.top/.bottom` mirrored,
+   installed style.css:590-617), so the band grows on the thin axis only; the
+   parent is already centred on the edge by RF's transform (`translate(-50%, 0)`
+   / `(0, -50%)`), so 50% pulled back by half the band centres it on that same
+   edge. 10px TOTAL, the corner grip's painted size.
+   The band is NODE-LOCAL: RF keeps the HANDLE variant screen-constant with
+   `scale: max(1/zoom, 1)` but writes nothing for the LINE variant, so the band
+   shrinks with the node at zoom < 1 while the grip does not. Kept that way on
+   purpose — the band tracks the node whose edge it grabs, not the viewport.
+   TABLE-GRIP-Z: the `.tnode` override moves this band OUTSIDE the card edge
+   (the 1px column stays resize; the column ports keep their inner half). */
 .resize-line.left::after, .resize-line.right::after {
   content: ''; position: absolute;
   top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 10px;
@@ -3186,6 +3196,15 @@ kbd {
 .ctx-item:hover { background: var(--elevated); }
 .ctx-item.danger { color: var(--acc); }
 .ctx-item.danger:hover { background: var(--acc-tint); }
+/* MENU-STATES (t_8b56f71a): a REFUSED row must PAINT as refused. This sheet
+   had no :disabled rule at all, so an unavailable Group/Ungroup looked exactly
+   like an available one — the owner's "không hiển thị gì cả". `.ctx-item`'s own
+   `color: var(--fg)` / `cursor: pointer` outrank the UA's disabled styling, so
+   both are undone explicitly here (and this block sits AFTER `.danger`, which
+   is what lets it win the colour tie). */
+.ctx-item:disabled { color: var(--dim); cursor: default; }
+.ctx-item:disabled:hover { background: transparent; }
+.ctx-hint { margin-left: auto; color: var(--dim); font-size: var(--fs-xs); }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 
 /* ---- F3: helper lines ---- */
@@ -3307,15 +3326,8 @@ kbd {
   background: var(--green); border-color: var(--green); color: var(--bg);
 }
 
-/* ONBOARD-P2/3 — the `?` sheet's capability block: what the deleted step-by-step
-   overlay uniquely named, as four scannable rows. Plain rows — no numbering, no
-   step chain, no controls — so it reads as a list, not a walkthrough. Tokens only. */
-.help-cap { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 14px; }
-.help-cap-row { display: flex; flex-direction: column; gap: 1px; }
-.help-cap-row b { font-size: var(--fs-md); font-weight: 600; color: var(--fg); }
-.help-cap-row span { font-size: var(--fs-sm); color: var(--dim); line-height: 1.45; }
-
-/* help popover: the one action row (Send feedback) under the Shortcuts heading */
+/* help popover: the one action row (Send feedback) under the Shortcuts heading.
+   (HELP-CAPS 2026-11-07 deleted the capability block + its rules that lived here.) */
 .help-action-btn {
   display: flex; align-items: center; gap: 8px; width: 100%;
   /* Spacing lives BELOW the button: it sits directly under the <h4>, and this
@@ -3379,6 +3391,57 @@ kbd {
   font-weight: 700;
   color: var(--sel);
   border-color: var(--sel);
+}
+
+/* ---- HIGHLIGHT ROUND: the neighbourhood halo (mode 2 "halo + lift") ----
+   Painted by paintHighlight (src/canvas/choreography.ts) as CLASSES only:
+   .ds-hl-lit on the hovered/selected node WRAPPER, .ds-hl-peer on the nodes
+   at the other end of its edges, .ds-hl on the wrapper while any node is
+   lit (focus mode). The halo is deliberately on `filter` — a different
+   property from the selection ring's `box-shadow` — so a node that is BOTH
+   selected and hovered shows the --sel ring AND the halo (mock option 3 was
+   rejected for exactly this). Colour is token-derived (--fg via color-mix),
+   never --sel, never hardcoded: a brightness lift alone is invisible on
+   light/sepia, so the token drop-shadow is what makes the halo read there.
+   The removed 2026-09-17 pulse is still gone: no ring, no outline, no line. */
+/* HIGHLIGHT-WEIGHT (2026-11-15): the halo strength is token-driven
+   (--hl-*, per theme in the token blocks above) because the painted-pixel
+   acceptance bar (round harness arm N) needs a stronger halo on dark
+   canvases than light ones. Layered drop-shadows COMPOSE — each layer
+   shadows the previous layers' paint — so keep new layers counted in the
+   harness, not eyeballed. Still blur-only: no ring, no outline, no
+   box-shadow (the selection ring owns that property). */
+.ds-hl-lit {
+  filter: brightness(var(--hl-b))
+    drop-shadow(0 0 var(--hl-r1) color-mix(in srgb, var(--fg) var(--hl-a1), transparent))
+    drop-shadow(0 0 var(--hl-r2) color-mix(in srgb, var(--fg) var(--hl-a2), transparent))
+    drop-shadow(0 0 var(--hl-r3) color-mix(in srgb, var(--fg) var(--hl-a3), transparent));
+}
+.ds-hl-peer {
+  filter: brightness(var(--hl-pb))
+    drop-shadow(0 0 var(--hl-pr1) color-mix(in srgb, var(--fg) var(--hl-pa1), transparent))
+    drop-shadow(0 0 var(--hl-pr2) color-mix(in srgb, var(--fg) var(--hl-pa2), transparent));
+}
+/* Focus mode: while a NODE is lit, edges outside the neighbourhood quiet
+   down and their flow payloads freeze (motion at 0.18 opacity still steals
+   the eye — same visibility mechanism as the gesture freeze above). A
+   selected edge is never dimmed. An edge-hover lights just itself and no
+   node, so it never triggers focus mode — today's behaviour, kept. */
+.ds-hl .react-flow__edge:not(.ds-electric):not(.selected) {
+  opacity: .18;
+}
+.ds-hl .react-flow__edge:not(.ds-electric):not(.selected) .ds-animated-payload {
+  visibility: hidden;
+}
+
+/* HIGHLIGHT-CONTAINER (GROUP-LOGICAL): the quieter CONTEXT treatment for the
+   frame AROUND a lit node. The frame never becomes the subject — no halo, no
+   dimming of its own — only its dashed border lifts, mixed toward the halo's
+   --fg-derived tone with the same per-theme pa1 ramp the peers use. Selection
+   on the frame itself still wins. */
+.ds-hl-ctx:not(.selected) .group-node {
+  border-color: color-mix(in srgb, var(--fg) var(--hl-pa1), var(--nc, var(--border-strong)));
+  transition: border-color 0.22s ease;
 }
 
 /* ---- K1: the node PULSE was REMOVED (Harvey, 2026-09-17) ----------------
@@ -3575,10 +3638,32 @@ kbd {
 .react-flow__edge-path { stroke-linejoin: round; }
 
 /* ---- L3c: the `table` node ---- */
+/* LAYOUT-FOLLOWS-WIDTH (2026-11-09) — THE DOCUMENT'S OWN WIDTH IS THE SURFACE.
+   The width used to be a render-time fact: a hook measured the card and wrote
+   --tnode-w, so the importer's layout, the document and the exporter had
+   already decided 250 — two widened cards sat 96px on top of each other.
+   It is now ONE number computed in the core (packages/gobi/src/model/
+   tableWidth.ts): the layout places with it, the adapter stores it as the
+   node's width, and React Flow paints its wrapper from that same inline width
+   — nothing here overrides it. The card fills the wrapper (`width: 100%`).
+   NO `min-width: max-content` safety net on a WRITABLE canvas: it made the
+   FIRST measurement (React Flow measures the wrapper) differ from the
+   document — measured as a self-edge routed for a 207px box on a 234px card.
+   The document IS the width, from the first frame: the adapter writes it on
+   import, useTableWidth writes it on load. The ONE exception is a LOCKED
+   canvas (`data-locked`: read-only, or stale while the code pane has errors) —
+   there the store write is refused, so a board that still stores an old width
+   paints a card that fits its ink instead of clipping it. */
+.canvas-wrap[data-locked] .react-flow__node-table { min-width: max-content; }
+/* TABLE-HEIGHT (t_5fa4dbb0) — the wrapper's HEIGHT is the CARD's, as its width is: a stored 170px box outlived the rows that produced it (the selection rect and the eight grips floated 77px below a 93px card). */
+.react-flow__node-table { height: auto !important; }
 .tnode {
-  width: 100%; min-width: 200px;
+  /* the store's node width (see the rule above); a floor keeps a two-column
+     card from collapsing below the app's own minimum card */
+  width: 100%;
+  min-width: 200px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 3px;
   font-family: var(--sans); font-size: var(--fs-md);
   box-shadow: var(--shadow-sm);
 }
@@ -3602,23 +3687,20 @@ kbd {
    clip that is not an ancestor of ANY handle is safe, and that means no clip on
    the card at all. Every painted pixel therefore keeps its old shape: see the
    `border-radius` declarations on `.tnode-head` and `.tnode > :last-child`. */
-.tnode > :last-child { border-radius: 0 0 8px 8px; }
+.tnode > :last-child { border-radius: 0 0 2px 2px; }
 .tnode.selected { border-color: var(--sel); box-shadow: 0 0 0 2px var(--sel); }
 .tnode-head {
   display: flex; align-items: center; gap: 6px;
-  padding: 7px 9px; background: var(--elevated);
+  padding: 7px var(--padX, 12px); background: var(--elevated);
   border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--nc, var(--border-strong));
-  /* ROUND AJ — replaces the card's deleted clip (see the `.tnode` header): the
-     bar is the top-most painted row, so it carries the top arc, at the card's
-     INNER radius (9px outer − 1px border). `:last-child` is the collapsed,
-     column-less card, where the head owns all four corners. */
-  border-radius: 8px 8px 0 0;
+  /* the identity rail is BLUEPRINT's own chrome (BOARD-STYLE); the node colour
+     still paints the icon and the port ring in every style. */
+  border-radius: 2px 2px 0 0;
 }
-.tnode-head:last-child { border-radius: 8px; }
 .tnode-ico { color: var(--nc, var(--dim)); flex: none; }
+.tnode-head:last-child { border-radius: 2px; }
 .tnode-name {
-  flex: 1; font-weight: 650; font-size: var(--fs-md); color: var(--fg);
+  flex: 1; font-weight: 650; font-size: var(--fName, 12px); color: var(--fg);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tnode-name small { color: var(--dim); font-weight: 400; }
@@ -3634,36 +3716,119 @@ kbd {
 }
 .tnode-toggle:hover { color: var(--fg); background: var(--surface); }
 .tnode-col {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 9px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--colGap, 14px);
+  height: var(--rH, 28px);
+  padding: calc(4px * var(--ts, 1)) var(--padX, 12px); border-bottom: 1px solid var(--border);
   position: relative; cursor: default;
 }
 .tnode-col:last-child { border-bottom: 0; }
 .tnode-col:hover { background: color-mix(in srgb, var(--sel) 8%, transparent); }
 .tnode-col.is-fk .tnode-cname { color: var(--sel); }
-.tnode-flags { display: flex; align-items: center; gap: 3px; flex: none; width: 30px; }
-.tnode-pk { color: var(--acc); }
-.tnode-fkico { color: var(--sel); }
+/* BOARD-STYLE — the constraint gutter. ONE anatomy, THREE paints: the marks are TEXT in every style; the style decides chrome only. `width` is the CORE's track (LAYOUT-FOLLOWS-WIDTH: useTableWidth publishes it per card, so the name column starts on one x on every row); unset = max-content. FLAG-SLOTS: an EMPTY slot (`.flag.ghost`) holds its place and paints nothing. */
+.tnode-flags {
+  display: flex; align-items: center; gap: var(--gapFlags, 6px);
+  flex: none; width: var(--gFlags, max-content);
+  font-family: var(--mono); white-space: nowrap;
+}
+.flag.ghost { visibility: hidden; pointer-events: none; }
+.flag {
+  font-size: var(--fChip, 8.5px); letter-spacing: .04em; line-height: 1.4;
+  white-space: nowrap;
+}
+/* SEMANTIC colour — never --nc: the node colour paints identity (header rail,
+   icon, port ring), the marks keep their meaning (BOARD-STYLE B5). The
+   `.tnode` prefix outranks the per-style `.flag` paint rules below. */
+.tnode .flag.flag-pk { color: var(--acc); }
+.tnode .flag.flag-fk { color: var(--sel); }
+.tnode .flag.flag-uq { color: var(--dim); }
+.tnode .flag.flag-nn { color: var(--dim2); }
+.tnode .flag.flag-nn.on { color: var(--dim); }
 .tnode-cname {
-  flex: 1; font-family: var(--mono); font-size: var(--fs-sm); color: var(--fg);
+  /* BOARD-STYLE — the NAME track is measured by the layout engine itself:
+     `field-sizing: content` makes the uncontrolled input as wide as its value,
+     so `external_reference_id` widens the table instead of being clipped. */
+  flex: 1 1 auto; width: auto; field-sizing: content; min-width: 2ch;
+  font-family: var(--mono); font-size: var(--fName, 12px); color: var(--fg);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.tnode-u {
-  font-family: var(--mono); font-size: var(--fs-2xs); color: var(--acc);
-  border: 1px solid var(--acc); border-radius: 3px; padding: 0 3px;
-}
-.tnode-nn {
-  width: 7px; height: 7px; border-radius: 50%; flex: none;
-  border: 1.5px solid var(--dim2); background: transparent;
-}
-.tnode-nn.on { border-color: var(--nc, var(--fg)); background: var(--nc, var(--fg)); }
 .tnode-ctype {
-  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
-  text-align: right; flex: none; max-width: 96px;
+  font-family: var(--mono); font-size: var(--fType, 10.5px); color: var(--dim);
+  text-align: right; flex: none;
+  /* the MEASURED shared track (--gType), 52px floor; unset = natural */
+  width: var(--gType, auto); min-width: 52px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   opacity: .65; transition: opacity .15s;
 }
 .tnode-col:hover .tnode-ctype { opacity: 1; }
+/* UNISURF-S5 — the editable row controls (TableRowList). The name input is an
+   UNCONTROLLED input wearing the read-only row's own class, reset to
+   transparent so it paints exactly like the span it replaced — the caret rule
+   lives in the component (nothing here may ever set its value). `.trow-b` is
+   the shared button reset for the two controls that are still BUTTONS (the
+   not-null mark `.tnode-nn` and the FK arrow); the TYPE cell is an INPUT now
+   (TYPE-CELL, t_67f95be7) and takes `.trow-in`. */
+.trow-in {
+  background: transparent; border: 0; outline: none; padding: 0;
+  margin: 0; min-width: 0; width: auto; cursor: text;
+}
+.trow-in:disabled { cursor: default; }
+.trow-b { padding: 0; margin: 0; font: inherit; background: transparent; cursor: pointer; }
+.trow-b:disabled { cursor: default; }
+.trow-chip.inf { color: var(--acc); opacity: .9; } /* proposed, until claimed */
+.trow-fk {
+  flex: none; font-family: var(--mono); font-size: calc(var(--fs-xs) * var(--ts, 1));
+  color: var(--dim2); line-height: 1;
+}
+.trow-fk[aria-pressed="true"] { color: var(--sel); }
+/* TABLEROW-LEGIBILITY (2026-11-09) — the HIT BOXES. Each row control is a
+   24x24 box (the element that receives the click) with its VISUAL unchanged:
+   the dot on a `::before`, glyphs centred, `margin` cancelling the extra size
+   so the row keeps its 19px content box (unisurf-tablerow T3/T5). WHERE: after
+   `.trow-b`'s reset (same specificity, earlier declarations lose). The type
+   column gets ONE measured track (the CORE's `--gType`): every row ends on one x.
+   ROW-CHROME-SCALE (t_f5d3fd9a) — the box is `max(24px, 24px * var(--ts, 1))`:
+   100% unchanged, 0.75 never under the 24px target, above it grows with the
+   type cell's font (measured before: 42px ink in a 24px box, cut off). NOT
+   scaled: the 1px borders, and ledger's row inset (composed with --padX). */
+.tnode-nn {
+  /* BOARD-STYLE — the NN mark is a TEXT toggle now (the same 24x24 hit box the
+     legibility pass gave the dot), sitting in the constraint gutter. The mark's
+     colour is semantic (--dim2 off / --dim on), never --nc. */
+  position: relative; z-index: 1; flex: none;
+  width: max(24px, calc(24px * var(--ts, 1))); height: max(24px, calc(24px * var(--ts, 1))); margin: 0;
+  border: 0; border-radius: 0; background: transparent;
+  font: inherit; font-size: var(--fChip, 8.5px); text-align: center;
+  letter-spacing: .04em; line-height: 1.4;
+}
+.trow-fk {                         /* TYPE-CELL: a <button> keeps the UA 2px outset border */
+  width: max(24px, calc(24px * var(--ts, 1))); height: max(24px, calc(24px * var(--ts, 1)));
+  margin: calc(-5px * var(--ts, 1)) calc(-7px * var(--ts, 1)); display: grid; place-items: center; border: 0; background: transparent; border-radius: calc(4px * var(--ts, 1));
+}
+/* TYPE-CELL (t_67f95be7) — the FK arrow is a HOVER affordance, not a badge:
+   `.door` had NO rule at all, so every row painted `→` at opacity 1. Hidden at
+   rest; revealed by the row under the pointer (media-gated like the ports) and
+   by the card's selection / the caret's row — neither is hover-derived. */
+.door { opacity: 0; transition: opacity .15s; }
+@media (hover: hover) { .tnode-col:hover .door { opacity: 1; } }
+.tnode.selected .door, .tnode-col.hl .door { opacity: 1; }
+.tnode-ctype {
+  /* TYPE-CELL (t_67f95be7) — the type is a free-text <input> now, not the cycle
+     button, so there is NO UA border to pay for: `.trow-in` zeroes it and the
+     old compensation (line-height 20px, margin -2.5px) went with the border —
+     an input centres its text in the 24px box (checks/unisurf-tablerow V1b).
+     BOARD-STYLE: the width stays the CORE's measured `--gType`, 52px floor;
+     `field-sizing: content` applies only when that track is unset. */
+  display: block; width: var(--gType, auto); min-width: var(--gType, 52px);
+  height: max(24px, calc(24px * var(--ts, 1))); field-sizing: content; font-size: var(--fType, 10.5px);
+}
+/* the S4 lock, row level: read-only/stale boards refuse row edits entirely */
+.tnode.locked .tnode-col { pointer-events: none; }
+/* UNISURF-S8 — the lock covers the CHROME too: the collapse chevron and the
+   "N hidden by show-mode" strip are board writes (collapse persists), so a
+   locked board refuses them physically as well as at the handler. */
+.tnode.locked .tnode-toggle, .tnode.locked .tnode-more { pointer-events: none; }
+.trow-pick .sp-card { width: 300px; }
+.trow-pick .sp-foot { justify-content: center; }
 .tnode-more {
   padding: 4px 9px; font-family: var(--mono); font-size: var(--fs-xs);
   color: var(--dim); border-top: 1px solid var(--border);
@@ -3686,13 +3851,88 @@ kbd {
    today's behaviour and touch falls back to the selection reveal below. */
 @media (hover: hover) {
   .tnode:hover .react-flow__handle.tnode-h { opacity: 1; }
-  .tnode:hover .tnode-h-head { opacity: 0; }
 }
 /* not hover-derived — must stay live on a coarse pointer */
 .tnode.selected .react-flow__handle.tnode-h,
 .tnode .react-flow__handle.tnode-h.connecting,
 .tnode .react-flow__handle.tnode-h.valid { opacity: 1; }
-.react-flow__handle.tnode-h.tnode-h-head { opacity: 0; }
+/* TABLE-GRIP-Z (t_0ad11a52) — the two VERTICAL edge lines vs the column ports.
+   Every row renders two `.tnode-h` ports straddling the card's own left/right
+   edge at z 5, and the shared line rule puts the line at z 1, so at the line's
+   own centre the port won and dragging the edge started a CONNECTION instead of
+   a resize (measured: 6 of 8 grips hittable). The fix is z-order + geometry,
+   scoped to `.tnode` so every other node keeps the shared contract:
+     · the vertical line rises to 6 (above the port's 5) and its 10px hit band
+       moves OUTSIDE the card — the 1px column is resize, the inner half of the
+       port (the connection door) is not swallowed;
+     · the 4 CORNER grips rise to 7 so the line cannot steal a corner's centre;
+     · the port keeps its 12px painted box and gains a 4px transparent ring
+       (20x20, the corner grip's own `::after` device), so a point 6px INSIDE
+       the card is still the port. No id, no route, no paint changed. */
+.tnode .resize-line.left, .tnode .resize-line.right { z-index: 6; }
+.tnode .resize-line.left::after, .tnode .resize-line.right::after { transform: none; }
+.tnode .resize-line.left::after { left: auto; right: 50%; }
+.tnode .react-flow__resize-control.handle { z-index: 7; }
+.tnode .react-flow__handle.tnode-h::after { content: ''; position: absolute; inset: -4px; }
+
+/* =====================================================================
+   BOARD-STYLE (task t_e13e056b) — style + density are PER-BOARD, driven by
+   `data-style` / `data-density` on the canvas wrapper. ONE anatomy, three
+   paints: a style may change ONLY border-radius, how constraints are drawn,
+   row insets, header rail, rule style and letter-case. DENSITY is the only
+   place spacing lives — the numbers are the approved sketch's, verbatim.
+   Colour never enters these blocks: every value is a theme token, so the
+   light theme repaints both style and density for free.
+   ===================================================================== */
+.canvas-wrap[data-density="compact"] .tnode { --rH: calc(22px * var(--ts, 1)); --colGap: calc(8px * var(--ts, 1));  --padX: calc(8px * var(--ts, 1));  --fName: calc(11px * var(--ts, 1)); --fType: calc(9.5px * var(--ts, 1));  --fChip: calc(8px * var(--ts, 1));   --gapFlags: calc(4px * var(--ts, 1)); }
+.canvas-wrap[data-density="comfy"]   .tnode { --rH: calc(28px * var(--ts, 1)); --colGap: calc(14px * var(--ts, 1)); --padX: calc(12px * var(--ts, 1)); --fName: calc(12px * var(--ts, 1)); --fType: calc(10.5px * var(--ts, 1)); --fChip: calc(8.5px * var(--ts, 1)); --gapFlags: calc(6px * var(--ts, 1)); }
+.canvas-wrap[data-density="airy"]    .tnode { --rH: calc(34px * var(--ts, 1)); --colGap: calc(20px * var(--ts, 1)); --padX: calc(16px * var(--ts, 1)); --fName: calc(13px * var(--ts, 1)); --fType: calc(11.5px * var(--ts, 1)); --fChip: calc(9.5px * var(--ts, 1)); --gapFlags: calc(8px * var(--ts, 1)); }
+/* TABLE-SCALE (t_cdd8e4f6) — `--ts` is ONE table's scale (0.75 - 1.5), written
+   inline by TableNode from `data.scale`; the density numbers above multiply it,
+   so the card names exactly what scales. Every other table keeps `--ts` = 1. */
+
+/* STYLE 1 — SHEET: no chrome, marks in a gutter, square corners. The BASE
+   rules above already declare it (radius 3, head 2 = 3 − the 1px border), so
+   sheet needs no radius block: it IS the default silhouette. */
+
+/* STYLE 2 — LEDGER: soft, rounded, rows inset, marks are bordered chips */
+.canvas-wrap[data-style="ledger"] .tnode { border-radius: 10px; }
+.canvas-wrap[data-style="ledger"] .tnode-head { border-radius: 9px 9px 0 0; }
+.canvas-wrap[data-style="ledger"] .tnode > :last-child { border-radius: 0 0 9px 9px; }
+.canvas-wrap[data-style="ledger"] .tnode-head:last-child { border-radius: 9px; }
+.canvas-wrap[data-style="ledger"] .tnode-col {
+  margin: 2px 6px; border-bottom: 0; border-radius: 6px;
+  padding: 0 calc(var(--padX) - 6px);
+}
+.canvas-wrap[data-style="ledger"] .tnode-col:hover { background: color-mix(in srgb, var(--sel) 10%, transparent); }
+.canvas-wrap[data-style="ledger"] .flag {
+  padding: calc(1px * var(--ts, 1)) calc(5px * var(--ts, 1)); border-radius: calc(4px * var(--ts, 1)); line-height: 1.4;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+
+/* STYLE 3 — BLUEPRINT: coloured rail, dotted rules, uppercase, bracketed marks */
+.canvas-wrap[data-style="blueprint"] .tnode { border-radius: 2px; }
+.canvas-wrap[data-style="blueprint"] .tnode-head {
+  border-radius: 0; border-left: 3px solid var(--nc, var(--acc));
+}
+.canvas-wrap[data-style="blueprint"] .tnode > :last-child { border-radius: 0 0 1px 1px; }
+.canvas-wrap[data-style="blueprint"] .tnode-head:last-child { border-radius: 1px; }
+.canvas-wrap[data-style="blueprint"] .tnode-name {
+  text-transform: uppercase; letter-spacing: .10em; font-size: calc(var(--fName) - 1px);
+}
+.canvas-wrap[data-style="blueprint"] .tnode-col { border-bottom: 1px dotted var(--border); }
+.canvas-wrap[data-style="blueprint"] .flag {
+  font-size: calc(var(--fChip) + .5px); color: var(--dim);
+  letter-spacing: .02em; text-transform: lowercase;
+}
+.canvas-wrap[data-style="blueprint"] .flag::before { content: '['; }
+.canvas-wrap[data-style="blueprint"] .flag::after { content: ']'; }
+.canvas-wrap[data-style="blueprint"] .ty { text-transform: uppercase; letter-spacing: .04em; }
+
+/* BOARD-STYLE — the inspector/Boards-menu segmented rows (one value, three
+   doors). The `.mbtn` vocabulary is the panel's own; no new control kit. */
+.seg-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg-row .mbtn.on { border-color: var(--sel); color: var(--sel); }
 
 /* =====================================================================
    L3a — ISO 5807 shapes: vertical handles + per-shape body padding
@@ -4261,7 +4501,8 @@ kbd {
      30x30 CSS px without changing the painted size or the node's layout —
      WCAG 2.2 SC 2.5.8 asks for 24x24 minimum. Keep in sync with
      `HANDLE_HIT_MARGIN_PX` in `src/touch.ts`. */
-  .react-flow__handle::after {
+  .react-flow__handle::after,
+  .tnode .react-flow__handle.tnode-h::after {
     content: '';
     position: absolute;
     inset: -5px;
@@ -5458,7 +5699,19 @@ kbd {
 /* TOOLBAR-V1 — the two columns sit in ONE row BELOW the segmented tabs
    (the tabs used to live inside the left column). */
 .em-cols { display: flex; gap: var(--space-5, 20px); flex: 1 1 auto; min-height: 0; }
-.em-left { width: 250px; flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3, 12px); overflow-y: auto; min-height: 0; }
+/* IMPORT-SCROLLBAR — the column is its own scroll container, and its children
+   ran full-width to the content edge with ZERO gap, so on overlay-scrollbar
+   systems (Harvey's Mac) the thumb painted straight over the textareas and
+   buttons (measured pre-fix: every control ended exactly at
+   scrollerRect.right - 10px — the scrollbar lane's inner edge — with 0px of
+   its own). Fix: RESERVE the lane with scrollbar-gutter (stable — reserves
+   the classic width even when the OS paints overlay scrollbars, so the
+   content box never extends under the thumb) and add one space token of
+   padding so the thumb never shares a pixel with a control. The scrollbar's
+   look is the app-wide token style (scrollbar-width: thin, token thumb,
+   transparent track — the `*` rule near the top of this file), not browser
+   chrome. Width stays 250px: gutter+padding come out of the CONTENT box. */
+.em-left { width: 250px; flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3, 12px); overflow-y: auto; min-height: 0; scrollbar-gutter: stable; padding-right: var(--space-2, 8px); }
 .em-right { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2, 8px); }
 .em-title { font-size: var(--fs-lg); font-weight: 650; }
 /* MODAL-DOORS (2026-11-03) — the ONE visible exit, shared by the export modal
@@ -5497,6 +5750,19 @@ kbd {
 .em-seg button.on { color: var(--fg); border-color: var(--acc); background: var(--acc-soft); }
 .em-seg button:disabled { opacity: .4; cursor: not-allowed; }
 .em-note { font-size: var(--fs-2xs); color: var(--dim2); }
+/* F3 (2026-11-20, t_8cfc79b0) — the reserved explainer slot (AGENTS.md UI
+   render isolation, owner-ruled): .em-expl holds every format-dependent note
+   in the left pane. min-height = the TALLEST format's measured stack — pdf's
+   own note (2 wrapped lines) plus the outline block, measured live in the
+   running modal at the fixed 250px pane with the web font settled (143px;
+   svg 97, png 22, json/mermaid 0 — pdf dominates by construction: it is the
+   outline block PLUS the longest note). flex 0 0 auto so the pane can never
+   squash the reservation, and the same column+gap rhythm as .em-left so
+   the slot's children keep the exact spacing they had as direct pane
+   children. A format toggle now repaints ONLY this box; the Export button
+   below it never moves (pre-fix, measured: button Y 360.95 on JSON vs
+   515.95 on PDF — a 155px travel). */
+.em-expl { display: flex; flex-direction: column; gap: var(--space-3, 12px); min-height: 143px; flex: 0 0 auto; }
 .em-go {
   font: inherit; font-size: var(--fs-sm); font-weight: 650;
   color: var(--bg); background: var(--acc);
@@ -5615,62 +5881,50 @@ kbd {
 .node.shape-display.body-inset    { --body-inset: 2% 30% 2% 12%; }
 .node.shape-offpage.body-inset    { --body-inset: 2% 3% 34% 3%; }
 
-/* ---- ROUND ROTATE — the rotate grip above the top resize grip ---------- */
-/* Positioning contract: the grip is rendered as a child of the node ROOT
-   (inside the rotated subtree would make it orbit WITH the node, which is
-   what the export needs but NOT the handle — it must sit at the UNROTATED
-   top edge). Instead DiagramNode renders it OUTSIDE the rotation wrapper
-   (a sibling positioned by the unrotated box), so these rules only style
-   it. Tokens only: the --sel / --surface pair the resize grips use, 12px
-   disc, 10px glyph. z-index 3: above the resize grips (2), below the
-   connect points (5) — the same ladder the resizer block documents. */
-.ds-rotate-grip {
-  position: absolute;
-  left: 50%; top: -30px;
-  width: 18px; height: 18px;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  border: 1px solid var(--sel);
-  background: var(--surface);
-  color: var(--sel);
-  cursor: grab;
-  z-index: 3;
-  padding: 0;
-}
-.ds-rotate-grip:active { cursor: grabbing; }
-.ds-rotate-grip:focus-visible {
-  outline: 2px solid var(--sel);
-  outline-offset: 2px;
-}
-
-/* ---- ROUND GROUP-ROTATE — the ONE shared grip for a multi-selection ---- */
-/* The multi-selection's shared rotate affordance (App's GroupRotateGrip, a
-   <ReactFlow> child): RotateGrip's own vocabulary — 18px disc + glyph, the
-   --sel / --surface pair — repositioned. It is NOT a child of the renderer:
-   its left/top are set inline by the component (screen-space coords INSIDE
-   .react-flow__renderer), so this rule positions it absolutely against the
-   renderer (pointer-events: the disc itself, never the canvas under it) and
-   everything else mirrors .ds-rotate-grip. z-index 1000: above node chrome
-   (the connect points' 5), below modals — same intent as the per-node
-   grip's ladder, one rung higher because it spans many nodes. */
+/* ---- ROUND GROUP-ROTATE — the ONE shared handle of a selection ---- */
+/* The selection's ONE shared handle (App's GroupRotateGrip, a <ReactFlow>
+   child) — SEL-CHROME-B (t_edb37ea1), geometry reused verbatim from variant B
+   of docs/sketches/lock-chrome-options.html: a PILL of 24px controls.
+   SEL-CHROME-UNIFY (t_e479c12d, 2026-11-19): the SAME pill serves a sole
+   selection and a multi-selection — slot order [rotate][group|ungroup][lock] (PILL-ORDER t_1270c161),
+   the group verb a swap that never widens the pill past three controls. left/top are set inline by the component (screen-space coords
+   INSIDE .react-flow__renderer), so this rule positions it absolutely against
+   the renderer and centres it on the box's top edge with ONE transform —
+   translate(-50%, 0): the component computes the CENTRE, the CSS takes the half
+   width. Screen-px constant: 58×30 with two controls, 86×30 with three
+   (2px padding + 1px border + 24px controls + 4px gaps) — the component's
+   SEL_HANDLE table and this rule must be edited together. z-index 1000:
+   above node chrome (the connect points' 5), below modals — one rung
+   above the per-node ladder, which retired with the per-card grip. */
 .ds-group-rotate-grip {
   position: absolute;
   transform: translate(-50%, 0);
-  width: 18px; height: 18px;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  border: 1px solid var(--sel);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   background: var(--surface);
-  color: var(--sel);
-  cursor: grab;
+  box-shadow: var(--shadow-toolbar);
   z-index: 1000;
+}
+/* one control language for both buttons — lucide glyphs at 13px in a 24×24 box
+   (the ≤4-control-type rule: the pill carries TWO control types, rotate and
+   lock, and each is the same button). */
+.ds-sel-handle-btn {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
   padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: grab;
 }
-.ds-group-rotate-grip:active { cursor: grabbing; }
-.ds-group-rotate-grip:focus-visible {
-  outline: 2px solid var(--sel);
-  outline-offset: 2px;
-}
+.ds-sel-handle-btn:hover, .ds-sel-handle-btn:focus-visible { background: var(--sel-soft); color: var(--sel); outline: none; }
+.ds-sel-handle-btn:active { cursor: grabbing; }
+.ds-sel-handle-btn:focus-visible { box-shadow: 0 0 0 2px var(--sel); }
 
 /* ---------- ROUND SELBOX (2026-10-27): the rotation-aware selection box ---- *
  *
@@ -5689,7 +5943,14 @@ kbd {
  * its focusability and — critically — its `pointer-events: all` hit target,
  * so RF's GROUP DRAG (grab the box, move the whole selection) and its
  * arrow-key nudge keep working exactly as before. Only the stale dashed
- * paint is gone. */
+ * paint is gone.
+ *
+ * GROUP-GAP-DRAG CORRECTION (t_10563e73, measured 2026-11-19): the hit-target
+ * claim above is FALSE — visibility:hidden removes an element from
+ * hit-testing entirely (a hidden element is never a pointer target), so the
+ * rect has owned no drag since the day this rule landed. That is the owner's
+ * "pressing the gap drops the selection" defect. The gap surface now lives in
+ * GroupGapDrag.tsx (below); this rule still hides RF's stale paint and stays. */
 .ds-flow-wrap .react-flow__nodesselection-rect {
   visibility: hidden; /* 2026-10-27 SELBOX: RF's box lags rotated shapes; the app's .ds-selection-box paints instead */
 }
@@ -5705,6 +5966,28 @@ kbd {
   pointer-events: none;
   background: var(--sel-soft);
   border: 1px dotted var(--sel);
+}
+/* GROUP-BOUNDARY-INSIDE (t_42fb2888): the QUIET boundary while INSIDE a logical group — the selection
+   box's dotted `--sel` vocabulary at reduced weight, NO fill; dotted keeps it distinct from a FRAME's
+   dashed border. Paint-only, flow coordinates, nothing persisted. */
+.ds-group-ctx-box {
+  position: absolute;
+  pointer-events: none;
+  background: none;
+  border: 1px dotted var(--sel);
+  opacity: 0.45;
+}
+
+/* 2026-11-16 GROUP-SELECTION (t_d2a66b62, defect c): the LOGICAL group's
+   wrapper spans its members' whole bbox, and RF sets pointer-events:'all'
+   INLINE on every node wrapper — so a click on the EMPTY space between
+   members landed on the invisible container and selected the whole block.
+   A logical group has no shape of its own: make its wrapper transparent to
+   the pointer (!important is required to beat RF's inline style). Member
+   clicks, the member/rect group drag and the dashed box are untouched;
+   the palette FRAME (type goblin, react-flow__node-goblin) is NOT matched. */
+.ds-flow-wrap .react-flow__node.react-flow__node-group {
+  pointer-events: none !important;
 }
 
 /* ===========================================================================
@@ -5757,3 +6040,305 @@ kbd {
    place). The same `:has()` coupling the toolbar uses fixes it here — the tip
    follows the toolbar down instead of needing a second state flag. */
 .canvas-wrap:has(.ds-share-banner) .tip-toast { top: 114px; }
+
+/* ==========================================================================
+   UNISURF-S3 (SPEC-UNIFIED-SURFACE §2/§9 step 3, 2026-11-08) — the code pane.
+   A docked RIGHT-side sibling column of the canvas INSIDE .canvas-wrap — not
+   a .app grid column: .app already transitions grid-template-columns for the
+   docked-panel resize, and a pane column there would inherit that transition,
+   the one thing the rail must never carry. .canvas-wrap becomes a two-column
+   grid instead: canvas minmax(0,1fr) + pane auto. `transition: none` is
+   EXPLICIT on the pane (a width transition freezes in an unfocused tab and
+   makes every measurement of it a lie — spec §2, prototype #d-code line 80).
+   ========================================================================== */
+.canvas-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+}
+.canvas-wrap > .react-flow { min-width: 0; }
+/* The code pane (RAIL-CONTEXT, t_766c544c): mounted ONLY while open — there is
+   no closed rail any more, so no width is declared for a non-.open pane. The
+   textarea is not mounted at all while closed (prototype #d-coderow.rail). */
+.cp-pane {
+  grid-column: 2; grid-row: 1;
+  /* the floating toolbar sits at top 14 + 42px; the pane starts below it */
+  margin-top: 64px;
+  transition: none;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex; flex-direction: column; min-height: 0;
+  position: relative; /* the resize separator is positioned against the pane */
+}
+/* CODE-RAIL-WIDTH (t_b3986041): 380px is only the DECLARED DEFAULT — the live
+   width is user data (`--cp-w`, written by useRailWidth via an inline style).
+   One value, two readers: the pane's column here and the separator's aria-valuenow. */
+.cp-pane.open { width: var(--cp-w, 380px); }
+/* The rail's resize separator, ON its inner edge and strictly INSIDE the pane:
+ * a 6px grab strip in the pane's own left padding. It must not overhang the
+ * canvas — a strip that straddles the border sits at z-index 3 OVER the last few
+ * pixels of the canvas, where it swallows clicks meant for an edge or a card that
+ * ends exactly at the boundary (measured: unisurf-inspector-doors' edge click
+ * landed on the strip). Geometry only, no colour literals. */
+.cp-split {
+  position: absolute; inset-block: 0; left: 0; width: 6px; z-index: 3;
+  cursor: col-resize; touch-action: none;
+}
+.cp-split::after {
+  content: ''; position: absolute; inset-block: 0; left: 0; width: 2px;
+  background: var(--border);
+}
+.cp-split:hover::after, .cp-split.dragging::after { background: var(--sel); }
+.cp-split:focus-visible { outline: none; }
+.cp-split:focus-visible::after { background: var(--sel); box-shadow: 0 0 0 2px var(--sel); }
+.cp-head {
+  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  border-bottom: 1px solid var(--border); color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: 0.06em;
+}
+.cp-fold {
+  margin-left: auto; border: 0; background: transparent; color: var(--dim);
+  cursor: pointer; border-radius: 6px; display: grid; place-items: center;
+  width: 22px; height: 22px;
+}
+.cp-fold:hover, .cp-fold:focus-visible { color: var(--fg); background: var(--elevated); }
+/* Read-only mirror (S3): the textarea is a VIEW — monospace, no resize grip,
+   pre-wrap off so the generated line structure is what you read. */
+.cp-code {
+  flex: 1; min-height: 0; resize: none; border: 0; outline: none;
+  background: transparent; color: var(--fg); font-family: var(--mono);
+  font-size: var(--fs-sm); line-height: 1.5; padding: 10px 12px;
+  white-space: pre; overflow: auto;
+}
+
+/* UNISURF-S4 (SPEC-UNIFIED-SURFACE §4, 2026-11-08) — the stale surfaces.
+ * The banner lives ON the canvas (grid column 1 of .canvas-wrap, absolutely
+ * positioned over it — the canvas must say ITSELF that it shows the last
+ * valid model); the error bar lives in the pane; the card outline + row
+ * marker land on the offending table (marks are render-only, never saved).
+ * No transition anywhere here: the same unfocused-tab rule as the rail. */
+.stale-banner {
+  position: absolute; top: 74px; left: 50%; transform: translateX(-50%);
+  z-index: 30; max-width: min(560px, 60%); pointer-events: none;
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 14px;
+  border: 1px solid var(--border); border-left: 3px solid var(--danger);
+  border-radius: 8px; background: var(--panel); color: var(--fg);
+  font-size: var(--fs-xs); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.stale-banner .stale-t { font-weight: 600; }
+.stale-banner .stale-first { color: var(--danger); font-family: var(--mono); font-size: var(--fs-2xs); }
+.stale-banner .stale-lock { color: var(--dim); font-size: var(--fs-2xs); }
+/* the pane's closed-world error list (every error, capped at 6 in markup). */
+.cp-errors {
+  max-height: 132px; overflow: auto; padding: 6px 10px;
+  border-top: 1px solid var(--danger); background: var(--panel);
+  font-family: var(--mono); font-size: var(--fs-2xs); color: var(--fg);
+}
+.cp-errors .err { padding: 2px 0; white-space: pre-wrap; }
+.cp-errors .err.more { color: var(--dim); }
+/* the offending card + row (render-only marks from App's stale report). */
+.tnode.stale-card { outline: 2px solid var(--danger); outline-offset: 2px; }
+.tnode-col.stale-row { box-shadow: inset 3px 0 0 var(--danger); }
+
+/* UNISURF-S6 (SPEC-UNIFIED-SURFACE §3/§5, 2026-11-08) — the selection bridge:
+ * the `line N ↗` chip in the pane head (canvas → code) and the ONE row the
+ * pane's caret declares (code → canvas). Both are render-only views of bridge
+ * state — never persisted, and no transition (the same unfocused-tab rule). */
+.cp-chip {
+  margin-left: auto; border: 0; background: transparent; cursor: pointer;
+  color: var(--sel); font-family: var(--mono); font-size: var(--fs-2xs);
+  border-radius: 6px; padding: 2px 6px; letter-spacing: 0.04em; white-space: nowrap;
+}
+.cp-chip:hover, .cp-chip:focus-visible { background: var(--elevated); color: var(--fg); }
+.tnode-col.hl { background: color-mix(in srgb, var(--sel) 18%, transparent); box-shadow: inset 3px 0 0 var(--sel); }
+.desc-badge{position:absolute;z-index:6;display:grid;place-items:center;padding:0;border:0;border-radius:4px;background:transparent;color:var(--dim);font-family:inherit;font-weight:600;line-height:1;cursor:pointer;opacity:.55} .desc-badge:hover,.desc-badge:focus-visible{color:var(--acc);opacity:1;outline:none} .desc-badge:focus-visible{box-shadow:0 0 0 2px var(--sel)} .desc-badge-g{display:grid;place-items:center;width:50%;height:50%;font-size:inherit}
+.desc-panel{position:fixed;inset:auto;margin:0;z-index:2000;width:min(420px,40vw);max-height:50vh;overflow:auto;padding:12px 14px;border:1px solid var(--border-strong);border-radius:10px;background:var(--pbg,var(--surface));color:var(--pfg,var(--fg));font-size:var(--fs-md);line-height:1.5;box-shadow:var(--shadow-strong)} .desc-panel-h{margin:0 0 6px;font-size:var(--fs-lg);font-weight:600;outline:none} .desc-panel-body{white-space:pre-line;font-size:var(--fs-sm);color:var(--pfg,var(--fg))} .desc-close{position:absolute;top:7px;right:7px;width:20px;height:20px;display:grid;place-items:center;padding:0;background:transparent;color:var(--pfg,var(--dim));border:1px solid transparent;border-radius:6px;font-family:inherit;font-size:var(--fs-lg);line-height:1;cursor:pointer} .desc-close:hover{color:var(--pfg,var(--fg));border-color:var(--border-strong)} .desc-close:focus-visible{box-shadow:0 0 0 2px var(--sel);color:var(--pfg,var(--fg));outline:none}
+/* LOCK-CHROME (t_63bd6f5d) · SEL-CHROME-B (t_edb37ea1) · SEL-CHROME-UNIFY
+   (t_e479c12d, 2026-11-19): the ONE lock control — a flex CHILD of the
+   selection pill (every selection size; the per-CARD 18px disc retired with
+   the round). No absolute position, 24px square so its hit target matches
+   the controls beside it (the pill owns the layout). The owner overturned
+   "absence is the state" (2026-11-18): the padlock is ALWAYS present —
+   CLOSED + accent when locked (all), OPEN + muted when not (none: outline +
+   dim, the toggle still live), `some` keeps the half-filled glyph + dashed
+   ring so one indicator serves EVERY mix. */
+.ds-lock-chip{position:static;display:grid;place-items:center;padding:0;border:1px solid var(--sel);border-radius:6px;background:var(--sel);color:var(--surface);cursor:pointer;line-height:1} .ds-lock-chip:hover,.ds-lock-chip:focus-visible{background:var(--fg);border-color:var(--fg);color:var(--surface);outline:none} .ds-lock-chip:focus-visible{box-shadow:0 0 0 2px var(--sel)}
+.ds-lock-chip[data-lock-state="none"]{border-color:var(--border-strong);background:transparent;color:var(--dim)}
+.ds-lock-chip[data-lock-state="none"]:hover,.ds-lock-chip[data-lock-state="none"]:focus-visible{color:var(--sel);border-color:var(--sel);background:transparent}
+.ds-lock-chip[data-lock-state="some"]{border-style:dashed;background:var(--surface);color:var(--sel)}
+.ds-lock-chip[data-lock-state="some"]:hover,.ds-lock-chip[data-lock-state="some"]:focus-visible{background:var(--fg);border-color:var(--fg);color:var(--surface)}
+/* GROUP-LOGICAL (t_eb8fab7e): React Flow's builtin `group` node type paints its
+   own theme card (style.css: padding 10px, width 150px, background, border,
+   hover/selected shadows). The LOGICAL group is an invisible container —
+   members and the selection ring carry every pixel it needs. Kill the card;
+   the inline style width/height stays RF's measured box (padding:0 is
+   load-bearing: the wrapper must measure exactly its declared box). */
+.react-flow__node-group,
+.react-flow__node-group.selectable:hover,
+.react-flow__node-group.selectable.selected {
+  width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* GROUP-GAP-DRAG (t_10563e73, 2026-11-19): the selected block's invisible
+   drag surface (components/GroupGapDrag.tsx) — pixel-identical to the painted
+   frame by construction (the same frameOf + BOUNDARY_PAD), rendered in RF's
+   ViewportPortal. z-index:-1 puts it BELOW every node wrapper inside the
+   viewport's stacking context (transform), so member cards still win
+   hit-testing, while it stays ABOVE the pane — a gap press is the block's.
+   `touch-action: none` so a touch drag moves the block instead of scrolling. */
+.ds-flow-wrap .ds-group-gap-hit {
+  position: absolute;
+  z-index: -1;
+  /* RF's .react-flow__viewport sets pointer-events:none — every hit surface
+     inside it must re-enable its own (the node wrappers do the same). */
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.ds-flow-wrap .ds-group-gap-hit:active {
+  cursor: grabbing;
+}
+
+/* ==========================================================================
+   HISTORY-V3 (t_37f23a89) — the version-history LEDGER dialog (`.hd-*`).
+   It REUSES the vocabulary it was asked to reuse, not a new one: the search
+   palette's `.sp-overlay` scrim + `.sp-card` card (the base still owns the
+   `max-width: calc(100% - 48px)` that keeps the 420px card inside a phone),
+   and the board dialog's `.bd-head` / `.bd-title` / `.bd-sub` / `.bd-x` /
+   `.bd-btn.primary` head + orange-Restore family verbatim. The only new
+   names are the ones this dialog alone needs: the ledger rows, the badge
+   chips, the label edit, and the restore bar pinned under the list.
+   TOKENS ONLY — no literal colour in this block; the palette is
+   --surface / --elevated / --border / --border-strong / --acc /
+   --danger / --on-acc / --dim / --dim2 / --fg / --shadow-pop, and the radii
+   are the ones the .bd- family already uses (12px card / 8px row / 7px
+   field). */
+.hd-card { width: 420px; max-height: calc(100vh - 64px); }
+.hd-head-txt { min-width: 0; }
+.hd-head-txt .bd-title { overflow-wrap: anywhere; }
+/* HISTORY-STABLE (D4, 2026-11-20): one muted explainer line under the
+   "N of 28 versions" count — the three numbers are interpolated in the JSX
+   from historyPolicy.ts, the one home. */
+.hd-exp { margin: 2px 0 0; color: var(--dim); font-size: var(--fs-sm); line-height: 1.45; }
+.hd-list {
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto; min-height: 110px; max-height: 320px;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px; background: var(--elevated);
+}
+.hd-empty { margin: 8px 6px; color: var(--dim); font-size: var(--fs-sm); }
+.hd-empty.hd-err { color: var(--danger); }
+.hd-row { position: relative; display: flex; align-items: stretch; gap: 6px; }
+.hd-row-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; padding-right: 44px; border-radius: 8px; text-align: left;
+  background: transparent; border: 1px solid transparent; color: var(--fg);
+}
+.hd-row-main:hover { background: var(--elevated); border-color: transparent; }
+.hd-row.sel .hd-row-main {
+  background: color-mix(in srgb, var(--acc) 6%, var(--elevated));
+  border-color: color-mix(in srgb, var(--acc) 35%, var(--border));
+}
+/* HISTORY-CHIPS (t_b580d7c5): hover paints the row's own card surface with NO
+   border; selection is the ONLY accent-mixed state (6% wash + 35% rim) — the
+   two states are different PROPERTIES, never one hue apart. */
+.hd-time {
+  color: var(--dim); font-size: var(--fs-sm); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  width: 98px; flex: none; overflow: hidden; text-overflow: ellipsis;
+}
+/* the time column is a CONSTANT so the chips left-align down the ledger: 98px
+   holds the widest real relTime form ("Wed Sep 30 23:59" = 96.7px at 11px Inter,
+   measured live 2026-11-20) — the ellipsis is a safety net, never a visible clip. */
+.hd-size { color: var(--dim2); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; margin-left: auto; white-space: nowrap; }
+.hd-badge {
+  display: inline-flex; align-items: center; font-size: var(--fs-sm);
+  line-height: 18px; padding: 0 8px; border-radius: 6px;
+  border: 1px solid var(--border); color: var(--dim); background: var(--surface);
+  letter-spacing: .02em; text-transform: lowercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;
+}
+/* HISTORY-CHIPS: ONE filled system — 11px lowercase text, 20px tall (18px line +
+   2px border under global border-box), surface fill, 6px radius; the kind only
+   changes the ink. No emoji: the pin glyph duplicated the pin BUTTON. */
+.hd-badge-pinned {
+  background: color-mix(in srgb, var(--acc) 10%, var(--elevated));
+  border-color: color-mix(in srgb, var(--acc) 30%, var(--border));
+  color: var(--acc);
+}
+/* HISTORY-STABLE (D5, 2026-11-20): the private 120px label-width cap is gone
+   with the name — the kept chip is a fixed word under the base 130px cap. */
+.hd-badge-restore { border-color: var(--border-strong); color: var(--fg); }
+.hd-badge-daily { background: var(--surface); color: var(--dim); }
+.hd-badge-auto { opacity: .75; }
+.hd-act {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; gap: 4px;
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+.hd-row:hover .hd-act,
+.hd-row:focus-within .hd-act,
+.hd-row.sel .hd-act { opacity: 1; pointer-events: auto; }
+/* acts appear on demand — hover, keyboard (focus-within), and the selected
+   row. HISTORY-STABLE (D3, 2026-11-20): the act is ABSOLUTELY positioned
+   inside the relative .hd-row, and every row reserves the same constant
+   44px right gutter, so the size column lands on one x on every row — the
+   old inline act pushed the selected row's size text ~52px left (the
+   owner's "các column nếu đổi tên sẽ bị lệch"). */
+.hd-icon-btn {
+  display: grid; place-items: center; width: 26px; border-radius: 7px;
+  background: transparent; border: 1px solid transparent; color: var(--dim);
+}
+.hd-icon-btn:hover { background: var(--surface); border-color: var(--border); color: var(--fg); }
+.hd-icon-btn[disabled] { opacity: .4; cursor: not-allowed; }
+/* the inline label-editor rule block is deleted (HISTORY-STABLE D5,
+   2026-11-20): the editor is gone with the naming feature the owner retired
+   ("tôi nghĩ k cần đặt tên"). The act gutter it used to occupy is the
+   constant reserved by D3 above. */
+/* HISTORY-STABLE (D1, 2026-11-20): the preview box is permanently rendered
+   with a FIXED height — its CONTENTS swap in place (the version's own layout
+   thumbnail when one is selected, the empty-state sentence when not), so a
+   selection can never grow the card, re-bucket the list above, or re-centre
+   the dialog. 74px = the 54px thumbnail inside an 8px pad + 1px border
+   (54 + 16 + 2 = 72, rounded up) and `flex: 0 0 auto` so the dialog's column
+   can never shrink the reserved box back into an overflow. */
+.hd-prev {
+  display: flex; align-items: center; flex: 0 0 auto; height: 74px; margin-top: 8px;
+  padding: 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--elevated); overflow: hidden;
+}
+/* ORCHESTRATOR FINDING (2026-11-20, live probe): the box said 66px but computed
+   40px — it is a flex child of the dialog's column, so `flex-shrink: 1` squeezed
+   the RESERVED box to 40px while the 54px thumbnail stayed 54px, overflowing 14px
+   above and below (top 290 < box top 297). A reserved box must not be allowed to
+   shrink: `flex: 0 0 auto` + a height that fits the 54px thumb in a 8px-padded,
+   1px-bordered content box (54 + 16 + 2 = 72, rounded to 74). */
+.hd-prev-empty { color: var(--dim2); font-size: var(--fs-sm); }
+.hd-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  border-top: 1px solid var(--border); padding-top: 10px; margin-top: 2px;
+}
+/* HISTORY-STABLE (D2, 2026-11-20): the bar is ONE line — the note never
+   wraps (nowrap + ellipsis instead of the old overflow-wrap: anywhere that
+   stranded the colon), and Restore is flex-shrink: 0 below. */
+.hd-note {
+  color: var(--dim); min-width: 0; flex: 1; font-size: var(--fs-sm);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hd-note b { color: var(--fg); }
+.hd-count { font-variant-numeric: tabular-nums; }
+.hd-err-txt { color: var(--danger); font-size: var(--fs-sm); }
+.hd-thumb rect { fill: var(--elevated); stroke: var(--dim2); }
+.hd-thumb line { stroke: var(--border-strong); }
+.hd-restore { flex-shrink: 0; }
+.bd-btn.primary.hd-restore[disabled] {
+  background: var(--elevated); border-color: var(--border-strong);
+  color: var(--dim2); opacity: 1;
+}
+/* the disabled Restore reads as a quiet ghost on the bar — never a filled accent
+   button pretending to be pressable. opacity:1 overrides the .bd-btn family's
+   .45 wash, which would blur these three tokens back into "broken-looking". */

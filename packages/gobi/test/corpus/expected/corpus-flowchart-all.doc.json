@@ -1,0 +1,440 @@
+{
+  "docVersion": 1,
+  "name": "Every flowchart kind in one walk",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "prep",
+      "kind": "preparation",
+      "label": "Initialise",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "s",
+      "kind": "terminator",
+      "label": "Start",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 360,
+        "y": 0
+      }
+    },
+    {
+      "id": "p",
+      "kind": "process",
+      "label": "Process",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 720,
+        "y": 0
+      }
+    },
+    {
+      "id": "d",
+      "kind": "decision",
+      "label": "valid?",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1080,
+        "y": 0
+      }
+    },
+    {
+      "id": "io",
+      "kind": "io",
+      "label": "read input",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1440,
+        "y": 0
+      }
+    },
+    {
+      "id": "doc",
+      "kind": "document",
+      "label": "Report",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 1800,
+        "y": 0
+      }
+    },
+    {
+      "id": "sub",
+      "kind": "subprocess",
+      "label": "Subprocess",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 2160,
+        "y": 0
+      }
+    },
+    {
+      "id": "man",
+      "kind": "manual",
+      "label": "Manual step",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 2520,
+        "y": 0
+      }
+    },
+    {
+      "id": "wait",
+      "kind": "delay",
+      "label": "Wait",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 2880,
+        "y": 0
+      }
+    },
+    {
+      "id": "conn",
+      "kind": "connector",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 152,
+        "h": 152
+      },
+      "position": {
+        "x": 3240,
+        "y": 0
+      }
+    },
+    {
+      "id": "off",
+      "kind": "offpage",
+      "label": "Off page",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 3462,
+        "y": 0
+      }
+    },
+    {
+      "id": "mi",
+      "kind": "manualinput",
+      "label": "Manual input",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 3822,
+        "y": 0
+      }
+    },
+    {
+      "id": "disp",
+      "kind": "display",
+      "label": "Show result",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 4182,
+        "y": 0
+      }
+    },
+    {
+      "id": "sd",
+      "kind": "storeddata",
+      "label": "Stored data",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 4542,
+        "y": 0
+      }
+    },
+    {
+      "id": "ll",
+      "kind": "looplimit",
+      "label": "Loop",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 4902,
+        "y": 0
+      }
+    },
+    {
+      "id": "is",
+      "kind": "internalstorage",
+      "label": "In memory",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 5262,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "prep",
+      "to": "s",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "s",
+      "to": "p",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "p",
+      "to": "d",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e4",
+      "from": "d",
+      "to": "io",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "yes",
+      "dash": "solid"
+    },
+    {
+      "id": "e5",
+      "from": "io",
+      "to": "doc",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e6",
+      "from": "doc",
+      "to": "sub",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e7",
+      "from": "sub",
+      "to": "man",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e8",
+      "from": "man",
+      "to": "wait",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e9",
+      "from": "wait",
+      "to": "conn",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e10",
+      "from": "conn",
+      "to": "off",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e11",
+      "from": "off",
+      "to": "mi",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e12",
+      "from": "mi",
+      "to": "disp",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e13",
+      "from": "disp",
+      "to": "sd",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e14",
+      "from": "sd",
+      "to": "ll",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e15",
+      "from": "ll",
+      "to": "is",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e16",
+      "from": "is",
+      "to": "p",
+      "fromHandle": "top",
+      "toHandle": "top",
+      "label": "again",
+      "dash": "solid",
+      "labelOffset": {
+        "x": 0,
+        "y": -20.4025
+      }
+    },
+    {
+      "id": "e17",
+      "from": "d",
+      "to": "prep",
+      "fromHandle": "bottom",
+      "toHandle": "bottom",
+      "label": "no",
+      "dash": "solid"
+    }
+  ]
+}

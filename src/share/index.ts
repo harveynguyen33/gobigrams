@@ -2,7 +2,7 @@
  * law: one index the doors import). The codec is PURE (no DOM writes, no
  * React); the URL helpers below only READ location, so Node harnesses can
  * still import this file wholesale. */
-import type {BoardDoc} from '../boards';
+import type {BoardDoc} from '../board/boards';
 import {SHARE_VERSION, type ShareDecode, type ShareEncode} from './shareTypes';
 import {encodeShare, decodeShare} from './shareCodec';
 

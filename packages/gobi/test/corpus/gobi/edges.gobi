@@ -1,0 +1,19 @@
+board "Edge vocabulary"
+a = service "A"
+b = service "B"
+c = service "C"
+d = service "D"
+e = service "E"
+f = service "F"
+g = service "G"
+a -> b "solid labelled"
+b ..> c "dashed"
+c -.> d "dotted"
+a ..> b solid
+d -> e flow:dots
+e -> f flow:icon flowIcon:mail flowCount:3
+a -> b "many" x3
+b -> c techn:"JDBC"
+a -> a "self"
+c -> c
+b -> a

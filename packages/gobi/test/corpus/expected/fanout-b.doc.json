@@ -1,0 +1,188 @@
+{
+  "docVersion": 1,
+  "name": "Consumer group protocol",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "gw",
+      "kind": "actor",
+      "label": "client gateway",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "topic",
+      "kind": "queue",
+      "label": "events",
+      "sub": "3 partitions",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 364,
+        "y": 0
+      }
+    },
+    {
+      "id": "grp",
+      "kind": "group",
+      "label": "consumer group v1",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 370,
+        "h": 591
+      },
+      "position": {
+        "x": 728,
+        "y": 0
+      }
+    },
+    {
+      "id": "c1",
+      "kind": "service",
+      "label": "consumer-1",
+      "sub": "P0 · P1",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "grp"
+    },
+    {
+      "id": "coord",
+      "kind": "service",
+      "label": "group coordinator",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 237
+      },
+      "parent": "grp"
+    },
+    {
+      "id": "c2",
+      "kind": "service",
+      "label": "consumer-2",
+      "sub": "P2",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 406
+      },
+      "parent": "grp"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "gw",
+      "to": "topic",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "publish",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "topic",
+      "to": "c1",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "P0 · P1",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -21.100000000000023,
+        "y": 0
+      }
+    },
+    {
+      "id": "e3",
+      "from": "topic",
+      "to": "c2",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "P2",
+      "dash": "solid",
+      "labelOffset": {
+        "x": -4.600000000000023,
+        "y": 0
+      }
+    },
+    {
+      "id": "e4",
+      "from": "coord",
+      "to": "c1",
+      "fromHandle": "top",
+      "toHandle": "bottom",
+      "label": "assignment",
+      "dash": "dashed"
+    },
+    {
+      "id": "e5",
+      "from": "c1",
+      "to": "coord",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "heartbeat",
+      "dash": "dashed",
+      "labelOffset": {
+        "x": 91.7,
+        "y": 0
+      }
+    },
+    {
+      "id": "e6",
+      "from": "c2",
+      "to": "coord",
+      "fromHandle": "top",
+      "toHandle": "bottom",
+      "label": "heartbeat",
+      "dash": "dashed"
+    }
+  ]
+}

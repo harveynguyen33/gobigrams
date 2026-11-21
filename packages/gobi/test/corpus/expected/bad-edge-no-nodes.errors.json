@@ -1,0 +1,22 @@
+[
+  {
+    "line": 1,
+    "col": 1,
+    "message": "edge mentions \"a\", which is never declared. Declare it first: a = service \"…\""
+  },
+  {
+    "line": 1,
+    "col": 6,
+    "message": "edge mentions \"b\", which is never declared. Declare it first: b = service \"…\""
+  },
+  {
+    "line": 2,
+    "col": 1,
+    "message": "edge mentions \"b\", which is never declared. Declare it first: b = service \"…\""
+  },
+  {
+    "line": 2,
+    "col": 6,
+    "message": "edge mentions \"a\", which is never declared. Declare it first: a = service \"…\""
+  }
+]

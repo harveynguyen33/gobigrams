@@ -1,0 +1,92 @@
+{
+  "id": "corpus-comments",
+  "name": "Comment handling",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "A",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "b",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 298
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "B",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "a",
+      "target": "b",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "label # not comment",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

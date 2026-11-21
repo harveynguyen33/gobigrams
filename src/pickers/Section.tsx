@@ -2,7 +2,7 @@
    verbatim, 2026-10-25 along the section banners the file declares).
    src/InspectorPickers.tsx re-exports the union, so no importer changes. */
 import {useId, type ReactNode} from 'react';
-import type {SectionId} from '../inspector';
+import type {SectionId} from '../canvas/inspector';
 
 /* ===========================================================================
    Section — the section wrapper for the ordered render.

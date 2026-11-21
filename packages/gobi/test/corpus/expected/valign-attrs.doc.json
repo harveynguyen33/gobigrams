@@ -1,0 +1,150 @@
+{
+  "docVersion": 1,
+  "name": "Alignment attributes",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "left",
+      "kind": "service",
+      "label": "Left top",
+      "body": "label-only",
+      "textStyle": {
+        "align": "left",
+        "vAlign": "top"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -715,
+        "y": 0
+      }
+    },
+    {
+      "id": "mid",
+      "kind": "service",
+      "label": "Centre middle",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 231
+      }
+    },
+    {
+      "id": "right",
+      "kind": "service",
+      "label": "Right bottom",
+      "body": "label-only",
+      "textStyle": {
+        "align": "right",
+        "vAlign": "bottom"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 437
+      }
+    },
+    {
+      "id": "memo",
+      "kind": "note",
+      "label": "Note bottom",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "bottom"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -570,
+        "y": 643
+      }
+    },
+    {
+      "id": "cap",
+      "kind": "text",
+      "label": "Caption left",
+      "textStyle": {
+        "align": "left",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -320,
+        "y": 643
+      }
+    },
+    {
+      "id": "tb",
+      "kind": "table",
+      "label": "t",
+      "color": "cyan",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        }
+      ],
+      "size": {
+        "w": 250,
+        "h": 170
+      },
+      "position": {
+        "x": -70,
+        "y": 643
+      }
+    },
+    {
+      "id": "tb2",
+      "kind": "table",
+      "label": "t2",
+      "color": "cyan",
+      "columns": [],
+      "size": {
+        "w": 250,
+        "h": 170
+      },
+      "position": {
+        "x": 250,
+        "y": 643
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "left",
+      "to": "mid",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "label",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "mid",
+      "to": "right",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid"
+    }
+  ]
+}

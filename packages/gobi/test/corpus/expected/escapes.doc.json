@@ -1,0 +1,45 @@
+{
+  "docVersion": 1,
+  "name": "Escapes",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "He said \"hi\" \\ twice",
+      "sub": "escaped \" quote",
+      "body": "card",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -360,
+        "y": 169
+      }
+    },
+    {
+      "id": "b",
+      "kind": "service",
+      "label": "hash # inside is not a comment",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 169
+      }
+    }
+  ],
+  "edges": []
+}

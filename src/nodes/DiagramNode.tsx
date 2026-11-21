@@ -1,11 +1,13 @@
-import {memo, useCallback, useEffect, useRef} from 'react';
+import {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
-import {lucideByName} from '../lucideIcons';
+/* LOCK-CHROME (t_63bd6f5d): the per-card padlock is GONE — the indicator
+ * lives on the selection chrome (components/LockChip via NodeChrome). */
+import {lucideByName} from '../theme/lucideIcons';
 import {asShape, ShapeFrame, type Shape as NodeShape} from './shapes';
-import {resolveColor, type ColorKey} from '../colors';
-import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
-import {paintRotation, rotateTransform} from '../rotation';
-import {RotateGrip} from '../components/RotateGrip';
+import {resolveColor, type ColorKey} from '../theme/colors';
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../layout/textStyle';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
+import {InlineTitle} from '../components/InlineTitle';
 import {SHAPE_MIN_PX} from './customShape';
 
 /** Shapes that are resizable — I5: every shape in SHAPES can be resized in
@@ -142,57 +144,13 @@ export function resizeFloorsFor(shape: NodeShape, naturalW: number, naturalH: nu
   };
 }
 
-/** L3a: handle orientation. A flowchart reads top-to-bottom, and a diamond with
- *  only left/right ports physically cannot express "Yes ↓ / No →". */
-export type HandleMode = 'lr' | 'tb';
-
-export type NodeKind = {
-  kicker: string;
-  title: string;
-  sub?: string;
-  metric?: string;
-  metricUnit?: string;
-  /** kebab-case lucide icon name ("server") or a raw unicode glyph ("◆"). */
-  icon?: string;
-  /** Symbolic accent key — resolved per theme at render time (L1). */
-  colorKey?: ColorKey;
-  /** Literal user-typed hex (the "custom…" escape hatch). Keys win. */
-  color?: string;
-  /** Architectural shape — generic notation, not a use case. */
-  shape?: string;
-  /** ROUND ROTATE — geometry rotation in degrees, normalised (-180, 180].
-   *  OPTIONAL: absent = 0, and boards from before this round render
-   *  byte-identically (no migration needed — see boardMigrations.ts).
-   *  The K5 post-it tilt is NOT stored here; paintRotation adds it. */
-  rotation?: number;
-  /** ROUND ROTATE — App's gesture writer, threaded per-node (selected only). */
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node (the
-   *  per-node grip is guarded to a single selection; multi gets the shared
-   *  GroupRotateGrip at App level instead). */
-  __rotateSel?: boolean;
-  /** L3a: 'tb' renders Top(target)/Bottom(source) ports instead of Left/Right. */
-  handles?: HandleMode;
-  /** L3a: 'label-only' renders one centered sentence, no kicker/sub/metric. */
-  body?: 'card' | 'label-only';
-  /** L3b: C4 element type — drives kicker/colour on the preset palette. */
-  c4Type?: string;
-  /** L3b: C4 relationship technology, rendered dim after the edge label. */
-  techn?: string;
-  /** PACKAGE-P §E.2 — the Text section's stored style. OPTIONAL and every field
-   *  optional: a board that predates the section has none, and `textStyleVars`
-   *  returns `{}` for it, so such a node renders byte-for-byte as it always
-   *  did. Nothing here is a size in px — see `src/textStyle.ts` for why `size`
-   *  is a SCALE. */
-  textStyle?: TextStyle;
-  /** HARVEY 2026-10-14 — drop the two inner arcs on a cylinder (database /
-      storeddata), leaving a bare drum. OPTIONAL: absent keeps the arcs, so a
-      board from before this field renders byte-identical. */
-  plainCylinder?: boolean;
-  /** AQ15 — auto-grow: called once fonts/measure settle if the body clips;
-      App grows the node's height (the same write a manual resize performs). */
-  __onGrow?: (id: string, height: number, width?: number) => void;
-};
+/* CORE-STEP4A-FIX — HandleMode + NodeKind moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts): the palette/presets need the data
+ * shapes and the package must not import a React component file. Re-exported
+ * so every existing importer (`import DiagramNode, {type NodeKind}`) is
+ * unchanged. */
+export type {HandleMode, NodeKind} from '../../packages/gobi/src/model/nodeData';
+import type {NodeKind} from '../../packages/gobi/src/model/nodeData';
 
 /* ITEM 2 (2026-09-17) — THE AUTO-SHOW NODE TOOLBAR IS GONE.
 
@@ -295,7 +253,7 @@ function NodeHandles({nodeId}: {nodeId: string}) {
   );
 }
 
-const Node = memo(({id, data, selected}: NodeProps) => {
+const Node = memo(({id, data, selected, width, height}: NodeProps) => {
   const d = data as unknown as NodeKind;
   const shape = asShape(d.shape);
   const nc = resolveColor(d);
@@ -483,7 +441,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      ROUND BF — the derivation moved into `resizeFloorsFor` (per-class floors);
      this call site passes the same refs. */
   const floors = resizeFloorsFor(shape, naturalWRef.current, naturalHRef.current);
-  const resizer = selected && RESIZABLE.has(shape) ? (
+  /* LOCK-CHROME (t_63bd6f5d): the card no longer draws a padlock — a locked,
+   * selected node shows one on the SELECTION chrome (LockChip in NodeChrome). */
+  /* BADGE-ON-SELECT: review mode now allows sole selection (the desc badge
+     reveals through it) — the resizer stays OFF there via the injected
+     `__review` token (UNISURF-S4's "no resize handle can appear"). NOT the
+     `readOnly` token: under the STALE lock the handles must stay on screen
+     and the seam refuses the write (unisurf-lock-seam C2a's contract). */
+  const resizer = selected && !(d as {__review?: boolean}).__review && !(d as any).__locked && RESIZABLE.has(shape) ? (
     <NodeResizer
       minWidth={floors.w}
       minHeight={floors.h}
@@ -534,14 +499,46 @@ const Node = memo(({id, data, selected}: NodeProps) => {
      `style={{'--nc': nc, ...tsVars}` literal every renderer uses is kept. */
   const rotT = rotateTransform(paintRotation(d as {rotation?: number; shape?: string}));
   if (rotT) (tsVars as Record<string, string>).transform = rotT;
-  /* ROUND ROTATE — the grip, ABOVE the top resize grip. GROUP-ROTATE: the
-     sole-selection token (`__rotateSel`, injected by App only when the
-     selection is EXACTLY this node) guards it — a multi-selection renders
-     NO per-node grips; the ONE shared grip is App's GroupRotateGrip. */
-  const grip = selected && d.__rotateSel && d.__rotate ? (
-    <RotateGrip nodeId={id} rotation={(d.rotation as number | undefined) ?? 0}
-      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+  /* CHROME-ABOVE (t_31a9bec9, 2026-11-13): the rotate grip and the desc
+     badge no longer mount in the node subtree — a node is ONE stacking
+     context, so a higher-z neighbour covered them (measured red,
+     unisurf-chrome-layer C1). Both now render in App's NodeChrome, a
+     popover host in the browser's TOP LAYER, from the same local CSS. */
+
+  /* INLINE-TITLE (t_cb9335df) — the in-place title editor for this kind.
+     Armed two ways: the TITLE ELEMENT's own onDoubleClick (the handler lives
+     on the title div itself, so a double-click on a handle, a resize grip or
+     the desc badge — all SIBLINGS, never children of the title — cannot reach
+     it; the handle keeps its auto-connect meaning), and App's F2 token
+     `__editTitle`, render-injected into the selected node's data exactly like
+     `__rotate` (never written into nodes state, never persisted). The commit
+     writer `onCommitTitle` rides the same injection; an empty commit never
+     reaches it (the caller reverts instead — a card with no title is not a
+     valid state). TABLE nodes are out of scope by the card's own decision. */
+  const [editTitle, setEditTitle] = useState(false);
+  useEffect(() => { if ((d as any).__editTitle) setEditTitle(true); }, [(d as any).__editTitle]);
+  const openTitleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    /* Review/stale lock: `readOnly` is injected only while SELECTED, but a
+       double-click can land on an unselected node too — the flow WRAPPER
+       carries .ds-read-only for the whole lock, so the ancestor check covers
+       the unselected case (the inert-editor hole). */
+    if ((d as any).readOnly || e.currentTarget.closest('.ds-read-only')) return;
+    setEditTitle(true);
+  };
+  const titleEdit = editTitle ? (
+    <InlineTitle
+      key={String((d as any).__editTitle ?? 'dbl')}
+      value={d.title ?? ''}
+      onCommit={v => { setEditTitle(false); if (v.trim()) (d as any).onCommitTitle?.(id, v); }}
+      onCancel={() => setEditTitle(false)}
+    />
   ) : null;
+  /* EDIT-BALANCE (t_864a8e0c): while editing, the title ROW fills its layout
+     band — .lo-title is a column-flex child that SHRINKS to the old title's
+     text (Harvey's ~25px editor in a big circle) — stretched to 100% (a no-op
+     for block rows), 80px floor. The CARD never reflows (W3): definite band. */
+  const editRowStyle: React.CSSProperties | undefined = editTitle ? {position: 'relative', width: '100%', minWidth: 80} : undefined;
 
   if (shape === 'note') {
     return (
@@ -550,7 +547,6 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
-        {grip}
         <NodeHandles nodeId={id} />
         {postit}
         {/* ROUND V — the text lives in its own box so the root's border can stay
@@ -558,7 +554,12 @@ const Node = memo(({id, data, selected}: NodeProps) => {
             grips are centred ON that border. */}
         <div className="note-body">
           {d.kicker && <div className="node-kicker">{d.kicker}</div>}
-          {d.title && <div className="note-title">{d.title}</div>}
+          {d.title && (
+            <div className="note-title" onDoubleClick={openTitleEdit} style={editRowStyle}>
+              {d.title}
+              {titleEdit}
+            </div>
+          )}
           {d.sub && <div className="node-sub">{d.sub}</div>}
         </div>
       </div>
@@ -570,7 +571,6 @@ const Node = memo(({id, data, selected}: NodeProps) => {
     return (
       <div className={`group-node${selected ? ' selected' : ''}${d.icon ? ' has-badge' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
         {resizer}
-        {grip}
         <NodeHandles nodeId={id} />
         <div className="group-head" aria-hidden="true" />
         {d.icon && (
@@ -596,14 +596,14 @@ const Node = memo(({id, data, selected}: NodeProps) => {
         style={{'--nc': nc, ...tsVars} as React.CSSProperties}
       >
         {resizer}
-        {grip}
         <NodeHandles nodeId={id} />
         <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
         {postit}
         <div className="node-body lo-body" ref={bodyRef}>
-          <div className="lo-title">
+          <div className="lo-title" onDoubleClick={openTitleEdit} style={editRowStyle}>
             {d.icon && <span className="node-ico"><IconGlyph icon={d.icon} /></span>}
             <span>{d.title}</span>
+            {titleEdit}
           </div>
           {d.sub && <div className="lo-sub">{d.sub}</div>}
         </div>
@@ -617,15 +617,15 @@ const Node = memo(({id, data, selected}: NodeProps) => {
   return (
     <div ref={innerRef} className={`node body-inset shape-${shape}${selected ? ' selected' : ''}`} style={{'--nc': nc, ...tsVars} as React.CSSProperties}>
       {resizer}
-      {grip}
       <NodeHandles nodeId={id} />
       <ShapeFrame shape={shape} plain={d.plainCylinder !== false} />
       {postit}
       <div className="node-body" ref={bodyRef}>
         {d.kicker && <div className="node-kicker">{d.kicker}</div>}
-        <div className="node-title">
+        <div className="node-title" onDoubleClick={openTitleEdit} style={editRowStyle}>
           {d.icon && <span className="node-ico"><IconGlyph icon={d.icon} /></span>}
           <span>{d.title}</span>
+          {titleEdit}
         </div>
         {d.sub && <div className="node-sub">{d.sub}</div>}
         {d.metric && (

@@ -1,0 +1,156 @@
+{
+  "id": "corpus-groups-nesting",
+  "name": "Groups nesting",
+  "nodes": [
+    {
+      "id": "cluster",
+      "type": "goblin",
+      "position": {
+        "x": -245,
+        "y": 224
+      },
+      "width": 1078,
+      "height": 333,
+      "style": {
+        "width": 1078,
+        "height": 333
+      },
+      "data": {
+        "shape": "group",
+        "kicker": "boundary",
+        "title": "Cluster",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "consumers",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "width": 684,
+      "height": 253,
+      "style": {
+        "width": 684,
+        "height": 253
+      },
+      "data": {
+        "shape": "group",
+        "kicker": "boundary",
+        "title": "Consumers",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "cluster"
+    },
+    {
+      "id": "orders",
+      "type": "goblin",
+      "position": {
+        "x": 748,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "database",
+        "kicker": "database",
+        "title": "orders",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "database",
+        "colorKey": "violet",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "cluster"
+    },
+    {
+      "id": "c1",
+      "type": "goblin",
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "C1",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "consumers"
+    },
+    {
+      "id": "c2",
+      "type": "goblin",
+      "position": {
+        "x": 354,
+        "y": 68
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "C2",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      },
+      "parentId": "consumers"
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

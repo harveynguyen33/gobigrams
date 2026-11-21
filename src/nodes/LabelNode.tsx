@@ -1,9 +1,7 @@
 import {memo, useEffect, useRef, useState} from 'react';
 import {NodeResizer, type NodeProps} from '@xyflow/react';
-import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../textStyle';
-import {paintRotation, rotateTransform} from '../rotation';
-import {RotateGrip} from '../components/RotateGrip';
-
+import {textStyleVars, alignForBody, vAlignForBody, type TextStyle} from '../layout/textStyle';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
 /* ITEM 2b (2026-09-18) — THE AUTO-SHOW NODE TOOLBAR IS GONE FROM THIS KIND TOO.
 
    `src/nodes/DiagramNode.tsx` documents the removal in full (its header, and the
@@ -57,27 +55,10 @@ import {RotateGrip} from '../components/RotateGrip';
    border on top of the `.label-node.selected` ring — the "2 borders" defect.
    Different class names would silently re-enable it. */
 
-/** Free-text annotation node. No handles, no chrome — plain text on the canvas. */
-export type LabelKind = {
-  text: string;
-  /** ROUND S — injected per-node by App's `rfNodes` memo, exactly like the
-   *  edge label's `onCommitLabel` in `rfEdges`. Props do NOT reach inside a
-   *  custom node component, so a callback has to travel through `data`. */
-  onCommitText?: (id: string, v: string) => void;
-  /** ROUND S — review mode, threaded through `data` for the same reason (the
-   *  read-only flag had to reach the edge renderer this way too — fix L). */
-  readOnly?: boolean;
-  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
-  rotation?: number;
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
-  __rotateSel?: boolean;
-  /** PACKAGE-P §E.2 — the Text section's stored style, same shape and same
-   *  lazy-write discipline as the goblin kind (`src/textStyle.ts`). Absent on
-   *  every board written before PACKAGE-P, and an absent one renders exactly as
-   *  today: `textStyleVars` returns `{}` and the sheet's fallbacks win. */
-  textStyle?: TextStyle;
-};
+/* CORE-STEP4A-FIX — LabelKind moved to the package
+ * (@techgoblin/gobi-core model/nodeData.ts); re-exported for existing importers. */
+export type {LabelKind} from '../../packages/gobi/src/model/nodeData';
+import type {LabelKind} from '../../packages/gobi/src/model/nodeData';
 
 /** PACKAGE-P §E.3(b) — the inspector panel, as a selector.
  *  The Text section's controls live inside this element, so "the pointer is
@@ -108,10 +89,14 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
   const tsVars = textStyleVars(d.textStyle, alignForBody(undefined), vAlignForBody(undefined));
 
   // Same gate as `DiagramNode`: the resizer exists only while selected. In
-  // read-only review mode nothing can become selected (`elementsSelectable`
-  // is false and the mode's toggle clears an existing selection), so this
-  // branch cannot be reached there — see the round report.
-  const resizer = selected ? (
+  // read-only review mode nothing editing could ride a selection: BADGE-ON-SELECT
+  // (t_e1ad9237) changed that — review now allows SOLE selection (the desc
+  // badge reveals through it), so this branch IS reachable there and the
+  // resizer is gated off the injected `__review` token (NOT `readOnly` —
+  // under the STALE lock the handles stay on screen and the seam refuses
+  // the write), keeping UNISURF-S4's "no resize handle can appear" contract
+  // for review mode.
+  const resizer = selected && !(d as {__review?: boolean}).__review && !(d as any).__locked ? (
     <NodeResizer
       minWidth={80}
       minHeight={48}
@@ -196,6 +181,15 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
   // One reader for the mode, used by the gesture — same as GoblinEdge's `ro`.
   const ro = !!d.readOnly;
 
+  /* INLINE-TITLE (t_cb9335df) — F2 parity: App's render-injected `__editTitle`
+     token opens the SAME editor this kind already owns (ROUND S above). The
+     textarea semantics (multi-line, Cmd/Ctrl+Enter commits) are unchanged —
+     a pre-existing, documented decision; only the OPENING gained a keyboard
+     route. */
+  useEffect(() => {
+    if ((d as any).__editTitle && !ro) { setDraft(d.text ?? ''); setEditing(true); }
+  }, [(d as any).__editTitle]);
+
   useEffect(() => {
     // The `select()` mirrors GoblinEdge's focus effect. `focus` alone would
     // leave the caret wherever it landed; selecting the whole caption is what
@@ -227,11 +221,8 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
      literal the renderers use is kept. */
   const rotT = rotateTransform(paintRotation(d as {rotation?: number}));
   if (rotT) (tsVars as Record<string, string>).transform = rotT;
-  /* GROUP-ROTATE: sole-selection token — no per-node grip in a multi. */
-  const grip = selected && d.__rotateSel && d.__rotate ? (
-    <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
-      onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
-  ) : null;
+  /* CHROME-ABOVE (t_31a9bec9): the rotate grip renders in App's NodeChrome
+     (top layer) — the label's stacking context no longer owns it. */
   return (
     <div
       className={`label-node${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
@@ -254,7 +245,6 @@ const LabelNode = memo(({id, data, selected}: NodeProps) => {
       title={editing || ro ? undefined : `${shown}${shown.length <= 24 ? '  ·  Double-click to edit' : ''}`}
     >
       {resizer}
-      {grip}
       {editing ? (
         /* `nodrag` — measured in @xyflow/system's useDrag: a pointerdown whose
            target matches `.nodrag` is dropped by the d3-drag filter, and

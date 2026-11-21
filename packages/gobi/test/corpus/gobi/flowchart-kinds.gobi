@@ -1,0 +1,20 @@
+board "Flowchart kinds"
+start = terminator "Start"
+ask = decision "valid?"
+read = io "read input"
+step = process "Normalize"
+sub = subprocess "Subprocess"
+doc = document "Report"
+prep = preparation "Initialise"
+man = manual "Manual step"
+wait = delay "Wait"
+conn = connector "A"
+off = offpage "Off page"
+mi = manualinput "Manual input"
+disp = display "Show result"
+sd = storeddata "Stored data"
+ll = looplimit "Loop"
+is = internalstorage "In memory"
+start -> step
+step -> ask
+ask -> read

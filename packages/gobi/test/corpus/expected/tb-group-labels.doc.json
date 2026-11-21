@@ -1,0 +1,167 @@
+{
+  "docVersion": 1,
+  "name": "TB group with member labels",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "cluster",
+      "kind": "group",
+      "label": "Order pipeline",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 998,
+        "h": 253
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "ingest",
+      "kind": "service",
+      "label": "Ingest",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 40,
+        "y": 68
+      },
+      "parent": "cluster"
+    },
+    {
+      "id": "matcher",
+      "kind": "service",
+      "label": "Matcher",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 354,
+        "y": 68
+      },
+      "parent": "cluster"
+    },
+    {
+      "id": "writer",
+      "kind": "service",
+      "label": "Writer",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 668,
+        "y": 68
+      },
+      "parent": "cluster"
+    },
+    {
+      "id": "sink",
+      "kind": "database",
+      "label": "Sink",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 268
+      }
+    },
+    {
+      "id": "audit",
+      "kind": "note",
+      "label": "Audit trail",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": 0,
+        "y": 480
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "ingest",
+      "to": "matcher",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "parse",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "matcher",
+      "to": "writer",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "label": "route",
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "writer",
+      "to": "sink",
+      "fromHandle": "bottom",
+      "toHandle": "right",
+      "label": "commit",
+      "dash": "solid"
+    },
+    {
+      "id": "e4",
+      "from": "sink",
+      "to": "audit",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "trail",
+      "dash": "dashed"
+    },
+    {
+      "id": "e5",
+      "from": "ingest",
+      "to": "sink",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "bypass",
+      "dash": "solid",
+      "labelOffset": {
+        "x": 0,
+        "y": 29.902500000000003
+      }
+    }
+  ]
+}

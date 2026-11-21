@@ -30,7 +30,7 @@ list is for people deciding whether to adopt.)
 - SVG export with real, selectable `<text>` (not a screenshot, not outlined curves)
 - PNG and PDF export
 - JSON round-trip (board backup / machine transfer)
-- Mermaid `flowchart` source import
+- Mermaid `flowchart` source import — door currently hidden in the Import dialog (it under-delivered; the parser stays, coming back later)
 
 ## Appearance
 

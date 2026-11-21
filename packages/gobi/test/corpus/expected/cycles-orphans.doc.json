@@ -1,0 +1,113 @@
+{
+  "docVersion": 1,
+  "name": "Cycles and orphans",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": -270,
+        "y": 0
+      }
+    },
+    {
+      "id": "b",
+      "kind": "service",
+      "label": "B",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 169
+      }
+    },
+    {
+      "id": "c",
+      "kind": "service",
+      "label": "C",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 338
+      }
+    },
+    {
+      "id": "d",
+      "kind": "note",
+      "label": "D",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 180,
+        "h": 64
+      },
+      "position": {
+        "x": -125,
+        "y": 507
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "right",
+      "toHandle": "left",
+      "dash": "solid"
+    },
+    {
+      "id": "e2",
+      "from": "b",
+      "to": "c",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "dash": "solid"
+    },
+    {
+      "id": "e3",
+      "from": "c",
+      "to": "a",
+      "fromHandle": "left",
+      "toHandle": "bottom",
+      "dash": "solid"
+    },
+    {
+      "id": "e4",
+      "from": "b",
+      "to": "b",
+      "fromHandle": "left",
+      "toHandle": "right",
+      "label": "self",
+      "dash": "solid"
+    }
+  ]
+}

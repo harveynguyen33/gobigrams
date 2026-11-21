@@ -1,0 +1,54 @@
+{
+  "docVersion": 1,
+  "name": "Comment handling",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "service",
+      "label": "A",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "b",
+      "kind": "service",
+      "label": "B",
+      "body": "label-only",
+      "textStyle": {
+        "align": "center",
+        "vAlign": "middle"
+      },
+      "size": {
+        "w": 290,
+        "h": 145
+      },
+      "position": {
+        "x": 0,
+        "y": 298
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "a",
+      "to": "b",
+      "fromHandle": "bottom",
+      "toHandle": "top",
+      "label": "label # not comment",
+      "dash": "solid"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+a = service "A"
+g = group "G"
+a { b }

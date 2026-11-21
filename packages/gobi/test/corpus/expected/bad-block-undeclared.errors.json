@@ -1,0 +1,7 @@
+[
+  {
+    "line": 2,
+    "col": 1,
+    "message": "\"g\" is never declared. Declare the group first: g = group \"…\""
+  }
+]

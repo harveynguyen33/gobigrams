@@ -1,0 +1,151 @@
+{
+  "id": "corpus-spec-example",
+  "name": "Kafka rebalance storm",
+  "nodes": [
+    {
+      "id": "broker",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Broker",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "amber",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "orders",
+      "type": "goblin",
+      "position": {
+        "x": 360,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "database",
+        "kicker": "database",
+        "title": "orders",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "database",
+        "colorKey": "violet",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "consumer",
+      "type": "goblin",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "width": 420,
+      "height": 200,
+      "style": {
+        "width": 420,
+        "height": 200
+      },
+      "data": {
+        "shape": "group",
+        "kicker": "boundary",
+        "title": "Consumers",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "broker",
+      "target": "orders",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate",
+        "flow": "dots"
+      },
+      "label": "append",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "orders",
+      "target": "consumer",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)",
+        "strokeDasharray": "6 4"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerStart": {
+        "type": "one",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "markerEnd": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

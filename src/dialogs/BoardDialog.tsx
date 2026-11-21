@@ -87,7 +87,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {X} from 'lucide-react';
 import type {PresetId} from '../presets';
-import {FOCUSABLE} from '../Settings';
+import {FOCUSABLE} from '../ui/Settings';
 
 export type BoardDialogMode = 'create' | 'rename' | 'delete';
 

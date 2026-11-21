@@ -1,0 +1,3 @@
+board "Escapes"
+a = service "He said \"hi\" \\ twice" sub:"escaped \" quote"
+b = service "hash # inside is not a comment"

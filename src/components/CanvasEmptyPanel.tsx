@@ -8,7 +8,7 @@
  *  callback the boards menu calls, never a second path. */
 import {useEffect} from 'react';
 import {Panel} from '@xyflow/react';
-import {trackSurface} from '../analytics';
+import {trackSurface} from '../app/analytics';
 
 type CanvasEmptyPanelProps = {
   /** App's gate: the board load has RESOLVED and the board truly has no nodes. */

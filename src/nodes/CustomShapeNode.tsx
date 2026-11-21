@@ -44,24 +44,23 @@
  * derivation, the icon imports and the two unused React Flow imports all went
  * with it — and `App.tsx` no longer injects the value.
  */
-import {memo} from 'react';
+import {memo, useEffect, useState} from 'react';
 import {Handle, NodeResizer, Position, type NodeProps} from '@xyflow/react';
-import {paintRotation, rotateTransform} from '../rotation';
-import {RotateGrip} from '../components/RotateGrip';
+import {paintRotation, rotateTransform} from '../canvas/rotation';
+import {InlineTitle} from '../components/InlineTitle';
 import {svgDataUri, SHAPE_MIN_PX} from './customShape';
-import {resolveColor} from '../colors';
-import type {ColorKey} from '../colors';
+import {resolveColor} from '../theme/colors';
+import type {ColorKey} from '../theme/colors';
 
 export type CustomShapeKind = {
   svg: string;          // the sanitised inline SVG markup (CustomShape.data)
   viewBox: string;
   title: string;
   colorKey: ColorKey;
-  /** ROUND ROTATE — geometry rotation (absent = 0) + App's grip writer. */
+  /** ROUND ROTATE — geometry rotation (absent = 0). CHROME-ABOVE
+   *  (t_31a9bec9): the grip writer tokens are gone — the grip renders in
+   *  App's NodeChrome and calls the rotation writer directly. */
   rotation?: number;
-  __rotate?: (id: string, phase: 'start' | 'delta' | 'end' | 'cancel', delta: number) => void;
-  /** GROUP-ROTATE — App injects this ONLY on the sole selected node. */
-  __rotateSel?: boolean;
 };
 
 /* The goblin node's scheme, verbatim (DiagramNode's handleDblClick +
@@ -79,6 +78,28 @@ function handleDblClick(nodeId: string) {
 
 const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
   const d = data as unknown as CustomShapeKind;
+  /* INLINE-TITLE (t_cb9335df) — an imported shape's TITLE is edited in place
+     too. Unlike a goblin card there is no title element to host the handler —
+     the import paints only the <img> — so the gesture sits on the ROOT, and
+     the root's children include the four HANDLES: the target carve-out below
+     is what keeps a handle double-click on its auto-connect meaning (and the
+     grips, if selected, their resize meaning). The editor overlays the whole
+     box; the img sits under it. F2 arrives the same way as on a goblin, via
+     App's render-injected `__editTitle` token. */
+  const [editTitle, setEditTitle] = useState(false);
+  useEffect(() => { if ((d as any).__editTitle) setEditTitle(true); }, [(d as any).__editTitle]);
+  const openTitleEdit = (e: React.MouseEvent) => {
+    /* NEVER swallow a handle / resize-grip double-click (the card's A6).
+       CHROME-ABOVE (t_31a9bec9): the rotate grip and desc badge are no
+       longer descendants of this root (they render in the top layer), so
+       the carve-out covers the in-node surfaces only. */
+    if (e.target instanceof Element
+      && e.target.closest('.react-flow__handle, .react-flow__resize-control')) return;
+    e.stopPropagation();
+    /* Review/stale lock, incl. the unselected-node case — see DiagramNode. */
+    if ((d as any).readOnly || e.currentTarget.closest('.ds-read-only')) return;
+    setEditTitle(true);
+  };
   /* ROUND BF (2026-10-23) — `--nc` reaches this node kind (wired then for
      BF-1's at-rest ring). ROUND BF-2 (2026-10-24) INVERTED the ring: the
      at-rest outline is gone and `.custom-shape-node.selected` now paints the
@@ -92,15 +113,20 @@ const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
     <div
       className={`custom-shape-node${selected ? ' selected' : ''}`}
       data-shape-title={d.title}
+      onDoubleClick={openTitleEdit}
       style={{'--nc': nc, ...(rotateTransform(paintRotation(d as {rotation?: number})) ? {transform: rotateTransform(paintRotation(d as {rotation?: number}))!} as React.CSSProperties : {})} as React.CSSProperties}
     >
-      {/* GROUP-ROTATE: the sole-selection token guards the per-node grip —
-          a multi-selection renders no per-node grips (App's shared grip). */}
-      {selected && d.__rotateSel && d.__rotate && (
-        <RotateGrip nodeId={id} rotation={d.rotation ?? 0}
-          onGesture={(phase, delta) => d.__rotate!(id, phase, delta)} />
+      {editTitle && (
+        <InlineTitle
+          key={String((d as any).__editTitle ?? 'dbl')}
+          value={d.title ?? ''}
+          onCommit={v => { setEditTitle(false); if (v.trim()) (d as any).onCommitTitle?.(id, v); }}
+          onCancel={() => setEditTitle(false)}
+        />
       )}
-      {selected && (
+      {/* CHROME-ABOVE (t_31a9bec9): the rotate grip renders in App's
+          NodeChrome (top layer), not in the card's stacking context. */}
+      {selected && !(d as {__review?: boolean}).__review && !(d as any).__locked && (
         /* §8.3 — the live resize carries the same 32px floor the import path
            enforces, and NO ceiling: ROUND BE (2026-10-23, Harvey: resize
            should behave like normal shapes) removed maxWidth/maxHeight so the
@@ -112,7 +138,8 @@ const CustomShapeNode = memo(({id, data, selected}: NodeProps) => {
            correction still holds: the resizer carries NO aspect lock — the
            node box can take any ratio. The artwork itself cannot distort
            (the <img> below is object-fit: contain, so it letterboxes inside
-           the box). */
+           the box). BADGE-ON-SELECT (t_e1ad9237): `readOnly` gates the
+           handles off in review mode, which now allows sole selection. */
         <NodeResizer
           minWidth={SHAPE_MIN_PX}
           minHeight={SHAPE_MIN_PX}

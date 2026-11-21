@@ -1,0 +1,218 @@
+{
+  "id": "corpus-cycles-orphans",
+  "name": "Cycles and orphans",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "goblin",
+      "position": {
+        "x": -270,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "A",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "b",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 169
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "B",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "c",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 338
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "C",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "d",
+      "type": "goblin",
+      "position": {
+        "x": -125,
+        "y": 507
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "shape": "note",
+        "kicker": "note",
+        "title": "D",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "sticky-note",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "a",
+      "target": "b",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
+    },
+    {
+      "id": "e2",
+      "type": "goblinEdge",
+      "source": "b",
+      "target": "c",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    },
+    {
+      "id": "e3",
+      "type": "goblinEdge",
+      "source": "c",
+      "target": "a",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "left",
+      "targetHandle": "bottom"
+    },
+    {
+      "id": "e4",
+      "type": "goblinEdge",
+      "source": "b",
+      "target": "b",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "self",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "left",
+      "targetHandle": "right"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

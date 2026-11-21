@@ -3,7 +3,7 @@
  * payload format… the link never carries .gobi source, only compiled JSON").
  * Import type-only: this module is part of the PURE codec cone (harness S1b)
  * and must not drag app code in. */
-import type {BoardDoc} from '../boards';
+import type {BoardDoc} from '../board/boards';
 
 /** The one format version this build writes. Bumped only on a breaking
  *  payload change; unknown tags decode to a refusal (S3), never a throw. */

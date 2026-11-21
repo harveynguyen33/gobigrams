@@ -1,15 +1,20 @@
 import {useEffect, useMemo, useRef, useState, type RefObject} from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {X} from 'lucide-react';
-import {EXPORT_TOKENS, tokensFor} from '../theme';
-import {toMermaid, toMermaidSequence, fromMermaid} from '../mermaid';
-import {trackExport} from '../analytics';
+import {EXPORT_TOKENS, tokensFor} from '../theme/theme';
+import {toMermaid, toMermaidSequence, fromMermaid} from '../gobi/mermaid';
+import {trackExport} from '../app/analytics';
 
 export type ExportScope = 'full' | 'selection';
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'json' | 'mermaid';
 /* AR-9 — one pluraliser for every count string ("1 node · 0 edges"), so no
    branch hand-writes its own. */
 const count = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'}`;
+
+/* MERMAID-OFF (t_d616040c, 2026-11-07) — the ⇅ → Import → "From Mermaid text"
+ * door does not do what the UI promises (Harvey's verdict after real use).
+ * ONE flag: flip to true and the whole door returns with no other edit. */
+const MERMAID_IMPORT_ENABLED = false;
 
 const THEME_CHOICES: {id: string; label: string}[] = [
   {id: 'live', label: 'live'},
@@ -115,6 +120,14 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
   const [gobiText, setGobiText] = useState('');
   const [gobiErrors, setGobiErrors] = useState<{line: number; col: number; message: string}[]>([]);
   const [gobiNote, setGobiNote] = useState<string | null>(null);
+  /* IMPORT-REENTRY — one dispatch per dialog session. The ref is the real
+     latch (it must engage SYNCHRONOUSLY: a double-click's second activation
+     can land before the first handler's `await import()` resolves, so a
+     state-only guard races); the state only renders it as disabled. The
+     error branch resets both so a failed paste can be fixed and retried —
+     and IMPORT-SESSION below resets them on the dialog's close edge. */
+  const [gobiSent, setGobiSent] = useState(false);
+  const gobiSentRef = useRef(false);
   const tabRef = useRef<HTMLButtonElement>(null);
 
   const scoped = useMemo(() => {
@@ -189,7 +202,19 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
    * that form cannot apply here). */
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (wasOpen.current && !open) returnFocusTo?.current?.focus();
+    if (wasOpen.current && !open) {
+      returnFocusTo?.current?.focus();
+      /* IMPORT-SESSION (t_0a89d013) — the close edge ENDS the import session.
+       * This modal never unmounts while closed, so IMPORT-REENTRY's latch
+       * stayed engaged after ONE import and the button was dead until a full
+       * page reload (round-gobi-import-once L6b, red pre-fix). The pasted
+       * text survives on purpose: the latch, not an empty box, is what
+       * guards the double dispatch. */
+      gobiSentRef.current = false;
+      setGobiSent(false);
+      setGobiNote(null);
+      setGobiErrors([]);
+    }
     wasOpen.current = open;
   }, [open, returnFocusTo]);
 
@@ -271,20 +296,41 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
    * the compiler is the app's own (so a bad paste comes back as structured
    * errors instead of a re-parse). The compiler arrives through import(): the
    * modal never statically imports src/gobi, so this door costs the main
-   * bundle nothing until someone pastes. */
+   * bundle nothing until someone pastes. CORE-STEP2: the compiler returns
+   * the neutral GobiDocument and the canvas adapter (also lazy, also off
+   * the boot path) is the ONE place that maps it to a React-Flow board. */
   const doImportGobi = async () => {
+    /* IMPORT-REENTRY — the synchronous latch: ONE dispatch per dialog
+     * session. Without it the 900ms success-note window leaves the button
+     * live with the compiled text still in the box, and the second click of
+     * a double-click re-imports the same document (measured 4n/2e). */
+    if (gobiSentRef.current) return;
+    gobiSentRef.current = true;
+    setGobiSent(true);
     setGobiErrors([]);
     setGobiNote(null);
-    const {compileGobi} = await import('../gobi');
-    const res = compileGobi(gobiText);
+    const {compileGobi} = await import('@techgoblin/gobi-core');
+    /* LAYOUT-FOLLOWS-WIDTH — a table compiles at the width the card really
+       paints, so the placement cannot lay two widened cards on top of each
+       other. The canvas wrapper IS the board's published look (App paints
+       data-style/data-density from curBoard), so this door reads the same two
+       values without a new prop path through App (which is at its hard cap). */
+    const cv = document.querySelector('main.canvas-wrap');
+    const look = {style: cv?.getAttribute('data-style'), density: cv?.getAttribute('data-density')};
+    const res = compileGobi(gobiText, look);
     if (res.ok === false) {
       /* NOTHING is dispatched: the board is untouched and the errors ARE the
-       * answer — one row per error, line:column first. */
+       * answer — one row per error, line:column first. The latch releases:
+       * the user fixes the text and clicks again. */
+      gobiSentRef.current = false;
+      setGobiSent(false);
       setGobiErrors(res.errors);
       return;
     }
-    window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board: res.board}}));
-    setGobiNote(`Compiled ${count(res.board.nodes.length, 'node')} · ${count(res.board.edges.length, 'edge')} — inserting onto the board…`);
+    const {toBoardDoc} = await import('../gobi/adapterCanvas');
+    const board = toBoardDoc(res.doc, look);
+    window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board}}));
+    setGobiNote(`Compiled ${count(board.nodes.length, 'node')} · ${count(board.edges.length, 'edge')} — inserting onto the board…`);
     window.setTimeout(onClose, 900);
   };
 
@@ -308,6 +354,9 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
 
           {tab === 'import' && (
             <div className="em-import">
+              {/* MERMAID-OFF — gated, not deleted; the flag comment at the top
+                  of this file says why and what flipping it restores. */}
+              {MERMAID_IMPORT_ENABLED && (<>
               <div className="em-label">From Mermaid text</div>
               <textarea
                 className="em-ta"
@@ -322,6 +371,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
               </button>
               {importMsg && <div className="em-note">{importMsg}</div>}
               <div className="em-note">Flowchart subset: node shapes, edge labels, subgraphs. Styling (classDef) is not imported.</div>
+              </>)}
 
               {/* GOBI-2 — the .gobi door, beside Mermaid (same tab, same import
                   event, same one-undo-step contract). Errors replace the note
@@ -336,7 +386,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
                 rows={8}
                 spellCheck={false}
               />
-              <button className="em-go" onClick={doImportGobi} disabled={!gobiText.trim()}>
+              <button className="em-go" onClick={doImportGobi} disabled={!gobiText.trim() || gobiSent}>
                 Import .gobi
               </button>
               {gobiErrors.length > 0 && (
@@ -373,7 +423,14 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
             {id: 'json', label: 'JSON'},
             {id: 'mermaid', label: 'Mermaid'},
           ]} />
+          {/* F3 / render isolation (owner-ruled 2026-11-20): the per-format
+              explainer region is ONE reserved slot — .em-expl is min-height'd
+              to the tallest format's measured stack (pdf: its own note plus
+              the outline block), so a format toggle repaints only this box
+              and the Export button below it never moves. */}
+          <div className="em-expl">
           {format === 'pdf' && <div className="em-note">PDF (opens the print dialog — choose Save as PDF). The browser embeds the fonts; text stays selectable.</div>}
+          {format === 'png' && <div className="em-note">A raster cannot carry the node descriptions — the SVG export can, and screen readers read them.</div>}
 
           {/* ROUND C — "Outline text": exact-typography mode for SVG (and the
               PDF print view, which renders the same string). OFF by default:
@@ -397,6 +454,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
               </div>
             </>
           )}
+          </div>
 
           <div className="em-label">Theme</div>
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />

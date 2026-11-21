@@ -1,0 +1,277 @@
+/* Architectural shapes — one generic component per conventional diagram notation.
+   Every shape is geometry only (no use-case text baked in); colour comes from the
+   node's --nc custom property, so the colour swatches drive the shape outline,
+   icon, metric and glow for all shapes.
+
+   Frames use a normalised viewBox (0 0 200 100) with preserveAspectRatio="none"
+   and non-scaling strokes, so they scale with any node size.
+
+   L3a: the ISO 5807 flowchart set joins the architecture set here. One `Shape`
+   union, one `ShapeFrame`, one `ShapePreview` — presets select a subset for
+   their palette, they never fork the shape component. */
+
+export type Shape =
+  /* architecture */
+  | 'service' | 'database' | 'queue' | 'external' | 'actor' | 'storage' | 'gateway' | 'group' | 'note'
+  /* L3a — ISO 5807 flowchart */
+  | 'terminator' | 'process' | 'decision' | 'io' | 'document' | 'subprocess'
+  | 'manual' | 'delay' | 'connector' | 'preparation'
+  /* ROUND AD — the six "every tool ships this" additions Harvey approved. */
+  | 'offpage' | 'manualinput' | 'display' | 'storeddata' | 'looplimit' | 'internalstorage'
+  /* PACKAGE-SEQ — UML sequence. The lifeline is a STRETCHABLE node: the head
+     box carries the participant name; the dashed stem is drawn inside the same
+     frame, so stretching the node downward lengthens the lifeline. Activation
+     is the thin bar; fragment is the combined-fragment frame (alt/opt/loop/…
+     named in the node's sub line). */
+  | 'lifeline' | 'activation' | 'fragment';
+
+/* ITEM 4 (2026-09-17) — EVERY `hint` IS A GLANCEABLE SECONDARY LINE.
+
+   Harvey: "ở các hình shape chữ description nhìn hơi dài, có thể nào gọn nhẹ hơn
+   ko" — the shape descriptions read too long, make them lighter.
+
+   RULES APPLIED TO EVERY ROW:
+     1. Never repeat the LABEL inside the hint. The row already renders
+        `{label}` on its first line and `{hint}` beneath it, so a hint that
+        restates the label spends a line saying nothing. Measured before this
+        pass: `storage` ("bucket · object storage") and `preparation`
+        ("Preparation · Initialization · hexagon · setup / init") both did it.
+     2. Keep the GEOMETRY cue only where the silhouette is the useful part of
+        the name — "dashed rect" earns its place because "External" does not say
+        a rectangle is coming; "hexagon" earns it for Gateway. Drop it where the
+        label is self-describing.
+     3. Keep the SEMANTIC cue, because that is what actually disambiguates two
+        shapes that look different but mean similar things (io "data in / out"
+        vs process "action step").
+     4. ≤ ~22 chars where the meaning survives. The five longest rows went from
+        33–53 chars down to 14–22.
+     5. NO TWO HINTS MAY COLLIDE. All 19 are distinct — asserted by
+        `checks/package-o-metrics.mjs`, which reads this table.
+
+   These strings are shared: the palette ROW (`renderPaletteRow` in App.tsx), the
+   shape-inspector `<select>` (`{s.label} — {s.hint}`) and the library search
+   haystack all read them, so all four surfaces tightened together with no second
+   edit. The `LIBRARY`-side hints in `presets.ts` are a SEPARATE table and were
+   tightened in the same pass. */
+export const SHAPES: {id: Shape; label: string; hint: string}[] = [
+  {id: 'service', label: 'Service', hint: 'rounded rect · app'},
+  {id: 'database', label: 'Database', hint: 'cylinder · datastore'},
+  {id: 'queue', label: 'Queue', hint: 'rows + items · bus'},
+  {id: 'external', label: 'External', hint: 'dashed rect · 3rd party'},
+  {id: 'actor', label: 'Actor', hint: 'rect + person · user'},
+  {id: 'storage', label: 'Storage', hint: 'bucket · objects'},
+  {id: 'gateway', label: 'Gateway', hint: 'hexagon · api / lb'},
+  {id: 'group', label: 'Group', hint: 'dashed boundary'},
+  {id: 'note', label: 'Note', hint: 'plain text'},
+  {id: 'terminator', label: 'Terminal', hint: 'stadium · start / end'},
+  {id: 'process', label: 'Process', hint: 'rect · action step'},
+  {id: 'decision', label: 'Decision', hint: 'diamond · yes / no'},
+  {id: 'io', label: 'Input / Output', hint: 'parallelogram · data'},
+  {id: 'document', label: 'Document', hint: 'wavy base · in or out'},
+  {id: 'subprocess', label: 'Predefined process', hint: 'double-bar rect'},
+  {id: 'preparation', label: 'Preparation', hint: 'hexagon · setup'},
+  {id: 'manual', label: 'Manual operation', hint: 'trapezoid · by hand'},
+  {id: 'delay', label: 'Delay', hint: 'D-shape · wait'},
+  {id: 'connector', label: 'On-page connector', hint: 'circle · jump'},
+  /* ROUND AD — draw.io's own template labels, verbatim, for the six additions. */
+  {id: 'offpage', label: 'Off-page connector', hint: 'home plate · another page'},
+  {id: 'manualinput', label: 'Manual input', hint: 'sloped top · by keyboard'},
+  {id: 'display', label: 'Display', hint: 'curved trapezoid · show data'},
+  {id: 'storeddata', label: 'Stored data', hint: 'cylinder · read / write'},
+  {id: 'looplimit', label: 'Loop limit', hint: 'notched top · loop start'},
+  {id: 'internalstorage', label: 'Internal storage', hint: 'pane rect · in-memory'},
+  /* PACKAGE-SEQ — UML sequence trio. Hints follow the SAME rules as above:
+     geometry cue + semantic cue, ≤22 chars, no label repetition, no collisions
+     (package-o-metrics asserts distinctness across the whole table). */
+  {id: 'lifeline', label: 'Lifeline', hint: 'head + dashed stem'},
+  {id: 'activation', label: 'Activation', hint: 'thin bar · processing'},
+  {id: 'fragment', label: 'Fragment', hint: 'frame · alt / loop'},
+];
+
+export const SHAPE_IDS: Shape[] = SHAPES.map(s => s.id);
+
+/** Shapes a flowchart preset offers as its own vocabulary (the 9 ISO additions
+ *  plus `preparation`, which adapts the existing `gateway` hexagon geometry),
+ *  plus ROUND AD's six "every tool ships this" additions. */
+export const FLOWCHART_EXTRA_SHAPES: Shape[] =
+  ['terminator', 'process', 'decision', 'io', 'document', 'subprocess', 'manual', 'delay', 'connector', 'preparation',
+   'offpage', 'manualinput', 'display', 'storeddata', 'looplimit', 'internalstorage'];
+
+export function asShape(v: unknown): Shape {
+  return typeof v === 'string' && (SHAPE_IDS as string[]).includes(v) ? (v as Shape) : 'service';
+}
+
+/* GOBI-WRAP-RULES N2 (2026-11-03) — shapes whose outline spends real height
+ * on a TOP FACE, as a fraction of the 0 0 200 100 viewBox's height:
+ *   · database / storeddata — the cylinder's elliptical rim: ellipse cy=20
+ *     ry=15, so the rim's bottom arc crosses y=35 of 100 → 0.35 (ROUND AD
+ *     gave both kinds ONE drawing);
+ *   · storage — the bin's lid band: rect y=2 height=19 → ends y=21 of 100.
+ * The DOM-less export's text band starts BELOW this line (exportScene
+ * textBox), so a kicker clears the rim instead of sitting on its arc. The
+ * canvas needs no twin: its `.node-body` inset registry already insets the
+ * cylinder band. checks/round-gobi-text-fit.mjs C1/C2 enumerates this set
+ * FROM the frame markup (top ellipse / top pill band) and asserts the table
+ * equals it — no hand-maintained list on either side. */
+export const SHAPE_TOP_FACE: Partial<Record<Shape, number>> = {
+  database: 0.35,
+  storeddata: 0.35,
+  storage: 0.21,
+};
+
+/* ROUND AG (recorded, unchanged — round-ag-colors ag15 reads this declaration
+   verbatim): the 9% mix as a presentation VALUE. It cannot ride a fill
+   ATTRIBUTE (var() is invalid there), which is exactly how the canvas ended
+   up with fill="transparent" — see shapeFrameMarkup below for where it
+   actually paints from now on. */
+const FILL = 'color-mix(in srgb, var(--nc, var(--border-strong)) 9%, transparent)';
+
+/* ROUND AR, AR-1 — THE SHAPE GEOMETRY, AS DATA.
+ *
+ * Every case below is the SAME drawing its React sibling renders, expressed as
+ * inner markup in the normalised 200×100 frame. `ShapeFrame` consumes this
+ * table through `shapeFrameMarkup` (below), so the exporter (src/export/exportSvg.ts)
+ * and the canvas share ONE source — the file's own "never a second copy free
+ * to drift" rule, now enforced rather than aspirational.
+ *
+ * `p` = the outline primitive's attributes (resolved fill/stroke, NOT var()
+ * references — the exporter writes literal values); `line` = inner detail
+ * strokes; `plain` drops the cylinder's inner arcs exactly as the React
+ * `plainCylinder` flag does. */
+
+type FramePaint = {
+  fill?: string; stroke: string; strokeWidth?: number;
+  fillOpacity?: string; dash?: string; plain?: boolean;
+  /* ROUND AW — the CANVAS tint as ONE inline style: `fill:var(--nc)`.
+     var() is valid in a style attribute, never in a presentation attribute, so the
+     canvas paint can only live here. The 9% alpha rides the unconditional
+     fill-opacity attribute (buildPng's opacity-keyed resolution pass still reads
+     it). OPTIONAL: the exporter's call sites keep passing literal fill +
+     fill-opacity attributes and compile unchanged. */
+  fillStyle?: string;
+};
+
+function frameMarkup(shape: Shape, p: FramePaint): string {
+  const sw = p.strokeWidth ?? 1.5;
+  const a = `${p.fill ? `fill="${p.fill}"` : ''}${p.fillOpacity ? ` fill-opacity="${p.fillOpacity}"` : ''}${p.fillStyle ? ` style="${p.fillStyle}"` : ''} stroke="${p.stroke}" stroke-width="${sw}" stroke-linejoin="round"`;
+  const line = `fill="none" stroke="${p.stroke}" stroke-width="${sw}"`;
+  const accent = p.stroke;
+  switch (shape) {
+    case 'service':
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>`;
+    case 'external':
+      return `<rect x="1" y="1" width="198" height="98" rx="14" stroke-dasharray="8 5" ${a}/>`;
+    /* ROUND AD / HARVEY 2026-10-14 — ONE cylinder drawing for `database` and
+       `storeddata`; `plain` drops the two inner arcs (see ShapeFrame). */
+    case 'database':
+    case 'storeddata': {
+      const rings = p.plain === false
+        ? `<path d="M4 42 A 96 15 0 0 0 196 42" ${line} opacity="0.5"/><path d="M4 60 A 96 15 0 0 0 196 60" ${line} opacity="0.3"/>`
+        : '';
+      return `<ellipse cx="100" cy="20" rx="96" ry="15" ${a}/><path d="M4 20 V80 A 96 15 0 0 0 196 80 V20" ${a}/>${rings}`;
+    }
+    case 'queue':
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>` +
+        `<path d="M62 10 V90" ${line} opacity="0.35"/>` +
+        `<path d="M28 26 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<path d="M28 50 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<path d="M28 74 H50" ${line} stroke-linecap="round" opacity="0.7"/>` +
+        `<circle cx="16" cy="26" r="4.5" fill="${accent}" opacity="0.9"/>` +
+        `<circle cx="16" cy="50" r="4.5" fill="${accent}" opacity="0.9"/>` +
+        `<circle cx="16" cy="74" r="4.5" fill="${accent}" opacity="0.9"/>`;
+    case 'actor':
+      return `<rect x="1" y="1" width="198" height="98" rx="14" ${a}/>` +
+        `<circle cx="36" cy="42" r="13" fill="none" stroke="${accent}" stroke-width="2.4"/>` +
+        `<path d="M14 84 C 14 66 24 59 36 59 C 48 59 58 66 58 84" fill="none" stroke="${accent}" stroke-width="2.4" stroke-linecap="round"/>`;
+    case 'storage':
+      return `<path d="M1 18 H199 V 76 A 99 23 0 0 0 1 76 Z" ${a}/>` +
+        `<rect x="1" y="2" width="198" height="19" rx="9.5" ${a}/>`;
+    case 'gateway':
+      return `<path d="M34 1 H166 L199 50 L166 99 H34 L1 50 Z" ${a}/>`;
+    case 'terminator':
+      return `<rect x="1" y="1" width="198" height="98" rx="49" ${a}/>`;
+    case 'process':
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>`;
+    case 'decision':
+      return `<path d="M100 2 L198 50 L100 98 L2 50 Z" ${a}/>`;
+    case 'io':
+      return `<path d="M36 2 H198 L164 98 H2 Z" ${a}/>`;
+    case 'document':
+      return `<path d="M1 1 H199 V78 C 175 96 155 68 131 80 S 91 96 67 78 S 27 62 1 78 Z" ${a}/>`;
+    case 'subprocess':
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>` +
+        `<path d="M26 2 V98" ${line}/><path d="M174 2 V98" ${line}/>`;
+    case 'preparation':
+      return `<path d="M46 2 H154 L198 50 L154 98 H46 L2 50 Z" ${a}/>`;
+    case 'manual':
+      return `<path d="M2 2 H198 L164 98 H36 Z" ${a}/>`;
+    case 'delay':
+      return `<path d="M2 2 H122 A 78 48 0 0 1 122 98 H2 Z" ${a}/>`;
+    /* ROUND BE (2026-10-23) — the paint must FILL the frame (skill:
+       shape-geometry-and-render-sites law 1) so the NodeResizer grips sit ON
+       the circle. The frame below is SQUARE for this one shape, so cx/cy=50
+       r=49.5 reaches every edge: r is the frame half minus the 0.5-unit
+       stroke inset every rect-based shape uses (service: x=1 of 200). The
+       old `cx=100 cy=50 r=48` in the 200x100 frame filled only 96/200 of the
+       width — the dead strips the grips floated in. */
+    case 'connector':
+      return `<circle cx="50" cy="50" r="49.5" ${a}/>`;
+    case 'offpage':
+      return `<path d="M2 2 H198 V66 L100 98 L2 66 Z" ${a}/>`;
+    case 'manualinput':
+      return `<path d="M2 30 L198 2 V98 H2 Z" ${a}/>`;
+    case 'display':
+      return `<path d="M2 2 H120 A 78 48 0 0 1 120 98 H2 Z" ${a}/>`;
+    case 'looplimit':
+      return `<path d="M36 2 H164 L198 24 V98 H2 V24 Z" ${a}/>`;
+    case 'internalstorage':
+      return `<rect x="1" y="1" width="198" height="98" rx="2" ${a}/>` +
+        `<path d="M26 2 V98" ${line}/><path d="M2 26 H26" ${line}/>`;
+    case 'lifeline':
+      return `<rect x="1" y="1" width="198" height="30" rx="6" ${a}/>` +
+        `<path d="M100 31 V98" ${line} stroke-dasharray="6 5"/>`;
+    case 'activation':
+      return `<rect x="88" y="1" width="24" height="98" rx="4" ${a}/>`;
+    case 'fragment':
+      return `<rect x="1" y="1" width="198" height="98" ${a}/>` +
+        `<path d="M1 1 H66 L82 17 V1" ${line}/><path d="M1 1 H66 L82 18 H1 Z" ${a}/>`;
+    default:
+      return '';
+  }
+}
+
+/** The exporter's entry point: resolved paint values in, inner markup out.
+ *  Emitted inside a viewBox="0 0 200 100" wrapper by the caller. */
+export function shapeFrameSvg(shape: Shape, paint: FramePaint): string {
+  return frameMarkup(shape, paint);
+}
+
+/** The live render path: the SAME table, wrapped in the frame svg the canvas
+ *  always mounted. `nc` is the resolved `--nc` colour; `plain` matches the
+ *  `plainCylinder` flag's semantics (undefined = plain, per AQ10).
+ *  ROUND AW (Harvey, decision A 2026-10-21) — the canvas must PAINT the tint.
+ *  It used to pass fill:'transparent' + fillOpacity:'0.09', so every frame
+ *  primitive carried fill="transparent" fill-opacity="0.09": opacity ×
+ *  transparent = transparent, and the orphan 0.09 never painted. The fill is
+ *  a real `--nc` at 9% now, via an inline STYLE — the one place var() is
+ *  valid. It stays a separate fill-opacity (NOT a color-mix alpha) so
+ *  buildPng's opacity-keyed resolution pass (ROUND AV defect-2) still reads
+ *  computed fillOpacity 0.09 and rewrites the clone's fill as rgba. */
+export function shapeFrameMarkup(shape: Shape, nc: string, plain: boolean): string {
+  return frameMarkup(shape, {
+    stroke: nc,
+    fillOpacity: '0.09',
+    fillStyle: `fill:${nc}`,
+    plain,
+  });
+}
+
+/** SVG frame drawn behind the node content. Not used by group / note.
+ *  ROUND AR — renders `shapeFrameMarkup`, the SAME table the exporter emits:
+ *  the visual output is unchanged (fill + stroke from the node's `--nc` var,
+ *  non-scaling stroke), but there is no second copy of the geometry left to
+ *  drift.
+ *  XSS note: the injected markup is 100% generated by `frameMarkup` above —
+ *  static path/rect attribute strings with NO user data interpolated (node
+ *  titles etc. never reach it) — so the trusted-input surface is empty and
+ *  `dangerouslySetInnerHTML` is safe here. */

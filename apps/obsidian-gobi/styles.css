@@ -1,0 +1,43 @@
+/* Gobigrams (```gobi code blocks) — the plugin's whole stylesheet.
+ * Colours come from Obsidian's own variables; the diagram itself is SVG
+ * painted by the shared core with tokens resolved from the same variables. */
+
+/* The wrapper Obsidian's processor owns. */
+.gobi-block {
+  margin: 0.75em 0;
+}
+
+/* The SVG keeps its natural size and only shrinks to fit the pane; the
+ * viewBox makes height:auto geometrically exact. */
+.gobi-render svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* The error block — Mermaid-style: visible, styled, copy-pasteable. */
+.gobi-errors {
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--text-error);
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+.gobi-errors-title {
+  color: var(--text-error);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.gobi-errors-row {
+  font-family: var(--font-monospace);
+  color: var(--text-normal);
+  white-space: pre-wrap;
+}
+
+.gobi-errors-hint {
+  color: var(--text-muted);
+}

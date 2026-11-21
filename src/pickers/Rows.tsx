@@ -3,11 +3,12 @@
    src/InspectorPickers.tsx re-exports the union, so no importer changes. */
 import {useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode} from 'react';
 import {SHAPES, ShapePreview, type Shape} from '../nodes/shapes';
-import {COLOR_VAR} from '../colors';
-import {clampRotation, norm180} from '../rotation';
-import {ROTATION_MIN, ROTATION_MAX} from '../layoutConstants';
+import {COLOR_VAR} from '../theme/colors';
+import {clampRotation, norm180} from '../canvas/rotation';
+import {ROTATION_MIN, ROTATION_MAX} from '../layout/layoutConstants';
 import {usePopoverPlacement} from './popover';
 import {G} from './Art';
+import {resolveTableScale, TABLE_SCALE_MIN, TABLE_SCALE_STEP} from '../../packages/gobi/src/model/tableStyle';
 
 /* ===========================================================================
    IconPickerRow — trigger + caret + popover of icon+label rows (§B #2-#6,#9,#10).
@@ -284,6 +285,73 @@ export function ToggleRow({value, onChange, options, title, wide, grid3, half}: 
           {o.art ?? o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+
+/* ===========================================================================
+   ScaleRow — TABLE-SCALE (t_cdd8e4f6): the inspector row for ONE table's own
+   scale, beside its name/schema/colour — a hero table in a board of small ones,
+   so the value lives on the NODE and the board's density is untouched.
+   TABLE-SCALE-NOMAX (t_7f37db5b, Harvey: "Min is ok but should not restrict
+   max"): a `range` needs SOME max, so the slider's max is DERIVED from the
+   current value (`max(2, ceil(scale * 2 * 2) / 2)` = twice it, to a whole 50%)
+   and can never pin the thumb at the real value; the NUMBER field takes any
+   value >= 0.75 and is the door to everything above. The readout prints the
+   TRUE percent (a board carrying 8 shows "800%" beside a 1600% slider). `Reset`
+   returns the card to the density as-is; the model stores the FRACTION, the
+   reader sees percent. Writes go through the caller's ONE update path (one undo
+   entry per commit, like every inspector field).
+
+   SCALE-UNITS (t_c6f652b3, 2026-11-10): ONE unit everywhere — PERCENT. The
+   number field used to speak SCALE UNITS (`1` beside `100%`), so `400` there was
+   400x (measured 72 792px, silently). It now takes the slider's percent (min 75,
+   step 5, no max) and divides ONCE; the DOCUMENT keeps `scale: 4` for 400%.
+   =========================================================================== */
+export function ScaleRow({value, onChange}: {value?: number; onChange: (v: number) => void}) {
+  const scale = resolveTableScale(value);
+  const pct = Math.round(scale * 100);
+  const min = Math.round(TABLE_SCALE_MIN * 100);
+  const step = Math.round(TABLE_SCALE_STEP * 100);
+  const max = Math.round(Math.max(2, Math.ceil(scale * 4) / 2) * 100);
+  return (
+    <div className="field">
+      <label>scale <b data-scale-value>{pct}%</b></label>
+      <div className="field-row">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={pct}
+          data-table-scale
+          aria-label="table scale"
+          title={`this table only — ${min}% to ${max}% (the field beside takes any percent above ${min}%)`}
+          onChange={e => onChange(resolveTableScale(Number(e.currentTarget.value) / 100))}
+        />
+        <input
+          type="number"
+          min={min}
+          step={step}
+          value={pct}
+          data-table-scale-num
+          aria-label="table scale value"
+          title={`this table only — any percent from ${min} up, no maximum`}
+          onChange={e => {
+            const v = Number(e.currentTarget.value);
+            if (isFinite(v) && v >= min) onChange(resolveTableScale(v / 100));
+          }}
+        />
+        <button
+          type="button"
+          className="mbtn"
+          title="Reset this table to 100%"
+          aria-label="Reset table scale to 100%"
+          disabled={pct === 100}
+          onClick={() => onChange(1)}
+        >Reset</button>
+      </div>
     </div>
   );
 }

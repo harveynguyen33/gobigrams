@@ -1,0 +1,229 @@
+{
+  "id": "corpus-body-choices",
+  "name": "Body layout choices",
+  "nodes": [
+    {
+      "id": "bare",
+      "type": "goblin",
+      "position": {
+        "x": -270,
+        "y": 0
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Bare service",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "carded",
+      "type": "goblin",
+      "position": {
+        "x": 0,
+        "y": 399
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Carded",
+        "sub": "one line of prose buys the shell",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "forced",
+      "type": "goblin",
+      "position": {
+        "x": -845,
+        "y": 598
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Forced card",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "simple",
+      "type": "goblin",
+      "position": {
+        "x": -485,
+        "y": 598
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "service",
+        "title": "Forced simple",
+        "sub": "explicit simple wins",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "kick",
+      "type": "goblin",
+      "position": {
+        "x": -125,
+        "y": 598
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "service",
+        "kicker": "CUSTOM",
+        "title": "Kicker buys card",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "server",
+        "colorKey": "cyan",
+        "body": "card",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "gate",
+      "type": "goblin",
+      "position": {
+        "x": 235,
+        "y": 598
+      },
+      "width": 290,
+      "height": 145,
+      "style": {
+        "width": 290,
+        "height": 145
+      },
+      "data": {
+        "shape": "gateway",
+        "kicker": "ingress",
+        "title": "GW",
+        "sub": "routes",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "router",
+        "colorKey": "cyan",
+        "body": "label-only",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    },
+    {
+      "id": "lbl",
+      "type": "label",
+      "position": {
+        "x": 595,
+        "y": 598
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "text": "A caption never carries a body",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "goblinEdge",
+      "source": "bare",
+      "target": "carded",
+      "animated": false,
+      "style": {
+        "stroke": "var(--c-slate)"
+      },
+      "data": {
+        "shape": "bezier",
+        "offset": "center",
+        "strokeKey": "slate"
+      },
+      "label": "link",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "var(--c-slate)",
+        "width": 14,
+        "height": 14
+      },
+      "sourceHandle": "bottom",
+      "targetHandle": "top"
+    }
+  ],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

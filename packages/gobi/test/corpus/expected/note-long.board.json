@@ -1,0 +1,37 @@
+{
+  "id": "corpus-note-long",
+  "name": "A long note fits its box",
+  "nodes": [
+    {
+      "id": "bad",
+      "type": "goblin",
+      "position": {
+        "x": -125,
+        "y": 88
+      },
+      "width": 180,
+      "height": 64,
+      "style": {
+        "width": 180,
+        "height": 64
+      },
+      "data": {
+        "shape": "note",
+        "kicker": "note",
+        "title": "any error: all of them at once — line, col, message, hint, suggestion and the span it came from",
+        "sub": "",
+        "metric": "",
+        "metricUnit": "",
+        "icon": "sticky-note",
+        "colorKey": "slate",
+        "textStyle": {
+          "align": "center",
+          "vAlign": "middle"
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "updatedAt": 1234567890123,
+  "preset": "custom"
+}

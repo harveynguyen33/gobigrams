@@ -1,0 +1,13 @@
+board "Tables and edges"
+users = table "users" {
+  id uuid pk notnull;
+  email varchar notnull unique;
+  name varchar;
+}
+orders = table "orders" {
+  id uuid pk;
+  user_id uuid fk;
+}
+users -> orders card:1..n
+orders -> users card:0..1..n
+orders -> users "audit" dotted

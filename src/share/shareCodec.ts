@@ -14,7 +14,7 @@
  * CompressionStream('deflate-raw'). No new deps. Both entry points are async
  * (the two real callers — the Share door and the view route — are async by
  * nature), so there is no synchronous half-format to keep honest. */
-import type {BoardDoc} from '../boards';
+import type {BoardDoc} from '../board/boards';
 import {SHARE_VERSION, type ShareDecode, type ShareEncode, type ShareRefusal} from './shareTypes';
 
 /** The uncompressed escape hatch: same scheme, 'u' marks no deflate. */
