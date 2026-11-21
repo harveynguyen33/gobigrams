@@ -68,6 +68,9 @@ export type GobiColumn = {
   fk: boolean;
   notNull: boolean;
   unique: boolean;
+  /** UNISURF-S7 — the FK target table id (authored `ref:<id>` on the column
+   *  line; the drag and the .sp-* picker both write it). */
+  ref?: string;
   line: number;
 };
 
@@ -97,6 +100,11 @@ export type GobiEdgeStmt = {
   flowIcon: string | null;
   flowCount: number | null;
   card: string | null;
+  /** The two authored sides, EXACTLY as the parser read them: `0..1`/`0..n`
+   *  stay ONE piece, so the compiler never has to split a joined string
+   *  (`'1..0..1'.split('..')` yields three pieces — ERD-CARDINALITY). */
+  cardLeft: string | null;
+  cardRight: string | null;
   techn: string | null;
   x: number;
   line: number;
@@ -273,6 +281,8 @@ export type GobiDocColumn = {
   fk?: true;
   notNull?: true;
   unique?: true;
+  /** UNISURF-S7 — the FK target table id (authored `ref:<id>`). */
+  ref?: string;
 };
 
 /** One node of the document: the authored content plus the resolved

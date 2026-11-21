@@ -28,6 +28,7 @@ import {gobiMemberOrder, packGroup, routeEdgeHandles, detourEdgeHandles, placeEd
 import {gobiBodyOf, gobiTextStyle} from './gobiText';
 import {validateGobi} from './gobiValidator';
 import {GOBI_KIND_GEOMETRY} from './registry';
+import {tableNaturalWidth, tableNaturalHeight} from './model/tableWidth';
 import {GOBI_KIND_ITEM} from './gobiTypes';
 import {
   type GobiAst,
@@ -46,7 +47,14 @@ export type GobiCompileResult =
   | {ok: true; doc: GobiDocument}
   | {ok: false; errors: GobiError[]};
 
-export function compileGobi(text: string): GobiCompileResult {
+/* LAYOUT-FOLLOWS-WIDTH — the SURFACE's table look as a LAYOUT input. A `.gobi`
+ * text carries no style/density (B6), so with NO options the language's neutral
+ * table geometry stands (corpus/MCP/headless stay byte-identical); the APP
+ * supplies both on every door it owns, so its placement reads the SAME width
+ * function the card and the exporter do. */
+export type GobiCompileOptions = {style?: unknown; density?: unknown};
+
+export function compileGobi(text: string, opts?: GobiCompileOptions): GobiCompileResult {
   /* 1–3. PARSE + VALIDATE — one pass each, all errors collected. */
   const parsed = parseGobi(text);
   if (!parsed.ok) {
@@ -61,7 +69,7 @@ export function compileGobi(text: string): GobiCompileResult {
      shell is the minimum the layout passes read (id/position/size/style +
      the shape marker the label pass groups by); the authored content it
      carries in the doc is projected at emit. */
-  const {nodes, order, specs} = buildWork(ast);
+  const {nodes, order, specs} = buildWork(ast, opts);
   const {edgeShells, edgeSpecs} = buildEdgeWork(ast);
 
   /* placeholder positions: authored order packed at (i·600, 0) so layout's
@@ -321,7 +329,7 @@ type NodeSpec = {
   columns?: GobiDocColumn[];
 };
 
-function buildWork(ast: GobiAst): {nodes: FlowNode[]; order: string[]; specs: Map<string, NodeSpec>} {
+function buildWork(ast: GobiAst, opts?: GobiCompileOptions): {nodes: FlowNode[]; order: string[]; specs: Map<string, NodeSpec>} {
   const nodes: FlowNode[] = [];
   const order: string[] = [];
   const specs = new Map<string, NodeSpec>();
@@ -345,16 +353,25 @@ function buildWork(ast: GobiAst): {nodes: FlowNode[]; order: string[]; specs: Ma
         name: c.name, type: c.type,
         ...(c.pk ? {pk: true as const} : {}), ...(c.fk ? {fk: true as const} : {}),
         ...(c.notNull ? {notNull: true as const} : {}), ...(c.unique ? {unique: true as const} : {}),
+        /* UNISURF-S7 — the FK target id rides the doc so a text commit keeps it. */
+        ...(c.ref ? {ref: c.ref} : {}),
       }));
       specs.set(stmt.id, {
         kind: 'table', label: stmt.title ?? stmt.id,
         color: (stmt.attrs.color as string) ?? 'cyan',
         columns,
       });
+      /* LAYOUT-FOLLOWS-WIDTH — with the surface's style + density the table's
+         width is its CONTENT's (model/tableWidth.ts, the same function the
+         adapter and the card read); without options the neutral geometry stands.
+         TABLE-HEIGHT: the HEIGHT too — the layout reserves the rows' own box (a
+         6-row card must not run into the node below it); the canvas node stores NEITHER. */
+      const tw = opts ? tableNaturalWidth({columns}, opts.style, opts.density) : size.w;
+      const th = opts ? tableNaturalHeight({columns}, opts.style, opts.density) : size.h;
       nodes.push({
         id: stmt.id, type: 'table', position: {x: 0, y: 0},
-        width: size.w, height: size.h,
-        style: {width: size.w, height: size.h},
+        width: tw, height: th,
+        style: {width: tw, height: th},
         data: {shape: null},
       } as unknown as FlowNode);
       continue;
@@ -447,7 +464,10 @@ function buildEdgeWork(ast: GobiAst): {edgeShells: FlowEdge[]; edgeSpecs: EdgeSp
       };
       if (stmt.label) spec.label = stmt.label;
       if (stmt.techn) spec.techn = stmt.techn;
-      if (stmt.card) spec.card = stmt.card.split('..') as [string, string];
+      /* ERD-CARDINALITY — the parser's two sides verbatim. Splitting the joined
+       * spelling was the defect: `'1..0..1'.split('..')` is THREE pieces and the
+       * `as [string, string]` cast silenced it, so the target side became '0'. */
+      if (stmt.cardLeft && stmt.cardRight) spec.card = [stmt.cardLeft, stmt.cardRight];
       if (stmt.flow) spec.flow = stmt.flow;
       if (stmt.flowIcon) spec.flowIcon = stmt.flowIcon;
       if (stmt.flowCount !== null) spec.flowCount = stmt.flowCount;

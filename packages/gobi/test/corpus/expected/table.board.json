@@ -10,10 +10,8 @@
         "y": 0
       },
       "width": 250,
-      "height": 170,
       "style": {
-        "width": 250,
-        "height": 170
+        "width": 250
       },
       "data": {
         "name": "users",
@@ -49,10 +47,8 @@
         "y": 231
       },
       "width": 250,
-      "height": 170,
       "style": {
-        "width": 250,
-        "height": 170
+        "width": 250
       },
       "data": {
         "name": "orders",
@@ -101,8 +97,8 @@
         "width": 18,
         "height": 12
       },
-      "sourceHandle": "bottom",
-      "targetHandle": "top"
+      "sourceHandle": "right_rel_c1",
+      "targetHandle": "left_rel_c1"
     },
     {
       "id": "e2",
@@ -118,14 +114,20 @@
         "offset": "center",
         "strokeKey": "slate"
       },
-      "markerEnd": {
-        "type": "one",
+      "markerStart": {
+        "type": "zeroOrOne",
         "color": "var(--c-slate)",
         "width": 18,
         "height": 12
       },
-      "sourceHandle": "top",
-      "targetHandle": "bottom"
+      "markerEnd": {
+        "type": "many",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
+      "sourceHandle": "right_rel_c1",
+      "targetHandle": "left_rel_c1"
     },
     {
       "id": "e3",
@@ -149,8 +151,8 @@
         "width": 14,
         "height": 14
       },
-      "sourceHandle": "top",
-      "targetHandle": "bottom"
+      "sourceHandle": "right_rel_c1",
+      "targetHandle": "left_rel_c1"
     }
   ],
   "updatedAt": 1234567890123,

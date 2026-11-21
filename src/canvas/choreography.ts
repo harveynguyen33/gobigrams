@@ -8,7 +8,8 @@
  * internal research notes, sections T1/T3/T4/T11.
  */
 import {useCallback, useEffect, useRef, useState} from 'react';
-import type {Edge} from '@xyflow/react';
+import type {Edge, Node} from '@xyflow/react';
+import {isLogicalGroup} from './groupLogical';
 
 /** class added to an edge group + path (and its label) while it is "electric" */
 export const ELECTRIC = 'ds-electric';
@@ -34,6 +35,27 @@ export const NO_ANIM = 'ds-no-anim';
 export const READ_ONLY = 'ds-read-only';
 export const NO_PAN = 'nopan';
 
+/* HIGHLIGHT ROUND — the neighbourhood halo (mode 2 "halo + lift",
+   docs/sketches/highlight-options.html, owner-approved).
+
+   HL_FOCUS rides the wrapper (`.ds-hl`) and is the ONE switch for focus mode
+   (the rest of the board quiets while anything is lit). HL_LIT / HL_PEER ride
+   the node WRAPPER and paint the halo — deliberately on `filter`, because the
+   ONE box-shadow on a node card is the selection ring (`var(--sel)`), and a
+   halo written into box-shadow would erase selection on a selected+hovered
+   node (exactly why mock option 3 was rejected). The halo colour is
+   token-derived in CSS (`color-mix(in srgb, var(--fg) …)`), never --sel,
+   and it is a blur, not a line. */
+export const HL_FOCUS = 'ds-hl';
+export const HL_LIT = 'ds-hl-lit';
+export const HL_PEER = 'ds-hl-peer';
+/* HIGHLIGHT-CONTAINER (GROUP-LOGICAL) — the quieter CONTEXT treatment for the
+   container of a lit node. Only a visible FRAME (goblin `shape:'group'`) ever
+   carries it: the frame is context, never the subject, so it gets a border
+   lift (see .ds-hl-ctx in styles.css) instead of the halo. A LOGICAL group
+   paints nothing at all — it lights by membership instead. */
+export const HL_CTX = 'ds-hl-ctx';
+
 /**
  * True when an element currently carries RF's OWN `selected` class.
  *
@@ -48,114 +70,205 @@ function isSelected(el: HTMLElement | null): boolean {
 /** how long the layout-transition class stays on (must exceed the .35s CSS transition) */
 export const LAYOUT_MS = 400;
 
-const esc = (v: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(v) : v);
+/* HIGHLIGHT ROUND — desired-state painter. Everything below is computed FROM
+   SCRATCH on every call, then diffed onto the DOM with classList.toggle, so
+   two drivers (a hover focus and the current selection) can share the same
+   classes without ever leaving a stranded class behind: there is no touched
+   list to get out of sync, only the desired state. Hover never re-renders
+   React — this runs on RF's mouseenter/leave and on the selection callback,
+   touching classList only. */
+type HoverFocus = {kind: 'node' | 'edge', id: string} | null;
 
-const edgeEls = (root: HTMLElement, id: string) =>
-  Array.from(root.querySelectorAll<HTMLElement>(`.react-flow__edge[data-id="${esc(id)}"]`));
+function paintHighlight(
+  root: HTMLElement,
+  edges: Edge[],
+  nodes: Node[],
+  focus: HoverFocus,
+  selIds: readonly string[],
+) {
+  /* A node is LIT when it is the hover focus OR selected; peers are the nodes
+     at the other ends of the edges that touch a lit node. An edge-hover lights
+     just that edge and NO node, so it can never trigger focus mode — today's
+     behaviour, kept. */
+  const foci = new Set(selIds);
+  if (focus?.kind === 'node') foci.add(focus.id);
+  const litEdges = new Set<string>();
+  const peers = new Set<string>();
+  for (const ed of edges) {
+    if (foci.has(ed.source) || foci.has(ed.target)) {
+      litEdges.add(ed.id);
+      peers.add(ed.source);
+      peers.add(ed.target);
+    }
+  }
+  if (focus?.kind === 'edge') litEdges.add(focus.id);
 
-const edgePathEls = (root: HTMLElement, id: string) =>
-  Array.from(root.querySelectorAll<HTMLElement>(
-    `.react-flow__edge[data-id="${esc(id)}"] .react-flow__edge-path`,
-  ));
+  /* HIGHLIGHT-CONTAINER (GROUP-LOGICAL) — the two container kinds answer the
+     hover question DIFFERENTLY, on purpose:
+     • A FRAME (goblin `shape:'group'`) is scenery. A hovered child lights its
+       OWN neighbourhood exactly as above — never the frame's other children,
+       never their edges — and the frame itself gets only the quieter HL_CTX
+       border lift: the frame is context, not the subject.
+     • A LOGICAL group (RF `type:'group'`, paints nothing) is a UNIT: the block
+       is what answers "what does this connect to", so lighting one member
+       alone would be a half-truth. Every member becomes a peer, and EVERY edge
+       attached to any member lights — even the edge to a node far outside the
+       block. This is the deliberate difference from the frame rule. */
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const ctxParents = new Set<string>();
+  for (const id of foci) {
+    const pid = byId.get(id)?.parentId;
+    if (!pid) continue;
+    const parent = byId.get(pid);
+    if (!parent) continue;
+    if (isLogicalGroup(parent)) {
+      for (const m of nodes) if (m.parentId === pid && m.id !== id) peers.add(m.id);
+      for (const ed of edges) {
+        if (byId.get(ed.source)?.parentId === pid || byId.get(ed.target)?.parentId === pid ||
+            ed.source === pid || ed.target === pid) litEdges.add(ed.id);
+      }
+    } else if (parent.data?.shape === 'group') {
+      ctxParents.add(pid);
+    }
+  }
 
-const edgeLabelEls = (root: HTMLElement, id: string) =>
-  Array.from(root.querySelectorAll<HTMLElement>(`.edge-label[data-edge-id="${esc(id)}"]`));
-
-/** Add `cls` to every element of `els`, recording the touched elements for cleanup. */
-function paint(els: HTMLElement[], cls: string, touched: HTMLElement[]) {
-  els.forEach(el => {
-    el.classList.add(cls);
-    touched.push(el);
+  /* Nodes: lit outranks peer (the mock's paint priority). A selected+hovered
+     node is simply lit once — the halo never contests the selection ring. The
+     HL_CTX toggle rides the same pass so a re-paint that no longer names a
+     frame as context strips the class (computed-from-scratch, no touched
+     list). */
+  let litNodes = 0;
+  root.querySelectorAll<HTMLElement>('.react-flow__node').forEach((el) => {
+    const id = el.getAttribute('data-id');
+    const lit = !!id && foci.has(id);
+    el.classList.toggle(HL_LIT, lit);
+    el.classList.toggle(HL_PEER, !lit && !!id && peers.has(id));
+    el.classList.toggle(HL_CTX, !!id && ctxParents.has(id));
+    if (lit) litNodes++;
   });
+
+  /* Edges: electric on the lit neighbourhood — except a SELECTED edge, which
+     already reads as highlighted and must not jump under the pointer (the old
+     lightEdge rule, kept verbatim). */
+  const electricIds = new Set<string>();
+  root.querySelectorAll<HTMLElement>('.react-flow__edge').forEach((el) => {
+    const id = el.getAttribute('data-id');
+    const on = !!id && litEdges.has(id) && !isSelected(el);
+    el.classList.toggle(ELECTRIC, on);
+    if (id && on) electricIds.add(id);
+  });
+  /* path + label ride the same state (the label is a SIBLING element, matched
+     by data-edge-id, not a descendant — see the .edge-label.ds-electric note). */
+  root.querySelectorAll<HTMLElement>('.react-flow__edge-path').forEach((el) => {
+    const g = el.closest('.react-flow__edge');
+    el.classList.toggle(ELECTRIC, !!g && g.classList.contains(ELECTRIC));
+  });
+  root.querySelectorAll<HTMLElement>('.edge-label').forEach((el) => {
+    const id = el.getAttribute('data-edge-id');
+    el.classList.toggle(ELECTRIC, !!id && electricIds.has(id));
+  });
+
+  /* FOCUS MODE: on while any NODE is lit. Rooted on the wrapper so the CSS
+     dim (.ds-hl …) can never leak into the code rail, dialogs or panels. */
+  root.classList.toggle(HL_FOCUS, litNodes > 0);
 }
 
-/** Remove every recorded class and clear the tally. */
-function unpaint(touched: HTMLElement[], cls: string) {
-  touched.forEach(el => el.classList.remove(cls));
-  touched.length = 0;
+/** Strip every highlight class from the tree — board switch / unmount only. */
+function wipeHighlight(root: HTMLElement) {
+  root.classList.remove(HL_FOCUS);
+  root.querySelectorAll<HTMLElement>('.react-flow__node').forEach((el) => {
+    el.classList.remove(HL_LIT, HL_PEER, HL_CTX);
+  });
+  root.querySelectorAll<HTMLElement>('.react-flow__edge, .react-flow__edge-path, .edge-label')
+    .forEach((el) => el.classList.remove(ELECTRIC));
 }
 
 /**
- * K1 — hover choreography.
+ * K1 — hover + selection choreography.
  *
  * Hover an edge  → that edge goes electric (accent stroke + glow + flowing dash).
- * Hover a node  → every connected edge (either direction) goes electric.
+ * Hover a node  → every connected edge goes electric, and (HIGHLIGHT ROUND)
+ *                 the hovered node and its peers get the halo `filter`, the
+ *                 rest of the board dims until the pointer leaves.
+ * Select a node → the same neighbourhood lights, PERSISTENTLY — and since
+ *                 the owner's override (2026-11-20, HL-GATE) the option gates
+ *                 BOTH halves: off paints nothing on hover or select, and a
+ *                 toggle-off wipes mid-hover AND mid-selection paint.
+ *                 Read-only still lights (App's gate there is the option OR
+ *                 read-only). See App's wiring at the useHoverChoreography
+ *                 call and onSelectionChange.
  *
- * THE PULSE IS DELIBERATELY GONE (Harvey, 2026-09-17). A hover effect used to
- * also outline the hovered node and every peer. That ring was drawn in the SAME
- * `--sel` colour as the selection ring, i.e. ONE visual signal carrying two
- * different meanings ("hovering" / "selected"), and it covered the whole
- * neighbourhood of the hovered node — so the UI read as confused, which is the
- * opposite of what a hover hint is for. The information worth keeping is
- * "what does this node connect to?", and the ELECTRIC edges answer exactly that
- * without inventing a second selection colour. Do not re-add a node outline here.
+ * THE PULSE IS STILL GONE (Harvey, 2026-09-17): the halo is `filter`
+ * brightness + drop-shadow on the node WRAPPER — a different property from
+ * the selection ring's `box-shadow`, a different colour (`--fg`-derived, not
+ * `--sel`), a blur and not a line. It therefore answers "what does this node
+ * connect to?" without ever contesting or resembling the one selection
+ * signal. Do not re-add a node outline here.
  *
- * Returns the four `on*MouseEnter/Leave` handlers for `<ReactFlow>`.
- *
- * F — `enabled` gates the whole effect. The hover highlight is a user option
- * now and it DEFAULTS OFF, so when it is false every handler returns early and
- * `clear()` runs (the effect below) to un-paint anything already lit: toggling
- * the option off mid-hover must not strand an ELECTRIC edge.
+ * F/HL-GATE — `enabled` gates BOTH halves: when false the handlers ignore
+ * enter events and the effect below repaints empty, so a toggle-off
+ * strands no ELECTRIC edge, no lit halo, and no lit selection.
  */
 export function useHoverChoreography(
   wrapRef: React.RefObject<HTMLElement | null>,
   edgesRef: React.RefObject<Edge[]>,
+  nodesRef: React.RefObject<Node[]>,
   enabled: boolean,
 ) {
-  const touchedEdges = useRef<HTMLElement[]>([]);
+  const focusRef = useRef<HoverFocus>(null);
+  const selIdsRef = useRef<string[]>([]);
 
-  const clear = useCallback(() => {
-    unpaint(touchedEdges.current, ELECTRIC);
-  }, []);
+  const repaint = useCallback(() => {
+    const root = wrapRef.current;
+    if (!root) return;
+    paintHighlight(root, edgesRef.current ?? [], nodesRef.current ?? [], enabled ? focusRef.current : null, enabled ? selIdsRef.current : []);
+  }, [wrapRef, edgesRef, nodesRef, enabled]);
 
-  const noop = useCallback(() => {}, []);
+  /** Selection driver — called from App's onSelectionChange, which fires AFTER
+   *  RF commits the new selection, so RF's own `selected` classes are already
+   *  fresh when the paint walks the DOM. WRITE unconditional, paint gated. */
+  const applySelection = useCallback((nodes: readonly {id: string}[]) => {
+    selIdsRef.current = nodes.map((n) => n.id);
+    repaint();
+  }, [repaint]);
 
-  /* F — disabled: un-paint on the very next render after the toggle. `clear` is
-     idempotent, so this is a cheap no-op while something else owns the paint. */
-  useEffect(() => {
-    if (!enabled) clear();
-  }, [enabled, clear]);
-
-  /** Paint one edge (group + path + label) electric — unless it is SELECTED.
-   *  Selection outranks hover: a selected edge already reads as highlighted, so
-   *  the electric repaint would make it jump (1.8px → 4px + dash + glow) under
-   *  the pointer. Same rule the removed node pulse followed. */
-  const lightEdge = useCallback((root: HTMLElement, id: string) => {
-    if (isSelected(edgeEls(root, id)[0] ?? null)) return;
-    paint(edgeEls(root, id), ELECTRIC, touchedEdges.current);
-    paint(edgePathEls(root, id), ELECTRIC, touchedEdges.current);
-    paint(edgeLabelEls(root, id), ELECTRIC, touchedEdges.current);
-  }, []);
+  const clearHover = useCallback(() => {
+    focusRef.current = null;
+    repaint();
+  }, [repaint]);
 
   const onEdgeMouseEnter = useCallback((_e: React.MouseEvent, edge: Edge) => {
-    const root = wrapRef.current;
-    if (!enabled || !root) return;
-    clear();
-    lightEdge(root, edge.id);
-  }, [wrapRef, clear, lightEdge, enabled]);
-
-  const onEdgeMouseLeave = useCallback(() => { clear(); }, [clear]);
+    if (!enabled) return;
+    focusRef.current = {kind: 'edge', id: edge.id};
+    repaint();
+  }, [enabled, repaint]);
 
   const onNodeMouseEnter = useCallback((_e: React.MouseEvent, node: {id: string}) => {
-    const root = wrapRef.current;
-    if (!enabled || !root) return;
-    clear();
-    // every edge touching this node, in either direction — this is the whole
-    // effect: it shows the node's connections without touching any node's ring.
-    (edgesRef.current ?? [])
-      .filter(ed => ed.source === node.id || ed.target === node.id)
-      .forEach(ed => lightEdge(root, ed.id));
-  }, [wrapRef, edgesRef, clear, lightEdge, enabled]);
+    if (!enabled) return;
+    focusRef.current = {kind: 'node', id: node.id};
+    repaint();
+  }, [enabled, repaint]);
 
-  const onNodeMouseLeave = useCallback(() => { clear(); }, [clear]);
+  const onEdgeMouseLeave = clearHover;
+  const onNodeMouseLeave = clearHover;
+
+  /* F/HL-GATE — disabled: repaint EMPTY on the very next render after the
+     toggle — the gated pass drops the hover focus AND wipes the selection
+     paint (owner override 2026-11-20: one option, both lights). */
+  useEffect(() => {
+    if (!enabled) {
+      focusRef.current = null;
+      repaint();
+    }
+  }, [enabled, repaint]);
 
   // A board switch / unmount must not leave stale highlighted classes behind.
-  useEffect(() => clear, [clear]);
+  useEffect(() => () => {
+    const root = wrapRef.current;
+    if (root) wipeHighlight(root);
+  }, [wrapRef]);
 
-  if (!enabled) {
-    return {onEdgeMouseEnter: noop, onEdgeMouseLeave: noop, onNodeMouseEnter: noop, onNodeMouseLeave: noop};
-  }
-  return {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave};
+  return {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave, applySelection};
 }
 
 /**

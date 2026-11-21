@@ -36,6 +36,11 @@
  */
 import {readdirSync, statSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
+/* HISTORY-V1 — the save-history numbers and the generational planner moved to
+   src/board/historyPolicy.ts: the ONE dependency-free home both sides import
+   (node here, the browser-side local adapter later — that chain must not
+   drag node:fs). This module stays the fs side: scans, plans, unlinks. */
+import {HISTORY_RE, historyStampOf, planHistory} from '../src/board/historyPolicy.ts';
 
 export const RETENTION = Object.freeze({
   /** A tombstone younger than this always survives (recover a mis-click). */
@@ -58,6 +63,9 @@ export const RETENTION = Object.freeze({
 export const TOMBSTONE_RE = /^([A-Za-z0-9_-]+)\.deleted-(\d{8}T\d{6}Z)\.json$/;
 /** `<boardId>.json.bak` — the exact AS-6 backup name. */
 export const BAK_RE = /^([A-Za-z0-9_-]+)\.json\.bak$/;
+/* HISTORY_RE (`<boardId>.<epoch-ms>.json`) moved to src/board/historyPolicy.ts
+   with the HISTORY-V1 retention numbers — the one home; imported above. */
+
 
 /** Parse the tombstone name stamp (`20261104T185606Z`) to UTC ms.
  *  Returns NaN for an impossible date — the planner treats a tombstone it
@@ -141,6 +149,131 @@ export function planRetention(entries, opts = {}) {
     kept: {tombstones: tombs.length - removedTombstones, baks: baks.length - removedBaks, other},
     scanned: entries.length,
   };
+}
+
+/**
+ * HARNESS-ISOLATION-2 F2 — the liveness layer over the pure history plan.
+ *
+ * The generational law itself (ring + daily + pins, per board) lives in
+ * src/board/historyPolicy.ts — planHistory, PURE, no filesystem. This
+ * wrapper adds the ONE thing the pure planner deliberately does not know:
+ * whether the board still EXISTS. When `liveIds` is given, a generation
+ * whose board has no live board file is removed too — a deleted board's
+ * recovery copy is its tombstone, so its history is redundant (the same
+ * rule the `.bak` class uses). There is still NO global cap: a global cap
+ * let harness scratch churn evict a real board's window once, which is the
+ * exact failure this class exists against.
+ *
+ * @param {{name: string}[]} entries — names read from boards/.history/
+ * @param {{now?: number, liveIds?: Set<string>|null, pins?: Iterable<string>}} [opts]
+ * @returns {{keep: string[], evict: string[], other: string[]}} file NAMES;
+ *   `evict` is oldest-first, and contains ONLY `<id>.<13-digit-epoch-ms>.json`
+ *   names — the safety contract every harness pins.
+ */
+export function planHistoryRetention(entries, opts = {}) {
+  const plan = planHistory(entries, opts);
+  const liveIds = opts.liveIds ?? null;
+  if (liveIds === null) return plan;
+  const keep = [];
+  const evict = [...plan.evict];
+  for (const name of plan.keep) {
+    const m = HISTORY_RE.exec(name);
+    if (m && !liveIds.has(m[1])) evict.push(name);
+    else keep.push(name);
+  }
+  evict.sort((a, b) => (historyStampOf(a) ?? 0) - (historyStampOf(b) ?? 0));
+  return {keep, evict, other: plan.other};
+}
+
+/**
+ * The newest stored generation stamp for ONE board id, or null when the class
+ * is empty for it. A readdir + name-grammar scan — deliberately NO index file
+ * (a corrupt index would be a new failure mode; the file names are the
+ * truth). HISTORY-V1's sampling rule reads this on every PUT.
+ * @param {string} dir — boards/.history
+ * @param {string} id — the board id
+ */
+export function newestHistoryStamp(dir, id) {
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch (e) {
+    if (e && e.code === 'ENOENT') return null;
+    throw e;
+  }
+  let newest = null;
+  for (const name of names) {
+    const m = HISTORY_RE.exec(name);
+    if (!m || m[1] !== id) continue;
+    const ts = Number(m[2]);
+    if (newest === null || ts > newest) newest = ts;
+  }
+  return newest;
+}
+
+/**
+ * Apply the history plan to a directory. Missing directory is a no-op (the
+ * first PUT creates it); a file that vanishes mid-prune is fine; anything else
+ * is reported through `log` rather than swallowed.
+ * @param {string} dir — boards/.history
+ * @param {{liveIds?: Set<string>|null, log?: (msg: string) => void}} [opts]
+ */
+export function pruneBoardHistory(dir, opts = {}) {
+  const log = opts.log ?? (() => {});
+  let names;
+  try {
+    names = readdirSync(dir, {withFileTypes: true})
+      .filter(d => d.isFile())
+      .map(d => ({name: d.name}));
+  } catch (e) {
+    if (e && e.code === 'ENOENT') return {keep: [], evict: [], other: [], removed: 0, note: 'dir absent'};
+    throw e;
+  }
+  const plan = planHistoryRetention(names, opts);
+  let removed = 0;
+  for (const name of plan.evict) {
+    try {
+      rmSync(join(dir, name));
+      removed++;
+    } catch (e) {
+      if (e && e.code === 'ENOENT') continue; // raced away — already gone
+      log(`[board-history] failed to remove ${name}: ${e && e.message ? e.message : e}`);
+    }
+  }
+  return {...plan, removed};
+}
+
+/**
+ * HARNESS-ISOLATION-2 F2 — remove ONE board's generations (called by DELETE).
+ * A deleted board's recovery copy is its AS-7 tombstone, exactly like its
+ * `.bak`, so keeping ten old generations of a board that no longer exists is
+ * the unbounded-growth defect this module exists to prevent. The planner's
+ * regex is reused, so only exact `<id>.<13-digit-epoch-ms>.json` names can be
+ * named — never a live board, a tombstone, the library or a `.bak`.
+ * @returns {number} how many generation files were unlinked
+ */
+export function dropBoardHistory(dir, id, opts = {}) {
+  const log = opts.log ?? (() => {});
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch (e) {
+    if (e && e.code === 'ENOENT') return 0;
+    throw e;
+  }
+  let removed = 0;
+  for (const name of names) {
+    const m = HISTORY_RE.exec(name);
+    if (!m || m[1] !== id) continue;
+    try {
+      rmSync(join(dir, name));
+      removed++;
+    } catch (e) {
+      if (e && e.code === 'ENOENT') continue;
+      log(`[board-history] failed to remove ${name}: ${e && e.message ? e.message : e}`);
+    }
+  }
+  return removed;
 }
 
 /**

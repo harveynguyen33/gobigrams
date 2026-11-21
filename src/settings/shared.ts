@@ -6,6 +6,7 @@ import {type Mode, type ThemeName} from '../theme/theme';
 import {type MarqueeMode} from '../canvas/marqueeMode';
 import {type ZOrderMode} from '../board/zOrderMode';
 import {type LayoutDirection} from '../layout/layout';
+import type {TableStyle, Density} from '../../packages/gobi/src/model/tableStyle';
 
 export type Props = {
   open: boolean;
@@ -67,6 +68,17 @@ export type Props = {
    *  auto-layout consumes it through useCanvasTools. */
   layoutDir: LayoutDirection;
   onLayoutDir: (d: LayoutDirection) => void;
+  /** TABLE-STYLE-RELOCATE (t_2f3039c6) — the CURRENT board's table style +
+   *  density, relocated from the Boards menu's retired "Board style…" row
+   *  (it restyled only table nodes, so the name was wrong twice over). App
+   *  resolves the pair exactly as the canvas attr does (board field, absent
+   *  = the New-boards default) and passes the ONE writer — setBoardStyle —
+   *  so no second write path exists. hasBoard=false (no board open) renders
+   *  an honest state line, never a dead control. */
+  tableStyle: TableStyle;
+  tableDensity: Density;
+  onTableStyle: (s: TableStyle, d: Density) => void;
+  hasBoard: boolean;
   /** return focus to the toolbar button on close */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
   /** ROUND BI — the current board as a PNG data URL (App's buildPng); null on
@@ -75,6 +87,4 @@ export type Props = {
   /** ROUND BI, ITEM 3 — the About pane's feedback entry opens the APP-level
    *  dialog; the element is passed so Esc returns focus to the exact control. */
   onOpenFeedback: (from: HTMLElement | null) => void;
-  /** ONBOARD-P5 — the one-line tips switch (Canvas pane, default ON). */
-  tips: boolean; onTips: (v: boolean) => void;
 };

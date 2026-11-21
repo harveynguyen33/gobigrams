@@ -61,7 +61,7 @@ export type InspectorTarget =
 
 /** Every section the inspector can render, across all four target kinds. */
 export type SectionId =
-  | 'content' | 'text' | 'style'                    // goblin (+ label for `text`)
+  | 'content' | 'definition' | 'text' | 'style'       // goblin (+ label for `text`)
   | 'table' | 'columns' | 'showMode'                // table
   | 'label' | 'line' | 'markers' | 'cardinality' | 'flow';   // edge
 
@@ -181,6 +181,7 @@ export const hasBody = (t: InspectorTarget) =>
 --------------------------------------------------------------------------- */
 export const COLLAPSED_DEFAULT: Record<SectionId, boolean> = {
   content: false,
+  definition: false,
   text: false,
   style: false,
   table: false,
@@ -290,6 +291,11 @@ export function getInspectorSections(target: InspectorTarget): InspectorSection[
     case 'label':
       return (['text'] as const).map(sec);
     case 'goblin':
-      return (['content', 'text', 'style'] as const).map(sec);
+      /* DESC-1 — `definition` sits between Content and Text: it is the node's
+       *  CONTENT in paragraph form (what the shape IS, not how it is spelled
+       *  or formatted), so it follows the short fields and precedes the
+       *  formatting ladder — the same "words first, looks later" ladder the
+       *  goblin order already argues for in §D. */
+      return (['content', 'definition', 'text', 'style'] as const).map(sec);
   }
 }

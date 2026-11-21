@@ -189,3 +189,24 @@ export function computeHelperSnap(
 
   return {position: applied, guides: {vertical, horizontal}};
 }
+
+/** SHAPE-FIDELITY (t_926d8509, arm D) — convert the ABSOLUTE snap produced by
+ * `computeHelperSnap` into the position React Flow stores for the node:
+ * parent-relative when the dragged node is a group child (RF stores child
+ * positions relative to their parent), rounded, and CLAMPED inside the
+ * parent's bounds so `extent: 'parent'` cannot silently undo the snap on the
+ * next render. `parent` is the dragged node's parent box in ABSOLUTE
+ * coordinates, or null for a top-level node — then this is just Math.round. */
+export function snapToParentRelative(
+  applied: {x: number; y: number; w?: number; h?: number},
+  parent?: {x: number; y: number; w: number; h: number} | null,
+): XYPosition {
+  const x = Math.round(applied.x);
+  const y = Math.round(applied.y);
+  if (!parent) return {x, y};
+  const cw = applied.w ?? 0, ch = applied.h ?? 0;
+  return {
+    x: Math.min(Math.max(x - parent.x, 0), Math.max(parent.w - cw, 0)),
+    y: Math.min(Math.max(y - parent.y, 0), Math.max(parent.h - ch, 0)),
+  };
+}

@@ -91,9 +91,13 @@ export function HelpSheet({btnRef, popRef, open, onToggle, onSendFeedback, canRe
             <div className="help-row"><span>Delete selection</span><span className="help-keys"><kbd>Del</kbd></span></div>
             <div className="help-row"><span>Copy / paste / duplicate</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>C</kbd><kbd>V</kbd><kbd>D</kbd></span></div>
             <div className="help-row"><span>Rotate selection<span className="help-hint">Shift-drag the grip snaps 15°</span></span><span className="help-keys"><kbd>Alt</kbd><kbd>R</kbd></span></div>
+            <div className="help-row"><span>Group selection</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>G</kbd></span></div>
+            <div className="help-row"><span>Ungroup</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>G</kbd></span></div>
+            <div className="help-row"><span>Lock / unlock selection</span><span className="help-keys"><kbd>Alt</kbd><kbd>L</kbd></span></div>
             <div className="help-row"><span>Deselect</span><span className="help-keys"><kbd>Esc</kbd></span></div>
             <div className="help-row"><span>Fit view to diagram</span><span className="help-keys"><kbd>⇧</kbd><kbd>1</kbd></span></div>
             <div className="help-row"><span>Read-only review</span><span className="help-keys"><kbd>⇧</kbd><kbd>2</kbd></span></div>
+            <div className="help-row"><span>Toggle the code pane</span><span className="help-keys"><kbd>⌘/Ctrl</kbd><kbd>/</kbd></span></div>
             {/* the same hint Settings → Shortcuts shows on this row, so the two
                 surfaces carry the same information (item 4), not just the same
                 labels */}

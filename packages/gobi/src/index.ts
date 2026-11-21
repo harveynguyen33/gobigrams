@@ -51,6 +51,13 @@ export {renderGobiDocument, type RenderGobiOptions} from './renderSvg';
 export {tableMeasurer, metricKey, metricKeyParts, type GobiMeasureText, type GobiMetrics} from './tableMeasure';
 export {themeBlocks, tokensFromCss} from './themeCss';
 export {EXPORT_TOKENS} from './model/theme';
+/* UNISURF-S1 — the inverse door: BoardDoc → `.gobi` text (the code pane's
+ * projection). Sits beside toBoardDoc; the compiler-only bundle stays clean
+ * because this module imports no React/Flow runtime — only the registries. */
+export {boardDocToGobi, emittableNodeIds, type BoardDocToGobiResult} from './model/adapterText';
+/* UNISURF-S2 — the merge door: fold a compiled text edit back into the live
+ * BoardDoc, preserving what the grammar cannot express. */
+export {applyGobiDoc} from './model/mergeGobi';
 export {THEME_CSS} from './themeSheet';
 export {DEFAULT_METRICS} from './defaults';
 export {describeGobiDocument, type GobiDescribe, type GobiDescribeNode, type GobiDescribeEdge, type GobiDescribeGroup} from './describeGobi';

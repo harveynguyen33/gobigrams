@@ -17,6 +17,7 @@
  */
 
 import {toBoardDoc} from './model/adapterCanvas';
+import {tableNaturalHeight} from './model/tableWidth';
 import {exportSvg, type ExportNode, type SvgMeasurer, type TextRect} from './model/export/exportSvg';
 import type {BoardDoc} from './model/boardDoc';
 import type {GobiDocument} from './gobiTypes';
@@ -83,12 +84,18 @@ const headlessText = (el: unknown, tokens: Record<string, string>): TextRect | n
 };
 
 /** The compiler's own size wins; a size-less node gets the canvas heights
- * (61 + 34 per row) rather than the emitter's 180x90 default, which would
- * disagree with every row it paints. */
+ *  (61 + 34 per row) rather than the emitter's 180x90 default, which would
+ *  disagree with every row it paints.
+ *  TABLE-HEIGHT (t_5fa4dbb0): a TABLE's size-less box is its ROWS' — the same
+ *  core number the layout reserves with (model/tableWidth.ts). The adapter no
+ *  longer stores a height, so without this the card estimate above painted a
+ *  3-column ERD grid 61px tall (measured: rect 59px for three rows). */
 const stampMeasured = (n: {width?: number; height?: number; style?: {width?: number | string; height?: number | string}; data?: Record<string, unknown>}) => {
   const rows = rowParts(n.data || {});
+  const cols = (n.data as {columns?: unknown} | undefined)?.columns;
   const w = n.width ?? (typeof n.style?.width === 'number' ? n.style.width : undefined) ?? 190;
-  const h = n.height ?? (typeof n.style?.height === 'number' ? n.style.height : undefined) ?? (61 + 34 * (rows - 1));
+  const h = n.height ?? (typeof n.style?.height === 'number' ? n.style.height : undefined)
+    ?? (Array.isArray(cols) ? tableNaturalHeight({columns: cols as never}) : (61 + 34 * (rows - 1)));
   return {width: w, height: h};
 };
 

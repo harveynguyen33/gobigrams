@@ -1,6 +1,6 @@
 {
   "name": "@techgoblin/obsidian-gobi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "commonjs",
   "description": "The .gobi Obsidian door — renders ```gobi code blocks as diagrams through @techgoblin/gobi-core. Render only: no canvas, no editing, no sync-back.",

@@ -16,7 +16,7 @@ import type * as React from 'react';
 import type {Node, Edge, ReactFlowInstance} from '@xyflow/react';
 import {readToken, tokensFor, EXPORT_TOKENS} from '../theme/theme';
 import {mermaidToGraph} from '../gobi/mermaid';
-import {gobiInsert} from '../gobi/gobiInsert';
+import {gobiInsert, mergeById, mergeEdges} from '../gobi/gobiInsert';
 import type {ExportNode, ExportEdge, ExportInput, SvgMeasurer} from '../export/exportSvg';
 import type {OutlineShaper} from '../export/textOutline';
 
@@ -481,40 +481,38 @@ export function useExportActions(
   const fileRef = useRef<HTMLInputElement>(null);
 
   /* AQ21 — the export modal's TEXT imports land here. Fresh ids, grid layout.
-     AS-3: the import is ADDITIVE (setNodes/setEdges append), so it is ONE undo
-     entry: pushHistory() snapshots the pre-import graph (and clears `future`,
+     AS-3: the import is ADDITIVE (setNodes/setEdges merge into the board), so
+     it is ONE undo entry: pushHistory() snapshots the pre-import graph (and
+     clears `future`,
      the redo contract) BEFORE the append — a single Cmd+Z removes exactly the
      import, redo restores it. (The old code wiped history here, which was
      copied from the JSON import — but that path REPLACES the board; this one
      appends, so the reset destroyed undoable work.)
      GOBI-2: the `.gobi` door dispatches the SAME event, so both text doors get
-     the same append + the same single undo entry. Its detail is already REAL
+     the same merge + the same single undo entry. Its detail is already REAL
      board nodes/edges (the compiler ran the palette factories and the layout),
-     so it skips mermaidToGraph and inserts verbatim — through gobiInsert, which
-     remaps ids a canvas node already owns. */
-  /* The append must see the ids the canvas REALLY owns, not the ones this
-     effect closed over when it subscribed (its deps stay [flash, tickTask]).
-     One assignment per render, never stale. */
-  const liveGraph = useRef({nodes, edges});
-  liveGraph.current = {nodes, edges};
-  /* ROUND IMPORT-ONCE — ids promised to an insert that has not committed yet.
-     gobiInsert records its winners into the set, so a duplicate delivery of
-     the same event (two active listeners, a double dispatch before the next
-     render) reserves PAST the first insert's ids instead of minting them
-     again — colliding node ids are what made React Flow render ZERO edges.
-     Cleared in an EFFECT keyed on the committed graph, never mid-render: a
-     render that does not contain the insert must not reopen the window. */
-  const reservedIds = useRef(new Set<string>());
-  useEffect(() => { reservedIds.current.clear(); }, [nodes, edges]);
+     so it skips mermaidToGraph and inserts verbatim.
+     IMPORT-DUP (t_349010fd): the insert is a MERGE BY ID — `mergeById` /
+     `mergeEdges` run in the FUNCTIONAL updaters against the live committed
+     lists, so an id the board already owns is updated in place (the doc's
+     own node, exactly what a fresh insert lands) and re-importing the same
+     document is a no-op instead of a board that grows -2 copies on every
+     import. Edges key on id AND endpoints (the compiler mints `e1`,`e2`…
+     per document, so another document's `e1` is a different edge and keeps
+     the old suffix-append). The same property retires the IMPORT-ONCE
+     reservation set: a duplicate delivery of this event merges onto the
+     first delivery's result and mints nothing (a functional updater sees
+     the previous updater's committed list, so even two synchronous
+     dispatches cannot collide). */
   useEffect(() => {
     const h = (ev: Event) => {
       const parsed = (ev as CustomEvent).detail;
       if (!parsed) return;
       if (parsed.from === 'gobi' && parsed.board) {
-        const ins = gobiInsert(parsed.board, liveGraph.current, reservedIds.current);
+        const ins = gobiInsert(parsed.board);
         pushHistory();
-        setNodes(ns => [...ns, ...ins.nodes]);
-        setEdges(es => [...es, ...ins.edges]);
+        setNodes(ns => mergeById(ns, ins.nodes));
+        setEdges(es => mergeEdges(es, ins.edges));
         bumpHist(v => v + 1);
         flash(`Imported ${ins.nodes.length} nodes · ${ins.edges.length} edges from .gobi`);
         return;

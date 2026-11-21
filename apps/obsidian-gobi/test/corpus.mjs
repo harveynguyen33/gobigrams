@@ -9,7 +9,7 @@
  * WHAT IT PROVES (the card's acceptance 1, 2, 3, 5):
  *   C1  main.js loads as CJS with only 'obsidian' external; the bundled-core
  *       marker (BUNDLED_CORE + the core's own refusal string) is inside it;
- *   C2  corpus parity: all 24 good fixtures render through the processor and
+ *   C2  corpus parity: all 26 good fixtures render through the processor and
  *       hash- AND byte-match packages/gobi/test/corpus/expected/<name>.svg;
  *   C3  the negative control: the comparator FAILS on a wrong pair (a runner
  *       that always says pass cannot survive);
@@ -112,7 +112,7 @@ const good = fixtures.filter((f) => !f.startsWith('bad-')).map((f) => ({name: f.
 const bad = fixtures.filter((f) => f.startsWith('bad-')).map((f) => ({name: f.replace(/\.gobi$/, ''), text: readFileSync(join(FIXTURE_DIR, f), 'utf8')}));
 
 console.log(`  ..   fixtures: ${good.length} good / ${bad.length} bad`);
-ok('C2a the corpus has the expected shape (24 good / 7 bad)', good.length === 24 && bad.length === 7);
+ok('C2a the corpus has the expected shape (26 good / 7 bad)', good.length === 26 && bad.length === 7);
 
 const svgOf = (html) => {
   const open = html.indexOf('<svg');
@@ -130,7 +130,7 @@ for (const g of good) {
   if (svg && svg === expected && el.classes.has('gobi-block') && el.innerHTML.includes('gobi-render')) parity++;
   else mismatches.push(`${g.name} (svg=${svg ? 'yes' : 'NONE'} byte-equal=${svg === expected})`);
 }
-ok(`C2b all 24 good fixtures render byte-identical SVG through the plugin processor`, parity === good.length,
+ok(`C2b all 26 good fixtures render byte-identical SVG through the plugin processor`, parity === good.length,
   `${parity}/${good.length}; mismatches: ${mismatches.slice(0, 5).join(', ')}`);
 ok('C2c hashes agree with the committed .sha256 goldens',
   good.every((g) => {

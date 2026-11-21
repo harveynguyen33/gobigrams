@@ -6,6 +6,8 @@ import {useRef} from 'react';
 import {MARQUEE_OPTS} from '../canvas/marqueeMode';
 import {ZORDER_OPTS} from '../board/zOrderMode';
 import {LAYOUT_DIR_OPTS} from '../layout/layoutMode';
+import {TABLE_STYLES, DENSITIES, TABLE_STYLE_LABELS, DENSITY_LABELS} from '../../packages/gobi/src/model/tableStyle';
+import {useNewBoardDefaults} from '../hooks/useNewBoardDefaults';
 import {ROADMAP, ROADMAP_REVIEWED, type RoadmapItem, type RoadmapStatus} from '../ui/roadmap';
 import {APP_VERSION} from './version';
 import type {Props} from './shared';
@@ -14,8 +16,13 @@ import {Row, ToolbarChip, Toggle, Segmented, gridSizeOptions} from './Controls';
 export function CanvasPane({
   gridSize, onGridSize, alignGuides, onAlignGuides, animate, onAnimate, highlight, onHighlight,
   marquee, onMarquee, zOrder, onZOrder, layoutDir, onLayoutDir, pngScale, onPngScale, pngPad, onPngPad, autosave, onAutosave,
-  tips, onTips,
-}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave' | 'tips' | 'onTips'>) {
+  tableStyle, tableDensity, onTableStyle, hasBoard,
+}: Pick<Props, 'gridSize' | 'onGridSize' | 'alignGuides' | 'onAlignGuides' | 'animate' | 'onAnimate' | 'highlight' | 'onHighlight' | 'marquee' | 'onMarquee' | 'zOrder' | 'onZOrder' | 'layoutDir' | 'onLayoutDir' | 'pngScale' | 'onPngScale' | 'pngPad' | 'onPngPad' | 'autosave' | 'onAutosave' | 'tableStyle' | 'tableDensity' | 'onTableStyle' | 'hasBoard'>) {
+  /* BOARD-STYLE — Settings → New boards. These two are the DEFAULT a board with
+     no style/density of its own reads (Harvey, 2026-11-09); they are not the
+     current board's value — that one is written from the inspector or the
+     "Table style" group below and stored ON the board. */
+  const nb = useNewBoardDefaults();
   return (
     <>
       <h2 className="settings-h" id="settings-title">Canvas</h2>
@@ -100,14 +107,59 @@ export function CanvasPane({
             labelOf={v => LAYOUT_DIR_OPTS.find(o => o.v === v)?.label ?? String(v)}
           />
         </Row>
-        <Row label="Highlight connections" hint="brighten the edges that touch the hovered node">
-          <Toggle label="Highlight connections" value={highlight} onToggle={() => onHighlight()} />
+        <Row label="Neighbourhood highlight" hint="light a node's connections when you hover or select it">
+          <Toggle label="Neighbourhood highlight" value={highlight} onToggle={() => onHighlight()} />
         </Row>
-        {/* ONBOARD-P5 — the one-line tips. Frequency rule: a tip is a first-use
-            nudge the user turns off once, so its switch lives here, not on the
-            toolbar. Off = nothing is scheduled and the toast does not mount. */}
-        <Row label="Tips" hint="one-line hints the first time you use a feature">
-          <Toggle label="Tips" value={tips} onToggle={() => onTips(!tips)} />
+        {/* TABLE-STYLE-RELOCATE (t_2f3039c6) — the CURRENT board's table style,
+            relocated from the Boards menu's misnamed "Board style…" row: that
+            row restyled ONLY `.tnode` rows (shapes, labels, notes and edges
+            untouched), so both the name and the home were wrong. Same two
+            controls the inspector's table panel shows, ONE writer
+            (setBoardStyle, threaded as onTableStyle), parked beside the
+            New-boards defaults a board with no value falls back to. */}
+        <div className="settings-group">Table style</div>
+        {hasBoard ? (<>
+          <Row label="Style" hint="the current board's table nodes; other shapes are unchanged">
+            <Segmented
+              label="Table style"
+              options={TABLE_STYLES}
+              value={tableStyle}
+              onPick={v => onTableStyle(v, tableDensity)}
+              labelOf={v => TABLE_STYLE_LABELS[v]}
+            />
+          </Row>
+          <Row label="Density" hint="row height and spacing for the current board's tables">
+            <Segmented
+              label="Table density"
+              options={DENSITIES}
+              value={tableDensity}
+              onPick={v => onTableStyle(tableStyle, v)}
+              labelOf={v => DENSITY_LABELS[v]}
+            />
+          </Row>
+        </>) : (
+          <Row label="Style" hint="open or create a board to restyle its tables">
+            <span className="settings-state">No board open</span>
+          </Row>
+        )}
+        <div className="settings-group">New boards</div>
+        <Row label="Default style" hint="the table style a board with none of its own uses">
+          <Segmented
+            label="Default board style"
+            options={TABLE_STYLES}
+            value={nb.style}
+            onPick={nb.setStyle}
+            labelOf={v => TABLE_STYLE_LABELS[v]}
+          />
+        </Row>
+        <Row label="Default density" hint="row height and spacing for a board with none of its own">
+          <Segmented
+            label="Default board density"
+            options={DENSITIES}
+            value={nb.density}
+            onPick={nb.setDensity}
+            labelOf={v => DENSITY_LABELS[v]}
+          />
         </Row>
       </div>
     </>

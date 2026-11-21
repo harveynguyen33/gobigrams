@@ -26,6 +26,8 @@ import {CUSTOM_PRESET} from './presets/index';
 import type {BoardDoc} from './boardDoc';
 import type {ColorKey} from './colors';
 import type {TableColumn} from './nodeData';
+import {tableRelEnd} from './relEnd';
+import {tableNaturalWidth} from './tableWidth';
 import {GOBI_CARD_TOKENS, GOBI_KIND_ITEM, type GobiDocument} from '../gobiTypes';
 
 /** ROUND GOBI-LOCK — kind → palette item is DERIVED from the same registry
@@ -45,7 +47,7 @@ const itemFor = (kind: string): PaletteItem | undefined => {
  * presets/basic (the ONE table); the local copy this file kept was deleted so
  * the adapter and makeEdge cannot drift apart. */
 
-export type ToBoardDocOptions = {now?: number; id?: string};
+export type ToBoardDocOptions = {now?: number; id?: string; style?: unknown; density?: unknown};
 
 /** GobiDocument → the React-Flow board the app inserts. Pure: the same doc
  *  + opts always produce a byte-identical board (the corpus's determinism
@@ -53,6 +55,10 @@ export type ToBoardDocOptions = {now?: number; id?: string};
  *  `updatedAt = now`, `id = opts.id ?? gobi-<now>`. */
 export function toBoardDoc(doc: GobiDocument, opts: ToBoardDocOptions = {}): BoardDoc {
   const nodes: FlowNode[] = [];
+  /* TABLE-HANDLES — every table node's COLUMN LIST (already id-minted below),
+     keyed by node id: the edge pass resolves a generic side against the columns
+     the node actually renders. Filled in the table branch, so no second walk. */
+  const tableCols: Record<string, TableColumn[] | undefined> = {};
   for (const d of doc.nodes) {
     /* table — its own node type (a column list is not a Shape). */
     if (d.kind === 'table') {
@@ -60,14 +66,23 @@ export function toBoardDoc(doc: GobiDocument, opts: ToBoardDocOptions = {}): Boa
         id: `c${i + 1}`, name: c.name, type: c.type,
         ...(c.pk ? {pk: true} : {}), ...(c.fk ? {fk: true} : {}),
         ...(c.notNull ? {notNull: true} : {}), ...(c.unique ? {unique: true} : {}),
+        /* UNISURF-S7 — the FK target id (authored ref:<id>); the column id is
+           re-minted positionally as before, node ids stay stable. */
+        ...(c.ref ? {ref: c.ref} : {}),
       }));
+      /* LAYOUT-FOLLOWS-WIDTH — the document's OWN width: the same function the
+         compiler laid out with, so React Flow, the edges, the minimap and the
+         SVG export read one number. No options → the doc's stored size.
+         TABLE-HEIGHT: NO height — a table's wrapper is as tall as its CARD, so the reservation stays in `size`. */
+      const tw = opts.style !== undefined || opts.density !== undefined
+        ? tableNaturalWidth({columns}, opts.style, opts.density) : d.size.w;
       nodes.push({
         id: d.id, type: 'table', position: {x: d.position.x, y: d.position.y},
-        width: d.size.w, height: d.size.h,
-        style: {width: d.size.w, height: d.size.h},
+        width: tw, style: {width: tw},
         data: {name: d.label, columns, colorKey: (d.color as ColorKey) ?? 'cyan'},
       });
       if (d.parent) (nodes[nodes.length - 1] as {parentId?: string}).parentId = d.parent;
+      tableCols[d.id] = columns;
       continue;
     }
 
@@ -110,15 +125,24 @@ export function toBoardDoc(doc: GobiDocument, opts: ToBoardDocOptions = {}): Boa
     nodes.push(node);
   }
 
+  /* ERD-CARDINALITY D4 / TABLE-HANDLES — a `table` renders ONLY per-column
+     handles, and their TYPE is fixed: `right_rel_<colId>` is a source,
+     `left_rel_<colId>` is a target. The layout's generic side is therefore
+     irrelevant on a table (a target-typed handle used as a source is exactly
+     the invisible-edge defect). The COLUMN is chosen by meaning by the one
+     shared rule (model/relEnd.ts) the stored-board read path uses too; a
+     non-table endpoint gets the layout's own side handed straight back. */
+
   const edges: FlowEdge[] = doc.edges.map((d) => {
     const crow = d.card ?? null;
     const seed = {
       label: d.label ?? undefined,
       techn: d.techn ?? undefined,
       ...(crow ? {crowStart: GOBI_CARD_TOKENS[crow[0]!] as never, crowEnd: GOBI_CARD_TOKENS[crow[1]!] as never} : {}),
-      /* the RESOLVED routing — the placement passes' answer, verbatim */
-      sourceHandle: d.fromHandle,
-      targetHandle: d.toHandle,
+      /* the RESOLVED routing — the placement passes' answer, translated for a
+         table endpoint into the column handle it actually renders. */
+      sourceHandle: tableRelEnd(tableCols[d.from], d.to, true, d.fromHandle),
+      targetHandle: tableRelEnd(tableCols[d.to], d.from, false, d.toHandle),
     };
     const edge = makeEdge(d.from, d.to, CUSTOM_PRESET.edges, d.id, seed);
     /* the resolved dash (§2.4: the explicit keyword won over the operator

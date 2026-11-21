@@ -298,7 +298,7 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
 
   function parseTableBlock() {
     next(); // '{'
-    const cols: {name: string; type: string; pk: boolean; fk: boolean; notNull: boolean; unique: boolean; line: number}[] = [];
+    const cols: {name: string; type: string; pk: boolean; fk: boolean; notNull: boolean; unique: boolean; ref?: string; line: number}[] = [];
     while (p < tokens.length && !at('}')) {
       const nameTok = peek()!;
       if (nameTok.type === ';') { next(); continue; }
@@ -313,7 +313,7 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
         skipToNextLine(); continue;
       }
       next();
-      const col = {name: String(nameTok.value), type: String(typeTok.value), pk: false, fk: false, notNull: false, unique: false, line: nameTok.line};
+      const col = {name: String(nameTok.value), type: String(typeTok.value), pk: false, fk: false, notNull: false, unique: false, ref: undefined as string | undefined, line: nameTok.line};
       // flags until ; or }
       while (!at(';') && !at('}')) {
         const f = peek();
@@ -322,8 +322,22 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
         else if (f.type === 'ident' && f.value === 'fk') { col.fk = true; next(); }
         else if (f.type === 'ident' && f.value === 'notnull') { col.notNull = true; next(); }
         else if (f.type === 'ident' && f.value === 'unique') { col.unique = true; next(); }
+        /* UNISURF-S7 — ref:<table id>: the FK's target. A bare `>` is not a
+           lexable token (the punctuation set is { } ; : =), so the spec's
+           `ref: > target.id` arrow reads as this colon form. */
+        else if (f.type === 'ident' && f.value === 'ref' && tokens[p + 1]?.type === ':') {
+          next(); // ref
+          next(); // ':'
+          const v = peek();
+          if (!v || (v.type !== 'ident' && v.type !== 'string')) {
+            err(v ?? f, 'column ref needs a table id (ref:orders)');
+            skipToNextLine(); break;
+          }
+          next();
+          col.ref = String(v.value);
+        }
         else {
-          err(f, `"${String(f.value)}" is not a column flag — the flags are pk, fk, notnull, unique`);
+          err(f, `"${String(f.value)}" is not a column flag — the flags are pk, fk, notnull, unique and ref:<table>`);
           next();
           skipToNextLine();
           break;
@@ -408,7 +422,7 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
     }
     const edge: GobiEdgeStmt = {
       kind: 'edge', from, to, op, label: null, dash: null,
-      flow: null, flowIcon: null, flowCount: null, card: null, techn: null,
+      flow: null, flowIcon: null, flowCount: null, card: null, cardLeft: null, cardRight: null, techn: null,
       x: 1, line, col: fromTok.col,
     };
     ast.statements.push(edge);
@@ -462,6 +476,7 @@ export function parseGobi(text: string): {ok: true; ast: GobiAst} | {ok: false; 
           else if (r && r.type === 'number' && r.value === 1) { right = '1'; next(); }
           if (!right) { err(r ?? t, 'card needs a right side (1, n, 0..1 or 0..n)'); skipToNextLine(); return; }
           edge.card = `${left}..${right}`;
+          edge.cardLeft = left; edge.cardRight = right;
           continue;
         }
         if (w === 'techn' && tokens[p + 1]?.type === ':') {

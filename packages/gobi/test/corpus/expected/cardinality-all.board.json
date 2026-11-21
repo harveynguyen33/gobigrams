@@ -192,8 +192,14 @@
         "offset": "center",
         "strokeKey": "slate"
       },
+      "markerStart": {
+        "type": "zeroOrOne",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
       "markerEnd": {
-        "type": "one",
+        "type": "zeroOrMany",
         "color": "var(--c-slate)",
         "width": 18,
         "height": 12
@@ -215,8 +221,14 @@
         "offset": "center",
         "strokeKey": "slate"
       },
+      "markerStart": {
+        "type": "zeroOrMany",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
       "markerEnd": {
-        "type": "many",
+        "type": "one",
         "color": "var(--c-slate)",
         "width": 18,
         "height": 12
@@ -275,8 +287,14 @@
         "labelPinned": true
       },
       "label": "optional",
+      "markerStart": {
+        "type": "zeroOrOne",
+        "color": "var(--c-slate)",
+        "width": 18,
+        "height": 12
+      },
       "markerEnd": {
-        "type": "one",
+        "type": "zeroOrOne",
         "color": "var(--c-slate)",
         "width": 18,
         "height": 12

@@ -27,6 +27,7 @@ import {LABEL_HALF_H_PX, labelAnchor, type LabelPos} from '../edgeLabel';
 import {rotateSvgTransform} from '../rotation';
 import {buildSceneSync as sceneSync, type Scene, type SceneNode, type SceneTextRow, type Bounds} from './exportScene';
 import {shapeLineToSvg, type OutlineShaper} from './textOutline';
+import {noteMarkup, mixHex} from './noteMarkup';
 
 /** One measured text ROW's font — read off that row's own live element.
  *  AR-11: the canvas sets a DIFFERENT family per row (`.node-title` →
@@ -103,6 +104,9 @@ export type SvgMeasurer = {
     d: string;
     start: {x: number; y: number};
     end: {x: number; y: number};
+    /** ERD-CARDINALITY — a self-loop's label point (the start/end midpoint is
+     *  inside the node box). Absent on every ordinary measured route. */
+    label?: {x: number; y: number};
   } | null;
   /** ROUND-AR-DEFECT-1 — the computed font of the edge's own LABEL row.
    *  `.edge-label` is NOT inside `.react-flow__edge`: React Flow's
@@ -191,6 +195,24 @@ const escAttr = (s: unknown): string =>
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && isFinite(v) ? v : null;
+
+/** D3 (SPEC-NODE-DESCRIPTION §Export, t_9253ec58) — the accessible pair a
+ *  described node carries into the file: `<title>` names the node, `<desc>`
+ *  is its long description (SVG 2 §5.7 — user agents feed both to
+ *  accessibility APIs, and neither is ever painted, so the render cannot
+ *  change). Emitted ONLY on a node whose `data.desc` is a non-empty string,
+ *  and always as the pair's first children of the group; SVG 2 forbids an
+ *  EMPTY title/desc, so a whitespace-only desc emits NOTHING and a desc-less
+ *  node emits NEITHER — a board with no descriptions exports byte-identically
+ *  to the pre-D3 tree (checks/unisurf-desc-export.mjs C4 pins that).
+ *  `esc()` keeps newlines (any text content is allowed) and escapes & < >. */
+function titleDesc(n: {id: string; title?: string; data?: Record<string, unknown> | null}): string {
+  const d = n.data?.desc;
+  const desc = typeof d === 'string' && d.trim() ? d : '';
+  if (!desc) return '';
+  const label = String(n.title ?? n.data?.title ?? n.data?.text ?? n.data?.name ?? n.id ?? '');
+  return `${label.trim() ? `<title>${esc(label)}</title>` : ''}<desc>${esc(desc)}</desc>`;
+}
 
 /** `var(--x, fallback)` → the resolved token value (same fallback chain as
  *  the live render: token map first, then the var's own fallback). */
@@ -388,7 +410,9 @@ export function domMeasurer(root?: () => unknown): SvgMeasurer {
       try {
         const el = nodeEl as Element | null;
         if (!el || typeof el.querySelector !== 'function') return null;
-        const svgEl = el.querySelector('.node-ico svg');
+        /* NOTE-PARITY — a post-it's glyph paints inside `.ds-postit-mark`
+         * (NOT `.node-ico`); ask the mark first, the generic channel second. */
+        const svgEl = el.querySelector('.ds-postit-mark svg') || el.querySelector('.node-ico svg');
         if (!svgEl) return null;
         const vb = (svgEl.getAttribute('viewBox') || '0 0 24 24').trim();
         const kids = [...svgEl.children].filter((c): c is SVGElement =>
@@ -710,13 +734,8 @@ function nodeText(
   return lines.join('');
 }
 
-/** Post-it note: rect + folded corner + text (the POSTIT silhouette). */
-function noteMarkup(s: {w: number; h: number}, surface: string, dim: string): string {
-  return [
-    `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="4" fill="${escAttr(surface)}" stroke="${escAttr(dim)}" stroke-width="1"/>`,
-    `<path d="M${s.w - 16} 1 L${s.w - 1} 16 L${s.w - 1} 1 Z" fill="${escAttr(dim)}" opacity="0.25"/>`,
-  ].join('');
-}
+/** Post-it note: rect + folded corner — geometry lives in ./noteMarkup.ts
+ *  (SHAPE-FIDELITY: the canvas wins; hard-cap extraction). */
 
 /** ERD table: header band + colour strip + one row per visible column.
  *  ROUND-AR-DEFECT-1 — `t` (when the measurer found the table's DOM) carries
@@ -913,7 +932,15 @@ export function emitContent(scene: Scene, outline?: EmitCtx['outline']): {conten
 
 /** The bounds-pass variant: emits with a KNOWN offset (the final viewBox
  *  arithmetic), collecting marker defs into `defs`. */
-export function emitContentInto(scene: Scene, parts: string[], defs: string[], outline?: EmitCtx['outline']): void {
+export function emitContentInto(scene: Scene, parts: string[], defs: string[], outline?: EmitCtx['outline'], tokens?: Record<string, string>): void {
+  /* SHAPE-FIDELITY — the canvas paints the group frame/tint and the note
+   * fold/gradient in the NODE'S OWN colour (`style={{'--nc': nc}}` on every
+   * renderer — --nc is per-node data, never a theme token), so the export
+   * blends against that node's accent. --elevated/--bg ARE theme tokens and
+   * resolve from the caller's sheet; legacy callers without tokens fall
+   * back to the scene surfaces. */
+  const elRaw = tokens ? resolveVar('var(--elevated)', tokens) : '';
+  const elevated = elRaw && !elRaw.startsWith('var(') ? elRaw : scene.surface;
   const pad = scene.pad;
   const b: Bounds = scene.bounds;
   const off = {x: pad - b.minX, y: pad - b.minY};
@@ -925,24 +952,48 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
     const left = g.absX + off.x, top = g.absY + off.y;
     const lw = g.w, lh = g.h;
     parts.push(`<g data-ar-node="${escAttr(g.id)}" transform="translate(${left},${top})">`);
-    parts.push(`<rect x="0" y="0" width="${lw}" height="${lh}" rx="10" fill="none" stroke="${escAttr(g.accent)}" stroke-width="1.2" stroke-dasharray="8 5"/>`);
+    parts.push(titleDesc(g));
+    /* SHAPE-FIDELITY — canvas truth (styles.css group band): rx 14, 1.5px
+     * dashed in --nc over a 7% --nc tint. The dash pair is `12 4` — the CSS
+     * `dashed` 3:1 rhythm at the canvas's scale. The tint is PRE-BLENDED to
+     * the exact canvas composite (mix(bg, nc, 0.07), printed flat, no
+     * translucency surprises) and fill-opacity stays on the element as the
+     * tint-pair mechanism the table header uses. */
+    const bgRaw = tokens ? resolveVar('var(--bg)', tokens) : '';
+    const bg = bgRaw && !bgRaw.startsWith('var(') ? bgRaw : scene.bg;
+    parts.push(`<rect x="0" y="0" width="${lw}" height="${lh}" rx="14" fill="${mixHex(bg, g.accent, 0.07)}" fill-opacity="1" stroke="${escAttr(g.accent)}" stroke-width="1.5" stroke-dasharray="12 4"/>`);
     for (const r of g.rows) parts.push(rowEl(r));
     parts.push('</g>');
   }
   /* edges */
   parts.push(`<g transform="translate(${off.x},${off.y})">`);
-  const markerId = (color: string, w: number, h: number): string => {
-    const id = 'ar-mk-' + Math.abs(hashStr(`${color}|${w}x${h}`)).toString(36);
+  /* ERD-CARDINALITY — the canvas's crow's-foot glyphs (src/nodes/Crowfoot.tsx)
+   * emitted as marker defs, so a declared relationship is visible in the file
+   * exactly as it is on the canvas (decision #10/#46). Widths and refX are the
+   * component's own, all markerUnits="userSpaceOnUse". */
+  const CROW: Record<string, {w: number; g: (c: string) => string}> = {
+    one: {w: 10, g: (c) => `<path d="M9 1 V11" stroke="${c}" stroke-width="1.6"/>`},
+    many: {w: 12, g: (c) => `<g stroke="${c}" stroke-width="1.5" fill="none"><path d="M11 1 L1 6"/><path d="M11 11 L1 6"/><path d="M11 6 L1 6"/></g>`},
+    zeroOrOne: {w: 18, g: (c) => `<g stroke="${c}" stroke-width="1.5" fill="none"><circle cx="13.5" cy="6" r="3.2"/><path d="M17 1 V11"/></g>`},
+    zeroOrMany: {w: 20, g: (c) => `<g stroke="${c}" stroke-width="1.5" fill="none"><circle cx="15.5" cy="6" r="3.2"/><path d="M9 1 L19 6"/><path d="M9 11 L19 6"/><path d="M9 6 L19 6"/></g>`},
+  };
+  const markerId = (color: string, w: number, h: number, kind: string): string => {
+    const crow = CROW[kind];
+    const gw = crow ? crow.w : w;
+    const id = 'ar-mk-' + Math.abs(hashStr(crow ? `${color}|${kind}` : `${color}|${w}x${h}`)).toString(36);
     if (!defs.some(d => d.includes(`id="${id}"`))) {
-      defs.push(
-        `<marker id="${id}" markerWidth="${w}" markerHeight="${h}" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse">` +
-        `<polyline points="-5,-4 0,0 -5,4 -5,-4" fill="${escAttr(color)}" stroke="${escAttr(color)}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker>`);
+      const c = escAttr(color);
+      defs.push(crow
+        ? `<marker id="${id}" markerWidth="${gw}" markerHeight="12" viewBox="0 0 ${gw} 12" refX="${gw / 2}" refY="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse">${crow.g(c)}</marker>`
+        : `<marker id="${id}" markerWidth="${w}" markerHeight="${h}" viewBox="-10 -10 20 20" markerUnits="strokeWidth" refX="0" refY="0" orient="auto-start-reverse">` +
+          `<polyline points="-5,-4 0,0 -5,4 -5,-4" fill="${c}" stroke="${c}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></marker>`);
     }
     return id;
   };
   for (const e of scene.edges) {
-    const marker = markerId(e.color, e.marker.w, e.marker.h);
-    parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}"${e.dashArray ? ` stroke-dasharray="${escAttr(e.dashArray)}"` : ''} marker-end="url(#${marker})"/>`);
+    const endKind = e.markerEndKind ?? 'arrow';
+    const start = e.markerStartKind ? ` marker-start="url(#${markerId(e.color, e.marker.w, e.marker.h, e.markerStartKind)})"` : '';
+    parts.push(`<path d="${escAttr(e.d)}" fill="none" stroke="${escAttr(e.color)}" stroke-width="${e.strokeWidth}"${e.dashArray ? ` stroke-dasharray="${escAttr(e.dashArray)}"` : ''} marker-end="url(#${markerId(e.color, e.marker.w, e.marker.h, endKind)})"${start}/>`);
     if (e.label) {
       const lw = Math.max(24, e.label.row.content.length * 6.6 + 12); /* = labelMetrics.estimateEdgeLabelWidth, pinned by M1 */
       const mid = {x: e.label.x, y: e.label.y}; /* GOBI-TEXT2 - FLOW space, like the path above: this group ALREADY carries translate(off), so adding the offset here shifted the plate by (off,off) a second time (measured +24,+24 on the door's own render). The plate below is the canvas label's own box: 5px radius (`.edge-label`), 2*LABEL_HALF_H_PX tall, and it is painted ONLY for the plate states (labelPlatePaint): the `none` default has no background. */
@@ -970,6 +1021,7 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
        (untouched boards export byte-identically). */
     const rt = rotateSvgTransform(n.rotation ?? 0, s.w, s.h);
     parts.push(`<g data-ar-node="${escAttr(n.id)}" transform="translate(${n.absX + off.x},${n.absY + off.y})${rt ? ' ' + rt : ''}">`);
+    parts.push(titleDesc(n));
     if (n.kind === 'label') {
       for (const r of n.rows) parts.push(rowEl(r));
     } else if (n.kind === 'customshape') {
@@ -988,7 +1040,10 @@ export function emitContentInto(scene: Scene, parts: string[], defs: string[], o
           ? `<g transform="scale(${s.w / 200},${s.h / 100})">${sized}</g>`
           : `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="none" stroke="${escAttr(n.accent)}" stroke-width="1.5"/>`);
     } else if (n.frame === 'note') {
-      parts.push(noteMarkup(s, scene.surface, scene.dim));
+      parts.push(noteMarkup(s, scene.surface, elevated, n.accent, defs));
+      /* NOTE-PARITY — the canvas glyph joins the note's emit (same icon
+       * contract the generic channel pushes below). */
+      if (n.icon) parts.push(iconMarkup(n.icon));
       for (const r of n.rows) parts.push(rowEl(r));
     } else if (n.kind === 'table') {
       /* ROUND C — the table's own textLine calls become rowMarkup calls
@@ -1025,7 +1080,7 @@ export function emitSvg(scene: Scene, ctx: EmitCtx = {}): string {
    * agree — the spec §3 mount measures what the file paints. */
   const parts: string[] = [];
   const defs: string[] = [];
-  emitContentInto(scene, parts, defs, ctx.outline);
+  emitContentInto(scene, parts, defs, ctx.outline, ctx.tokens);
   const content = parts.join('');
   /* the token <style> block stays in the file (other tooling reads it) but
    * nothing painted depends on it (D3) */

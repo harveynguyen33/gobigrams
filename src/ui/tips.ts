@@ -6,7 +6,7 @@
    onboarding arc — pull revelation beats a pushed tour, docs/DAP-TOUR-RESEARCH.md
    §4 E5).
 
-   THE FOUR GATES ARE THE CONTRACT, and they live HERE rather than in App so a
+   THE GATES ARE THE CONTRACT, and they live HERE rather than in App so a
    harness can execute them (`checks/round-onboard-p5.mjs` bundles this module and
    runs it against a Map-backed storage stub — a source read proves nothing about
    which branch runs first):
@@ -18,7 +18,18 @@
                                    back, so "it showed" and "it is spent" cannot
                                    disagree. The × writes the same forever key,
                                    which makes dismissing permanent for free.
-     4. A SETTINGS SWITCH        — default ON; off schedules nothing at all.
+
+   GATE 4 LEFT HERE (2026-11-14, Harvey, option A): the Settings switch did not
+   survive its own round. Tips need no global switch — each shows ONCE EVER and
+   at most ONE per session, so a profile's lifetime exposure is four toasts, and
+   the toast's × already kills a tip permanently at the moment it annoys. The
+   row also described a mechanism in a Canvas pane where nobody looks, and a
+   capability with no UI is exactly the defect class this repo keeps hitting.
+   TIPS_PREF / tipsOn() / setTipsOn() and the takeTip gate left with it. What
+   the switch's death leaves behind is the ONE-TIME migration below: a profile
+   whose legacy pref is FALSE has tips off forever, so every tip is marked seen
+   once; a profile with the pref TRUE or ABSENT plants nothing and keeps its
+   tips.
 
    A REFUSED TIP IS NEVER SPENT. Every gate returns BEFORE the claim, so a group
    created during a session that already showed the edge tip still fires its own
@@ -30,8 +41,6 @@
    no trigger is RED rather than dead data.
    `site` stays a PATH, not a function name — the same App call site serves the
    palette insert for group and table, so naming a function would over-promise. */
-
-import {loadPref, savePref} from '../board/prefs';
 
 export type TipId = 'edge' | 'group' | 'table' | 'export';
 
@@ -55,12 +64,18 @@ export const TIPS: Tip[] = [
     line: 'SVG keeps text selectable — outline only when a viewer lacks the fonts.'},
 ];
 
-/** gate 4 — the Settings switch, through the ONE preference path (prefs.ts).
- *  Absent means ON: a fresh profile gets the tips, and `loadPref` plants nothing
- *  until the user makes an explicit choice. */
-export const TIPS_PREF = 'tips';
-export const tipsOn = (): boolean => loadPref(TIPS_PREF, true);
-export const setTipsOn = (on: boolean): void => savePref(TIPS_PREF, on);
+/** The retired switch's ONE-TIME migration (see the header). Runs once per
+ *  boot at module load, idempotent by construction (markTipSeen is idempotent,
+ *  so a re-run just rewrites the same four '1's). Storage unavailable — private
+ *  mode — plants nothing and must not throw. The literal key is the legacy
+ *  pref path ('diagram-studio:pref:tips', prefs.ts's PREFIX + 'tips'); reading
+ *  it raw avoids importing prefs.ts for a value nothing else reads. */
+function retireTipsPref(): void {
+  try {
+    if (localStorage.getItem('diagram-studio:pref:tips') !== 'false') return;
+    for (const t of TIPS) markTipSeen(t.id);
+  } catch { /* storage unavailable — nothing to migrate, never throw */ }
+}
 
 /** gate 2 — one key per id: a tip that has SHOWN never returns. */
 const seenKey = (id: TipId) => `diagram-studio:tip-seen:${id}`;
@@ -74,6 +89,13 @@ export function tipSeen(id: TipId): boolean {
 export function markTipSeen(id: TipId): void {
   try { localStorage.setItem(seenKey(id), '1'); } catch { /* ignore */ }
 }
+
+/** The migration FIRES HERE — after markTipSeen, and deliberately not at the
+ *  function's own definition above: its first placement sat ABOVE the `seenKey`
+ *  const, so markTipSeen hit the TDZ and its catch swallowed the throw — the
+ *  migration planted nothing, silently (caught by p5.2a's RED run on the
+ *  pre-fix tree). */
+retireTipsPref();
 
 /** gate 1 — ONE tip per session. sessionStorage, never localStorage: the next
  *  TIP may arrive in the next tab, not the next page load. */
@@ -92,7 +114,6 @@ function markSession(): void {
 export function takeTip(id: TipId): string | null {
   const tip = TIPS.find(t => t.id === id);
   if (!tip) return null;                    // only the four registered ids
-  if (!tipsOn()) return null;               // gate 4 — the Settings switch
   if (tipShownThisSession()) return null;   // gate 1 — one per session
   if (tipSeen(id)) return null;             // gate 2 — once ever
   markSession();

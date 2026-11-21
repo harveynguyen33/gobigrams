@@ -26,6 +26,7 @@ import '../styles.css';
 import type {BoardDoc} from '../board/boards';
 import {migrateDoc} from '../board/boardMigrations';
 import {ShareBanner} from '../components/ShareBanner';
+import {DescDotLayer} from '../components/DescDot';
 import {nodeTypes, embedNodes} from './embedNodeTypes';
 import {edgeTypes} from '../edges';
 import {docBox, liveBox, num, type DocBox, type SizedNode} from './embedFit';
@@ -254,6 +255,12 @@ function EmbedFlow() {
         colorMode="dark"
       >
         <Background variant={BackgroundVariant.Dots} gap={32} size={2} />
+        {/* READONLY-DOT (t_c1564804): the SAME rest cue component the app
+            mounts with on={readOnly} — an embed is a read-only viewer by
+            construction (no badge, no panels, no selection: the dot is the
+            one cue a desc shape exists), so `on` is constant here. One code
+            path, two mounts of it. */}
+        <DescDotLayer on />
       </ReactFlow>
     </div>
   );

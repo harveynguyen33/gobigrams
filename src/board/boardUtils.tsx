@@ -4,7 +4,7 @@
  *  markerFor, bootTheme, wouldCycle). Behaviour-neutral: byte-identical bodies,
  *  only `export` keywords and this file's imports are new. .tsx because
  *  TableGlyph is a component. */
-import {MarkerType, type Edge, type Node} from '@xyflow/react';
+import {MarkerType, type Edge, type Node, type XYPosition} from '@xyflow/react';
 import {COLOR_VAR, isColorKey, keyForHex, resolveColor, resolveColorKey, type ColorKey} from '../theme/colors';
 import {asShape, SHAPE_IDS, ShapePreview, type Shape} from '../nodes/shapes';
 import {isCrowFoot, markerIdFor} from '../nodes/Crowfoot';
@@ -207,4 +207,21 @@ export function wouldCycle(source: string, target: string, edges: {source: strin
     for (const nxt of adj.get(cur) ?? []) if (!seen.has(nxt)) { seen.add(nxt); stack.push(nxt); }
   }
   return false;
+}
+
+/** Absolute flow position of a node (parent-relative resolved up the tree).
+ *  HEADROOM t_a21adb78 — moved VERBATIM out of App.tsx (its family nodeW /
+ *  nodeH / sideAnchor already lives here); canvas/absPos.ts is gone. */
+export function absPos(n: Node, all: Node[]): XYPosition {
+  let x = n.position.x, y = n.position.y;
+  let pid = n.parentId;
+  const guard = new Set<string>();
+  while (pid && !guard.has(pid)) {
+    guard.add(pid);
+    const p = all.find(m => m.id === pid);
+    if (!p) break;
+    x += p.position.x; y += p.position.y;
+    pid = p.parentId;
+  }
+  return {x, y};
 }

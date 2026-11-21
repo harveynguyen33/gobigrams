@@ -12,9 +12,19 @@ export type CtxTarget =
   | {kind: 'pane'; x: number; y: number};
 
 export type CtxAction =
-  | 'duplicate' | 'copy' | 'delete' | 'front' | 'back' | 'note'
+  | 'duplicate' | 'copy' | 'delete' | 'front' | 'back'
   | 'editLabel' | 'reverse'
+  /* GROUP-OBJECT + LOCK v1 (t_c5023f3b) — 'note' was retired with the
+     NOTE_ENABLED=false palette hide; the dead App handler went with it. */
+  | 'group' | 'ungroup' | 'lock'
   | 'addNode' | 'paste' | 'selectAll' | 'fitView';
+
+/* Per-selection row state, derived ONCE in useGroupLock (the menu only
+   READS it — a second copy here is exactly how the rows drifted from what
+   the keyboard would do). MENU-STATES (t_8b56f71a): a row can now also be
+   disabled, carry a different label, and say WHY it is refused. */
+export type CtxRow = {disabled?: boolean; label?: string; hint?: string};
+export type CtxMenuState = Partial<Record<CtxAction, CtxRow>>;
 
 type Item =
   | {kind: 'action'; id: CtxAction; label: string; icon?: React.ReactNode; disabled?: boolean; danger?: boolean}
@@ -23,6 +33,12 @@ type Item =
 const NODE_ITEMS: Item[] = [
   {kind: 'action', id: 'duplicate', label: 'Duplicate'},
   {kind: 'action', id: 'copy', label: 'Copy'},
+  {kind: 'sep'},
+  /* GROUP-OBJECT + LOCK v1 (t_c5023f3b) — Group/Ungroup act on the whole
+     selection; 'lock''s label flips to Unlock through the `menu` prop. */
+  {kind: 'action', id: 'group', label: 'Group'},
+  {kind: 'action', id: 'ungroup', label: 'Ungroup'},
+  {kind: 'action', id: 'lock', label: 'Lock'},
   {kind: 'sep'},
   {kind: 'action', id: 'front', label: 'Bring to front'},
   {kind: 'action', id: 'back', label: 'Send to back'},
@@ -51,11 +67,12 @@ const PANE_ITEMS: Item[] = [
 ];
 
 export default function ContextMenu({
-  target, onAction, onClose,
+  target, onAction, onClose, menu,
 }: {
   target: CtxTarget;
   onAction: (action: CtxAction) => void;
   onClose: () => void;
+  menu?: CtxMenuState;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{left: number; top: number} | null>(null);
@@ -108,16 +125,25 @@ export default function ContextMenu({
       <div className="ctx-title">
         {target.kind === 'node' ? 'Node' : target.kind === 'edge' ? 'Edge' : 'Canvas'}
       </div>
-      {items.map((it, i) => it.kind === 'sep' ? (
-        <div key={i} className="ctx-sep" />
-      ) : (
-        <button
-          key={it.id}
-          type="button"
-          className={`ctx-item${it.danger ? ' danger' : ''}`}
-          onClick={() => { onAction(it.id); onClose(); }}
-        >{it.label}</button>
-      ))}
+      {items.map((it, i) => {
+        if (it.kind === 'sep') return <div key={i} className="ctx-sep" />;
+        /* MENU-STATES (t_8b56f71a): everything below is a READ of the one
+           derivation — no enabled/label logic lives in the menu. */
+        const row = menu?.[it.id];
+        return (
+          <button
+            key={it.id}
+            type="button"
+            className={`ctx-item${it.danger ? ' danger' : ''}`}
+            data-ctx-action={it.id}
+            disabled={row?.disabled === true}
+            onClick={() => { onAction(it.id); onClose(); }}
+          >
+            <span className="ctx-label">{row?.label ?? it.label}</span>
+            {row?.hint && <span className="ctx-hint">{row.hint}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }

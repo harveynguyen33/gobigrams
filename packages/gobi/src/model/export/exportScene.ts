@@ -34,7 +34,7 @@
 
 import {resolveColor, COLOR_VAR, isColorKey} from '../colors';
 import {asShape, SHAPE_TOP_FACE} from '../nodes/shapes';
-import {rotatedExtent} from '../rotation';
+import {rotatedExtent, paintRotation} from '../rotation';
 import {labelAnchor, labelPlatePaint, type LabelPos} from '../edgeLabel';
 import {
   type ExportNode, type ExportEdge, type ExportInput,
@@ -48,7 +48,7 @@ import {EDGE_LABEL_FONT} from '../labelMetrics';
 import {alignAnchor} from '../textStyle';
 /* GOBI-CONNECT — the headless route (handle-aware), the ONE owner of the
  * anchor arithmetic + the generator call for a DOM-less export. */
-import {edgeRoute} from './edgeRoute';
+import {edgeRoute, selfLoopRoute, markerKindOf, type RoutedPath} from './edgeRoute';
 /* ROUND GOBI-TEXT3 — the DOM-less vertical placement (a leaf: no cycle). */
 import {vAlignRows, rowsExtent} from './textVAlign';
 
@@ -104,6 +104,11 @@ export type SceneEdge = {
    *  the same dash the canvas does. Absent = solid. */
   dashArray?: string;
   marker: {w: number; h: number};
+  /** ERD-CARDINALITY — the declared marker kind per end (a CrowFoot word or an
+   *  RF arrow sentinel). The emitter paints a DISTINCT glyph per kind, so the
+   *  exported file carries the same cardinality the canvas draws. */
+  markerStartKind?: string;
+  markerEndKind?: string;
   label?: {
     x: number; y: number; row: SceneTextRow;
     /** ROUND GOBI-TEXT — the plate, resolved from the SAME three states the
@@ -500,6 +505,8 @@ export function buildSceneBody(input: ExportInput): Scene {
   const sceneNodes: SceneNode[] = [];
   const sceneGroups: SceneNode[] = [];
   for (const n of nodes) {
+    /* GROUP-LOGICAL (t_eb8fab7e): the React Flow logical group (type 'group', NOT the palette's shape:'group' frame) paints nothing on the canvas and exports NOTHING — its members alone define the scene and the bounds, so an export is byte-identical with and without it. */
+    if (n.type === 'group' && !(n.data as any)?.shape) continue;
     const s = nodeSize(n);
     const p = abs.get(n.id)!;
     const accent = nodeAccent(n, tokens);
@@ -508,15 +515,12 @@ export function buildSceneBody(input: ExportInput): Scene {
     const sn: SceneNode = {
       id: n.id, absX: p.x, absY: p.y, w: s.w, h: s.h,
       kind, accent, rows: [], data: n.data ?? null,
-      /* ROUND ROTATE — GEOMETRY rotation only (d.rotation), NOT the K5 tilt:
-       *  the tilt was a canvas-only CSS affectation before this round and the
-       *  export never painted it, so including it here would change the bytes
-       *  of every old actor/note board — the round's byte-parity invariant
-       *  forbids that. A node the user HAS rotated exports with its full
-       *  stored angle. */
-      rotation: typeof (n.data as {rotation?: unknown} | null)?.rotation === 'number'
-        ? ((n.data as {rotation: number}).rotation || undefined)
-        : undefined,
+      /* NOTE-PARITY — the PAINTED angle via paintRotation, the SAME function
+       * the canvas paints (geometry + the K5 postit tilt, ONE definition in
+       * rotation.ts). The emitter turns 0 back into no transform, and the
+       * BOUNDS pass below uses the same painted angle, so a tilted note's
+       * rotated footprint stays inside the viewBox. */
+      rotation: paintRotation(n.data ?? {}),
     };
     if (kind === 'group') {
       /* ROUND GOBI-GROUP-BANNER — no childBounds re-fit here any more: the
@@ -574,6 +578,9 @@ export function buildSceneBody(input: ExportInput): Scene {
             : nt)
         : nt;
       sn.frame = 'note';
+      /* NOTE-PARITY — the note's canvas glyph (`.ds-postit-mark svg`) joins
+       * the export via the same measurer the generic channel uses. */
+      sn.icon = measurer.icon?.(n.el) ?? null;
       sn.textRect = noteText ?? null;
       if (noteText?.runs) {
         /* NOTE-TEXT-RENDER — a MEASURED note: the rows are the truth, but the
@@ -619,18 +626,18 @@ export function buildSceneBody(input: ExportInput): Scene {
 
   /* ---- edges */
   const sceneEdges: SceneEdge[] = [];
+  let selfN = 0; /* ERD-CARDINALITY — self-edges alternate bow direction by board order (the canvas reads the same array). */
   for (const e of edges) {
     const src = byId.get(e.source)!;
     const tgt = byId.get(e.target)!;
     const color = resolveVar(resolveColor(e.data), tokens);
-    /* GOBI-CONNECT (t_c911fabb) — the headless fallback is no longer a
-     * centre-to-centre stub: with no live element we rebuild the REAL route
-     * from the edge's own handles + the nodes' absolute boxes, through the
-     * same generators the canvas paints with (see `edgeRoute`). The old stub
-     * stays LAST for the shapes it still covers honestly — an edge whose
-     * handles are unknown or compound (the ERD column ids). */
-    const route = (e.el ? measurer.edgePath(e.el) : null)
-      ?? edgeRoute(e, {...abs.get(src.id)!, ...nodeSize(src)}, {...abs.get(tgt.id)!, ...nodeSize(tgt)})
+    /* GOBI-CONNECT — the headless route rebuilds the canvas's own anchors from
+     * the edge's handles + the nodes' absolute boxes; the stub stays LAST. */
+    const boxS = {...abs.get(src.id)!, ...nodeSize(src)};
+    const boxT = {...abs.get(tgt.id)!, ...nodeSize(tgt)};
+    const route: RoutedPath = (e.el ? measurer.edgePath(e.el) : null)
+      ?? (e.source === e.target ? selfLoopRoute(boxS, e.sourceHandle, e.targetHandle, selfN++) : null)
+      ?? edgeRoute(e, boxS, boxT)
       ?? stubEdgePath(e, src, tgt, abs);
     const me = (typeof e.markerEnd === 'object' && e.markerEnd !== null ? e.markerEnd : {}) as {width?: unknown; height?: unknown};
     const mw = typeof me.width === 'number' && isFinite(me.width) && me.width > 0 ? me.width : 14;
@@ -644,12 +651,15 @@ export function buildSceneBody(input: ExportInput): Scene {
     const se: SceneEdge = {
       id: e.id, d: route.d, color, strokeWidth: 1.8, marker: {w: mw, h: mh},
       ...(dashArray ? {dashArray} : {}),
+      ...(markerKindOf(e.markerStart) ? {markerStartKind: markerKindOf(e.markerStart)} : {}),
+      ...(markerKindOf(e.markerEnd) ? {markerEndKind: markerKindOf(e.markerEnd)} : {}),
     };
     const label = e.label;
     if (typeof label === 'string' && label) {
       const degenerate = route.start.x === 0 && route.start.y === 0 && route.end.x === 0 && route.end.y === 0;
       const d = (e.data ?? {}) as Record<string, unknown>;
-      const L = degenerate
+      const L = route.label ? {x: route.label.x, y: route.label.y}
+        : degenerate
         ? {x: (abs.get(src.id)!.x + abs.get(tgt.id)!.x + nodeSize(src).w - nodeSize(tgt).w) / 2,
            y: (abs.get(src.id)!.y + abs.get(tgt.id)!.y + nodeSize(src).h - nodeSize(tgt).h) / 2}
         : labelAnchor({
@@ -695,14 +705,9 @@ export function buildSceneBody(input: ExportInput): Scene {
   for (const cn of [...sceneGroups, ...sceneNodes]) {
     const s = {w: cn.w, h: cn.h};
     const p = {x: cn.absX, y: cn.absY};
-    /* ROUND ROTATE — a rotated node's paint extent is the orbit of its four
-     * corners, which can exceed the w×h AABB (a 100×50 box at 90° paints a
-     * 50×100 footprint whose corners stick out along BOTH axes). Union the
-     * rotated corners — exactly the AABB at 0°. Geometry rotation only, same
-     * as the emitter (the K5 tilt is canvas-only, as it always was). */
-    const rotDeg = typeof (cn.data as {rotation?: unknown} | null)?.rotation === 'number'
-      ? (cn.data as {rotation: number}).rotation
-      : 0;
+    /* NOTE-PARITY — the same painted angle the emitter paints, so the
+     * tilted footprint stays inside the viewBox. */
+    const rotDeg = paintRotation(cn.data ?? {});
     if (rotDeg === 0) {
       bounds.minX = Math.min(bounds.minX, p.x);
       bounds.minY = Math.min(bounds.minY, p.y);

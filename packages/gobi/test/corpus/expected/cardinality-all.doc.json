@@ -108,10 +108,8 @@
       "fromHandle": "bottom",
       "toHandle": "top",
       "card": [
-        "0",
-        "1",
-        "0",
-        "n"
+        "0..1",
+        "0..n"
       ],
       "dash": "solid"
     },
@@ -122,8 +120,7 @@
       "fromHandle": "bottom",
       "toHandle": "top",
       "card": [
-        "0",
-        "n",
+        "0..n",
         "1"
       ],
       "dash": "solid"
@@ -148,10 +145,8 @@
       "toHandle": "right",
       "label": "optional",
       "card": [
-        "0",
-        "1",
-        "0",
-        "1"
+        "0..1",
+        "0..1"
       ],
       "dash": "dotted",
       "labelOffset": {

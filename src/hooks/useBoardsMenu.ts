@@ -18,7 +18,10 @@ import {getPreset} from '../presets';
 import type {PresetId} from '../presets';
 import type {BoardDialogResult} from '../dialogs/BoardDialog';
 import type {ShowMode} from '../nodes/TableNode';
+import type {TableStyle, Density} from '../../packages/gobi/src/model/tableStyle';
 import {trackFirstAction} from '../app/analytics';
+
+const STALE_SWITCH = 'Repair the code-pane draft before switching boards';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useBoardsMenu(
@@ -41,6 +44,10 @@ export function useBoardsMenu(
   applyBoard: (doc: BoardDoc) => void,
   flash: (msg: string) => void,
   tickTask: (id: 'node' | 'edge' | 'label' | 'move' | 'export' | 'board') => void,
+  /** UNISURF-S9 — the App's ONE lock seam predicate. A board-level write is not a
+   *  node edit: the draft belongs to the board it was authored against, so it is
+   *  refused HERE (with a visible reason) rather than half-applied below. */
+  writeBlocked: () => boolean,
 ) {
 
   /** ITEM 6b — the board dialog. `null` = closed. The MODE is the state: a
@@ -49,24 +56,21 @@ export function useBoardsMenu(
    *  boards API. */
   const [boardDlg, setBoardDlg] = useState<BoardDialogResult['kind'] | null>(null);
 
-  /** PACKAGE-TEMPLATES §2.5 Pass 2 — the Templates gallery. `false` = closed.
-   *
-   *  TWO SEPARATE PIECES OF STATE, ON PURPOSE, and they can be TRUE AT THE SAME
-   *  TIME: the "Browse all templates…" row lives INSIDE the board dialog, so
-   *  opening the gallery from there leaves that dialog mounted underneath (the
-   *  gallery's scrim is above it — see `.tg-overlay`'s z-index). The alternative —
-   *  one enum, `'create' | 'rename' | 'delete' | 'gallery'` — would UNMOUNT the
-   *  dialog and lose the half-typed board name, which is exactly the work the user
-   *  was doing when they went browsing. `boardDlg` answers "is a board dialog
-   *  open, and in which mode"; `tgOpen` answers "is the gallery open". */
+  /** PACKAGE-TEMPLATES §2.5 — the gallery. TWO states on purpose: the
+   *  "Browse all templates…" row lives INSIDE the board dialog and the dialog
+   *  must stay mounted (one enum would unmount it and lose a half-typed name). */
   const [tgOpen, setTgOpen] = useState(false);
-  /** ROUND 4, ITEM 1 — `boardPick` and its `setBoardPick` are GONE, with the
-   *  dialog's `initialPick` prop they existed to feed. ROUND 3 had already
-   *  removed their only non-null writer (the gallery creates the board itself),
-   *  leaving four `setBoardPick(null)` resets guarding a value nothing could
-   *  set; ROUND 4 removed the last reader (the dialog's row-matching), so the
-   *  state was carrying nothing at all. Deleting it is the honest end of that
-   *  history — no behaviour changed: every write was already a reset to `null`. */
+
+  /** HISTORY-V3 (t_37f23a89) — the version-history dialog's open state,
+   *  owned HERE with the boards-menu cluster it opens from (same shape as
+   *  tgOpen). `openHistory` closes the menu first — the popover row's
+   *  contract is "menu closes; dialog opens" — and focus returns to the
+   *  BOARDS button because ModalMounts hands HistoryDialog the same
+   *  boardsMenuBtnRef the board dialog and gallery return to (ITEM 6b). */
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const openHistory = useCallback(() => { setBoardsOpen(false); setHistoryOpen(true); }, [setBoardsOpen]);
+  const closeHistory = useCallback(() => setHistoryOpen(false), []);
+
   /** The dialog's close path for all three of its modes. Focus restore is left
    *  to `BoardDialog`'s own unmount contract (`returnFocusTo`), which is what the
    *  boards-menu route has always used.
@@ -113,9 +117,7 @@ export function useBoardsMenu(
    *    - cancelling the dialog clears it, so abandoning a typed name is not a
    *      deferred naming of the next board either.
    *
-   *  DECLARED ABOVE `createFromTemplate` deliberately: both `useTemplate` and
-   *  `onBoardDialog` are `useCallback`s that close over it, and a `useCallback`
-   *  cannot reference a `const` that has not been initialised yet. */
+   *  DECLARED ABOVE `createFromTemplate`: both closures need it initialised. */
   const pendingBoardName = useRef<string>('');
 
   /** ROUND 3 — THE ONE OWNER OF "CREATE A BOARD FROM A TEMPLATE".
@@ -140,6 +142,7 @@ export function useBoardsMenu(
    *  `useCallback` cannot close over a `const` that has not been initialised
    *  yet — the same TDZ constraint `onBoardDialog` documents below. */
   const createFromTemplate = useCallback((opts: {name?: string; preset?: PresetId; templateId?: string} = {}) => {
+    if (writeBlocked()) return flash(STALE_SWITCH);
     const wantPid: PresetId = opts.preset ?? 'custom';
     const t = opts.templateId ? getPreset(wantPid).templates?.find(x => x.id === opts.templateId) : undefined;
     const pid: PresetId = t ? wantPid : 'custom';
@@ -163,7 +166,7 @@ export function useBoardsMenu(
         flash(`New board failed: ${err?.message ?? 'unknown'}`);
       }
     })();
-  }, [boardList, flushSave, applyBoard, flash, tickTask]);
+  }, [boardList, flushSave, applyBoard, flash, tickTask, writeBlocked]);
 
   /** ROUND 3 — "Use template" CREATES THE BOARD, in ONE step.
    *
@@ -287,8 +290,21 @@ export function useBoardsMenu(
     flash(`${p.label} preset — palette, edge defaults and layout changed. Existing elements kept.`);
   }, [presetId, flushSave, flash, suggestTheme]);
 
+  /** BOARD-STYLE (2026-11-09) — the ONE writer for the board's style + density.
+   *  Every door (the table-selected inspector, Settings → Canvas → the Table
+   *  style group — TABLE-STYLE-RELOCATE t_2f3039c6) calls this;
+   *  it writes the BOARD field, so the value is per-board and round-trips. The
+   *  save is the existing autosave effect (it watches curBoard.style/density),
+   *  never a second write path — and a locked/stale board refuses it here, with
+   *  the same visible reason every other board write uses. */
+  const setBoardStyle = useCallback((style: TableStyle, density: Density) => {
+    if (writeBlocked()) return flash(STALE_SWITCH);
+    setCurBoard(c => (c ? {...c, style, density} : c));
+  }, [setCurBoard, writeBlocked, flash]);
+
   const openBoard = useCallback(async (id: string) => {
     if (id === curBoard?.id) { setBoardsOpen(false); return; }
+    if (writeBlocked()) { setBoardsOpen(false); return flash(STALE_SWITCH); }
     try {
       await flushSave();
       const doc = await boards.getBoard(id);
@@ -298,7 +314,7 @@ export function useBoardsMenu(
     } catch (err) {
       flash(`Open board failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, flushSave, applyBoard, flash]);
+  }, [curBoard, flushSave, applyBoard, flash, writeBlocked]);
 
   /** ITEM 6b — opens the designed rename dialog. The name arrives from
    *  `onBoardDialog`; this callback keeps the save body verbatim. */
@@ -306,6 +322,7 @@ export function useBoardsMenu(
 
   const doRenameBoard = useCallback(async (name: string) => {
     if (!curBoard || !name || name === curBoard.name) return;
+    if (writeBlocked()) return flash(STALE_SWITCH);
     try {
       await flushSave();
       const saved = await boards.saveBoard({
@@ -316,7 +333,7 @@ export function useBoardsMenu(
        harmless; the copy makes that invariant ENFORCED rather than implicit —
        a future in-place patch of edge.data can no longer rewrite history. */
     edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-        preset: presetId, legend: curBoard.legend,
+        preset: presetId, legend: curBoard.legend, style: curBoard.style, density: curBoard.density,
       });
       setCurBoard(c => c ? {...c, name: saved.name, updatedAt: saved.updatedAt} : c);
       setBoardList(l => l.map(b => b.id === curBoard.id ? {...b, name: saved.name, updatedAt: saved.updatedAt} : b));
@@ -327,10 +344,11 @@ export function useBoardsMenu(
     } catch (err) {
       flash(`Rename failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, flushSave, flash, presetId, tickTask]);
+  }, [curBoard, flushSave, flash, presetId, tickTask, writeBlocked]);
 
   const doDuplicateBoard = useCallback(async () => {
     if (!curBoard) return;
+    if (writeBlocked()) return flash(STALE_SWITCH);
     const name = `${curBoard.name} (copy)`;
     try {
       await flushSave();
@@ -343,7 +361,7 @@ export function useBoardsMenu(
        harmless; the copy makes that invariant ENFORCED rather than implicit —
        a future in-place patch of edge.data can no longer rewrite history. */
     edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
-        preset: presetId, legend: curBoard.legend,
+        preset: presetId, legend: curBoard.legend, style: curBoard.style, density: curBoard.density,
       });
       setBoardList(await boards.listBoards());
       applyBoard(saved);
@@ -352,13 +370,14 @@ export function useBoardsMenu(
     } catch (err) {
       flash(`Duplicate failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, flushSave, applyBoard, flash, tickTask]);
+  }, [curBoard, flushSave, applyBoard, flash, tickTask, writeBlocked]);
 
   /** ITEM 6b — opens the designed destructive confirm. */
   const deleteBoard = useCallback(() => { setBoardDlg('delete'); }, []);
 
   const doDeleteBoard = useCallback(async (confirmed?: boolean) => {
     if (!curBoard || !confirmed) return;
+    if (writeBlocked()) return flash(STALE_SWITCH);
     try {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = undefined;
@@ -377,7 +396,10 @@ export function useBoardsMenu(
     } catch (err) {
       flash(`Delete failed: ${err?.message ?? 'unknown'}`);
     }
-  }, [curBoard, applyBoard, flash]);
+  }, [curBoard, applyBoard, flash, writeBlocked]);
+
+  /* S10 — "Save now" is a board WRITE like the other five rows: it reads the lock. */
+  const saveNow = useCallback(() => { if (writeBlocked()) return flash(STALE_SWITCH); void flushSave(); }, [flushSave, flash, writeBlocked]);
 
   /** ITEM 6b — the dialog's ONE submit path for all THREE modes. Each branch is
    *  the body of the native prompt / confirm it replaces, verbatim apart from
@@ -432,7 +454,7 @@ export function useBoardsMenu(
 
   return [boardDlg, setBoardDlg, tgOpen, setTgOpen, pendingBoardName,
     closeBoardDlg, newBoard, createFromTemplate, useTemplate, closeGallery,
-    boardsMenuBtnRef, boardsPopPos, boardsPopClamp, switchPreset, openBoard,
-    renameBoard, doRenameBoard, doDuplicateBoard, deleteBoard, doDeleteBoard,
-    onBoardDialog, boardsBtnRef] as const;
+    boardsMenuBtnRef, boardsPopPos, boardsPopClamp, switchPreset, setBoardStyle, openBoard,
+    renameBoard, doRenameBoard, doDuplicateBoard, deleteBoard, doDeleteBoard, saveNow,
+    onBoardDialog, boardsBtnRef, historyOpen, openHistory, closeHistory] as const;
 }

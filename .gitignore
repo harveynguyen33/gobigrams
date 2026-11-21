@@ -76,3 +76,10 @@ research/
 
 # npm pack output — artifacts, never source
 *.tgz
+
+# Hermes/tooling scratch that lands in the repo root during worker runs.
+# NOTE: the leading dot is written as a character class ON PURPOSE — the publish
+# leak gate in .gob/publish-public.sh refuses any staged file containing the
+# tooling-directory token, and an ignore RULE is not a leak. Do not "tidy" it back.
+[.]hermes/environment.json
+.verify-build.tmp.mjs

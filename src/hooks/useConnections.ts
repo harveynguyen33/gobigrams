@@ -44,6 +44,11 @@ export function useConnections(
   nextId: () => number,
   /** ONBOARD-P5 — the first edge's tip (the four gates live in src/tips.ts). */
   fireTip: (id: TipId) => void,
+  /* UNISURF-S7 — the FK writer needs the node write + the canvas lock
+     (readOnly || stale); readOnlyRef above covers readOnly only, and a stale
+     board must refuse an FK exactly like a read-only one. */
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
+  lockRef: React.MutableRefObject<boolean>,
 ) {
   // ---- F7 helpers: cycle detection on the current edge set ----
   /** Would adding source→target create a directed cycle? */
@@ -57,6 +62,48 @@ export function useConnections(
     tickTask('edge');
     fireTip('edge');
   }, [tickTask, fireTip]);
+
+  // ---- UNISURF-S7: the ONE FK writer (column-handle drag + the → picker) --
+  // A connect that starts on a table column's right handle is a FOREIGN KEY:
+  // the column gains fk + ref:<target>, its TYPE is never touched (the
+  // grammar carries fk as a flag, not a type), and the edge carries the
+  // crow's foot at the MANY end — the source end, the FK column itself.
+  // TableRowList's picker reaches the same function through __onFk: one code
+  // path, one shape (the edge anchors at the target's FIRST left handle, so
+  // drop-on-body, drop-on-handle and the pick produce byte-identical boards).
+  const fkConnect = useCallback((nodeId: string, colId: string, targetId: string): boolean => {
+    /* The S4 lock: nodesConnectable=false stops the DOM gesture, but a forced
+       DOM event can still open the picker — the lock is asserted HERE. */
+    if (lockRef.current || nodeId === targetId) return false;
+    const colsOf = (nid: string) =>
+      (((nodesRef.current.find(n => n.id === nid)?.data ?? {}) as {columns?: {id: string}[]}).columns ?? []);
+    if (!colsOf(nodeId).some(c => c.id === colId)) return false;
+    pushHistory(); /* ONE entry covers the column flag AND the edge */
+    setNodes(ns => ns.map(n => n.id === nodeId ? {...n, data: {...(n.data ?? {}), columns:
+      (((n.data ?? {}) as {columns: {id: string}[]}).columns ?? []).map(c =>
+        c.id === colId ? {...c, fk: true, ref: targetId} : c)}} : n));
+    /* re-pointing REPLACES: the column's previous FK edge (same source handle)
+       goes with the new one — ref is single-valued in the grammar. */
+    const old = `right_rel_${colId}`;
+    setEdges(es => addEdge(makeEdge(nodeId, targetId, {...preset.edges, path: defaultPath}, `e${nextId()}`, {
+      sourceHandle: old, targetHandle: `left_rel_${colsOf(targetId)[0]?.id ?? 'h'}`,
+      crowStart: 'many', crowEnd: 'one',
+    }), es.filter(e => !(e.source === nodeId && e.sourceHandle === old))));
+    return true;
+  }, [lockRef, nodesRef, pushHistory, setNodes, setEdges, preset, defaultPath, nextId]);
+  /* The handle-id form of "is this drag an FK" (H6: a column ID, never an
+     index — the header handle shares the first column's id by design). */
+  const fkColOf = (h: string | null | undefined): string | null =>
+    /^right_rel_(.+)$/.exec(h ?? '')?.[1] ?? null;
+  /* A right_rel_ handle exists only on table nodes, but the guard is the
+     node's own type — a table's column drag is an FK gesture even when the
+     writer REFUSES it (locked/stale): it must never fall through to the
+     plain-edge path and silently draw an unanchored arrow. */
+  const isFkDrag = (source: string, handle: string | null | undefined): string | null => {
+    const colId = fkColOf(handle);
+    return colId && nodesRef.current.find(n => n.id === source)?.type === 'table' ? colId : null;
+  };
+
   // ---- F4: edge reconnect (undoable, keeps type + data + styling) ----
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     /* AUDIT-follow-up — a rewire can create a cycle too: drop the end on a node
@@ -129,6 +176,14 @@ export function useConnections(
       flash('Blocked: this connection would create a cycle (A→B→A)');
       return;
     }
+    /* UNISURF-S7 — a column-handle drag dropped on the TABLE (not a handle)
+       is the same FK the picker writes: one writer, one shape. Refused or
+       accepted, the gesture ENDS here (never a plain edge instead). */
+    const fkCol = isFkDrag(src, c.sourceHandle);
+    if (fkCol) {
+      if (fkConnect(src, fkCol, targetId)) onEdgeCreated();
+      return;
+    }
     const newId = `e${nextId()}`;
     // The target node already exists in state, so the edge can be added
     // directly — the old `setTimeout` deferral only existed to wait for the
@@ -136,7 +191,7 @@ export function useConnections(
     pushHistory();
     setEdges(es => addEdge(makeEdge(src, targetId!, {...preset.edges, path: defaultPath}, newId), es));
     onEdgeCreated();
-  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath, onEdgeCreated]);
+  }, [rf, absNodes, noCycles, pushHistory, setEdges, preset, defaultPath, onEdgeCreated, fkConnect]);
   /* HARVEY 2026-10-13 — DOUBLE-CLICK A HANDLE -> connect to the nearest shape.
      DiagramNode dispatches `gobi:handle-connect` {nodeId, handleId}; this effect
      owns the search: nearest node within DOUBLE_CLICK_CONNECT_RANGE (flow px,
@@ -256,6 +311,14 @@ export function useConnections(
         targetHandle: c.sourceHandle,
       };
     }
+    /* UNISURF-S7 — a connect that started on a table column's right handle is
+       an FK, not a plain edge; refused (locked/stale) or accepted, the gesture
+       ends here so a refused FK can never fall through to a plain edge.
+       UNISURF-S8 — the checklist tick and the first-edge tip fire on a
+       connect that LANDED: fkConnect answers false when the lock refused it,
+       so a refused FK must not tick the edge task or spend the tip. */
+    const fkCol = isFkDrag(c.source, c.sourceHandle);
+    if (fkCol) { if (fkConnect(c.source, fkCol, c.target)) onEdgeCreated(); return; }
     onEdgeCreated();
     /* AUDIT-2 + AUDIT-3 — the twin check, pushHistory and the id mint all moved
        OUT of the setEdges updater. Two reasons, both measured:
@@ -283,7 +346,7 @@ export function useConnections(
     setEdges(es => addEdge(makeEdge(c.source, c.target, {...preset.edges, path: defaultPath}, newId, {
       sourceHandle: c.sourceHandle, targetHandle: c.targetHandle,
     }), es));
-  }, [onEdgeCreated, pushHistory, setEdges, preset, defaultPath]);
+  }, [onEdgeCreated, pushHistory, setEdges, preset, defaultPath, fkConnect]);
 
   // ---- F7: connection rules applied to every new connection ----
   const onConnectRules = useCallback((c: Connection) => {
@@ -302,5 +365,5 @@ export function useConnections(
     onConnect(c);
   }, [noCycles, oneIn, createsCycle, onConnect, flash]);
 
-  return [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules] as const;
+  return [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules, fkConnect] as const;
 }

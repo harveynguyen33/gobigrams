@@ -5,11 +5,14 @@ import {
   getBezierPath, getSmoothStepPath, getStraightPath,
   useStore,
   useStoreApi,
+  useInternalNode,
   MarkerType,
   type EdgeProps,
   type EdgeMarkerType,
 } from '@xyflow/react';
 import {COLOR_VAR, type ColorKey} from '../theme/colors';
+/* ERD-CARDINALITY — the ONE self-loop route, shared with the exporter. */
+import {selfLoopRoute} from '../export/edgeRoute';
 import {
   // ROUND T — the midpoint drag. A STORED waypoint routes through our own path
   // for the edge's own kind (they all read both coordinates); no waypoint routes
@@ -91,8 +94,8 @@ const SEL_CORE_PX = 1.1;
  */
 const GoblinEdge = memo((props: EdgeProps) => {
   const {
-    id, sourceX, sourceY, targetX, targetY,
-    sourcePosition, targetPosition, label, selected, data,
+    id, source, target, sourceX, sourceY, targetX, targetY,
+    sourcePosition, targetPosition, sourceHandleId, targetHandleId, label, selected, data,
   } = props;
 
   const [editing, setEditing] = useState(false);
@@ -123,12 +126,12 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  `LABEL_HALF_H_PX` — the first frame's stand-in — is no longer imported for
    *  the same reason. */
   const [labelHalfW, setLabelHalfW] = useState(0);
-  /** The live `[x, y, zoom]` — the same store value React Flow's own
-   *  `screenToFlowPosition` reads, and the same one the label's counter-scale
-   *  below needs. Subscribing here re-renders on pan/zoom only, exactly like
-   *  every other edge on the canvas. */
-  const t = useStore(s => s.transform);
-  /* AUDIT-6 — the LIVE transform for in-flight gestures: `t` above is the value
+  /** F1 (2026-11-20) — the ZOOM scalar only: every position this edge paints is
+   *  flow-space (the viewport's container transform handles pan), so pan cannot
+   *  affect it; only the label/handle counter-scale reads the zoom. The old
+   *  whole-transform sub re-rendered every edge per pan tick (audit F1). */
+  const zoom = useStore(s => s.transform[2]);
+  /* AUDIT-6 — the LIVE transform for in-flight gestures: `zoom` above is the value
      at render time; a zoom that lands mid-gesture updates the store and this
      getter reads it fresh on every move (see beginGesture's transform getter). */
   const storeApi = useStoreApi();
@@ -196,6 +199,26 @@ const GoblinEdge = memo((props: EdgeProps) => {
   // The registered type id selects the path generator, so all four conventional
   // edge types render through this one editable component.
   const kind = (data as any)?.__type ?? d.shape;
+  /* ERD-CARDINALITY D3 — a self-edge leaves and re-enters the SAME node, so a
+     generator route collapses into a line through the box. The node's own
+     geometry comes from the store; the route itself is the exporter's (one
+     owner), bowing out/up on variant 0 and down on variant 1. */
+  const srcNode = useInternalNode(source);
+  const selfBox = source === target && srcNode
+    ? {x: srcNode.internals.positionAbsolute.x, y: srcNode.internals.positionAbsolute.y,
+       w: srcNode.measured?.width ?? srcNode.width ?? 0, h: srcNode.measured?.height ?? srcNode.height ?? 0}
+    : null;
+  const loopVariant = useStore((s) => {
+    if (source !== target) return 0;
+    let i = 0;
+    for (const x of s.edges) {
+      if (x.source !== target || x.target !== target) continue;
+      if (x.id === id) break;
+      i++;
+    }
+    return i % 2;
+  });
+  const selfLoop = selfBox ? selfLoopRoute(selfBox, sourceHandleId, targetHandleId, loopVariant) : null;
   let path = '';
   let labelX = (sourceX + targetX) / 2;
   let labelY = (sourceY + targetY) / 2;
@@ -299,7 +322,9 @@ const GoblinEdge = memo((props: EdgeProps) => {
      own route reads `W`), and an untouched edge of any kind still calls its
      generator verbatim — that is the whole of the parity claim. */
   try {
-    if (kind === 'straight') {
+    if (selfLoop) {
+      path = selfLoop.d; labelX = selfLoop.label!.x; labelY = selfLoop.label!.y;
+    } else if (kind === 'straight') {
       if (custom) {
         [path, labelX, labelY] = straightPath(bGeo, W);
       } else {
@@ -460,9 +485,9 @@ const GoblinEdge = memo((props: EdgeProps) => {
      *  agree by construction. A pane that cannot be measured yet yields null and
      *  the gesture simply reports nothing rather than writing a bogus point. */
     const toFlow = (ev: {clientX: number; clientY: number}): Pt | null => {
-      const b = paneRef.current?.getBoundingClientRect();
-      if (!b) return null;
-      return {x: (ev.clientX - b.left - t[0]) / t[2], y: (ev.clientY - b.top - t[1]) / t[2]};
+      const b = paneRef.current?.getBoundingClientRect(); if (!b) return null;
+      const v = storeApi.getState().transform; /* F1: translate read LIVE, never subscribed */
+      return {x: (ev.clientX - b.left - v[0]) / v[2], y: (ev.clientY - b.top - v[1]) / v[2]};
     };
     const origin = toFlow(e);
     /** A pointer that never touched the pane reports nothing — and it must also
@@ -526,7 +551,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
          position — the third cause of the owner's "click once and it jumps".
          The guard itself stays (it is `movedBy`, shared with the bend handle);
          only the value changes. */
-      lock: labelDragLockPx(t[2]),
+      lock: labelDragLockPx(zoom),
       /* ONE history entry, at the START — the same convention `onBend`
          documents. The write is the UNPINNED state: a gesture that has not
          moved yet has moved nothing, and `labelPinned: false` is bit-identical
@@ -578,13 +603,13 @@ const GoblinEdge = memo((props: EdgeProps) => {
    *  bend handle's own nudge. */
   /** The label's live box, in FLOW px. Measured from the element (never
    *  estimated from the string length) and divided by the zoom, because the
-   *  label is counter-scaled by `1/t[2]` and its flow-space size therefore
+   *  label is counter-scaled by `1/zoom` and its flow-space size therefore
    *  depends on the zoom. Both are MEASUREMENTS: the width is whatever the user
    *  typed, so no constant could stand for it, and 0 is the honest reading of
    *  "not measured yet". `LABEL_HALF_H_PX` is no longer needed as a first-frame
    *  fallback — the only consumer left is the handle nudge, which runs after the
    *  label has mounted. */
-  const halfW = labelHalfW / (t[2] || 1);
+  const halfW = labelHalfW / (zoom || 1);
 
   /** ROUND AL, AL-4 — THE CREATE SIGNAL, and why the CLICK POINT is no longer
    *  kept. The double-click still converts its point (`__editAt.at`) and the
@@ -631,40 +656,36 @@ const GoblinEdge = memo((props: EdgeProps) => {
     setEditing(true);
   }, [createAt?.t]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** The painted label's own box, measured from the DOM at the zoom that is
-   *  live, and re-measured when the zoom changes (the label is counter-scaled by
-   *  `1/zoom`, so its FLOW size follows the zoom — the measurement has to as
-   *  well). Read from `getBoundingClientRect`, never estimated from the string:
-   *  the width is whatever the user typed. */
-  /** The label's own box, measured from the DOM at the zoom that is live, and
-   *  re-measured when the zoom changes (the label is counter-scaled by `1/zoom`,
-   *  so its FLOW size follows the zoom — the measurement has to as well). Read
-   *  from `getBoundingClientRect`, never estimated from the string: the width is
-   *  whatever the user typed. ONLY the half-WIDTH is kept — see the declaration
-   *  above for why the height went with the clamp. */
+  /** The label's own box, measured from the DOM. Read from
+   *  `getBoundingClientRect`, never estimated from the string: the width is
+   *  whatever the user typed. Only the half-WIDTH is kept (declaration above
+   *  explains why the height went with the clamp).
+   *
+   *  F1c — why `zoom` is NOT a dep: the label plate is NOT counter-scaled, so
+   *  `r.width` carries the viewport zoom and `r.width / 2 / z` is the
+   *  ZOOM-INVARIANT flow half-width — a re-measure on every zoom step computed
+   *  the identical value and the setState bailed, costing an effect run (and a
+   *  re-render attempt) per zoom tick with 32 identical-prop edge renders per
+   *  pan gesture. Re-measure only when the box itself changes: `shown` (the
+   *  label appears/disappears) and `editing` (the plate's box is a different
+   *  element). The guard below keeps the FIRST mount setState the only one. */
   useEffect(() => {
     const el = labelBox.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const z = t[2] || 1;
-    setLabelHalfW(r.width / 2 / z);
-  }, [shown, t, editing]);
+    const z = zoom || 1;
+    const hw = r.width / 2 / z;
+    setLabelHalfW(prev => prev === hw ? prev : hw);
+  }, [shown, editing]);
 
   /** The handle's own position. The path's midpoint — the label's own anchor and
    *  the point on the line the user grabs — EXCEPT when a label is painted there,
    *  where the two affordances would overlap.
    *
-   *  ROUND AK, AK-11 — WHY IT IS NUDGED, AND WHY THAT IS THE SECOND LINE OF
-   *  DEFENCE RATHER THAN THE FIRST. The first is STRUCTURAL: both affordances run
-   *  through `useEdgeGesture`, whose `claim` closes the window on the first
-   *  pointerdown, so a shared point could never start two gestures anyway. The
-   *  nudge is the documented fallback — it keeps the two TAP RINGS from
-   *  overlapping, so the user never has to guess which one a tap will land on.
-   *
-   *  IT APPLIES ONLY WHEN A LABEL IS PAINTED. With no label there is nothing to
-   *  avoid, so the handle stays on the generator's own midpoint: that is the
-   *  pixel-parity rule this file obeys everywhere, and the reason selecting an
-   *  unlabelled edge renders exactly as it did before this pass. */
+   *  ROUND AK, AK-11 (fold) — the nudge is the SECOND line of defence: the
+   *  first is structural (useEdgeGesture's `claim` closes the window on the
+   *  first pointerdown), and it applies ONLY when a label is painted — with no
+   *  label the handle stays on the generator's own midpoint (pixel parity). */
   const handleAt = hasLabel
     ? nudgeAlongPath({x: labelX, y: labelY}, pathPts, HANDLE_CLEAR_PX + halfW)
     : {x: labelX, y: labelY};
@@ -876,7 +897,7 @@ const GoblinEdge = memo((props: EdgeProps) => {
               data-edge-id={id}
               title="Drag to bend this line"
               style={{
-                transform: `translate(-50%,-50%) translate(${handleAt.x}px, ${handleAt.y}px) scale(${1 / t[2]})`,
+                transform: `translate(-50%,-50%) translate(${handleAt.x}px, ${handleAt.y}px) scale(${1 / zoom})`,
                 // draw.io's own axis feedback: col-resize while the drag is locked
                 // horizontal, row-resize while vertical, grab at rest, grabbing
                 // for the first pixels before the lock is decided.

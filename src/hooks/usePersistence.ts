@@ -3,10 +3,10 @@
  *  PACKAGE-S dirty marker, flushSave with its AS-5 save gate + AUDIT-8b retry,
  *  the debounced autosave effect, and the first-boot last-board bootstrap with
  *  its StrictMode double-mount guard). Behaviour-neutral: bodies are
- *  byte-identical; only this wrapper, its parameter list and the return tuple
- *  are new. applyBoard STAYS in App() (it owns the module-level idc bump and
- *  the undo/selection reset) and is passed in; nodes/edges and the board
- *  doc state stay in App and pass down positionally — no context.  (feature-map home: src/hooks/usePersistence.ts)
+ *  byte-identical; only the wrapper, its parameters and the tuple are new.
+ *  applyBoard STAYS in App() (the idc bump + undo/selection reset are its);
+ *  nodes/edges and the doc state pass down positionally — no context.
+ *  (feature-map home: src/hooks/usePersistence.ts)
  */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type * as React from 'react';
@@ -35,8 +35,9 @@ export function usePersistence(
   applyBoard: (doc: BoardDoc) => void,
   /** GOBI-S1 — true while a share-link fragment owns the boot: the last-board
    *  bootstrap is skipped entirely (a shared view never loads, and never
-   * seeds, the visitor's own boards). */
+   *  seeds, the visitor's own boards). */
   shareActive: React.MutableRefObject<boolean>,
+  lockRef: React.MutableRefObject<boolean>, /* S11 — the save reads the lock */
 ) {
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -63,22 +64,15 @@ export function usePersistence(
    *  loading a board doesn't immediately write it back to disk. */
   const skipAutosave = useRef(0);
 
-  /* AS-5 — THE SAVE GATE, stated once and named. A save (debounced autosave
-     scheduled, or a flush writing) runs only when BOTH hold:
-       (a) a board document has been LOADED — `boardLoaded` is the loader's
-           explicit flag (first boot with no last-board keeps it false until
-           the bootstrap resolves one way or the other; a failed load re-arms
-           nothing), and
-       (b) the id the LOADER applied (`boardLoadedDocId`, set by applyBoard
-           and cleared on board switch) EQUALS the id of the doc currently in
-           memory (`curBoardRef`) — so a flush landing while the next board is
-           still loading, a debounce firing mid-load, or any stale-doc window
-           writes nothing.
-     This replaces the old implicit `boardId`/`skipAutosave` combination.
+  /* AS-5 — THE SAVE GATE, stated once and named: a save (autosave timer or a
+     flush) runs only when BOTH hold — (a) a doc has been LOADED (`boardLoaded`,
+     the loader's explicit flag; a failed load re-arms nothing), and (b) the id
+     the LOADER applied (`boardLoadedDocId`) EQUALS the in-memory doc's
+     (`curBoardRef`) — so a flush landing mid-load or in any stale-doc window
+     writes nothing. This replaces the old `boardId`/`skipAutosave` combination.
      HARDENING, not a fix for a proven race: the 2026-10-19 data-loss incident
-     is UNDETERMINED (see ROUND-AS-SPEC Amendment 1); this gate removes the
-     unproven candidates' shared precondition — a save running when the
-     in-memory doc is not the loaded doc. */
+     is UNDETERMINED (ROUND-AS-SPEC Amendment 1); this gate removes the unproven
+     candidates' shared precondition. */
   const canAutosave = boardLoaded && boardLoadedDocId !== null && boardLoadedDocId === curBoardRef.current?.id;
 
   /* AS-4 — the board list refresher, declared BEFORE flushSave so the 404
@@ -110,10 +104,10 @@ export function usePersistence(
       }
     }).catch(() => { /* line stays as-is */ });
     /* AT-2 — the volatile last resort: IndexedDB itself unavailable (storage
-       disabled). One-time flash; the board list still renders.
-       ROUND BJ: was a dead dynamic import (localStore is also statically
-       imported — vite warned); the flag is a live module binding, read
-       directly. Zero behavior change. */
+       disabled). Flashes on each list refresh (the session stays volatile);
+       the board list still renders. ROUND BJ: was a dead dynamic import
+       (localStore is also statically imported — vite warned); the flag is a
+       live module binding, read directly. Zero behavior change. */
     if (isVolatile) flash('Browser storage is unavailable — boards will not survive a reload. Export JSON to keep your work.');
   }, [flash]);
 
@@ -121,8 +115,9 @@ export function usePersistence(
     setDirty(false); /* PACKAGE-S §S-3 */
     const board = curBoardRef.current;
     /* AS-5 — the explicit save gate: no write unless a board doc is LOADED and
-       its id matches the in-memory doc. (The old guard was just `!board`.) */
-    if (!canAutosave || !board) return;
+       its id matches the in-memory doc. S11 — AND the lock: a debounce armed
+       before the freeze fired 684 ms into a stale period (REVIEW-4). */
+    if (lockRef.current || !canAutosave || !board) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = undefined;
     const seq = ++saveSeq.current;
@@ -141,6 +136,11 @@ export function usePersistence(
      a future in-place patch of edge.data can no longer rewrite history. */
       edges: edgesRef.current.map(e => ({...e, data: {...(e.data as any)}, selected: false})),
       preset: presetId,
+      /* BOARD-STYLE — the board's own paint + spacing (per board). Absent keys
+         stay absent: a board authored before the round round-trips without
+         gaining a value it never chose. */
+      style: board.style,
+      density: board.density,
       // The `legend` key is PERSISTED data (`BoardDoc.legend`) even though the
       // on-canvas renderer is gone: it is written back from the loaded doc so a
       // board that carries the key still round-trips instead of losing it.
@@ -221,8 +221,14 @@ export function usePersistence(
     }
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => { void flushSave(); }, 800);
-    return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, boardId, flushSave, autosave, canAutosave]);
+    /* S11 — clear AND forget: `flushPending` trusts this ref, so a cleared id
+       left behind would make a freeze flush a save nobody armed. */
+    return () => { window.clearTimeout(saveTimer.current); saveTimer.current = undefined; };
+  }, [nodes, edges, boardId, flushSave, autosave, canAutosave,
+    /* BOARD-STYLE — a style/density write is a BOARD write: the effect must
+       schedule the same 800 ms debounce the node edits use, or the inspector
+       would change a value that never reaches disk. */
+    curBoard?.style, curBoard?.density]);
 
   // First load: open the last board, or the newest, or seed one from the
   // current in-memory starter diagram. Guarded against StrictMode's
@@ -279,6 +285,12 @@ export function usePersistence(
     })();
   }, [shareActive]);
 
+  /* S11 — arming a lock FLUSHES what the debounce owed (the pre-freeze doc);
+     the gate above then holds the door shut: nothing stranded, nothing dropped. */
+  const flushPending = useCallback(async () => {
+    if (saveTimer.current !== undefined) await flushSave();
+  }, [flushSave]);
+
   return [saveState, modeLabel, storageEstimate, localMode, dirty,
-    flushSave, refreshBoards, saveTimer, skipAutosave] as const;
+    flushSave, refreshBoards, saveTimer, skipAutosave, flushPending] as const;
 }

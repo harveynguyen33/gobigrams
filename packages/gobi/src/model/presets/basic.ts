@@ -65,35 +65,31 @@ export const C4_ENABLED = false;
    Flip to `true` to put Actor back — the flag is the entire switch. */
 export const ACTOR_ENABLED = false;
 
-/* HARVEY 2026-10-22 — four more create-surface hides, SAME pattern
+/* HARVEY 2026-10-22 — three more create-surface hides, SAME pattern
    (ACTOR/QUEUE/C4/SEQUENCE). One flag each; items stay in the tree, only the
    OFFER is gated:
      · STORAGE_ENABLED — the bucket shape in Data & storage (Harvey: "xoá
        Storage trong Data & Storage").
-     · ERD_ENABLED — BOTH entities items (Table + Note (enum)); with both off
-       the `entities` category section renders empty and disappears
-       (groupByCategory drops empty groups), and the ERD preset loses its
-       palette offer. `libraryFor('erd')` reads LIBRARY, so it returns [] —
-       acceptable: the ERD preset is template-seeded, and a stored erd board
-       keeps its nodes (shape rendering never consults this flag).
-       HARVEY 2026-10-23 — the ERD preset itself stays in PRESETS (a stored
-       erd board must still open as ERD); only its palette offer is gated.
-       HARVEY 2026-10-24 — the TEMPLATE is gated too (same flag, same
-       narrowness as C4_ENABLED's template gate): `templates` is the sole
-       source of the catalog's `erd` family, so gating the spread drops the
-       "Data model" family from the template catalog + gallery, and with no
-       templates a fresh ERD board is unreachable from every create path.
-       The `erd` key STAYS in PRESETS and erdTemplate stays in the tree —
-       a stored board with preset:'erd' still opens as ERD.
      · LANE_ENABLED — the swimlane; Harvey: Group and Lane are near-duplicates
        (both shape 'group', both a dashed boundary; Lane only adds a 420×200
        default size + swimlane aliases), so Lane goes, Group stays.
      · NOTE_ENABLED — the shared plain-text Note (annotations category).
        `withNoteLast` and the flowchart/c4 tail-hoist no-op when the item is
        not in LIBRARY (the filter finds nothing, nothing is appended).
-   Flip any to `true` to put the shape back — the flag is the entire switch. */
+   Flip any to `true` to put the shape back — the flag is the entire switch.
+
+   UNISURF-S13 (2026-11-09) — THE ERD HIDE IS GONE, and it was not replaced by
+   another flag. The old switch gated THREE unrelated things (the Table + Note
+   (enum) palette rows, the `erd` template, and the crow's-foot defaults on new
+   edges) and was flipped off to fix ONE of them: a plain arrow drawn on an
+   'erd' board arrived crow-footed because the markers came from the BOARD
+   PRESET instead of from what the edge connects. Gating the edge default also
+   gated the shapes, so the ERD surface was unreachable with a mouse. The
+   replacement is a rule, not a switch: a NEW edge is a plain arrow on EVERY
+   preset, and crow is authored where the cardinality actually lives — the FK
+   writer (table column → table) and the erdTemplate's own seeded
+   relationships. Both ERD palette rows and the template are always offered. */
 export const STORAGE_ENABLED = false;
-export const ERD_ENABLED = false;
 export const LANE_ENABLED = false;
 export const NOTE_ENABLED = false;
 
@@ -359,29 +355,31 @@ export const FLOWCHART_EDGES: EdgeDefaults = {
   flowAllowed: true,
 };
 
-/* ROUND BG, item A (2026-10-24) — HARVEY: drew plain flowchart arrows on a
-   stored 'erd'-preset board and every NEW edge arrived with crow's-foot
-   markers ("why does a normal arrow suddenly have crow's foot? absurd.").
-   The crow seeds on new edges now follow ERD_ENABLED, the SAME flag that has
-   hidden the whole ERD create surface since 46ecc24: flag false → plain
-   markerEnd ArrowClosed, exactly like FLOWCHART_EDGES, on every creation
-   path (all of them consume `preset.edges` through makeEdge). The branch
-   below keeps this a DEFAULTS table, never a board rewrite — stored edges
-   keep their baked crow markers, and an explicit seed crowStart/crowEnd
-   (the erdTemplate relationship seeds) still passes through makeEdge.
-   Flip ERD_ENABLED to true and the full crow pair returns. */
-export const ERD_EDGES: EdgeDefaults = {
+/* UNISURF-S13 (2026-11-09) — the ERD preset's NEW-EDGE defaults, and the reason
+   they are plain. ROUND BG (2026-10-24) found Harvey drawing a plain arrow on a
+   stored 'erd'-preset board and every new edge arriving crow-footed: the markers
+   were seeded from the BOARD's preset, so they described the board, not the edge.
+   The fix then was a global switch that also hid the shapes; the replacement is
+   this: a NEW edge is a plain ArrowClosed on EVERY preset, because a plain arrow
+   is plain by what it connects. Crow is authored at the CONNECTION — the FK
+   writer (`useConnections.fkConnect`) and the erdTemplate's own seeded
+   relationships — and `makeEdge` still honours an explicit seed for them.
+   Stored boards keep their baked markers: this is a DEFAULTS table, never a
+   board rewrite. */
+export const ERD_PRESET_EDGES: EdgeDefaults = {
   path: 'smoothstep',
   strokeKey: 'slate',
   dash: 'solid',
   markerStart: null,
-  ...(
-    /* Read the real flag, never a hard-coded branch: the table itself flips
-       with the switch, so a future re-enable cannot ship a stale half. */
-    ERD_ENABLED
-      ? {markerEnd: null, crowStart: 'one', crowEnd: 'many' as const}
-      : {markerEnd: MarkerType.ArrowClosed, crowStart: undefined, crowEnd: undefined}
-  ),
+  markerEnd: MarkerType.ArrowClosed,
   strokeWidth: 1.6,
   flowAllowed: false,
 };
+
+/* UNISURF-S13 — TEMPLATE-LOCAL defaults for `erdTemplate`'s authored
+   relationship edges (dataStorage.ts). Deliberately a COPY of the preset's
+   defaults, not a reference: the template's look and the board's new-edge look
+   are separate decisions, and neither may restyle the other. No crow lives
+   here either — each seeded relationship states its own cardinality
+   (crowStart/crowEnd on the seed). */
+export const ERD_EDGES: EdgeDefaults = {...ERD_PRESET_EDGES};

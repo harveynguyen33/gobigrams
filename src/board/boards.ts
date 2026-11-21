@@ -5,9 +5,15 @@
  * server-side app code that never reaches the tarball). */
 export type {BoardDoc} from '../../packages/gobi/src/model/boardDoc';
 import type {BoardDoc} from '../../packages/gobi/src/model/boardDoc';
+/* HISTORY-V2 — the listing row type lives at the transport that first
+ * produces it (serverBoards.ts, a leaf) so no new import edge is created;
+ * re-exported here like BoardDoc: the seam is the app-facing one-stop. */
+export type {HistoryRow} from './serverBoards';
+import type {HistoryRow} from './serverBoards';
 import type {Node, Edge} from '@xyflow/react';
 import {type PresetId, type TemplateSpec, getPreset, asPreset} from '../presets';
 import {type ThemeName} from '../theme/theme';
+import {type TableStyle, type Density} from '../../packages/gobi/src/model/tableStyle';
 /* ROUND BJ — the AT-1 boot probe moved to the leaf src/storageMode.ts so
  * library.ts can read it without importing boards.ts (which drags presets →
  * @xyflow/react into library's cone). Re-exported here under the names every
@@ -73,6 +79,57 @@ export const getBoard = async (id: string): Promise<BoardDoc> => {
   return server.getBoardServer(id);
 };
 
+/** HISTORY-V2 — the READ half of the save history, delegating by storage
+ *  mode exactly like the neighbours above. One row per stored generation,
+ *  NEWEST FIRST, the SAME shape in both modes (V4 landed the local store:
+ *  the rows now come from the IndexedDB `versions` store there, with the
+ *  server read half's own 404 gate for a board that is not live). */
+export const listHistory = async (id: string): Promise<HistoryRow[]> => {
+  if ((await mode()) === 'local') return local.listHistoryLocal(id);
+  return server.listHistoryServer(id);
+};
+
+export const getHistoryVersion = async (id: string, stamp: string): Promise<BoardDoc> => {
+  if ((await mode()) === 'local') return await local.getHistoryVersionLocal(id, stamp) as BoardDoc;
+  return server.getHistoryVersionServer(id, stamp);
+};
+
+/** HISTORY-V3 (t_37f23a89) — RESTORE, the law in ONE place: fetch the stored
+ *  generation, then PUT the exact old bytes back through the app's NORMAL
+ *  save path with the request body carrying `historyReason: 'pre-restore'`.
+ *  The checkpoint hook reads that flag on BOTH backends and bypasses the
+ *  120 s sampling gap, so the state being replaced lands in history as the
+ *  auto-shadow — a restore never loses a version, and undo-the-undo is just
+ *  a second restore. (The local branch honors byte-diff while waiving the
+ *  gap — restoring the state already live archives nothing there; the
+ *  server's hook is unconditional, pinned by the sampling harness.) The
+ *  caller ADOPTS the returned doc (App's applyBoard: adoption plus the
+ *  undo/redo stack reset in the one board-adoption write — the stacks
+ *  describe a different timeline after a restore). Nothing here is
+ *  synthetic: no extra entries, no rewritten history. */
+export const restoreHistoryVersion = async (id: string, stamp: string): Promise<BoardDoc> => {
+  const doc = await getHistoryVersion(id, stamp);
+  return saveBoard({...doc, historyReason: 'pre-restore'});
+};
+
+/** HISTORY-V3 — pin one generation, or edit an existing pin's label (the
+ *  cap counts PINS, not edits: a re-label at cap 4 is a 200). `''` is a
+ *  legal label — pinned without a name, the badge renders the pin alone.
+ *  The cap itself (4) and the ≤80-char trim live in the backend that owns
+ *  the records — server sidecar or local record — with the same answers. */
+export const pinHistoryLabel = async (id: string, stamp: string, label: string): Promise<{ok: boolean; pinned: number}> => {
+  if ((await mode()) === 'local') return local.pinHistoryLabelLocal(id, stamp, label);
+  return server.pinHistoryLabelServer(id, stamp, label);
+};
+
+/** HISTORY-V3 — unpin one generation. The freed slot is immediately usable
+ *  (the harness proves unpin-frees). Unpinning a stamp that was never
+ *  pinned answers the read half's own 404. */
+export const unpinHistoryLabel = async (id: string, stamp: string): Promise<{ok: boolean; pinned: number}> => {
+  if ((await mode()) === 'local') return local.unpinHistoryLabelLocal(id, stamp);
+  return server.unpinHistoryLabelServer(id, stamp);
+};
+
 export const createBoard = async (name: string): Promise<BoardDoc> => {
   if ((await mode()) === 'local') return await local.createBoard(name) as BoardDoc;
   return server.createBoardServer(name);
@@ -86,6 +143,15 @@ export const createBoard = async (name: string): Promise<BoardDoc> => {
 export const saveBoard = async (doc: {
   id: string; name: string; nodes: Node[]; edges: Edge[];
   preset?: PresetId; /** @deprecated (PACKAGE-M fix) — ignored; boards no longer store a theme. */ theme?: ThemeName; legend?: boolean;
+  /** BOARD-STYLE (2026-11-09) — the board's own table style + density. Absent
+   *  keys stay absent; each backend persists the two verbatim. */
+  style?: TableStyle; density?: Density;
+  /** HISTORY-V1/V3/V4 — the save-intent flag the checkpoint hook reads on
+   *  BOTH backends ('pre-restore' bypasses the 120 s sampling gap so the
+   *  state being replaced always lands as the auto-shadow; the local branch
+   *  also honors byte-diff, so restoring the already-live state archives
+   *  nothing there). Never persisted, never read back. */
+  historyReason?: string;
 }): Promise<BoardDoc> => {
   if ((await mode()) === 'local') {
     const saved = await local.saveBoard(doc);

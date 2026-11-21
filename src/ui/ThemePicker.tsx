@@ -1,7 +1,7 @@
 /* feature-map home: src/ui/ThemePicker.tsx */
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Check} from 'lucide-react';
-import {THEME_CARDS, resolveMode, type Mode, type ThemeName} from '../theme/theme';
+import {THEME_CARDS, resolveMode, DARK_MQ, type Mode, type ThemeName} from '../theme/theme';
 
 /**
  * M3 — the Appearance pane's theme picker.
@@ -138,7 +138,7 @@ export default function ThemePicker({
   useEffect(() => {
     if (!active) return;
     const mq = (() => {
-      try { return window.matchMedia('(prefers-color-scheme: dark)'); } catch { return null; }
+      try { return window.matchMedia(DARK_MQ); } catch { return null; }
     })();
     if (!mq) return;
     const onChange = () => setOsTheme(resolveMode('system'));

@@ -8,6 +8,7 @@ import type {Edge, Node} from '@xyflow/react';
 import {type BoardDoc} from './boards';
 import {COLOR_VAR, isColorKey, keyForHex, type ColorKey} from '../theme/colors';
 import {asPreset, makeEdge} from '../presets';
+import {tableRelEnd, type RelColumn} from '../../packages/gobi/src/model/relEnd';
 import {FLOW_ICON_PATHS} from '../nodes/flowIcons';
 
 /* ---------------------------------------------------------------------------
@@ -189,17 +190,31 @@ export const handleSidesOf = (n: Node | undefined): {source: string; target: str
     ? {source: 'bottom', target: 'top'}
     : {source: 'right', target: 'left'};
 
-/** Fill in an endpoint that was never stored. An endpoint that already carries
- *  an explicit handle id (an ERD relationship: `right_rel_o_id` /
- *  `left_rel_i_order`) is passed through byte-identical. */
+/** Fill in an endpoint that was never stored, and RESOLVE a `table` endpoint's
+ *  generic side onto a column handle the node really renders.
+ *
+ *  TABLE-HANDLES (t_99583ca8): a `table` renders ONLY `left_rel_<colId>` /
+ *  `right_rel_<colId>` (src/nodes/TableNode.tsx + TableRowList.tsx). Boards
+ *  written before the layout carried rel handles store the generic side
+ *  (`right`/`top`/…), which no table handle matches: React Flow resolved
+ *  nothing and painted NO line — Harvey's "ERP Test" board showed 7 edges of
+ *  data and 0 connections. The column is chosen by meaning by the SAME rule
+ *  `toBoardDoc` uses (packages/gobi/src/model/relEnd.ts), so a stored board and
+ *  a fresh `.gobi` import land on the same pixel. A handle that already names a
+ *  column (`*_rel_*`) is passed through byte-identical — a deliberate choice is
+ *  never second-guessed. */
 export const migrateEdgeEnds = (e: Edge, nodes: Node[]): Edge => {
-  if (e.sourceHandle != null && e.targetHandle != null) return e;
-  const ends = handleSidesOf(nodes.find(n => n.id === e.source));
-  const tEnds = handleSidesOf(nodes.find(n => n.id === e.target));
+  const end = (id: string, h: string | null | undefined, other: string, isSource: boolean) => {
+    const n = nodes.find((x) => x.id === id);
+    /* the COLUMN LIST is what makes an endpoint a table (no other kind carries
+       `data.columns`), and `tableRelEnd` treats a non-array as "not a table". */
+    const cols = (n?.data as {columns?: RelColumn[]} | undefined)?.columns;
+    return tableRelEnd(cols, other, isSource, h) ?? handleSidesOf(n)[isSource ? 'source' : 'target'];
+  };
   return {
     ...e,
-    sourceHandle: e.sourceHandle ?? ends.source,
-    targetHandle: e.targetHandle ?? tEnds.target,
+    sourceHandle: end(e.source, e.sourceHandle, e.target, true),
+    targetHandle: end(e.target, e.targetHandle, e.source, false),
   };
 };
 

@@ -1,5 +1,5 @@
 import {Fragment, useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Palette, Frame, Cable, Keyboard, Info, X} from 'lucide-react';
+import {Palette, Frame, Cable, Keyboard, Info, X, Braces} from 'lucide-react';
 import ThemePicker from './ThemePicker';
 import {type Mode, type ThemeName} from '../theme/theme';
 /* ROUND AA, ITEM 2 — the marquee mode's values and its plain-language option
@@ -17,6 +17,9 @@ import type {Props} from '../settings/shared';
 import {Row, ToolbarChip, Toggle, Segmented, dblRangeOptions} from '../settings/Controls';
 import {APP_VERSION} from '../settings/version';
 import {CanvasPane, AboutPane} from '../settings/Panes';
+/* SETTINGS-CODE-PANE — the Code pane lives in its own file: Panes.tsx sits at
+ * its budget cap, and the pane is one row. */
+import {CodePane} from '../settings/CodePane';
 /* ROUND BH — the in-app feedback dialog (public launch). ROUND BI, ITEM 3: the
  *  dialog itself now mounts ONCE in App.tsx (the ? help sheet is its second
  *  entry point), so Settings only forwards the opener through `onOpenFeedback`;
@@ -45,11 +48,12 @@ import {CanvasPane, AboutPane} from '../settings/Panes';
 
 
 export type SettingsCat =
-  | 'appearance' | 'canvas' | 'connections' | 'keys' | 'about';
+  | 'appearance' | 'canvas' | 'code' | 'connections' | 'keys' | 'about';
 
 export const SETTINGS_CATS: {id: SettingsCat; icon: React.ReactNode; name: string}[] = [
   {id: 'appearance',  icon: <Palette size={15} />,          name: 'Appearance'},
   {id: 'canvas',      icon: <Frame size={15} />,            name: 'Canvas'},
+  {id: 'code',        icon: <Braces size={15} />,           name: 'Code'},
   {id: 'connections', icon: <Cable size={15} />,            name: 'Connections'},
   {id: 'keys',        icon: <Keyboard size={15} />,         name: 'Shortcuts'},
   {id: 'about',       icon: <Info size={15} />,             name: 'About'},
@@ -74,8 +78,12 @@ const SHORTCUTS_KEYS: {what: string; keys: string[]}[] = [
   {what: 'Copy / paste / duplicate', keys: ['⌘/Ctrl', 'C', 'V', 'D']},
   {what: 'Deselect',                 keys: ['Esc']},
   {what: 'Rotate selection',         keys: ['Alt', 'R']},
+  {what: 'Group selection',          keys: ['⌘/Ctrl', 'G']},
+  {what: 'Ungroup',                  keys: ['⌘/Ctrl', '⇧', 'G']},
+  {what: 'Lock / unlock selection',  keys: ['Alt', 'L']},
   {what: 'Fit view to diagram',      keys: ['⇧', '1']},
   {what: 'Read-only review',        keys: ['⇧', '2']},
+  {what: 'Toggle the code pane',    keys: ['⌘/Ctrl', '/']},
   {what: 'Nudge selection',          keys: ['←↑↓→']},
   {what: 'Collapse / expand both panels', keys: ['⌘/Ctrl', '⌃', '⇧', '\\']},
   {what: 'Toggle left panel',            keys: ['⌘/Ctrl', '⌃', '⇧', '[']},
@@ -231,9 +239,9 @@ export default function Settings({
   marquee, onMarquee,
   zOrder, onZOrder,
   layoutDir, onLayoutDir,
+  tableStyle, tableDensity, onTableStyle, hasBoard,
   pngScale, onPngScale, pngPad, onPngPad,
   autosave, onAutosave,
-  tips, onTips,
   returnFocusTo,
   boardPng,
   onOpenFeedback,
@@ -341,16 +349,21 @@ export default function Settings({
           onZOrder={onZOrder}
           layoutDir={layoutDir}
           onLayoutDir={onLayoutDir}
+          tableStyle={tableStyle}
+          tableDensity={tableDensity}
+          onTableStyle={onTableStyle}
+          hasBoard={hasBoard}
           pngScale={pngScale}
           onPngScale={onPngScale}
           pngPad={pngPad}
           onPngPad={onPngPad}
           autosave={autosave}
           onAutosave={onAutosave}
-          tips={tips}
-          onTips={onTips}
         />
       );
+      /* SETTINGS-CODE-PANE — the code rail's commit preference gets its own
+       * pane; the row itself (and its persistence) lives in CodeLayoutRow. */
+      case 'code':        return <CodePane />;
       case 'connections': return (
         <ConnectionsPane
           noCycles={noCycles}

@@ -70,7 +70,14 @@ export function ShapePreview({shape, color}: {shape: Shape; color: string}) {
     case 'group':
       return wrap(<rect x="1" y="2" width="24" height="14" rx="3" strokeDasharray="4 3" {...s} />, 'group');
     case 'note':
-      return wrap(<path d="M19 2 H2 V16 H19 L24 9 Z" {...s} />, 'note');
+      /* SHAPE-FIDELITY (t_926d8509): the canvas post-it is the ONE note
+       * silhouette — a rounded card with the fold at the BOTTOM-RIGHT, not
+       * the old pennant. Proportions track the canvas/export geometry
+       * (fold leg ≈ 19% of the card height, corner radius ≈ 12/95). */
+      return wrap(<>
+        <path d="M3.3 2 H22.7 Q24.5 2 24.5 3.8 V13 L21.5 16 H3.3 Q1.5 16 1.5 14.2 V3.8 Q1.5 2 3.3 2 Z" {...s} />
+        <path d="M21.5 16 L24.5 13 V16 Z" fill={color} opacity="0.6" stroke="none" />
+      </>, 'note');
 
     /* ---------------- L3a previews ---------------- */
     case 'terminator':

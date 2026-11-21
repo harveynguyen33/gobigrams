@@ -18,7 +18,7 @@
  *      resize is in flight — it pushes a node change object carrying
  *      `{type: 'dimensions', resizing: true, setAttributes, dimensions}` from
  *      its `onChange`, and one final `{type: 'dimensions', resizing: false}`
- *      from its `onEnd`. Those changes reach our `handleNodesChange`, which
+ *      from its `onEnd`. Those changes reach our change handler, which
  *      only looked at `type === 'remove'`. The resize fell straight through.
  *   3. The size PERSISTS because React Flow's own `applyChanges` writes the
  *      change into the node: `measured` becomes the new dimensions and
@@ -51,7 +51,7 @@
  * the floors (`NODE_MIN_W` / `NODE_MIN_H`) and the gesture feel are untouched by
  * this round.
  */
-import type {NodeChange} from '@xyflow/react';
+import type {Node, NodeChange} from '@xyflow/react';
 
 /**
  * Per-gesture latch. One instance lives in `App.tsx` inside a `useRef`, so it
@@ -96,4 +96,75 @@ export function recordResizeGesture(guard: ResizeGuard, changes: readonly NodeCh
   // End of gesture (or a batch with no resize at all): re-arm the latch.
   if (ended) guard.active = false;
   return false;
+}
+
+/* ---------------------------------------------------------------------------
+ * TABLE-GRIP (t_ef4b3f8a) — A TABLE'S SIZE IS DERIVED, SO ITS GRIPS DRIVE THE
+ * SCALE AND NOTHING ELSE.
+ *
+ * Harvey (2026-11-09): "tại sao k cho scale như các hình shapes khác??" — every
+ * other node resizes by its corner grips, the table could not. The table got the
+ * same `<NodeResizer>`; what it may NOT get is the same DIMENSION WRITE. Its box
+ * is MEASURED by the core (`tableNaturalWidth(content, style, density, scale)`),
+ * and `applyChanges` writes `width`/`height` onto the node whenever the change
+ * carries `setAttributes` — a stored card size that silently diverges from the
+ * core's measure is the 250-vs-278 defect this repo already paid for once.
+ *
+ * So the gesture's change is CONVERTED, never applied: its width becomes one rung
+ * of the ladder the inspector offers (a 0.75 floor in 5% steps — the SAME
+ * numbers as `TABLE_SCALE_MIN/STEP` in the core; the harness pins them) and is
+ * written to the node's `scale`. NO CEILING (TABLE-SCALE-NOMAX, t_7f37db5b): a
+ * far drag keeps landing on rungs (2.0, 4.0 …) — the old 1.5 cap refused every
+ * bigger table. The MIN-side clamp stays (RAIL-COVER-2 / TABLE-GRIP-Z). The
+ * change is then DROPPED, together with the
+ * `position` change React Flow emits beside it for a top/left grip — dropping the
+ * dimensions but keeping the position would SLIDE the card while it is resized.
+ *
+ * `naturalWidth` is INJECTED (App passes the core's `tableNaturalWidth`) so this
+ * module keeps importing nothing but types and `checks/` can execute it directly.
+ * The end-of-gesture frame (`resizing: false`) is dropped without a write: it
+ * carries no dimension the frames did not already convert, and a mere click on a
+ * grip must not stamp a `scale` onto a table that never moved.
+ * ------------------------------------------------------------------------- */
+export const TABLE_GRIP_MIN = 0.75, TABLE_GRIP_STEP = 0.05;
+
+export function tableGripChanges(
+  changes: readonly NodeChange[],
+  nodes: readonly Node[],
+  setNodes: (u: (ns: Node[]) => Node[]) => void,
+  style: unknown,
+  density: unknown,
+  naturalWidth: (data: unknown, style: unknown, density: unknown, scale: number) => number,
+): NodeChange[] {
+  /* ONLY a gesture frame carries `resizing` — React Flow emits a plain
+     `{type:'dimensions', dimensions}` change for its OWN measurement pass, and
+     dropping THAT would leave the node unmeasured (invisible, unclickable). */
+  const dims = changes.filter((c): c is Extract<NodeChange, {type: 'dimensions'}> =>
+    c.type === 'dimensions' && typeof c.resizing === 'boolean');
+  if (!dims.length) return changes as NodeChange[];
+  const grip = new Set(dims.filter(c => nodes.some(n => n.id === c.id && n.type === 'table')).map(c => c.id));
+  if (!grip.size) return changes as NodeChange[];
+  const scale = new Map<string, number>();
+  for (const c of dims) {
+    const w = c.dimensions?.width;
+    const n = grip.has(c.id) ? nodes.find(m => m.id === c.id) : undefined;
+    if (!n || !w || c.resizing === false) continue;
+    const one = naturalWidth(n.data, style, density, 1);
+    const rung = Math.round(w / one / TABLE_GRIP_STEP) * TABLE_GRIP_STEP;
+    /* whole PERCENT: 0.05 steps float (0.8500000000000001 measured), and the
+       core's resolveTableScale snaps in whole percent for the same reason. NO
+       MAX: the rung itself is the value, however far the drag went. */
+    scale.set(c.id, Math.round(Math.max(TABLE_GRIP_MIN, rung) * 100) / 100);
+  }
+  if (scale.size) setNodes(ns => ns.map(n => scale.has(n.id)
+    ? {...n, data: {...(n.data as Record<string, unknown>), scale: scale.get(n.id)}}
+    : n));
+  return changes.filter(c => {
+    if (c.type === 'add') return true;
+    if (!grip.has(c.id)) return true;
+    /* the paired position change would SLIDE the card while it is resized */
+    if (c.type === 'position') return false;
+    /* a measurement frame in the same batch is not ours to drop */
+    return !(c.type === 'dimensions' && typeof c.resizing === 'boolean');
+  });
 }

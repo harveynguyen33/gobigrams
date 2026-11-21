@@ -7,9 +7,9 @@ import {type ColorKey} from '../colors';
 import {PALETTE, type PaletteItem, type PaletteCategory, type DiagramType} from '../palette';
 import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';
 import {
-  QUEUE_ENABLED, ACTOR_ENABLED, STORAGE_ENABLED, NOTE_ENABLED, LANE_ENABLED, ERD_ENABLED,
+  QUEUE_ENABLED, ACTOR_ENABLED, STORAGE_ENABLED, NOTE_ENABLED, LANE_ENABLED,
   C4_ENABLED, SEQUENCE_ENABLED,
-  C4_EDGES, FLOWCHART_EDGES, ERD_EDGES,
+  C4_EDGES, FLOWCHART_EDGES,
   type PresetId, type EdgeDefaults, type TemplateSpec, type DiagramPreset, makeEdge,
 } from './basic';
 import {FLOWCHART_PALETTE, FLOWCHART_NODE_SIZE, CONNECTOR_NODE_SIZE, NOTE_ITEM} from './flowchart';
@@ -220,9 +220,15 @@ export const LIBRARY: PaletteItem[] = [
   // 4b — PACKAGE-SEQ: the UML sequence pieces (HIDDEN — see SEQUENCE_ENABLED).
   ...(SEQUENCE_ENABLED ? SEQUENCE_PALETTE : []),
   // 5 — the ERD entities.
-  //     ERD_ENABLED (2026-10-22) — both items gated; `entities` section
-  //     disappears when empty (groupByCategory drops empty groups).
-  ...(ERD_ENABLED ? [TABLE_PALETTE_ITEM, ERD_ENUM_NOTE_ITEM] : []),
+  //     UNISURF-S13 (2026-11-09) — ALWAYS offered. The old ERD hide dropped both
+  //     rows here, which emptied the `entities` section (groupByCategory drops
+  //     empty groups) and made `libraryFor('erd')` return [] — so a table could
+  //     only arrive by importing a .gobi file. The capability was already built
+  //     (editable rows, FK by dragging a column); it just had no door. The hide
+  //     existed to stop a different bug (new edges inheriting crow from the board
+  //     preset), and that bug is now fixed at its source: `PRESETS.erd.edges` is
+  //     a plain arrow, and crow is authored on the connection.
+  TABLE_PALETTE_ITEM, ERD_ENUM_NOTE_ITEM,
 ];
 
 /* §2.7 — the Mixed (`custom`) set is its OWN selector, NOT a `types[]` filter

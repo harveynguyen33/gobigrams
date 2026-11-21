@@ -7,6 +7,7 @@
 import type {PresetId} from './presets/index';
 import type {ThemeName} from './theme';
 import type {FlowEdge, FlowNode} from './flowTypes';
+import type {TableStyle, Density} from './tableStyle';
 
 export type BoardDoc = {
   id: string;
@@ -16,6 +17,13 @@ export type BoardDoc = {
   updatedAt: number;
   /** L2 — the board's diagram type. Absent on old boards → 'architecture'. */
   preset?: PresetId;
+  /** BOARD-STYLE (2026-11-09) — the table node's paint + spacing, PER BOARD.
+   *  Absent on every board authored before the round → the Settings → New
+   *  boards default, then `sheet` / `comfy`. The `.gobi` text language never
+   *  reads either field (checks/unisurf-board-style B6), so a board written
+   *  before and after this card compiles byte-identically. */
+  style?: TableStyle;
+  density?: Density;
   /** PACKAGE-M fix — boards no longer store a theme. A preset may suggest one
    *  (and the user's global preference still wins); this field is LEGACY/IGNORED
    *  and kept only so old board files on disk still parse. */

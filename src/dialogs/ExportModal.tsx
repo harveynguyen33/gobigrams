@@ -310,7 +310,14 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
     setGobiErrors([]);
     setGobiNote(null);
     const {compileGobi} = await import('@techgoblin/gobi-core');
-    const res = compileGobi(gobiText);
+    /* LAYOUT-FOLLOWS-WIDTH — a table compiles at the width the card really
+       paints, so the placement cannot lay two widened cards on top of each
+       other. The canvas wrapper IS the board's published look (App paints
+       data-style/data-density from curBoard), so this door reads the same two
+       values without a new prop path through App (which is at its hard cap). */
+    const cv = document.querySelector('main.canvas-wrap');
+    const look = {style: cv?.getAttribute('data-style'), density: cv?.getAttribute('data-density')};
+    const res = compileGobi(gobiText, look);
     if (res.ok === false) {
       /* NOTHING is dispatched: the board is untouched and the errors ARE the
        * answer — one row per error, line:column first. The latch releases:
@@ -321,7 +328,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
       return;
     }
     const {toBoardDoc} = await import('../gobi/adapterCanvas');
-    const board = toBoardDoc(res.doc);
+    const board = toBoardDoc(res.doc, look);
     window.dispatchEvent(new CustomEvent('gobi:mermaid-import', {detail: {from: 'gobi', board}}));
     setGobiNote(`Compiled ${count(board.nodes.length, 'node')} · ${count(board.edges.length, 'edge')} — inserting onto the board…`);
     window.setTimeout(onClose, 900);
@@ -416,7 +423,14 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
             {id: 'json', label: 'JSON'},
             {id: 'mermaid', label: 'Mermaid'},
           ]} />
+          {/* F3 / render isolation (owner-ruled 2026-11-20): the per-format
+              explainer region is ONE reserved slot — .em-expl is min-height'd
+              to the tallest format's measured stack (pdf: its own note plus
+              the outline block), so a format toggle repaints only this box
+              and the Export button below it never moves. */}
+          <div className="em-expl">
           {format === 'pdf' && <div className="em-note">PDF (opens the print dialog — choose Save as PDF). The browser embeds the fonts; text stays selectable.</div>}
+          {format === 'png' && <div className="em-note">A raster cannot carry the node descriptions — the SVG export can, and screen readers read them.</div>}
 
           {/* ROUND C — "Outline text": exact-typography mode for SVG (and the
               PDF print view, which renders the same string). OFF by default:
@@ -440,6 +454,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
               </div>
             </>
           )}
+          </div>
 
           <div className="em-label">Theme</div>
           <Seg value={theme} set={setTheme} aria="Theme" selCount={selCount} tabRef={tabRef} options={THEME_CHOICES as {id: string; label: string}[]} />

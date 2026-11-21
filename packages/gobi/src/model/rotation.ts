@@ -258,3 +258,24 @@ export function beginRotate(cx: number, cy: number, px: number, py: number): Rot
 export function rotateDelta(b: RotateBegin, px: number, py: number): number {
   return norm180(bearingTo(b.cx, b.cy, px, py) - b.bearing);
 }
+
+/** CHROME-GROUPED (t_39ac5568, 2026-11-13): a grouped child's `position` is
+ *  PARENT-RELATIVE, but the gesture maths needs FLOW-ABSOLUTE. React Flow
+ *  v12 maintains the composed chain on the INTERNAL node
+ *  (`internals.positionAbsolute`) — pass that when available; this helper is
+ *  the ONE fallback that composes the whole parentId chain by hand (nested
+ *  groups included), so the composition cannot drift between call sites. */
+export type PosNode = {id: string; parentId?: string; position: {x: number; y: number}};
+
+export function absPosition(nodes: readonly PosNode[], n: PosNode): {x: number; y: number} {
+  let x = n.position.x, y = n.position.y;
+  let pid = n.parentId;
+  while (pid) {
+    const p = nodes.find(m => m.id === pid);
+    if (!p) break;
+    x += p.position.x;
+    y += p.position.y;
+    pid = p.parentId;
+  }
+  return {x, y};
+}

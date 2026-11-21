@@ -1,9 +1,9 @@
-import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
+import {cloneElement, useCallback, useEffect, useMemo, useState, useRef, type ReactElement} from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState,
   MarkerType, useStore, reconnectEdge, PanOnScrollMode, ConnectionMode,
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
-  type ReactFlowInstance, type XYPosition,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import {
   Copy, ChevronDown, ChevronLeft, ChevronRight,
@@ -17,14 +17,10 @@ import {
 import {fitPaddingFor} from '../canvas/checklistFit';
 import '@xyflow/react/dist/style.css';
 import {
-  // ROUND T — the bend rules (`SIDE_OUT`, `OPPOSITE_SIDE`, `STEP_GAP_PX`,
-  // `isSide4`) and the drag's own maths live in `edgeBend.ts`: the geometry a
-  // handler needs, the axis rule the POINTER decides (`dragAxis`) and the
-  // kind-aware wrapper (`bendAxisFor`), the writer (`applyDrag`) and the base
-  // point (`drawnMid`). The renderer's route is our own path on a stored
-  // waypoint and the generator otherwise (`needsCustom`).
-  // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with
-  // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
+  // ROUND T — the bend rules (`SIDE_OUT`, `OPPOSITE_SIDE`, `STEP_GAP_PX`, // `isSide4`) and the drag's own maths live in `edgeBend.ts`: the geometry a
+  // handler needs, the axis rule the POINTER decides (`dragAxis`) and the // kind-aware wrapper (`bendAxisFor`), the writer (`applyDrag`) and the base
+  // point (`drawnMid`). The renderer's route is our own path on a stored // waypoint and the generator otherwise (`needsCustom`).
+  // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
   // are written, and no axis is projected.
   applyDrag, bendAxisFor, dragPoint, plainMidpoint, BEND_SNAP_PX, type BendPhase, type Pt,
 } from '../canvas/edgeBend';
@@ -38,10 +34,13 @@ import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from '../
 
 import DiagramNode, {type NodeKind} from '../nodes/DiagramNode';
 import LabelNode, {type LabelKind} from '../nodes/LabelNode';
-import {newResizeGuard, recordResizeGesture} from '../board/resizeHistory';
+import {newResizeGuard, recordResizeGesture, tableGripChanges} from '../board/resizeHistory';
 import {useRotation, norm180} from '../hooks/useRotation';
 import {ROTATE_SNAP_DEG} from '../layout/layoutConstants';
 import {GroupRotateGrip} from '../components/GroupRotateGrip';
+import {GroupGapDrag} from '../components/GroupGapDrag';
+import {NodeChrome} from '../components/NodeChrome';
+import {DescDotLayer} from '../components/DescDot';
 import {SelectionBox} from '../components/SelectionBox';
 /* GOBI-S1 — the share view: hook (route + decode + edit-copy) and chrome.
  * BoardsPopover is the GOBI-S1 extraction that PAID for this round's App
@@ -57,25 +56,20 @@ import Tooltip from '../ui/Tooltip';
 import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey} from '../theme/colors';
 import {SHAPES, asShape, ShapePreview, type Shape} from '../nodes/shapes';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
- * editing surface (canvas render) never needs the emitter at first paint:
- * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
- * printView are only reachable from user actions (Export modal build,
- * Copy PNG, print PDF). So App keeps only the TYPES statically (import
- * type — erased at build time) and pulls the values through ONE dynamic
- * import seam at the point of use. First export pays one chunk fetch
- * (~150-200 KB raw, ~40 KB gz) that used to sit in the boot bundle.
- * The whole cluster is closed over App.tsx (no other app module imports
+ * editing surface (canvas render) never needs the emitter at first paint: * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
+ * printView are only reachable from user actions (Export modal build, * Copy PNG, print PDF). So App keeps only the TYPES statically (import
+ * type — erased at build time) and pulls the values through ONE dynamic * import seam at the point of use. First export pays one chunk fetch
+ * (~150-200 KB raw, ~40 KB gz) that used to sit in the boot bundle. * The whole cluster is closed over App.tsx (no other app module imports
  * these by value), so the seam here is the only door. */
 /* ROUND BJ — same lazy seam as exportSvg above: the shaper stack and the
- * print route only run inside export handlers. One memoised promise per
- * module, so the first export pays the chunk once and every later export
+ * print route only run inside export handlers. One memoised promise per * module, so the first export pays the chunk once and every later export
  * reuses it. Types stay static (erased). */
 
 import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from '../canvas/inspector';
 import {
-  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow,
+  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow, ScaleRow,
   /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
      two pure helpers the harness executes rather than restates. */
   FlowSpeed,
@@ -97,31 +91,43 @@ import {
 } from '../layout/textStyle';
 import {
   getPreset, edgeColorPatch, edgeColorLiteralPatch, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
-  type PresetId, type DiagramPreset, type PathId,
+  type PresetId, type DiagramPreset,
 } from '../presets';
 import {type PaletteItem} from '../theme/palette';
 /* ROUND AD, ITEM 5(a) — the colour key's label and its persisted dismissal
    (Option B's condition: the key must be labelled where the user looks, and the
    label must be dismissible so it does not become permanent furniture). */
 import {KEY_NOTE_TEXT, loadKeyNote, saveKeyNote} from '../theme/colorKeyNote';
-import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, type Mode, type ThemeName} from '../theme/theme';
+import {applyTheme, loadMode, hasStoredMode, resolveMode, isDarkTheme, saveMode, DARK_MQ, type Mode, type ThemeName} from '../theme/theme';
 import * as boards from '../board/boards';
 import type {BoardDoc, BoardMeta} from '../board/boards';
 import ContextMenu, {type CtxTarget, type CtxAction} from '../ui/ContextMenu';
+import {useGroupLock, lockedIdSet, visibleSelected} from '../hooks/useGroupLock';
+import {useGapDragGesture} from '../hooks/useGapDrag';
+import {useLogicalGroup} from '../hooks/useLogicalGroup';
+import {useCanvasPrefs} from '../hooks/useCanvasPrefs';
+import {useClipboard} from '../hooks/useClipboard';
 import {HelpSheet} from '../components/HelpSheet';
 import {RotateInternalsBridge} from '../components/RotateInternalsBridge';
+import {DescPanels} from '../components/DescPanels';
 import {ModalMounts} from '../components/ModalMounts';
 import {CanvasEmptyPanel} from '../components/CanvasEmptyPanel';
+import BoardPanel from '../components/BoardPanel'; import {useTableWidth} from '../hooks/useTableWidth'; import {useRailReveal} from '../hooks/useRailReveal'; import {DefinitionSection, descData, descPaintData, type DescPaint} from '../components/DefinitionSection';
+import {swatchRow} from '../components/swatchRow';
+import {resolveTableStyle, resolveDensity} from '../../packages/gobi/src/model/tableStyle'; import {tableNaturalWidth} from '../../packages/gobi/src/model/tableWidth'; import {readNewBoardStyle, readNewBoardDensity} from '../hooks/useNewBoardDefaults';
 import {Toolbar} from '../components/Toolbar';
+import {CodePane, StaleBanner} from '../components/CodePane';
+import {useCodeCommit} from '../hooks/useCodeCommit';
+import {useSelectionBridge} from '../hooks/useSelectionBridge';
 import Checklist, {type ChecklistTaskId, isChecklistComplete, readChecklistDone, readChecklistDismissed} from '../nodes/Checklist';
 /* ONBOARD-P5 — the one-line tips: the four gates live in the pure module, the
  * render in src/components/TipToast.tsx. */
-import {takeTip, markTipSeen, tipsOn, setTipsOn, type TipId} from '../ui/tips';
+import {takeTip, markTipSeen, type TipId} from '../ui/tips';
 import TipToast from '../components/TipToast';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
-import {computeHelperSnap, type HelperGuides} from '../canvas/helperLines';
+import {computeHelperSnap, snapToParentRelative, type HelperGuides} from '../canvas/helperLines';
 import HelperLinesView from '../canvas/HelperLinesView';
 /* ROUND AM, AM-3 — the flow glyphs' ONE home. Imported HERE and in
    `GoblinEdge.tsx` (AL-6: the chip row and the travelling chip read the same
@@ -141,7 +147,9 @@ import {
   FINE_NODE_CLICK_DISTANCE_PX,
   COARSE_NODE_CLICK_DISTANCE_PX,
 } from '../canvas/touch';
-import {usePanelCollapse, isPanelHidden} from '../canvas/panelCollapse';
+import {usePanelCollapse} from '../canvas/panelCollapse';
+import {useReviewReveal, panelHiddenFor} from '../canvas/reviewChrome';
+import {useRailPanel} from '../canvas/railPanel';
 /* ROUND AA, ITEM 2 — the marquee mode: its persisted value, its React Flow
    enum, and the hook that owns both. */
 import {useMarqueeMode} from '../canvas/marqueeMode';
@@ -156,7 +164,6 @@ import {
  *  the shape `LIBRARY` above: that one is the 34-element constant, this one is
  *  the user's own starred document on disk. */
 import {type FavouriteNode} from '../board/library';
-import {loadPref, savePref} from '../board/prefs';
 import * as library from '../board/library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
@@ -181,6 +188,7 @@ import {
   edgeMarkerUrl, edgeStrokeKeyOf, hasCrow, isEditable, nodeW, nodeH,
   edgeGeo, edgeDrawnMid, TableGlyph, dashArray, favouritePreview, markerFor,
   edgeStroke, edgeStrokeKey, bootTheme,
+  absPos,
 } from '../board/boardUtils';
 
 const nodeTypes = {goblin: DiagramNode, label: LabelNode, table: TableNode, customshape: CustomShapeNode};
@@ -191,35 +199,28 @@ export type EdgeData = {
   shape?: string;
   offset?: 'center' | 'start' | 'end';
   /** STEP 1 (2026-09-18): the fraction `getSmoothStepPath` calls `stepPosition`
-   *  (0..1), which slides the step's cross-bar along the split axis. READ-ONLY
-   *  LEGACY as of ROUND T — the slider that wrote it is gone, so nothing here
+   *  (0..1), which slides the step's cross-bar along the split axis. READ-ONLY *  LEGACY as of ROUND T — the slider that wrote it is gone, so nothing here
    *  writes the key any more; it is read only so a board saved while the slider
    *  existed still renders exactly as it did. */
   bend?: number;
   /** ROUND S/T (2026-09-18): the ABSOLUTE 2-D waypoint the edge's midpoint was
-   *  dragged to — `bendX` from a horizontal gesture, `bendY` from a vertical one
-   *  (see `edgeBend.dragAxis`). BOTH are read: a stored key routes the edge
+   *  dragged to — `bendX` from a horizontal gesture, `bendY` from a vertical one *  (see `edgeBend.dragAxis`). BOTH are read: a stored key routes the edge
    *  through `freePath`, which is the only route that can use both coordinates.
    *  Absent means "never dragged", and the edge stays on the generator. */
   bendX?: number;
   bendY?: number;
   /** ROUND AK, AK-10 — the FREE 2-D label position, in RELATIVE flow px, added
-   *  to the anchor `GoblinEdge` derives. ABSENT (not `{0,0}`) is the default: a
-   *  board that never moved its label carries no key, and `onLabelWrite` below
-   *  DELETES both keys when the label is centred, so "reset", "snapped back" and
-   *  "never moved" are one stored state rather than three that merely render the
+   *  to the anchor `GoblinEdge` derives. ABSENT (not `{0,0}`) is the default: a *  board that never moved its label carries no key, and `onLabelWrite` below
+   *  DELETES both keys when the label is centred, so "reset", "snapped back" and *  "never moved" are one stored state rather than three that merely render the
    *  same. */
   labelOffset?: {x: number; y: number};
   /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While falsy the label
    *  auto-centres; once true `labelOffset` wins. */
   labelPinned?: boolean;
   /** ROUND AM, AM-1 — THE POINT the stored `labelOffset` was measured against,
-   *  in flow coordinates. It is what makes a dragged label keep tracking the
-   *  pointer while a NODE moves: when a write states a different anchor than the
-   *  one stored here, `onLabelWrite` first corrects the stored offset by the
-   *  anchor's movement and then applies the write. ABSENT is the normal state —
-   *  a board written before this round, and a centred label, carry no key — and
-   *  an absent anchor simply means "nothing to rebase against", so an existing
+   *  in flow coordinates. It is what makes a dragged label keep tracking the *  pointer while a NODE moves: when a write states a different anchor than the
+   *  one stored here, `onLabelWrite` first corrects the stored offset by the *  anchor's movement and then applies the write. ABSENT is the normal state —
+   *  a board written before this round, and a centred label, carry no key — and *  an absent anchor simply means "nothing to rebase against", so an existing
    *  board renders byte-identically and the first drag adopts the live anchor as
    *  its base. */
   labelAnchor?: {x: number; y: number};
@@ -228,40 +229,26 @@ export type EdgeData = {
    *  `.edge-label` by the renderer; absent resolves to `surface` (today's look). */
   labelBg?: 'none' | 'surface' | 'outline';
   /** ROUND AM, AM-2 — the LABEL'S TEXT STYLE: the same `TextStyle` a node
-   *  stores on `data.textStyle`, under the edge's own key. ABSENT is the state
-   *  every existing board is in — `edgeTextStyleVars` returns `{}`, no custom
-   *  property reaches the element and `.edge-label`'s own fallbacks paint the
-   *  11px / 600 / `var(--mono)` it painted before this round.
-   *
-   *  WHY A SEPARATE KEY AND NOT `textStyle`. `data.textStyle` on an edge would
-   *  read as the text of something that is not a node, and an edge is the only
-   *  target where a stored `TextStyle` can carry fields the target cannot
-   *  express (align / vAlign / colorKey — see `edgeTextStyleVars`). The label's
-   *  ink stays `labelTextKey` above, so this key never becomes a second writer
+   *  stores on `data.textStyle`, under the edge's own key. ABSENT is the state *  every existing board is in — `edgeTextStyleVars` returns `{}`, no custom
+   *  property reaches the element and `.edge-label`'s own fallbacks paint the *  11px / 600 / `var(--mono)` it painted before this round.
+   * *  WHY A SEPARATE KEY AND NOT `textStyle`. `data.textStyle` on an edge would
+   *  read as the text of something that is not a node, and an edge is the only *  target where a stored `TextStyle` can carry fields the target cannot
+   *  express (align / vAlign / colorKey — see `edgeTextStyleVars`). The label's *  ink stays `labelTextKey` above, so this key never becomes a second writer
    *  for the colour. */
   labelStyle?: TextStyle;
   /** ROUND AK, AK-13 — the double-click-on-the-path signal, threaded per-edge
-   *  exactly like `__edit`: a fresh timestamp AND the flow point the click
-   *  landed on. A double-click on a line with no label has nothing to edit yet,
-   *  so the editor has to be opened by a signal (the element does not exist) and
-   *  the commit has to know where the label was created.
-   *
-   *  ROUND AN, AN-1 — IT IS A ONE-SHOT AND IT MUST NEVER SURVIVE ITS MOMENT.
-   *  It was written by `openLabelAt` and deleted NOWHERE, so it stayed on the
-   *  edge forever: every later rename re-entered the renderer's create branch
-   *  and wrote the CENTRED state (the owner's "đổi text, enter thì nó tự nhiên
-   *  về lại center"). Two halves fix it, and they are not alternatives —
-   *  `consumeEditAt` below ends the signal on both editor exits, and
-   *  `migrateEdge` FOLDS A STORED ONE AWAY ON READ, because this key reached
-   *  the saved document before the fix existed (measured: 4 + 2 + 1 occurrences
-   *  across three of the user's own boards), so without the read-time fold a
+   *  exactly like `__edit`: a fresh timestamp AND the flow point the click *  landed on. A double-click on a line with no label has nothing to edit yet,
+   *  so the editor has to be opened by a signal (the element does not exist) and *  the commit has to know where the label was created.
+   * *  ROUND AN, AN-1 — IT IS A ONE-SHOT AND IT MUST NEVER SURVIVE ITS MOMENT.
+   *  It was written by `openLabelAt` and deleted NOWHERE, so it stayed on the *  edge forever: every later rename re-entered the renderer's create branch
+   *  and wrote the CENTRED state (the owner's "đổi text, enter thì nó tự nhiên *  về lại center"). Two halves fix it, and they are not alternatives —
+   *  `consumeEditAt` below ends the signal on both editor exits, and *  `migrateEdge` FOLDS A STORED ONE AWAY ON READ, because this key reached
+   *  the saved document before the fix existed (measured: 4 + 2 + 1 occurrences *  across three of the user's own boards), so without the read-time fold a
    *  reload would put every label back in the create state. */
   __editAt?: {at: Pt; t: number};
   /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
-   *  `__onBend`. It carries the FINISHED write, not the pointer: only the
-   *  renderer holds the resolved path and the anchor, so the write is computed
-   *  there (since ROUND AM's AM-1 by `anchorWrite` — a DELTA plus the anchor
-   *  frame it was measured in) and this merges the result — rebasing the stored
+   *  `__onBend`. It carries the FINISHED write, not the pointer: only the *  renderer holds the resolved path and the anchor, so the write is computed
+   *  there (since ROUND AM's AM-1 by `anchorWrite` — a DELTA plus the anchor *  frame it was measured in) and this merges the result — rebasing the stored
    *  offset when the frame moved. */
   __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
   /** PACKAGE-SEQ — the UML message kind this edge carries. Drives arrowhead +
@@ -272,42 +259,39 @@ export type EdgeData = {
 
 
 export default function App() {
-  /* ITEM 2 — the canvas holds NOTHING while a board load is in flight.
-     A board is the source of truth and it arrives asynchronously (~500ms after
-     mount). Seeding the canvas with `initialNodes` painted the three sample
-     nodes and then replaced them mid-flight — the placeholder flash. The seed's
-     ONLY remaining consumer is the genuine first run, where the bootstrap below
-     saves it verbatim as "My first board"; until the load resolves (or fails)
-     the canvas is deliberately empty and shows the `.canvas-empty` panel, which
-     is already gated on `nodes.length === 0`. `boardLoaded` is what keeps that
-     panel from claiming "This board is empty" during the load. */
+  /* ITEM 2 — the canvas holds NOTHING while a board load is in flight: seeding
+     it painted the sample nodes then replaced them mid-flight (the flash). The
+     seed's only consumer is the genuine first run; until the load resolves the
+     canvas is empty and `.canvas-empty` (gated on nodes.length === 0) shows.
+     `boardLoaded` keeps that panel quiet DURING the load. */
   const [boardLoaded, setBoardLoaded] = useState(false);
-  /* AS-5 — the save gate's LOADED-ID half: the id of the document the loader
-     actually applied, set by applyBoard (and ONLY applyBoard — every path that
-     arrives here went through a successful load), cleared when the canvas
-     returns to no-board. A save runs only when this EQUALS the in-memory doc's
-     id: a flush landing while the NEXT board is still loading, a debounce
-     firing mid-load, or a failed load can never write another board's file. */
+  /* AS-5 — the save gate's LOADED-ID half: the id the loader actually applied
+     (set by applyBoard ONLY, cleared on no-board). A save runs only when this
+     EQUALS the in-memory doc's id, so a flush landing while the NEXT board is
+     still loading can never write another board's file. */
   const [boardLoadedDocId, setBoardLoadedDocId] = useState<string | null>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodes, setNodesRaw, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdgesRaw, onEdgesChange] = useEdgesState<Edge>([]);
+  /* UNISURF-S9 — ONE lock seam: every board write passes these two wrappers, so
+     no writer can forget the lock; `allowRef` is the ONE bypass. */
+  const lockRef = useRef(false);
+  const allowRef = useRef(false);
+  const writeBlocked = useCallback(() => lockRef.current && !allowRef.current, []);
+  const setNodes = useCallback((u: Node[] | ((ns: Node[]) => Node[])) => { if (!writeBlocked()) setNodesRaw(u); }, [setNodesRaw]);
+  const setEdges = useCallback((u: Edge[] | ((es: Edge[]) => Edge[])) => { if (!writeBlocked()) setEdgesRaw(u); }, [setEdgesRaw]);
   const [sel, setSel] = useState<string | null>(null);
   const [selCount, setSelCount] = useState(0);
   const [selEdgeId, setSelEdgeId] = useState<string | null>(null);
-  const [rf, setRf] = useState<ReactFlowInstance | null>(null);
+  const [rf, setRf] = useState<ReactFlowInstance | null>(null); const [revealTick, setRevealTick] = useState(0); /* RAIL-COVER-2: the rail reveal's gesture counter */
   const wrap = useRef<HTMLDivElement>(null);
 
-  // ---- M3/S1: interface class + M3/S2: docked-panel collapse ----
-  // `appRef` is the EMBED HOST, not the window: the hook measures this element
-  // with a ResizeObserver so a narrow host (side pane, iframe, split column)
-  // gets the compact layout even on a wide screen. Its results are published on
+  // ---- M3/S1: interface class + M3/S2: docked-panel collapse ---- // `appRef` is the EMBED HOST, not the window: the hook measures this element
+  // with a ResizeObserver so a narrow host (side pane, iframe, split column) // gets the compact layout even on a wide screen. Its results are published on
   // `.app` as data attributes for the later touch / tablet / phone steps.
   const appRef = useRef<HTMLDivElement>(null);
   const ui = useEditorInterface(appRef);
-  // M3/S2c: `setPanelsVisible` is the shortcut's ONE atomic write; `togglePanel`
-  // is the per-side chevron's. M3/S2d dropped `setPanelPinned` with the auto-hide
-  // it served, and the reviewer's flag removed the two never-consumed methods
-  // (`setPanelCollapsed`, `resetPanels`) — one flag per side is the whole state.
+  // M3/S2c: `setPanelsVisible` is the shortcut's ONE atomic write; `togglePanel` // is the per-side chevron's. M3/S2d dropped `setPanelPinned` with the auto-hide
+  // it served, and the reviewer's flag removed the two never-consumed methods // (`setPanelCollapsed`, `resetPanels`) — one flag per side is the whole state.
   const {state: panelState, togglePanel, setPanelsVisible} = usePanelCollapse();
 
   /* ---- PACKAGE-P PASS 3 §C: ONE fold state for the whole panel ----------
@@ -318,8 +302,7 @@ export default function App() {
      Selection changes therefore do NOT reset it; only a toggle does. */
   const {toggleSection, isCollapsed} = useInspectorSections();
   /** The goblin `body` switch (§C) — a SECOND-LEVEL disclosure inside the Style
-   *  section, which §A.3 keeps OPEN. Session-scoped on purpose: §C names exactly
-   *  ONE new persisted key, and this one control is a click away in a section
+   *  section, which §A.3 keeps OPEN. Session-scoped on purpose: §C names exactly *  ONE new persisted key, and this one control is a click away in a section
    *  the user already has open. */
   const [bodyModeOpen, setBodyModeOpen] = useState(false);
 
@@ -339,23 +322,40 @@ export default function App() {
   const edgesRef = useRef<Edge[]>(edges);
   edgesRef.current = edges;
 
-  // ---- Part B: read-only review mode -------------------------------------
-  // A view-only canvas: pan and zoom freely, touch nothing. Kept LOCAL to
-  // App.tsx on purpose — it is one boolean, toggled from one toolbar button and
-  // read by this same component's <ReactFlow> props and its one keydown
-  // handler, so a hook in choreography.ts would add an indirection layer with a
-  // single call site and no shared logic. Persistence follows the established
-  // convention here (`diagram-studio:edge-path`, `diagram-studio:read-only`):
-  // one namespaced key, read once in a lazy `useState` initialiser that never
-  // throws when storage is unavailable, defaulting to OFF.
-  //
-  // K — HOISTED above the hover choreography deliberately: the gate there reads
-  // this flag (`highlight && !readOnly`), so the declaration must precede that
-  // call site. Every other reader sits further down and is blind to the
-  // position.
+  /* DUP-ID (t_0be8c968, 2026-11-12) — `idc` above is MODULE-LEVEL: a Vite HMR
+     re-eval of this module rewinds it to 100 while React state keeps the
+     loaded board, and the next blind n-prefixed mint re-mints an id the board
+     already carries — measured live on "ERP Test" (n100/n101/n102 table+goblin,
+     React Flow silently rendered 11 of 14 nodes). NEVER mint blind: skip any k
+     whose n-/e-prefixed id is still live in the CURRENT state, so no counter
+     rewind (HMR today, any setter tomorrow) can write a duplicate. Column ids
+     (`c${idc++}`) are intra-node data with no render loss and stay raw. */
+  const nextId = () => {
+    for (;;) {
+      const k = idc++;
+      /* node and edge ids live in SEPARATE React Flow namespaces — each mint
+         only has to avoid ids of its own kind */
+      if (!nodesRef.current.some(n => n.id === `n${k}`)
+        && !edgesRef.current.some(e => e.id === `e${k}`)) return k;
+    }
+  };
+
+  // ---- Part B: read-only review mode ------------------------------------- // A view-only canvas: pan and zoom freely, touch nothing. Kept LOCAL to
+  // App.tsx on purpose — it is one boolean, toggled from one toolbar button and // read by this same component's <ReactFlow> props and its one keydown
+  // handler, so a hook in choreography.ts would add an indirection layer with a // single call site and no shared logic. Persistence follows the established
+  // convention here (`diagram-studio:edge-path`, `diagram-studio:read-only`): // one namespaced key, read once in a lazy `useState` initialiser that never
+  // throws when storage is unavailable, defaulting to OFF. //
+  // K — HOISTED above the hover choreography deliberately: the gate there reads // this flag (`highlight && !readOnly`), so the declaration must precede that
+  // call site. Every other reader sits further down and is blind to the // position.
   const READ_ONLY_KEY = 'diagram-studio:read-only';
   const [readOnly, setReadOnly] = useState(() => {
     try { return localStorage.getItem(READ_ONLY_KEY) === '1'; } catch { return false; }
+  });
+  // VIEW-MODE CHROME — transient review reveal (reviewChrome.ts), never persisted.
+  const {reveal: reviewReveal, toggleSide: revealPanel, setBothVisible: revealPanels} = useReviewReveal(readOnly);
+  /* RAIL-CONTEXT — no rail by default; `auto` opens only while a table is selected. */
+  const [codeMode, setCodeMode] = useState<'auto' | 'open' | 'closed'>(() => {
+    try { return localStorage.getItem('diagram-studio:code-rail') === '1' ? 'open' : 'auto'; } catch { return 'auto'; }
   });
   /* AUDIT-16 — the ref mirrors `readOnly` so a handler that STARTED before the
      toggle (an in-flight connection drag) can still see the mode change when
@@ -363,10 +363,8 @@ export default function App() {
   const readOnlyRef = useRef(false);
   readOnlyRef.current = readOnly; // kept in sync every render (cheap, always right)
 
-  // ---- PACKAGE-K: hover choreography, interaction perf guard, layout
-  //      transition, animation gating. All four work on React Flow's own DOM
-  //      (classList on .react-flow__node[data-id] / .react-flow__edge[data-id])
-  //      and on the wrapper class, so none of them costs a React render.
+  // ---- PACKAGE-K: hover choreography, interaction perf guard, layout //      transition, animation gating. All four work on React Flow's own DOM
+  //      (classList on .react-flow__node[data-id] / .react-flow__edge[data-id]) //      and on the wrapper class, so none of them costs a React render.
   const {
     animate, toggle: toggleAnimate,
   } = useAnimationGating(nodes.length);
@@ -397,66 +395,32 @@ export default function App() {
      toolbar's auto-layout consumes it through useCanvasTools; Settings →
      Canvas owns the radio row. See `src/layoutMode.ts`. */
   const {layoutDir, setLayoutDir} = useLayoutDir();
-  const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave} =
-    useHoverChoreography(wrap, edgesRef, highlight && !readOnly);
+  /* HL-GATE (owner override 2026-11-20) — ONE option, BOTH lights: hover and
+     selection painting are gated together inside the choreography; read-only
+     is the exception (`highlight || readOnly` below — a viewer still lights
+     the neighbourhood). Selection STATE is never gated, only the paint. */
+  const {onEdgeMouseEnter, onEdgeMouseLeave, onNodeMouseEnter, onNodeMouseLeave, applySelection} =
+    useHoverChoreography(wrap, edgesRef, nodesRef, highlight || readOnly);
   const {startInteraction, endInteraction} = useInteractionGuard(wrap);
   const {animateLayout} = useLayoutTransition(wrap);
 
   // ---- snap to grid ----
   const [snap, setSnap] = useState(false);
-  /** M4: the grid pitch in px — the ONE source of truth for the snap grid, the
-   *  visible dot spacing, the "round onto the grid" math and the toolbar
-   *  tooltip. Owned here (session-scoped like `snap`); the toolbar keeps the
-   *  on/off toggle and Settings → Canvas owns the number, so neither is a
-   *  duplicate control. Never written to a board. */
-  /* PACKAGE-S §S-1 — the pitch persists (was session-only, which made the
-     Settings choice a lie across reloads). Lazy-init reads; the first visit
-     writes nothing until the user picks (prefs.ts contract). */
-  const [gridSize, setGridSize] = useState(() => loadPref('grid-size', 16));
-  // ---- PACKAGE-S §S-2 — export defaults (persisted; defaults = today's behaviour) ----
-  const [pngScale, setPngScale] = useState(() => loadPref('png-scale', 2));
-  const onPngScale = useCallback((n: number) => {
-    if (![1, 2, 3].includes(n)) return;
-    setPngScale(n);
-    savePref('png-scale', n);
-  }, []);
-  const [pngPad, setPngPad] = useState(() => loadPref('png-pad', 48));
-  const onPngPad = useCallback((n: number) => {
-    if (![24, 48, 96].includes(n)) return;
-    setPngPad(n);
-    savePref('png-pad', n);
-  }, []);
-  // ---- PACKAGE-S §S-3 — autosave control (default ON = today's behaviour) ----
-  const [autosave, setAutosave] = useState(() => loadPref('autosave', true));
-  const onAutosave = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
-    setAutosave(prev => {
-      const next = typeof v === 'function' ? (v as (p: boolean) => boolean)(prev) : v;
-      savePref('autosave', next);
-      return next;
-    });
-  }, []);
-  /** The only way the pitch is set: non-finite input (cleared / partial field)
-   *  is ignored — the last valid value stands — and anything finite is clamped
-   *  to [4, 64] and rounded to the nearest 4px step, so `snapGrid`,
-   *  `Background`'s gap and the rounding math can never disagree or go NaN. */
-  const onGridSize = useCallback((n: number) => {
-    if (!Number.isFinite(n)) return;
-    const next = Math.min(64, Math.max(4, Math.round(n / 4) * 4));
-    setGridSize(next);
-    savePref('grid-size', next);
-  }, []);
-  /* HARVEY 2026-10-13 — the dblclick auto-connect setting: toggle + reach
-     (clamped 150–800, 50px steps so the slider lands on sane numbers). */
-  const onDblConnect = useCallback((v: boolean) => {
-    setDblConnect(v);
-    savePref('dbl-connect', v);
-  }, []);
-  const onDblRange = useCallback((n: number) => {
-    if (!Number.isFinite(n)) return;
-    const next = Math.min(800, Math.max(150, Math.round(n / 50) * 50));
-    setDblRange(next);
-    savePref('dbl-range', next);
-  }, []);
+  /* HEADROOM (t_a21adb78) — the persisted canvas/export/connection prefs moved
+     VERBATIM into hooks/useCanvasPrefs.ts (same states, clamps, one-writer
+     callbacks, keys). App keeps the call site only; the hard cap is why.
+     Tuple order (documented in the hook): grid, onGrid, pngScale, onPngScale,
+     pngPad, onPngPad, autosave, onAutosave, dblConnect, onDblConnect,
+     dblRange, onDblRange, alignGuides, setAlignGuides, defaultPath,
+     rememberEdgePath. */
+  const [
+    gridSize, onGridSize,
+    pngScale, onPngScale, pngPad, onPngPad,
+    autosave, onAutosave,
+    dblConnect, onDblConnect, dblRange, onDblRange,
+    alignGuides, setAlignGuides,
+    defaultPath, rememberEdgePath,
+  ] = useCanvasPrefs();
   const [expOpen, setExpOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   /* MODAL-DOORS: ONE writer sets BOTH booleans — two doors can never be open at once. */
@@ -467,6 +431,10 @@ export default function App() {
   const [help, setHelp] = useState(false);
   // ---- F2: context menu ----
   const [ctx, setCtx] = useState<CtxTarget | null>(null);
+  /* INLINE-TITLE (t_cb9335df) — the F2 token: which node's title editor to
+     open. Render-injected into rfNodes (the __rotate pattern), never written
+     into nodes state, so it never reaches a saved board. */
+  const [titleEdit, setTitleEdit] = useState<{id: string; at: number} | null>(null);
   // ---- M3/S3: coarse-pointer handling ----
   // `isTouchScreen` is live: a hybrid laptop switching pointer flips it and the
   // drag thresholds below follow. `touchPrev` lets us notice the transition at
@@ -489,24 +457,10 @@ export default function App() {
   // ---- F3: helper lines ----
   const [guides, setGuides] = useState<HelperGuides>({vertical: null, horizontal: null});
   /** Alignment guides + snap on drop. ON by default (auto-align); toggled from the toolbar. */
-  /* PACKAGE-S §S-1 — persisted like its Canvas-pane neighbours. */
-  const [alignGuides, setAlignGuidesState] = useState(() => loadPref('align-guides', true));
-  const setAlignGuides = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
-    setAlignGuidesState(prev => {
-      const next = typeof v === 'function' ? (v as (p: boolean) => boolean)(prev) : v;
-      savePref('align-guides', next);
-      return next;
-    });
-  }, []);
   const helperDrag = useRef(false);
   // ---- F7: connection rules ----
   const [noCycles, setNoCycles] = useState(false);
   const [oneIn, setOneIn] = useState(false);
-  /* HARVEY 2026-10-13 (batch #3) — the handle dblclick auto-connect becomes a
-     SETTING: on by default, with an adjustable reach. Both persist through
-     prefs.ts's lazy-init contract (nothing written until the user chooses). */
-  const [dblConnect, setDblConnect] = useState(() => loadPref('dbl-connect', true));
-  const [dblRange, setDblRange] = useState(() => loadPref('dbl-range', 400));
   // ---- F6: pending drop-on-canvas connection ----
   const pendingDrop = useRef<Connection | null>(null);
   // ---- G: the handle the current connection drag STARTED from.
@@ -516,26 +470,6 @@ export default function App() {
   // silently kill the drop-to-create path. Written by onConnectStart, consumed
   // (and cleared) by onConnect.
   const connectOrigin = useRef<{nodeId: string; handleId: string | null | undefined} | null>(null);
-  // ---- G: the default edge path. `smoothstep` until the user changes an edge's
-  // curvature in the inspector, at which point that choice becomes the default
-  // for every edge drawn afterwards. Same convention as
-  // `diagram-studio:theme`: one namespaced key, read
-  // once through a lazy `useState` initialiser that never throws when storage is
-  // unavailable. An absent or unparseable value reads as `smoothstep`.
-  const EDGE_PATH_KEY = 'diagram-studio:edge-path';
-  const readEdgePath = (): PathId => {
-    try {
-      const v = localStorage.getItem(EDGE_PATH_KEY);
-      return v === 'bezier' || v === 'smoothstep' || v === 'step' || v === 'straight'
-        ? (v as PathId)
-        : 'smoothstep';
-    } catch { return 'smoothstep'; }
-  };
-  const [defaultPath, setDefaultPath] = useState<PathId>(readEdgePath);
-  const rememberEdgePath = useCallback((p: PathId) => {
-    setDefaultPath(p);
-    try { localStorage.setItem(EDGE_PATH_KEY, p); } catch { /* ignore */ }
-  }, []);
   /** Live modifier-key state (F7 bypass) — updated by keydown/keyup listeners. */
   const shiftDown = useRef(false);
   useEffect(() => {
@@ -585,6 +519,11 @@ export default function App() {
 
   // ---- multi-document boards (disk-backed via dev-server API) ----
   const [curBoard, setCurBoard] = useState<BoardDoc | null>(null);
+  /* BOARD-STYLE — PER-BOARD style + density; absent = the Settings → New boards default. */
+  const tableStyle = resolveTableStyle(curBoard?.style ?? readNewBoardStyle());
+  const tableDensity = resolveDensity(curBoard?.density ?? readNewBoardDensity());
+  /* LAYOUT-FOLLOWS-WIDTH — table widths follow the CORE (style/density + content); no moves. */
+  useTableWidth(nodes, setNodes, tableStyle, tableDensity);
   const [boardList, setBoardList] = useState<BoardMeta[]>([]);
   const [boardsOpen, setBoardsOpen] = useState(false);
 
@@ -715,7 +654,7 @@ export default function App() {
   useEffect(() => {
     if (mode !== 'system') return;
     let mq: MediaQueryList;
-    try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch { return; }
+    try { mq = window.matchMedia(DARK_MQ); } catch { return; }
     const onChange = () => {
       if (suggestedTheme) return;
       const t = resolveMode('system');
@@ -746,26 +685,16 @@ export default function App() {
   }, [suggestTheme]);
 
   const applyBoard = useCallback((doc0: BoardDoc) => {
-    // Load a board's nodes/edges, reset history/selection, fit view.
-    // Two effect runs will fire (nodes then edges state updates) — skip both.
-    // K3: the wrapper carries the layout-transition class while the board's
-    // nodes are swapped in, so loading never snaps.
-    // L1: legacy hex colours are migrated to symbolic keys on the way in.
-    // L2: the board's preset is adopted (it is board metadata; old boards have
-    //     none and default to 'architecture' — zero migration).
+    // Load nodes/edges, reset history/selection, fit view. Two effect runs fire
+    // (nodes then edges) — K3 skips both; L1 migrates hex; L2 adopts the preset.
     const doc = migrateDoc(doc0);
     adoptBoardPreset(doc);
-    /* PACKAGE-N pass 3 — advance the id counter past everything on this board.
-       `idc` is a module-level counter that resets to 100 on every page load,
-       while a board can already contain `n100`, `n101`… (the demo board does).
-       Every insert path (`addNodeByLabel`, paste, duplicate, and now a
-       favourite) then mints an id that ALREADY EXISTS: React Flow keeps two
-       nodes with the same id, and the next edit, selection or delete silently
-       acts on the wrong one — data loss, not a cosmetic glitch.
-       Bumping once per load makes a fresh id unique against the live board
-       under every insert path, at a cost of one scan. (It does not cover a
-       paste of many nodes in one tick, which can run ahead of the counter —
-       pre-existing, out of scope, and reported rather than silently changed.) */
+    /* PACKAGE-N pass 3 — advance `idc` (module-level, resets to 100 per load) past
+       everything on this board: an insert that mints an id the board already has
+       makes React Flow keep two nodes with one id, and the next edit, selection or
+       delete silently acts on the wrong one — data loss. One scan per load; the
+       mint itself is ALSO guarded live by nextId (DUP-ID t_0be8c968) — a counter
+       rewind (HMR module re-eval) can no longer mint a live id even mid-session. */
     for (const n of doc.nodes) {
       const m = /^n(\d+)$/.exec(n.id);
       if (m) idc = Math.max(idc, Number(m[1]) + 1);
@@ -778,24 +707,23 @@ export default function App() {
       skipAutosave.current = 2;
       past.current = [];
       future.current = [];
-      setNodes(doc.nodes.map(n => ({...n, selected: false})));
-      setEdges(doc.edges.map(e => ({...e, selected: false})));
+      /* UNISURF-S9 — a LOAD, not an edit: `readOnly` is a persisted preference,
+         so refusing here would refuse the boot restore of the mode itself. */
+      allowRef.current = true;
+      try {
+        setNodes(doc.nodes.map(n => ({...n, selected: false})));
+        setEdges(doc.edges.map(e => ({...e, selected: false})));
+      } finally { allowRef.current = false; }
       bumpHist(v => v + 1);
       setSel(null);
       setSelEdgeId(null);
       setSelCount(0);
       setCurBoard(doc);
-      /* AS-5 — ARM the save gate: this is the ONE place a doc is applied after
-         a successful load, so it is the one place the loaded id is set. Every
-         path out of applyBoard (open, first boot, delete-reseed, duplicate)
-         went through a real load. Until this line runs for the NEW doc, the
-         gate is closed — a flush landing mid-switch writes nothing. */
+      /* AS-5 — ARM the save gate: the ONE place a loaded doc is applied, so the
+         ONE place the loaded id is set; until then a flush writes nothing. */
       setBoardLoadedDocId(doc.id);
       boards.cacheLastBoard(doc.id);
-      /* HARVEY 2026-10-13 — maxZoom 1: a 1-node board must not zoom to 250%.
-         FIRST-VISIT rework — the load fit is panel-aware (checklistFit.ts);
-         presence comes from the panel's own storage readers, NOT a DOM query —
-         see checklistFit.ts for the boot-timing reason. */
+      /* HARVEY 2026-10-13 — maxZoom 1; the load fit is panel-aware (checklistFit). */
       setTimeout(() => rf?.fitView({maxZoom: 1,
         padding: fitPaddingFor(!readChecklistDismissed() && !isChecklistComplete(readChecklistDone()))}), 30);
     });
@@ -806,30 +734,27 @@ export default function App() {
   const fitOpts = useMemo(() => ({maxZoom: 1,
     padding: fitPaddingFor(!readChecklistDismissed() && !isChecklistComplete(readChecklistDone()))}), []);
 
-  /* ROUND BN-2 — the save/load cluster now lives in usePersistence.ts
-     (moved verbatim). applyBoard stays HERE (it owns the module-level idc
-     bump and the undo/selection reset) and is passed in; saveTimer and
-     skipAutosave come back out because two later App sites still write them
-     (the board-switch cancel and the beforeunload fast flush). */
+  /* ROUND BN-2 — the save/load cluster lives in usePersistence.ts; applyBoard
+     stays HERE (it owns the module-level idc bump and the undo reset). */
   /* GOBI-S1 — a fragment-owned boot (`#b=`) is a SHARE VIEW: the persistence
    * bootstrap must not load (or seed) the visitor's boards while it is on. */
   const shareActive = useRef(shareViewPayload() !== null);
   const [saveState, modeLabel, storageEstimate, localMode, dirty,
-    flushSave, refreshBoards, saveTimer, skipAutosave] = usePersistence(
+    flushSave, refreshBoards, saveTimer, skipAutosave, flushPending] = usePersistence(
     nodes, edges, nodesRef, edgesRef, curBoard, presetId, mode, autosave,
-    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard, shareActive);
+    boardLoaded, setBoardLoaded, boardLoadedDocId, setBoardList, flash, applyBoard, shareActive, lockRef);
 
   /* ROUND BN-2 — the boards menu cluster now lives in useBoardsMenu.ts
      (moved verbatim). boardsOpen/boardList/curBoard/presetId stay here
      (shared with usePersistence and the popover JSX) and pass down. */
   const [boardDlg, setBoardDlg, tgOpen, setTgOpen, pendingBoardName,
     closeBoardDlg, newBoard, createFromTemplate, useTemplate, closeGallery,
-    boardsMenuBtnRef, boardsPopPos, boardsPopClamp, switchPreset, openBoard,
-    renameBoard, doRenameBoard, doDuplicateBoard, deleteBoard, doDeleteBoard,
-    onBoardDialog, boardsBtnRef] = useBoardsMenu(
+    boardsMenuBtnRef, boardsPopPos, boardsPopClamp, switchPreset, setBoardStyle, openBoard,
+    renameBoard, doRenameBoard, doDuplicateBoard, deleteBoard, doDeleteBoard, saveNow,
+    onBoardDialog, boardsBtnRef, historyOpen, openHistory, closeHistory] = useBoardsMenu(
     nodesRef, edgesRef, boardList, setBoardList, boardsOpen, setBoardsOpen,
     curBoard, setCurBoard, presetId, setPresetId, setShowMode, setNoCycles,
-    setOneIn, suggestTheme, flushSave, saveTimer, applyBoard, flash, tickTask);
+    setOneIn, suggestTheme, flushSave, saveTimer, applyBoard, flash, tickTask, writeBlocked);
 
   /** ONBOARD-P3 — the ONE way into the templates gallery. The boards menu and the
    *  empty board's "Start from a template" both call THIS, so the gallery cannot
@@ -858,14 +783,25 @@ export default function App() {
     return () => window.removeEventListener('mousedown', onDown);
   }, [help]);
 
-  const fmtDate = (ts: number) => {
-    const d = new Date(ts);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
-  };
-
   // ---- history (undo / redo) ----
-  const [past, future, bumpHist, pushHistory, undo, redo, canUndo, canRedo] = useUndoHistory(
+  const [past, future, bumpHist, pushHistoryRaw, undo, redo, canUndo, canRedo] = useUndoHistory(
     nodesRef, edgesRef, setNodes, setEdges, setSel, setSelCount, setSelEdgeId);
+  /* UNISURF-S9 — history is a board write: a refused edit must leave NO entry. */
+  const pushHistory = useCallback(() => { if (!writeBlocked()) pushHistoryRaw(); }, [pushHistoryRaw]);
+
+  /* UNISURF-S4 — the pane's commit lane: ONE undo entry per typing streak, a
+   * stale report the canvas lock + banner read (`stale` extends review's gates). */
+  const [codeStale, onCodeCommitRaw, onCodeTypingEnd] = useCodeCommit(pushHistory, setNodes, setEdges, flushPending);
+  const canvasLock = readOnly || !!codeStale;
+  /* UNISURF-S7/S9 — the ref the seam and useConnections' FK writer read. */
+  lockRef.current = canvasLock;
+  /* UNISURF-S9 — THE bypass: the pane's own commit is the repair, so it must
+     land ON the stale board. Opened and closed inside one tick, `finally`-safe. */
+  const onCodeCommit = useCallback((r: Parameters<typeof onCodeCommitRaw>[0]) => {
+    allowRef.current = true;
+    try { onCodeCommitRaw(r); } finally { allowRef.current = false; }
+  }, [onCodeCommitRaw]);
+  const [pendKey, hlKey, setPendKey, pickColumn, setHlKey] = useSelectionBridge(rf); /* UNISURF-S6 bridge */
 
   /* GOBI-S1 — the share view route (see useShareView). `shareActive` is
    * declared above usePersistence so the bootstrap gate can read it. */
@@ -882,93 +818,21 @@ export default function App() {
   const rotateInternals = useRef<((ids: string | string[]) => void) | null>(null);
   const [onRotateGesture, onGroupRotateGesture, rotateSelection] = useRotation(nodesRef, setNodes, pushHistory, rotateInternals);
 
-  // ---- clipboard (copy / paste / duplicate) ----
-  const clipboard = useRef<Snap | null>(null);
 
-  const copySelection = useCallback(() => {
-    const selNodes = nodesRef.current.filter(n => n.selected);
-    if (!selNodes.length) return;
-    const ids = new Set(selNodes.map(n => n.id));
-    clipboard.current = {
-      nodes: selNodes.map(n => ({...n, position: {...n.position}, data: {...(n.data as any)}, selected: false})),
-      edges: edgesRef.current.filter(e => ids.has(e.source) && ids.has(e.target)).map(e => ({...e})),
-    };
-  }, []);
-
-  const pasteClipboard = useCallback((offset = 40) => {
-    const cb = clipboard.current;
-    if (!cb || !cb.nodes.length) return;
-    pushHistory();
-    const idMap = new Map<string, string>();
-    const newNodes: Node[] = cb.nodes.map(n => {
-      const id = `n${idc++}`;
-      idMap.set(n.id, id);
-      return {
-        ...n, id, selected: true,
-        position: {x: n.position.x + offset, y: n.position.y + offset},
-        data: {...(n.data as any)},
-      };
-    });
-    /* AUDIT-1 — group membership is an ID REFERENCE too: remap `parentId`
-       through the same idMap used for edges. A pasted child whose group was
-       NOT pasted drops out of the group (parentId deleted) instead of staying
-       a ghost child of the ORIGINAL group; a pasted subgroup re-parents to the
-       pasted parent. `extent: 'parent'` only makes sense with a live parent. */
-    for (const nn of newNodes) {
-      const pid = (nn as any).parentId as string | undefined;
-      if (pid) {
-        const mapped = idMap.get(pid);
-        if (mapped) (nn as any).parentId = mapped;
-        else { delete (nn as any).parentId; delete (nn as any).extent; }
-      }
-    }
-    const newEdges: Edge[] = cb.edges.map(e => ({
-      ...e, id: `e${idc++}`, source: idMap.get(e.source)!, target: idMap.get(e.target)!, selected: false,
-    }));
-    setNodes(ns => [...ns.map(n => (n.selected ? {...n, selected: false} : n)), ...newNodes]);
-    setEdges(es => [...es, ...newEdges]);
-    tickTask('node');
-  }, [tickTask, pushHistory, setNodes, setEdges]);
-
-  const duplicateSelection = useCallback(() => {
-    copySelection();
-    pasteClipboard(40);
-  }, [copySelection, pasteClipboard]);
-
-  /** Nudge every selected node by (dx, dy). Used by the arrow keys. */
-  const nudge = useCallback((dx: number, dy: number) => {
-    const ids = new Set(nodesRef.current.filter(n => n.selected).map(n => n.id));
-    if (!ids.size) return;
-    tickTask('move');   // CHECKLIST-EDGE — the arrows ARE a move gesture
-    setNodes(ns => ns.map(n => ids.has(n.id)
-      ? {...n, position: {x: n.position.x + dx, y: n.position.y + dy}}
-      : n));
-  }, [setNodes, tickTask]);
-
-  /** Delete every selected node (and its attached edges). */
-  const deleteSelection = useCallback(() => {
-    const ids = new Set(nodesRef.current.filter(n => n.selected).map(n => n.id));
-    if (!ids.size) return;
-    pushHistory();
-    setNodes(ns => ns.filter(n => !ids.has(n.id)));
-    setEdges(es => es.filter(e => !ids.has(e.source) && !ids.has(e.target)));
-  }, [pushHistory, setNodes, setEdges]);
-
-  // ---- F2: context menu actions ----
-  /** Absolute flow position of a node (parent-relative resolved up the tree). */
-  const absPos = useCallback((n: Node, all: Node[]): XYPosition => {
-    let x = n.position.x, y = n.position.y;
-    let pid = n.parentId;
-    const guard = new Set<string>();
-    while (pid && !guard.has(pid)) {
-      guard.add(pid);
-      const p = all.find(m => m.id === pid);
-      if (!p) break;
-      x += p.position.x; y += p.position.y;
-      pid = p.parentId;
-    }
-    return {x, y};
-  }, []);
+  /* HEADROOM (t_a21adb78) — the clipboard slice moved VERBATIM into
+     hooks/useClipboard.ts (refs + the native paste-cursor tracker + the
+     five callbacks). App keeps the call site; the hard cap is why.
+     Tuple order: [clipboard, pasteCursor, copySelection, pasteClipboard,
+     duplicateSelection, nudge, deleteSelection]. */
+  const [
+    clipboard, pasteCursor, copySelection, pasteClipboard,
+    duplicateSelection, nudge, deleteSelection,
+  ] = useClipboard(nodesRef, edgesRef, wrap, rf, pushHistory, nextId, setNodes, setEdges, tickTask, flash, snap, gridSize);
+  /* GROUP-OBJECT + LOCK v1 (t_c5023f3b) — the three gestures + the context menu's enabled/label state, behind ONE seam (App.tsx is at its cap). */
+  const {groupSelection, ungroupSelection, toggleLockSelection, menuState} = useGroupLock({nodesRef, nodes, setNodes, pushHistory, flash, nextId, readOnly});
+  const {onLogicalClick, onLogicalDblClick, escapeGroup, insideId} = useLogicalGroup({nodesRef, nodes, setNodes, setPendKey}); /* GROUP-LOGICAL t_eb8fab7e; GROUP-BOUNDARY-INSIDE reads insideId */
+  /* GROUP-GAP-DRAG t_10563e73 — the selected block's gap-drag writer (container-only, ONE history entry). */
+  const onGapDragGesture = useGapDragGesture({nodes, setNodes, pushHistory, startInteraction, endInteraction, flash, snap, gridSize});
 
   const ctxAction = useCallback((action: CtxAction, target: CtxTarget) => {
     if (action === 'addNode' && target.kind === 'pane') {
@@ -982,6 +846,10 @@ export default function App() {
       return;
     }
     if (action === 'paste') { pasteClipboard(40); return; }
+    /* GROUP-OBJECT + LOCK v1 — these act on the whole SELECTION, never just the right-clicked node. */
+    if (action === 'group') { groupSelection(); return; }
+    if (action === 'ungroup') { ungroupSelection(); return; }
+    if (action === 'lock') { toggleLockSelection(); return; }
     if (action === 'selectAll') {
       setNodes(ns => ns.map(n => ({...n, selected: true})));
       setEdges(es => es.map(e => ({...e, selected: true})));
@@ -1028,21 +896,6 @@ export default function App() {
           const out = [...rest];
           out.splice(at, 0, cur);
           return out;
-        });
-        return;
-      }
-      if (action === 'note') {
-        // insert a Note node just below-right of this node
-        pushHistory();
-        const p = absPos(node, nodesRef.current);
-        const nid = `n${idc++}`;
-        setNodes(ns => {
-          const note: Node = {
-            id: nid, type: 'goblin',
-            position: {x: p.x + nodeW(node) + 48, y: p.y + 12},
-            data: {shape: 'note', kicker: 'note', title: 'New note', sub: '', icon: 'sticky-note', colorKey: 'slate'},
-          };
-          return [...ns, note];
         });
         return;
       }
@@ -1112,9 +965,6 @@ export default function App() {
     if (tip) markTipSeen(tip.id);
     setTip(null);
   }, [tip]);
-  /** gate 4's UI half — App state mirrors the pref so the Settings row repaints. */
-  const [tipsPref, setTipsPref] = useState(() => tipsOn());
-  const changeTips = useCallback((v: boolean) => { setTipsPref(v); setTipsOn(v); }, []);
 
   // ---- F3 + F9 + F1: drag lifecycle ----
   const absNodes = useCallback((ns: Node[]) => {
@@ -1127,14 +977,14 @@ export default function App() {
     return map;
   }, [absPos]);
   /* ROUND BN-2 — the connection cluster now lives in useConnections.ts
-     (moved verbatim; the three id-mint sites call nextId = () => idc++
-     because App owns the module-level counter). pendingDrop, connectOrigin,
-     readOnlyRef and shiftDown stay here — onConnectStart (the JSX) and the
-     keyboard effect still write them — and pass down positionally. */
-  const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules] = useConnections(
+     (moved verbatim; the three edge id-mint sites call the nextId callback
+     because App owns the module-level counter — and nextId skips live ids,
+     DUP-ID t_0be8c968). pendingDrop, connectOrigin,
+     readOnlyRef and shiftDown stay here and pass down positionally. */
+  const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules, fkConnect] = useConnections(
     nodesRef, edgesRef, setEdges, setGuides, pushHistory, tickTask, flash, rf, wrap,
     readOnlyRef, pendingDrop, connectOrigin, shiftDown, absNodes, noCycles, oneIn,
-    dblConnect, dblRange, preset, defaultPath, () => idc++, fireTip);
+    dblConnect, dblRange, preset, defaultPath, nextId, fireTip, setNodes, lockRef);
 
   const onNodeDrag = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     const ns = nodesRef.current;
@@ -1144,13 +994,12 @@ export default function App() {
     const me = absMap.get(dragged.id);
     if (!me) return;
 
-    // F3: helper lines — top-level single-node drags only (child nodes are
-    // constrained by extent:'parent' and follow their group).
+    // F3: helper lines — single-node drags (top-level AND group children).
     // IMPORTANT: while dragging we ONLY show the guides, we never write the
     // node position (writing it every frame fights React Flow's own drag and
     // makes the node feel stuck/snapped). The snap is applied once, on drop.
-    if (!dragged.parentId && alignGuides) {
-      const others = [...absMap.values()].filter(v => v.n.id !== dragged.id && !v.n.parentId);
+    if (alignGuides) {
+      const others = [...absMap.values()].filter(v => v.n.id !== dragged.id);
       const {guides: g} = computeHelperSnap(
         {x: me.x, y: me.y, w: me.w, h: me.h},
         others.map(v => ({x: v.x, y: v.y, w: v.w, h: v.h})),
@@ -1163,30 +1012,6 @@ export default function App() {
 
   const onNodeDragStop = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
     tickTask('move');
-    // F3: apply the final snap (the release itself can move the node a hair)
-    // then clear the helper lines.
-    if (helperDrag.current) {
-      helperDrag.current = false;
-      const ns0 = nodesRef.current;
-      const dragged0 = ns0.find(n => n.id === draggedNode.id);
-      if (dragged0 && !dragged0.parentId) {
-        const absMap0 = absNodes(ns0);
-        const me0 = absMap0.get(dragged0.id);
-        const others0 = [...absMap0.values()].filter(v => v.n.id !== dragged0.id && !v.n.parentId);
-        if (me0 && others0.length) {
-          const {position} = computeHelperSnap(
-            {x: me0.x, y: me0.y, w: me0.w, h: me0.h},
-            others0.map(v => ({x: v.x, y: v.y, w: v.w, h: v.h})),
-          );
-          setNodes(ns => ns.map(n => n.id === dragged0.id
-            ? {...n, position: {x: Math.round(position.x), y: Math.round(position.y)}}
-            : n));
-        }
-      }
-      setGuides({vertical: null, horizontal: null});
-    }
-
-    // F1: reparent on drop — inside a group bounds → adopt; outside → release.
     const ns = nodesRef.current;
     const dragged = ns.find(n => n.id === draggedNode.id);
     if (!dragged || dragged.type === 'label') return;
@@ -1194,19 +1019,43 @@ export default function App() {
     const me = absMap.get(dragged.id);
     if (!me) return;
 
+    // F3: apply the final snap ONCE, on drop — the guides were display-only
+    // while dragging. SHAPE-FIDELITY: membership (F1 below) is decided from
+    // the SNAPPED position and there is ONE write per drop, so the reparent
+    // can never race the snap back through a stale nodesRef.
+    let snap: {x: number, y: number} | null = null;
+    if (helperDrag.current) {
+      helperDrag.current = false;
+      setGuides({vertical: null, horizontal: null});
+      const others = [...absMap.values()].filter(v => v.n.id !== dragged.id);
+      if (others.length) {
+        const {position} = computeHelperSnap(
+          {x: me.x, y: me.y, w: me.w, h: me.h},
+          others.map(v => ({x: v.x, y: v.y, w: v.w, h: v.h})),
+        );
+        if (Math.abs(position.x - me.x) > 0.5 || Math.abs(position.y - me.y) > 0.5) snap = position;
+      }
+    }
+    const abs = snap ?? {x: me.x, y: me.y};
+
+    // F1: reparent on drop — inside a group bounds → adopt; outside → release.
     const groups = ns.filter(n => asShape((n.data as any)?.shape) === 'group' && n.id !== dragged.id);
     // never adopt into one of my own (future) children
     const hit = groups.find(g => {
       const gp = absMap.get(g.id)!;
-      return me.x >= gp.x && me.y >= gp.y && me.x + me.w <= gp.x + gp.w && me.y + me.h <= gp.y + gp.h;
+      return abs.x >= gp.x && abs.y >= gp.y && abs.x + me.w <= gp.x + gp.w && abs.y + me.h <= gp.y + gp.h;
     });
 
+    /* GROUP-LOGICAL (t_eb8fab7e): release-on-drop is a FRAME rule only — a logical-group member leaves its block ONLY by Cmd+Shift+G (the container carries the block's drag; an inside-mode solo drag keeps membership). */
+    const parentIsFrame = !!ns.some(n => n.id === dragged.parentId && asShape((n.data as any)?.shape) === 'group');
     if (hit && dragged.parentId !== hit.id) {
       const hp = absMap.get(hit.id)!;
       /* AUDIT-12 — no second push: onNodeDragStartAll already snapshotted the
          pre-gesture state, and the adoption is part of the SAME perceived
          gesture ("move it into the group"). Two pushes made the gesture cost
          two undos. The drag-start entry restores position AND membership. */
+      const pos = snapToParentRelative(
+        {x: abs.x - hp.x, y: abs.y - hp.y}, {x: 0, y: 0, w: hp.w, h: hp.h});
       setNodes(ns2 => {
         const cur = ns2.find(n => n.id === dragged.id);
         if (!cur) return ns2;
@@ -1214,7 +1063,7 @@ export default function App() {
           ...cur,
           parentId: hit.id,
           extent: 'parent' as const,
-          position: {x: Math.round(me.x - hp.x), y: Math.round(me.y - hp.y)},
+          position: pos,
         };
         // keep parent before children in the array
         const without = ns2.filter(n => n.id !== dragged.id);
@@ -1224,13 +1073,13 @@ export default function App() {
         return out;
       });
       flash(`Added to group “${(hit.data as any)?.title ?? hit.id}”`);
-    } else if (!hit && dragged.parentId) {
+    } else if (parentIsFrame && !hit) {
       // dragged out of its group — keep the absolute position, drop the parent
       /* AUDIT-12 — same collapse: the drag-start entry covers this. */
       setNodes(ns2 => {
         const cur = ns2.find(n => n.id === dragged.id);
         if (!cur) return ns2;
-        const out: Node = {...cur, parentId: undefined, extent: undefined, position: {x: Math.round(me.x), y: Math.round(me.y)}};
+        const out: Node = {...cur, parentId: undefined, extent: undefined, position: {x: Math.round(abs.x), y: Math.round(abs.y)}};
         const without = ns2.filter(n => n.id !== dragged.id);
         // place after the former parent so ordering stays valid for siblings
         const pIdx = without.findIndex(n => n.id === dragged.parentId);
@@ -1240,6 +1089,12 @@ export default function App() {
         return arr;
       });
       flash('Removed from group');
+    } else if (snap) {
+      // SHAPE-FIDELITY: children store parent-relative positions, clamped
+      // inside the parent so extent:'parent' cannot undo the snap.
+      const parent0 = dragged.parentId ? absMap.get(dragged.parentId) : null;
+      const pos = snapToParentRelative(abs, parent0 && {x: parent0.x, y: parent0.y, w: parent0.w, h: parent0.h});
+      setNodes(ns2 => ns2.map(n => n.id === dragged.id ? {...n, position: pos} : n));
     }
   }, [tickTask, absNodes, pushHistory, setNodes, setEdges, flash]);
 
@@ -1249,24 +1104,45 @@ export default function App() {
   }, [pushHistory]);
 
 
-  /* ROUND BN-2 — the canvas tool cluster (auto-layout, z-order, align/
-     distribute) now lives in useCanvasTools.ts, moved verbatim. */
+  /* ROUND BN-2 — the canvas tool cluster (auto-layout, z-order, align/distribute) now lives in useCanvasTools.ts, moved verbatim. */
   const [autoLayout, reorderSelection, align, distribute] = useCanvasTools(
     nodes, edges, nodesRef, setNodes, pushHistory, absNodes, animateLayout,
     rf, sel, zOrderMode, preset, layoutDir, tickTask);
 
 
   const selected = nodes.find(n => n.id === sel);
-  const selectedEdge = edges.find(e => e.id === selEdgeId) ?? null;
+  /* RAIL-CONTEXT — the rail is contextual: a TABLE selection reveals it, anything else closes it; a manual toggle pins the mode for the rest of the session. */
+  const codeOpen = codeMode === 'open' || (codeMode === 'auto' && selected?.type === 'table');
+  const toggleCode = useCallback(() => {
+    try { localStorage.setItem('diagram-studio:code-rail', codeOpen ? '0' : '1'); } catch { /* ignore */ }
+    setCodeMode(codeOpen ? 'closed' : 'open');
+  }, [codeOpen]);
+  const railPanel = useRailPanel(codeMode === 'open'); /* CODE-RAIL-WIDTH: the TRANSIENT inspector layer — only when the USER opened the rail (not the contextual table auto-open, where the inspector is what edits that table) */
+  const selectedEdge = edges.find(e => e.id === selEdgeId) ?? null; useRailReveal(rf, codeOpen, selected, revealTick); /* RAIL-COVER: the rail's width comes out of the canvas, so pan the selected node back inside it (pan only, on open + once per resize gesture end) */
   const edgeMode = !!selectedEdge && selCount === 0;
 
   const update = (patch: Partial<NodeKind> | Partial<LabelKind>) => {
     if (!sel) return;
-    pushHistory();
+    pushHistory(); if ('scale' in patch) setRevealTick(t => t + 1); /* RAIL-COVER-2 — an inspector scale write is a gesture end: same bounded pan */
     setNodes(ns => ns.map(n => n.id === sel ? {...n, data: {...n.data, ...patch}} : n));
   };
 
-  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart. */
+  /** DESC-1 — the Additional Description commit: ONE history entry per BLUR (typing stays in DefinitionSection's draft), and an empty commit REMOVES the key — `update()`'s spread cannot drop one, so the write goes through the same setNodes+pushHistory lane via `descData`'s delete. */
+  const commitDesc = (v: string) => {
+    if (!sel) return;
+    const cur = ((nodes.find(n => n.id === sel)?.data as {desc?: string} | undefined)?.desc ?? '');
+    if (cur === v) return; /* a no-op blur pushes no history */
+    pushHistory();
+    setNodes(ns => ns.map(n => n.id === sel
+      ? {...n, data: descData({...n.data}, v) as NodeKind} : n));
+  };
+  const commitDescPaint = (patch: DescPaint) => { /* DA-3 — commitDesc's lane; descPaintData's delete rule clears keys */
+    if (!sel) return;
+    pushHistory();
+    setNodes(ns => ns.map(n => n.id === sel
+      ? {...n, data: descPaintData({...n.data}, patch) as NodeKind} : n));
+  };
+
   const bendDragging = useRef(false);
 
   /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart.
@@ -1584,11 +1460,11 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *  `data`. Read-only is a no-op — the menu that also reaches it is already
    *  inert in review mode, and this is the same defence in depth. */
   const openLabelAt = useCallback((id: string, at: Pt) => {
-    if (readOnly) return;
+    if (canvasLock) return;
     setEdges(es => es.map(e => (e.id === id
       ? {...e, data: {...((e.data ?? {}) as EdgeData), __editAt: {at, t: Date.now()}}}
       : e)));
-  }, [readOnly, setEdges]);
+  }, [canvasLock, setEdges]);
 
   /** ROUND AN, AN-1 — CONSUME THE CREATE SIGNAL: the deletion half of the
    *  one-shot, called by the renderer from BOTH exits of the label editor
@@ -1651,7 +1527,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      if the user leaves the text empty. So a double-click that is immediately
      cancelled writes nothing at all. */
   const onEdgeDoubleClick = useCallback((e: React.MouseEvent, edge: Edge) => {
-    if (readOnly || !rf || !wrap.current) return;
+    if (canvasLock || !rf || !wrap.current) return;
     // `screenToFlowPosition` is the authority this app uses for every
     // client→flow conversion, so no second conversion is compiled into the
     // renderer that could drift from these. (AUDIT-7 — raw client coords: the
@@ -1659,7 +1535,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     // subtraction here double-subtracted.)
     const at = rf.screenToFlowPosition({x: e.clientX, y: e.clientY});
     openLabelAt(edge.id, at);
-  }, [readOnly, rf, openLabelAt]);
+  }, [canvasLock, rf, openLabelAt]);
 
   /** ROUND AK, AK-14.1 — `Reset label position`, ONE history step.
    *
@@ -1752,6 +1628,20 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     setSel(id);
   }, [tickTask, pushHistory, setNodes]);
 
+  /** INLINE-TITLE — the in-place title commit (goblin + customshape): ONE
+   *  history entry per commit, exactly the commitLabelText lane (an unchanged
+   *  value pushes nothing, so a no-op blur costs no undo step). The EMPTY
+   *  revert is enforced by the CALLER (the editor never calls this with a
+   *  blank draft) — a card with no title is not a valid state. */
+  const commitNodeTitle = useCallback((id: string, title: string) => {
+    const cur = nodesRef.current.find(n => n.id === id);
+    if (!cur || (((cur.data as any)?.title ?? '') as string) === title) return;
+    tickTask('node');
+    pushHistory();
+    setNodes(ns => ns.map(n => (n.id === id ? {...n, data: {...n.data, title}} : n)));
+    setSel(id);
+  }, [tickTask, pushHistory, setNodes]);
+
   /** Edges get the label-commit callback + their path kind through data (custom
    *  edges only). L3c: crow's-foot markers are hand-authored SVG, so their
    *  `markerStart`/`markerEnd` become `url(#id)` here — derived from the data,
@@ -1799,12 +1689,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           // FB-L: the edge renderer owns the label's inline editor, so the
           // review-mode flag has to reach it per-edge — same shape as the two
           // keys above. Read-only keeps the label readable; it never opens the
-          // input.
-          readOnly,
+          // input. UNISURF-S4: `canvasLock` — stale locks edges like review.
+          readOnly: canvasLock,
         },
       };
     }),
-    [edges, onCommitLabel, readOnly, onBend, onLabelWrite, consumeEditAt, onGrow],
+    [edges, onCommitLabel, canvasLock, onBend, onLabelWrite, consumeEditAt, onGrow],
   );
 
   /** L3c: the symbolic keys whose crow's-foot glyphs this board needs. Keyed by
@@ -1816,36 +1706,49 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     return [...ks];
   }, [edges]);
 
-  /** L3c: table nodes receive the board's show-mode and their own collapse
-   *  handler. ITEM 2b removed the `__toolbar` injection — the action strip it
-   *  fed no longer exists in any node kind, so there is nothing to inject. */
+  /** L3c: table nodes get the show-mode, collapse + column-edit seams (S5). */
+  const lockedSet = lockedIdSet(nodes); /* LOCK v1 — effective set incl. group inheritance */
+  const lockedKey = [...lockedSet].sort().join(','); /* F1b — content signature: lockedIdSet mints a fresh Set per render, so the old identity dep re-ran this memo (rebuilding EVERY mapped node object) on every App render */
+  const rfNodeCache = useRef(new WeakMap<object, {stamp: string; out: (typeof nodes)[number]}>());
   const rfNodes = useMemo(
-    () => nodes.map(n => {
-      /* K — DEFECT 2: re-apply React Flow's `noPanClassName` token to the node
-         WRAPPER while review mode is on. RF only writes that class itself while
-         the node is draggable (`[noPanClassName]: isDraggable` in
-         @xyflow/react's NodeWrapper), so `nodesDraggable={false}` REMOVES it and
-         a drag starting on a node falls through to the pane and pans the canvas
-         — the node then travels with the viewport and reads as "dragging the
-         element". Outside review mode `n.className` is passed straight through,
-         byte-for-byte as before: there RF sets the token itself. */
-      const nodeClassName = readOnly ? [n.className, NO_PAN].filter(Boolean).join(' ') : n.className;
-      /* ROUND S — the `label` kind's in-place editor is rendered by
-         `src/nodes/LabelNode.tsx`, and a custom node component receives only its own
-         `data`. So the commit callback and the review-mode flag travel through
-         `data`, per-node — exactly how the edge renderer gets `onCommitLabel`
-         and `readOnly` in `rfEdges` above (fix L). Read off the node's OWN
-         type, so no other kind is touched. */
-      /* ROUND ROTATE — the grip + its writer travel per-node (a custom node
-         component receives only its own data; the same threading the label
-         and table kinds use above). GROUP-ROTATE: the writer is injected on
-         EVERY selected node (the chord path needs no per-node data), but the
-         SOLE-SELECTION token `__rotateSel` only on the single selected one —
-         in a multi-selection no per-node grip renders and App's shared
-         GroupRotateGrip drives the group instead. */
-      const rotData = n.selected ? {
-        __rotate: onRotateGesture,
-        ...(selCount === 1 ? {__rotateSel: true} : {}),
+    () => {
+    /* F1b stamp — every non-`nodes` mapping input, fixed order (scalars by value, seams by identity); WeakMap keyed by SOURCE ref: unchanged nodes hit, a drag frame (one rebuilt node) misses only that node, adoptUserNodes keeps every other node's internals — only the dragged node's edges re-render. */
+    const stamp = [canvasLock ? 1 : 0, readOnly ? 1 : 0,
+      titleEdit ? titleEdit.id + '@' + titleEdit.at : '', showMode,
+      codeStale ? codeStale.cols.join('|') : '', hlKey ?? '', lockedKey,
+      commitNodeTitle, commitLabelText, pushHistory, setNodes, fkConnect,
+    ].map(String).join('~');
+    const cache = rfNodeCache.current;
+    const mapNode = (n: (typeof nodes)[number]) => {
+      /* K — DEFECT 2 (fold): re-apply RF's `noPanClassName` to the node wrapper
+         while review mode is on — RF only writes that token itself while the
+         node is draggable, so `nodesDraggable={false}` would drop it and a
+         drag starting on a node would pan the canvas instead. Outside review
+         mode `n.className` passes through byte-for-byte as before. */
+      const nodeClassName = canvasLock ? [n.className, NO_PAN].filter(Boolean).join(' ') : n.className;
+      /* ROUND S (fold): `label` nodes get their in-place editor from
+         LabelNode; the commit callback + review flag ride `data`, like rfEdges. */
+      /* CHROME-ABOVE (fold): grip writer tokens RETIRED — rotate grip + desc
+         badge render in NodeChrome, one seam deeper, taking the rotation
+         writer directly with its own sole-selection + !readOnly gate. */
+      /* INLINE-TITLE (fold): token + writer + review flag ride the SAME
+         render-time injection, selected nodes only (opens select first);
+         never written into nodes state. */
+      /* BADGE-ON-SELECT (fold): review mode allows sole selection (the desc
+         badge reveals through it). Lock-seam philosophy: STALE keeps every
+         affordance on screen and refuses the WRITE at the seam; REVIEW is a
+         clean reading view that shows no editing chrome. So `readOnly` stays
+         canvasLock (the legacy editor gate — blocked under both locks) and
+         `__review` is the PURE review flag the node components gate their
+         resizers on: a node selected before the stale lock keeps its handles
+         (the drag is refused by the seam), while a review selection paints
+         the ring and the ⓘ and nothing else. The title-editor writer/token
+         keep their pre-change unconditional injection. */
+      const editData = n.selected ? {
+        onCommitTitle: commitNodeTitle,
+        readOnly: canvasLock,
+        __review: readOnly,
+        ...(titleEdit?.id === n.id ? {__editTitle: titleEdit.at} : {}),
       } : {};
       if (n.type === 'label') {
         return {
@@ -1854,56 +1757,70 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           data: {
             ...((n.data ?? {}) as any),
             onCommitText: commitLabelText,
-            readOnly,
-            ...rotData,
+            readOnly: canvasLock,
+            ...(titleEdit?.id === n.id ? {__editTitle: titleEdit.at} : {}),
           },
         };
       }
       if (n.type === 'table') {
+        /* UNISURF-S4 stale marks + S5 row seam + S7 FK writer + S8 collapse gate. */
+        const staleCols = codeStale
+          ? codeStale.cols.flatMap(k => (k.startsWith(n.id + ':') ? [k.slice(n.id.length + 1)] : []))
+          : null;
         return {
-          ...n,
+          ...n, style: {...(n.style ?? {}), width: undefined}, /* BOARD-STYLE: wrapper shrink-wraps the measured card */
           className: nodeClassName,
           data: {
             ...((n.data ?? {}) as any),
             __showMode: showMode,
-            __onToggle: (id: string, collapsed: boolean) => {
-              pushHistory();
+            __onToggle: (id: string, collapsed: boolean) => { pushHistory();
               setNodes(ns => ns.map(m => m.id === id ? {...m, data: {...(m.data as any), collapsed}} : m));
             },
-            ...rotData,
+            /* UNISURF-S5 — the full-column seam; S7 — the ONE FK writer. */
+            __onColumns: (id: string, cols: import('../../packages/gobi/src/model/nodeData').TableColumn[], push?: boolean) => {
+              if (push) pushHistory();
+              setNodes(ns => ns.map(m => m.id === id ? {...m, data: {...(m.data as any), columns: cols}} : m));
+            },
+            __lock: canvasLock, __onPickColumn: pickColumn, __onFk: fkConnect, /* S6 bridge · S7 FK */
+            ...(staleCols ? {__staleCols: staleCols} : {}),
+            ...(hlKey && !codeStale && hlKey.startsWith(n.id + ':') ? {__hl: hlKey} : {}), /* S6 caret's row; never while stale */
           },
         };
       }
       /* memo safety: an UNSELECTED node's data object stays reference-equal
          (a new data object per recompute would defeat DiagramNode's memo). */
       return n.selected
-        ? {...n, className: nodeClassName, data: {...((n.data ?? {}) as any), ...rotData}}
+        ? {...n, className: nodeClassName, data: {...((n.data ?? {}) as any), ...editData}}
         : {...n, className: nodeClassName};
-    }),
-    [nodes, showMode, pushHistory, setNodes, readOnly, commitLabelText, onRotateGesture, selCount],
+    };
+    return nodes.map(n => {
+      const hit = cache.get(n);
+      if (hit && hit.stamp === stamp) return hit.out;
+      const mapped = mapNode(n);
+      const out = lockedSet.has(n.id) ? { /* LOCK v1 — derived at render, never stored */
+        ...mapped, draggable: false, deletable: false, connectable: false, data: {...((mapped.data ?? {}) as any), __locked: true}, className: [mapped.className, NO_PAN].filter(Boolean).join(' '), /* keep noPanClassName on locked nodes: RF only gives it to draggable ones, and panOnDrag=[1,2]'s right-button pan filter would otherwise swallow the node's contextmenu */
+      } : mapped;
+      cache.set(n, {stamp, out});
+      return out;
+    });
+    },
+    [nodes, showMode, pushHistory, setNodes, readOnly, codeStale, commitLabelText, commitNodeTitle, hlKey, fkConnect, canvasLock, titleEdit, lockedKey],
   );
 
   /* ---------------------------------------------------------------------
-     PACKAGE-N 2b — insertion is keyed on IDENTITY, never on a rendered index.
-
-     Both insert paths used to carry an index into the active preset's palette
-     array: the drag payload was the index the panel rendered, and
-     `SearchPalette` passed its own list index.
-     That only worked while every caller rendered the SAME array it resolved
-     against. The panel now renders a FILTERED subset of the one library, so a
-     rendered index and a library index are different numbers and the mismatch is
-     silent — the user drags one shape and gets another. `label` is unique across
-     `LIBRARY` (verified: zero duplicates), which makes it the stable identity to
-     travel with. Everything below the lookup is the previous body verbatim.
+     PACKAGE-N 2b (fold) — insertion is keyed on IDENTITY, never a rendered
+     index: the panel now renders a FILTERED subset of the one library, so a
+     rendered index ≠ a library index and the drag payload must carry `label`
+     (unique across LIBRARY, verified — zero duplicates). Body below is the
+     previous one verbatim.
      --------------------------------------------------------------------- */
   const addNodeByLabel = (label: string, pos?: {x: number; y: number}) => {
     const item = LIBRARY.find(p => p.label === label);
     if (!item) return;
-    const id = `n${idc++}`;
-    /* AUDIT-14 — the no-position default centres on the WRAP (a client coord:
-       rect.left + half), so with the palette open the insert lands at the
-       canvas centre like every sibling path, not 480 client px from the
-       viewport origin (~248 flow px off). */
+    const id = `n${nextId()}`;
+    /* AUDIT-14 (fold) — the no-position default centres on the WRAP
+       (client coord rect.left + half), so with the palette open the insert
+       lands at the canvas centre like every sibling path. */
     const wr3 = wrap.current?.getBoundingClientRect();
     const p = pos ?? (rf && wr3
       ? rf.screenToFlowPosition({x: wr3.left + wr3.width / 2, y: wr3.top + wr3.height / 2})
@@ -1911,12 +1828,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     pushHistory();
     tickTask('node');
 
-    // L3c: the ERD `table` node is its own node type (a column list is not a
-    // Shape — its height varies with the number of columns).
-    if (item.label === 'Table' && preset.id === 'erd') {
+    // L3c: the ERD `table` node is its own node type: a column list is not a
+    // Shape. UNISURF-S13 — no preset gate: the SHAPE picks the type, not the board.
+    if (item.label === 'Table') {
       setNodes(ns => [...ns, {
         id, type: 'table', position: p, selected: false,
-        style: {width: 250, height: 170},
+        style: {width: 250}, /* TABLE-HEIGHT: no stored height — the wrapper hugs the card */
         data: {
           name: 'new_table',
           columns: [
@@ -2301,7 +2218,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       const rel = offs[i] ?? {x: 0, y: 0};
       // §6.5 step 3 — RE-GENERATE IDS. Never reuse a stored one: it may collide
       // with an id already on this board.
-      const id = `n${idc++}`;
+      const id = `n${nextId()}`;
       // A selection copy stores no board id at all, so `__src` is its only
       // reference; `storedNode.id` covers a hand-written library file that did
       // keep one.
@@ -2325,7 +2242,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       void _sel;
       const src = idMap.get(se.source) ?? idMap.get(String(se.source));
       const tgt = idMap.get(se.target) ?? idMap.get(String(se.target));
-      return src && tgt ? ({...rest, id: `e${idc++}`, source: src, target: tgt, selected: false} as Edge) : null;
+      return src && tgt ? ({...rest, id: `e${nextId()}`, source: src, target: tgt, selected: false} as Edge) : null;
     }).filter(Boolean) as Edge[];
 
     setNodes(ns => [...ns.map(n => (n.selected ? {...n, selected: false} : n)), ...newNodes]);
@@ -2357,7 +2274,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     // AQ19 — centre the custom shape under the cursor (its own size is known).
     p = {x: Math.round(p.x - shape.w / 2), y: Math.round(p.y - shape.h / 2)};
     // §6.5 step 3 — RE-GENERATE THE ID. Never a stored one.
-    const id = `n${idc++}`;
+    const id = `n${nextId()}`;
     setNodes(ns => [...ns, {
       id,
       type: 'customshape',
@@ -2560,22 +2477,31 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      drag and a final `resizing: false` at the end; `recordResizeGesture` turns
      that stream into exactly one push and re-arms for the next gesture. The
      decision itself lives in `src/resizeHistory.ts` so `checks/` can execute it
-     rather than restate it. See that file for why the change-level flag is used
-     instead of `onResizeStart`, and why position changes are NOT recorded here.
-     `guard` is a plain object (not a boolean ref) because the helper needs to
-     write back through it. */
+     rather than restate it (change-level flag, not `onResizeStart`; position
+     changes are NOT recorded here). `guard` is a plain object (not a boolean
+     ref) because the helper needs to write back through it. */
   const resizeGuard = useRef(newResizeGuard());
 
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    /* S10: stale = read-only canvas; dropping it costs nothing (RF re-measures).
+       BADGE-ON-SELECT (t_e1ad9237): SELECTION changes are the one exception —
+       review mode now allows sole selection (the desc badge's door) and RF
+       delivers it as {type:'select'} through this seam; a selection is NOT a
+       document write (the save path strips `selected`, board/library.ts), so
+       the lock's byte-identical guarantee is untouched. Everything else stays
+       refused under the lock, exactly as before. */
+    if (writeBlocked() && !changes.every(c => c.type === 'select')) return;
     if (changes.some(c => c.type === 'remove')) noteRemove();
-    if (recordResizeGesture(resizeGuard.current, changes)) pushHistory();
-    onNodesChange(changes);
-  }, [onNodesChange, noteRemove, pushHistory]);
+    if (recordResizeGesture(resizeGuard.current, changes)) pushHistory(); if (changes.some(c => c.type === 'dimensions' && c.resizing === false)) setRevealTick(t => t + 1); /* RAIL-COVER-2: the gesture END (resizing:false, the undo step's frame) is the ONE moment the rail pans the resized node back inside — never per frame */
+    /* TABLE-GRIP: a derived size — the grip's dimensions change becomes `scale`. */
+    onNodesChange(tableGripChanges(changes, nodesRef.current, setNodes, tableStyle, tableDensity, tableNaturalWidth));
+  }, [onNodesChange, noteRemove, pushHistory, writeBlocked, setNodes, tableStyle, tableDensity, setRevealTick]);
 
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    if (writeBlocked()) return; /* S10 — same channel, same gate */
     if (changes.some(c => c.type === 'remove')) noteRemove();
     onEdgesChange(changes);
-  }, [onEdgesChange, noteRemove]);
+  }, [onEdgesChange, noteRemove, writeBlocked]);
 
 
   // Part B — ONE source of truth for the read-only review toggle. The toolbar
@@ -2591,21 +2517,23 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
        the state) decides so an in-flight keydown during the share decode is
        also covered. */
     if (shareActive.current) return;
-    const next = !readOnly;
+    const next = !readOnly; if (next) void flushPending(); /* S11 — flush, then lock (the same door) */
     setReadOnly(next);
     readOnlyRef.current = next; /* AUDIT-16 — visible to in-flight gestures immediately */
     try { localStorage.setItem(READ_ONLY_KEY, next ? '1' : '0'); } catch { /* ignore */ }
     if (next) {
-      // Entering the mode must not leave a stale ring or node
-      // toolbar on screen: `elementsSelectable={false}` only stops
-      // FUTURE selections, it does not clear an existing one — and
-      // the node toolbar / resize handles render off `selected`.
+    // Entering the mode must not leave a stale ring or node
+    // toolbar on screen: clearing the selection does that in one move
+    // (BADGE-ON-SELECT t_e1ad9237: review mode now allows FUTURE sole
+    // selections — the desc badge's door — but nothing editing may ride
+    // one; the clear here still guarantees a clean reading view on entry).
       setCtx(null);
       setSearchPos(null);
-      if (rf) {
-        rf.setNodes(nss => nss.map(n => n.selected ? {...n, selected: false} : n));
-        rf.setEdges(es => es.map(e2 => e2.selected ? {...e2, selected: false} : e2));
-      }
+      /* UNISURF-S10 — through the SEAM, not the instance setters: those diff
+         the store's RENDER-augmented copies back into the node list
+         (className/`data.__*` leaked that way and stuck to the document). */
+      setNodes(nss => nss.map(n => n.selected ? {...n, selected: false} : n));
+      setEdges(es => es.map(e2 => e2.selected ? {...e2, selected: false} : e2));
       setSel(null);
       setSelEdgeId(null);
       setSelCount(0);
@@ -2613,7 +2541,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     } else {
       flash('Editing enabled');
     }
-  }, [readOnly, rf, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount, shareActive]);
+  }, [readOnly, setNodes, setEdges, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount, shareActive, flushPending]);
 
   // ---- keyboard shortcuts ----
   useEffect(() => {
@@ -2625,14 +2553,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       if (settingsOpen) return;
       // ITEM 6b: the board dialog owns the keyboard too, and this return is
       // DELIBERATELY HERE — above the Escape branch below, not in the overlay
-      // guard after it. The board MENU is handled down there because Escape is
-      // the way out of a menu and the branch below is what closes it. The dialog
-      // is different: its own capture listener owns Escape (cancel) and Tab
-      // (the trap), so if this returned further down, Escape would ALSO reach the
-      // branch below and deselect every node on the canvas behind the dialog —
-      // the dialog would close and the user's selection would silently vanish.
-      // `isEditable(e.target)` above covers the name field, so typing is never
-      // swallowed; this line only stops the app's shortcuts landing behind it.
+      // guard after it. The board MENU is handled down there (Escape is the way
+      // out of a menu and the branch below closes it). The DIALOG is different:
+      // its own capture listener owns Escape (cancel) and Tab (the trap), so a
+      // return further down would let Escape deselect every node behind the
+      // dialog; `isEditable(e.target)` covers the name field. This line stops
+      // only the app's shortcuts landing behind the dialog.
       if (boardDlg) return;
       /* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery owns the keyboard while it is
          up, in the SAME guard as every other overlay and for the same reason.
@@ -2642,38 +2568,32 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
          never reaches the branch below and cannot deselect the canvas behind two
          scrims. */
       if (tgOpen) return;
+      if (historyOpen) return;  /* HISTORY-V3 — the ledger dialog owns the keyboard like the two above (its capture listener carries Escape/Tab). */
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
-      // D3: Escape clears node + edge selection and closes any open popovers.
-      // It is handled FIRST, before the overlay guard below, on purpose: Escape
-      // is the way OUT of every surface that guard protects. Move it after and
-      // Escape stops closing search → help → boards.
+      // D3: Escape clears node + edge selection and closes open popovers.
+      // FIRST, before the overlay guard below: Escape is the way OUT of every
+      // surface that guard protects (move it after → search/help/boards stop closing).
       if (e.key === 'Escape') {
         // M: Settings closes first — before search → help → boards → clear.
         if (settingsOpen) { setSettingsOpen(false); return; }
         if (searchPos) { setSearchPos(null); return; }
         if (help) { setHelp(false); return; }
         if (boardsOpen) { setBoardsOpen(false); return; }
-        if (rf) {
-          rf.setNodes(ns => ns.map(n => n.selected ? {...n, selected: false} : n));
-          rf.setEdges(es => es.map(e2 => e2.selected ? {...e2, selected: false} : e2));
-        }
+        /* GROUP-LOGICAL (t_eb8fab7e): inside a logical group, Escape first LEAVES it (selection returns to the group) — the deselect below would exit the grammar entirely. */
+        if (escapeGroup()) return;
+        setNodes(ns => ns.map(n => n.selected ? {...n, selected: false} : n));
+        setEdges(es => es.map(e2 => e2.selected ? {...e2, selected: false} : e2));
         return;
       }
-      // H1: every other overlay on screen owns the keyboard. While the help
-      // popover, a board menu or the insert palette is open, an app shortcut must
-      // not fire behind it — a stray ⌘Z would undo the newcomer's own work, and
-      // `?` would stack the cheat sheet on top of a surface that is already being
-      // read. (ONBOARD-P2/3: the step-by-step overlay that used to be the first
-      // member of this guard is deleted; the three surfaces that remain are the
-      // same three this guard always covered.)
+      // H1: every other overlay owns the keyboard — while help, a board menu or
+      // the insert palette is open, an app shortcut must not fire behind it (a
+      // stray ⌘Z would undo the newcomer's work; `?` would stack sheets).
       if (help || boardsOpen || searchPos) return;
       // Shift+1 (physical Digit1) — "fit view", the Figma/Excalidraw/Miro
-      // convention. It carries a modifier, so it is legal under this app's
-      // no-bare-key rule. Matched on `e.code`, NOT `e.key`: on most layouts
-      // Shift+1 delivers `!` as the key, so a key-based match would break.
-      // The overlay guard above and the `isEditable(e.target)` early-return at
-      // the top of this handler keep typing (and open overlays) safe.
+      // convention; carries a modifier, so legal under the no-bare-key rule.
+      // Matched on `e.code`, NOT `e.key` (Shift+1 delivers `!` on most
+      // layouts); the overlay guard and `isEditable` keep typing safe.
       if (e.shiftKey && e.code === 'Digit1' && !mod) {
         e.preventDefault();
         rf?.fitView({padding: 0.25});
@@ -2684,29 +2604,68 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // app's no-bare-key rule, and it is matched on `e.code`, NOT `e.key` —
       // Shift+2 delivers `@` as the key on most layouts, so a key-based match
       // would break.
-      // PLACEMENT IS LOAD-BEARING: this branch sits ABOVE the `if (readOnly)`
-      // early-return a few lines below. The mode must be enterable AND
-      // leavable by the same key, so the shortcut has to be reached before the
-      // handler starts swallowing everything. Move it below that return and the
-      // shortcut becomes one-way: it can switch the mode ON and then never OFF.
-      // It also deliberately sits after the overlay guard above, so a stray
-      // Shift+2 cannot flip the mode behind help, a board menu or the insert
-      // palette.
+      // PLACEMENT IS LOAD-BEARING: ABOVE the `if (readOnly)` early-return — the
+      // mode must be enterable AND leavable by the same key, before the handler
+      // starts swallowing everything (below it, the shortcut is one-way: ON and
+      // never OFF). It also sits after the overlay guard above, so a stray
+      // Shift+2 cannot flip the mode behind help, a board menu or the palette.
       if (e.shiftKey && e.code === 'Digit2' && !mod) {
         e.preventDefault();
         toggleReadOnly();
         return;
       }
-      // ---- Part B: read-only review mode owns no mutation --------------------
-      // Placed HERE on purpose — after `isEditable`, after the Settings guard,
-      // after Escape (the way out of every overlay) and after Shift+1, so those
-      // three keep working: they change the VIEWPORT or close a surface, never
-      // the board. Everything below this point mutates, so in review mode the
-      // handler returns before reaching it: undo, redo, copy, paste, duplicate,
-      // the panel-visibility chord, arrow-nudge and the `/` panel-search focus
-      // are all inert. `?` (the cheat sheet) is a pure read surface and is
-      // explicitly kept available.
-      if (readOnly) {
+      // ---- PACKAGE-Q: panel chrome — three chords, ONE writer each ----------
+      //   Cmd+Ctrl+Shift+backslash → hide BOTH docked panels if either one is on
+      //                              screen, else show BOTH (a single panel is
+      //                              still reachable from its own chevron)
+      //   Cmd+Ctrl+Shift+[         → toggle the LEFT panel only
+      //   Cmd+Ctrl+Shift+]         → toggle the RIGHT panel only
+      //
+      // THE GROUP CHORD GAINED A MODIFIER: on macOS the user asked for Cmd AND
+      // Ctrl together, and `mod` above is meta-OR-ctrl so it cannot express the
+      // pair — the real modifier PAIR is tested below, per platform. MATCHED ON
+      // `e.code`, NEVER the `k` string: Shift rewrites the delivered character,
+      // so a glyph match never fires (the Shift+1/Shift+2 trap above).
+      //
+      // VIEW-MODE CHROME (2026-11-14) — PLACEMENT IS LOAD-BEARING, now ABOVE the
+      // read-only early-return below, mirroring Shift+2's argument: hiding or
+      // showing a panel is a VIEW concern, not a board mutation, so review mode
+      // must reach these branches. In review they drive the TRANSIENT reveal
+      // (src/canvas/reviewChrome.ts — local state, never persisted; the
+      // `diagram-studio:panels` layout the editor will return to is never
+      // written); in edit mode the same branches keep the persisted writers. The
+      // overlay guard above still swallows them behind help, a board menu or the
+      // insert palette, and the stale lock gets NO reveal either: with
+      // `codeStale` (and not readOnly) the guard below still swallows them.
+      // They sit ABOVE the arrow-nudge, `?`, `/` branches, which they shadow.
+      //
+      // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
+      // desync unreachable, and `hiddenRef.current` is now the EFFECTIVE state
+      // (what the eye sees), so in review the group chord's "any visible → hide
+      // both" describes the revealed panels too. ONE atomic both-sides write of
+      // a VISIBLE decision per press; do not reintroduce a second path.
+      const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+      const panelChord = mac ? (e.metaKey && e.ctrlKey && e.shiftKey) : (e.ctrlKey && e.shiftKey);
+      if (panelChord && (readOnly || !codeStale) &&
+          (e.code === 'Backslash' || e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+        if (e.code === 'Backslash') {
+          e.preventDefault();
+          const {left, right} = hiddenRef.current;
+          // any panel visible → hide both; none visible → show both
+          if (readOnly) revealPanels(left && right); else { if (railPanel.active) railPanel.setShown(left && right); setPanelsVisible(left && right); }
+        } else if (e.code === 'BracketLeft') {
+          e.preventDefault();
+          if (readOnly) revealPanel('left'); else togglePanel('left');
+        } else if (e.code === 'BracketRight') {
+          e.preventDefault();
+          if (readOnly) revealPanel('right'); else if (railPanel.active) railPanel.toggle(); else togglePanel('right');
+        }
+        return;
+      }
+      // Part B: review mode / UNISURF-S4 stale own no mutation. Placed after
+      // `isEditable`, Settings, Escape and Shift+1 (viewport/surface changes)
+      // on purpose; everything below mutates. `?` stays available (pure read).
+      if (readOnly || !!codeStale) {
         if (k === '?') { setHelp(h => !h); return; }
         return;
       }
@@ -2726,64 +2685,24 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         rotateSelection(e.shiftKey ? -ROTATE_SNAP_DEG : ROTATE_SNAP_DEG);
         return;
       }
+      /* GROUP-OBJECT + LOCK v1: Cmd+G group, Cmd+Shift+G ungroup, Alt+L lock (NOT Cmd+L — the browser owns the address bar). */
+      if (mod && k === 'g' && !canvasLock) { e.preventDefault(); (e.shiftKey ? ungroupSelection : groupSelection)(); return; }
+      if (e.altKey && !mod && e.code === 'KeyL' && !canvasLock) { e.preventDefault(); toggleLockSelection(); return; }
       if (mod && k === 'c') { copySelection(); return; }
-      if (mod && k === 'v') { e.preventDefault(); pasteClipboard(40); return; }
+      if (mod && k === 'v') { e.preventDefault(); pasteClipboard(40, true); return; }
       if (mod && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
-      // ---- PACKAGE-Q: panel chrome — three chords, ONE writer each ----------
-      //   Cmd+Ctrl+Shift+backslash → hide BOTH docked panels if either one is on
-      //                              screen, else show BOTH (the Figma group
-      //                              toggle, unchanged; a single panel is still
-      //                              reachable from its own edge chevron)
-      //   Cmd+Ctrl+Shift+[         → toggle the LEFT panel only
-      //   Cmd+Ctrl+Shift+]         → toggle the RIGHT panel only
-      //
-      // THE GROUP CHORD GAINED A MODIFIER. It used to be one modifier plus
-      // Shift; on macOS the user asked for Cmd AND Ctrl together. `mod` above is
-      // meta-OR-ctrl, so it cannot express a two-modifier chord — the real
-      // modifier PAIR is tested below instead, per platform.
-      //
-      // MATCHED ON `e.code`, NEVER on the `k` string read above. All three
-      // chords carry Shift, and Shift rewrites the character a key delivers, so
-      // a character match against the bracket glyph would never fire. This is
-      // the same trap Shift+1 / Shift+2 higher up avoid by matching the physical
-      // Digit1 / Digit2 keys.
-      //
-      // PLACEMENT IS LOAD-BEARING and unchanged from the binding this replaces:
-      // these branches sit BELOW the read-only early-return above (panel
-      // visibility is a persisted layout mutation, so review mode must swallow
-      // them exactly as it swallowed the chord before) and BELOW the overlay
-      // guard, so a stray chord cannot flip panels behind help, a board menu or
-      // the insert palette. They sit ABOVE the arrow-nudge, `?`
-      // and `/` branches, which they shadow.
-      //
-      // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
-      // desync unreachable: the old code derived `next` from the raw collapse
-      // flags, so a left-only collapse wrote both sides as hidden for a right
-      // panel that was already hidden and the press changed nothing the eye
-      // could see. ONE atomic `setPanelsVisible` write of both sides is the fix;
-      // do not reintroduce a second path.
-      //
-      // NON-MAC: there is no Cmd key, so the group chord keeps the form this app
-      // already shipped on Windows/Linux — Ctrl+Shift — and the two per-side
-      // chords mirror onto the bracket keys. Documented in Settings → Shortcuts
-      // and README so the documentation matches the code.
-      const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
-      const panelChord = mac ? (e.metaKey && e.ctrlKey && e.shiftKey) : (e.ctrlKey && e.shiftKey);
-      if (panelChord && e.code === 'Backslash') {
-        e.preventDefault();
-        const {left, right} = hiddenRef.current;
-        // any panel visible → hide both; none visible → show both
-        setPanelsVisible(left && right);
-        return;
-      }
-      if (panelChord && e.code === 'BracketLeft') {
-        e.preventDefault();
-        togglePanel('left');
-        return;
-      }
-      if (panelChord && e.code === 'BracketRight') {
-        e.preventDefault();
-        togglePanel('right');
+      // INLINE-TITLE (t_cb9335df) — F2 opens the in-place title editor on the
+      // sole selected node, the keyboard twin of double-clicking the title.
+      // TABLE nodes are out of scope (their header renames through the
+      // inspector); review/stale mode already returned above, so the editor
+      // can never open on a locked canvas. The token is render-injected —
+      // F2 on a FRESH selection still refires because Date.now() moves.
+      if (e.key === 'F2' && !mod) {
+        const n = selCount === 1 ? nodesRef.current.find(m => m.id === sel) : undefined;
+        if (n && (n.type === 'goblin' || n.type === 'label' || n.type === 'customshape')) {
+          e.preventDefault();
+          setTitleEdit({id: n.id, at: Date.now()});
+        }
         return;
       }
       // arrow keys nudge the selection: 1px, Shift+arrow 10px
@@ -2801,18 +2720,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
       // D3: Escape clears node + edge selection and closes any open popovers
       // (handled above, before the overlay guard — Escape must stay the way out).
       if (k === '?') { setHelp(h => !h); return; }
-      // ---- PACKAGE-N 2c: `/` focuses the panel's shape search --------------
-      // draw.io's convention. Three guards, all required:
-      //   * `mod` — a bare `/` only. Mod+/ is left for a future binding and is
-      //     not stolen from the browser (Cmd+/ is a real shortcut elsewhere).
-      //   * the overlay guard ABOVE already returned while help, a board menu or
-      //     the insert modal is up, so `/` cannot focus a field
-      //     behind a dialog.
-      //   * `isEditable(e.target)` at the top of this handler means `/` typed
-      //     INTO a field (including this one) can never re-trigger — which is
-      //     what keeps the shortcut from fighting the handler. No `preventDefault`
-      //     is needed to swallow the character: we focus the field, so the `/`
-      //     never reaches anything that would render it.
+      // ---- PACKAGE-N 2c: `/` focuses the panel's shape search (draw.io's
+      // convention). Bare `/` only — the mod+/ variant is the code pane's
+      // (UNISURF-S3 below), and the overlay guard above plus the
+      // `isEditable` early-return keep both from firing behind a dialog or
+      // inside a field.
+      // UNISURF-S3 — Cmd/Ctrl+/ toggles the code pane rail (spec §6: the
+      // binding was free; mods pass the editable guard at the top).
+      if (k === '/' && mod) { e.preventDefault(); toggleCode(); return; }
       if (k === '/' && !mod && !isEditable(e.target) && isPanelVisible('left')) {
         e.preventDefault();
         searchRef.current?.focus();
@@ -2821,8 +2736,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, rf, searchPos, help, boardsOpen, settingsOpen,
-      setPanelsVisible, readOnly, toggleReadOnly, boardDlg, tgOpen]);
+  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, setNodes, setEdges, searchPos, help, boardsOpen, settingsOpen, escapeGroup,
+      groupSelection, ungroupSelection, toggleLockSelection,
+      setPanelsVisible, readOnly, codeStale, toggleReadOnly, boardDlg, tgOpen, toggleCode, sel, selCount, setTitleEdit, canvasLock, railPanel]);
 
   // ---- C5: live zoom level for the zoom pill ----
   const ZoomPill = () => {
@@ -2841,23 +2757,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     );
   };
 
-  // ---- I4: reliable cross-browser download (Safari on LAN blocks downloads
-  // from a detached anchor with a giant data:/blob: URL). Use a Blob + object
-  // URL, attach the anchor to the DOM, click it, then clean up on a timeout.
-  const download = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.rel = 'noopener';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      a.remove();
-      URL.revokeObjectURL(url);
-    }, 4000); // give Safari time to start the download before revoking
-  };
 
   /* ROUND BN-2 — the export cluster now lives in useExportActions.ts
      (moved verbatim; the lazy thunks moved with it and stay DYNAMIC inside
@@ -2958,16 +2857,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      row gone nothing reads it. The VALUE is untouched — `GoblinEdge.tsx:383`
      still reads `d.offset` — so a board carrying `start`/`end` still renders it. */
 
-  /* NOTE, reported rather than fixed in passing: `markerOptions` below is DEAD
-     (it is defined and never read — checked by grep). It was ALREADY dead before
-     this pass (the PACKAGE-P picker conversion replaced its one consumer with
-     `MARKER_OPTS`), so it is not this pass's to remove and it is left byte-for-byte
-     as found. Flagged here so the next pass does not mistake it for a regression. */
-  const markerOptions = [
-    {v: 'none', label: 'None'},
-    {v: MarkerType.ArrowClosed, label: 'Arrow (closed)'},
-    {v: MarkerType.Arrow, label: 'Open arrow'},
-  ];
+  /* HEADROOM t_a21adb78 — `markerOptions` IS DELETED. It was DEAD code (defined,
+     never read — checked by grep; a PACKAGE-P note had reported it rather than
+     fixing it in passing): this round's scope IS dead-code trim, so it goes.
+     The live tables are `MARKER_OPTS` / `MARKER_OPTS_START` right below. */
 
   /* ---- PACKAGE-P §B: the option tables the pickers render ----------------
      Each table is the SAME value set the `<select>` it replaces carried, so the
@@ -2978,12 +2871,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     {v: MarkerType.ArrowClosed, label: 'closed arrow', art: <ArtArrow kind="closed" />},
     {v: MarkerType.Arrow, label: 'open arrow', art: <ArtArrow kind="open" />},
   ];
-  /** same table, mirrored — the head-START control is the head-END one flipped. */
-  const MARKER_OPTS_START: PickerOption[] = [
-    {v: 'none', label: 'none', art: <ArtArrow kind="none" flip />},
-    {v: MarkerType.ArrowClosed, label: 'closed arrow', art: <ArtArrow kind="closed" flip />},
-    {v: MarkerType.Arrow, label: 'open arrow', art: <ArtArrow kind="open" flip />},
-  ];
+  /** same table, mirrored — the head-START control is the head-END one flipped.
+   *  HEADROOM t_a21adb78 — DERIVED instead of a hand-copied twin table (the
+   *  rows share value + label; only the glyph mirrors). cloneElement keeps the
+   *  same kind per row and adds flip, so the rendered table is identical. */
+  const MARKER_OPTS_START: PickerOption[] = MARKER_OPTS.map(o => ({
+    ...o, art: cloneElement(o.art as ReactElement<{kind: 'none' | 'closed' | 'open'; flip?: boolean}>, {flip: true}),
+  }));
   const WIDTH_OPTS: PickerOption[] = [1, 1.5, 1.8, 2, 3].map(w => ({
     v: String(w), label: String(w), art: <ArtWidth w={w} />,
   }));
@@ -3021,6 +2915,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   const LABEL_BG_OPTS: PickerOption[] = LABEL_BG_VALUES.map(v => ({
     v, label: v === 'none' ? 'None' : v === 'surface' ? 'Surface' : 'Outline', art: null,
   }));
+
+// HEADROOM t_a21adb78 — hoisted: the drop hint was spelled twice (aria-label + title).
+const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
 
   /* ==========================================================================
      ROUND AL, AL-6 — THE ONE CHIP ROW. This is the panel's ONLY row control.
@@ -3254,6 +3151,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   const hasSection = (id: SectionId) => inspSections.some(s => s.id === id);
   const SECTION_TITLES: Record<SectionId, string> = {
     content: 'Content',
+    definition: 'Additional Description',
     text: 'Text',
     style: 'Style',
     table: 'Table',
@@ -3322,95 +3220,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   const nodeColor = selected ? resolveColor(selected.data as any) : COLOR_VAR.accent;
 
 
-  /** L1 — the inspector swatches are COLOUR KEYS, painted with the live
-   *  `var(--c-*)` token, so the swatch itself recolours with the theme. Picking
-   *  one stores the key (not a hex), which is what makes light mode work.
-   *
-   *  ROUND AG2, ITEM 3 — the shared row lays the keys out in a fixed number of
-   *  columns. This is the SHARED control: every one of its call sites renders
-   *  the same keys, so a wrap problem is fixed once, here, rather than at the
-   *  two rows that were noticed. The class is `swatch6`, NOT `grid3`: that name
-   *  is the segmented font row's modifier (`.insp-seg.grid3`), and `.swatches`
-   *  and `.insp-seg` are the same element there, so sharing the name would move
-   *  the font row's gap. Measured in the `.swatches.swatch6` block in
-   *  `src/styles.css`.
-   *
-   *  ROUND BD — THE BULK ROW'S CURRENT IS THE SHARED KEY, NOT A CONSTANT NULL.
-   *  The old call passed a literal `null`, so all eleven cells always painted
-   *  ringless — an all-off state on a control the user has demonstrably used
-   *  (measured defect 8 of the old block). The single-node Style section lights
-   *  the cell whose key is in force (`swatchRow(resolveColorKey(...), ...)`),
-   *  and the bulk row now asks the SAME question of the batch: when every
-   *  selected node resolves to the SAME key, that key lights — exactly the
-   *  single-node contract. A mixed batch resolves to `null` (all off), which is
-   *  honest: no ring may claim one colour for eleven nodes that disagree.
-   *
-   *  ROUND AO, AO-1a — SIX COLUMNS, NOT THREE. AG2 shipped `swatch3` and the
-   *  three columns made every colour cell 80 x 26: a slab ("các ô nên nhỏ lại
-   *  cho đẹp"). Six columns is `(253 - 5x7) / 6 = 36.3px` against the same 26px
-   *  height, near-square and still a >= 36px tap target. One modifier, so all
-   *  seven call sites moved at once — deliberately: two cell sizes in one panel
-   *  would read as a mistake. The FULL reasoning lives beside the rule.
-   *
-   *  ROUND AO, AO-1c — THE THIRD PARAMETER IS NOW REAL, AND IT IS ONE OBJECT.
-   *  `custom` used to be `custom?: string`, a hook no call site ever passed; it
-   *  was the leftover of a custom-colour row that was never built. It is now
-   *  `custom?: {value, onPick}` — the picked literal (so the cell can paint it
-   *  and read as "on") plus the writer. ONE object rather than two positional
-   *  parameters because the pair is only ever meaningful together: a `value`
-   *  with no `onPick` would be a cell that paints a colour and cannot set one.
-   *
-   *  WHY THE SIGNATURE STAYS `swatchRow(current, onPick)`-COMPATIBLE. The
-   *  parameter is OPTIONAL AND LAST, so the six call sites that do not offer a
-   *  literal — Text `text color`, edge `text color`, edge `background color`,
-   *  the bulk multi-select row, and the two that predate it — keep the exact
-   *  call they had. Only the three rows where a literal is already legal (node
-   *  Style `color`, edge `stroke color`, table `color`) pass it.
-   *
-   *  THE CUSTOM CELL IS A 12TH CELL, AFTER THE ELEVEN KEYS, and only when the
-   *  caller opts in: 12 cells is a clean 6 x 2 in the six-column grid. It is
-   *  `aria-label`led "Custom color" because its content is an input with no
-   *  other name, and it carries `.on` when NO key is lit AND a literal is
-   *  stored — i.e. when the custom colour is the one in force. */
-  const swatchRow = (
-    current: ColorKey | null,
-    onPick: (k: ColorKey) => void,
-    custom?: {value?: string; onPick: (hex: string) => void},
-  ) => (
-    <div className="swatches swatch6">
-      {COLOR_KEYS.map(k => (
-        <div
-          key={k}
-          className={`swatch${current === k ? ' on' : ''}`}
-          style={{background: COLOR_VAR[k]}}
-          data-color-key={k}
-          title={k}
-          onClick={() => onPick(k)}
-        />
-      ))}
-      {custom && (
-        <div
-          className={`swatch-custom${!current && custom.value ? ' on' : ''}`}
-          data-custom="1"
-          /* the picked literal paints the cell; with none stored the class's own
-             gradient stands, so an untouched row is byte-identical to one that
-             never had this cell's colour set. */
-          style={custom.value ? {background: custom.value} : undefined}
-          title={custom.value ?? 'Custom color'}
-        >
-          <input
-            type="color"
-            aria-label="Custom color"
-            /* the input must SHOW the stored literal or the OS picker opens on
-               its own default; `#000000` is the fallback most engines use when no
-               value is given, so it is named rather than left implicit. */
-            value={custom.value ?? '#000000'}
-            onChange={e => custom.onPick(e.target.value)}
-          />
-        </div>
-      )}
-    </div>
-  );
 
   /** PACKAGE-P §E.2 — THE TEXT SECTION'S READER AND WRITER, and the reason they
    *  are a READER and a WRITER rather than one object.
@@ -3656,14 +3465,15 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     </>
   );
 
-  // ---- M3/S2d: the inspector is DOCKED, exactly like the palette ----
-  // C4's selection-driven auto-hide is GONE, along with the `pinned` override it
-  // needed: a panel is hidden when — and only when — the user collapsed it by
-  // hand. Both sides therefore use the identical one-line rule, so selecting or
-  // deselecting a node cannot move either panel, and the inspector no longer
-  // vanishes (or half-draws) just because the canvas has no selection.
-  const leftHidden = isPanelHidden(panelState, 'left');
-  const rightHidden = isPanelHidden(panelState, 'right');
+  // ---- M3/S2d: the inspector is DOCKED, like the palette — C4's selection auto-hide is GONE with the
+  // `pinned` override it needed: a panel is hidden only when the user collapsed it by hand, so a
+  // selection change cannot move either panel and the inspector no longer vanishes (or half-draws) just
+  // because the canvas has none. VIEW-MODE CHROME — in review a panel is hidden unless the viewer
+  // transiently revealed it (never persisted); in edit mode it is the persisted collapse, and everything
+  // below (hiddenRef, the `.app` classes, the chevrons) reads this, so the chrome describes what the eye
+  // sees. CODE-RAIL-WIDTH adds ONE more TRANSIENT layer to the inspector only (an open rail borrows its space — railPanel.ts, never persisted), so closing the rail restores the chosen layout.
+  const leftHidden = panelHiddenFor(readOnly, reviewReveal, panelState, 'left');
+  const rightHidden = railPanel.rightHidden(readOnly, reviewReveal, panelState);
 
   // ---- M3/S2c: the shortcut reads THIS, not the raw `collapsed` flags -----
   // The keydown effect is registered once; if it closed over `leftHidden` /
@@ -3748,7 +3558,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
    *  the one showing it. One predicate keeps a shortcut from focusing a field
    *  that is not on screen. */
   const isPanelVisible = (side: 'left' | 'right') =>
-    overlayMode !== null ? overlayRef.current === side : !isPanelHidden(panelState, side);
+    overlayMode !== null ? overlayRef.current === side : !(side === 'left' ? leftHidden : rightHidden);
 
   const panelToggle = (side: 'left' | 'right') => {
     const hidden = side === 'left' ? leftHidden : rightHidden;
@@ -3795,7 +3605,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         aria-keyshortcuts={isOverlay ? undefined : ariaChord}
         onClick={() => {
           if (isOverlay) { openOverlay(side); return; }
-          togglePanel(side);
+          // VIEW-MODE CHROME — review: transient reveal; edit: persisted writer.
+          // CODE-RAIL-WIDTH — with the rail open the inspector's visibility is ITS transient layer (never a `diagram-studio:panels` write), so the persisted layout survives the rail closing.
+          if (readOnly) revealPanel(side); else if (side === 'right' && railPanel.active) railPanel.toggle(); else togglePanel(side);
         }}
       >
         <Icon size={14} />
@@ -3946,9 +3758,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 never render inside the head. The inline style carries the
                 anchor computed in `boardsPopClamp` (left = button right + 6,
                 top = button top, max-width = viewport − anchor − 8). */}
-            {/* GOBI-S1 — the popover JSX moved to src/components/BoardsPopover.tsx
-                (the extraction that paid for this round's App lines; harness
-                boards-popover-pinned reads App + useBoardsMenu + the component). */}
+            {/* GOBI-S1 — the popover JSX lives in src/components/BoardsPopover.tsx. */}
             <BoardsPopover
               open={boardsOpen}
               pos={boardsPopPos}
@@ -3957,15 +3767,15 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               storageEstimate={storageEstimate}
               boardList={boardList}
               curBoard={curBoard}
-              fmtDate={fmtDate}
               onOpenBoard={id => void openBoard(id)}
               onClose={() => setBoardsOpen(false)}
               onNewBoard={() => { setBoardsOpen(false); newBoard(); }}
               onTemplates={() => { setBoardsOpen(false); openTemplates(); }}
               onRename={() => { setBoardsOpen(false); renameBoard(); }}
+              onHistory={openHistory}
               onDuplicate={() => { setBoardsOpen(false); void doDuplicateBoard(); }}
               onDelete={() => { setBoardsOpen(false); deleteBoard(); }}
-              onSaveNow={() => { setBoardsOpen(false); void flushSave(); }}
+              onSaveNow={() => { setBoardsOpen(false); saveNow(); }}
             />
           </div>
           <div className={`save-ind${saveState === 'saving' ? ' busy' : ''}${saveState === 'error' ? ' err' : ''}`} aria-live="polite">
@@ -4209,8 +4019,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 type="button"
                 className={`cust-drop${shapes.length ? ' cust-drop-compact' : ''}`}
                 data-custom-dropzone="true"
-                aria-label="Drop an SVG here, or click to choose a file"
-                title="Drop an SVG here, or click to choose a file"
+                aria-label={CUST_DROP_HINT}
+                title={CUST_DROP_HINT}
                 onClick={openShapeImport}
                 {...shapeZoneProps}
               >
@@ -4301,7 +4111,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
 
       {/* CENTER — canvas */}
       <main
-          className="canvas-wrap"
+          className="canvas-wrap" data-style={tableStyle} data-density={tableDensity} data-locked={canvasLock || undefined}
           ref={wrap}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}>
@@ -4321,8 +4131,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         <Toolbar
           canUndo={canUndo}
           canRedo={canRedo}
-          onUndo={undo}
-          onRedo={redo}
+          lock={canvasLock}
+          onUndo={() => { if (canvasLock) return; undo(); }}
+          onRedo={() => { if (canvasLock) return; redo(); }}
           onFitView={() => rf?.fitView({padding: 0.25})}
           readOnly={readOnly}
           onToggleReadOnly={toggleReadOnly}
@@ -4343,6 +4154,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           shareBtnRef={shareBtnRef}
           settingsOpen={settingsOpen}
           onOpenSettings={setSettingsOpen}
+          codeOpen={codeOpen}
+          onToggleCode={toggleCode}
           settingsBtnRef={settingsBtnRef}
           selCount={selCount}
           onAlign={align}
@@ -4356,7 +4169,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         {/* H2: getting-started checklist; its state and auto-hide live in Checklist.tsx. */}
         <Checklist done={checklistDone} dismissed={checklistDismissed} onDismiss={dismissChecklist} />
 
-        {/* ONBOARD-P5 — the one-line tip; with tips OFF `tip` stays null and nothing renders. */}
+        {/* ONBOARD-P5 — the one-line tip; a tip shows once EVER and at most one
+            per session (the gates live in src/ui/tips.ts), so `tip` is usually
+            null and nothing renders. */}
         {tip && <TipToast line={tip.line} onDismiss={dismissTip} />}
 
         {/* F2: context menu (node / edge / pane right-click) */}
@@ -4365,6 +4180,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             target={ctx}
             onAction={a => ctxAction(a, ctx)}
             onClose={() => setCtx(null)}
+            menu={ctx?.kind === 'node' ? menuState : undefined}
           />
         )}
 
@@ -4401,6 +4217,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           tgOpen={tgOpen}
           onCloseGallery={closeGallery}
           onUseTemplate={useTemplate}
+          historyOpen={historyOpen}
+          onCloseHistory={closeHistory}
+          historyBoard={curBoard}
+          onRestored={applyBoard}
           settingsOpen={settingsOpen}
           onCloseSettings={() => setSettingsOpen(false)}
           settingsProps={{
@@ -4429,14 +4249,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             onZOrder: setZOrderMode,
             layoutDir,
             onLayoutDir: setLayoutDir,
+            tableStyle, tableDensity, onTableStyle: setBoardStyle, hasBoard: !!curBoard,
             pngScale,
             onPngScale,
             pngPad,
             onPngPad,
             autosave,
             onAutosave,
-            tips: tipsPref,
-            onTips: changeTips,
             returnFocusTo: settingsBtnRef,
             boardPng: nodes.length ? boardPngForFeedback : null,
             onOpenFeedback: openFeedback,
@@ -4481,23 +4300,16 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           // Q: gated exactly like the three element-touching props below, so
           // review mode has ONE source of truth for "nothing on the canvas can
           // be changed": the update anchors render whenever this prop is truthy
-          // and are NOT read-only aware, so without the gate a review-mode user
-          // could still rip a wire off a node (and `onReconnect` would push an
-          // undo entry for a change the mode promises is impossible). With the
-          // prop false RF renders no `EdgeUpdateAnchors` at all — the gesture
-          // is absent, not merely inert. It is the ONLY reconnect path: grep
-          // `reconnect` in src/ returns this line, `onReconnect` above and its
-          // `reconnectEdge` call, nothing else (`reconnectRadius` is inert).
-          edgesReconnectable={!readOnly}
+          // and are NOT read-only aware, so without the gate a locked user
+          // could still rip a wire off a node. Prop false = RF renders no
+          // `EdgeUpdateAnchors` at all — the gesture is absent, not inert.
+          edgesReconnectable={!canvasLock}
           reconnectRadius={RECONNECT_RADIUS}
-          // B2: every connection point is usable in BOTH directions. Each node
-          // carries a source AND a target handle at each of its 8 points (see
-          // NodeHandles in DiagramNode.tsx), and Loose is what lets a drag also
-          // run source→source or target→target on one point. Under the default
-          // Strict mode a drag must leave a source and land on a target, so a
-          // corner could only ever work one way round.
+          // B2: every connection point is usable in BOTH directions — Loose
+          // lets a drag run source→source or target→target on one point;
+          // Strict would make each corner work only one way round.
           connectionMode={ConnectionMode.Loose}
-          nodeTypes={nodeTypes}
+          nodeTypes={nodeTypes} onNodeClick={onLogicalClick} onNodeDoubleClick={readOnly ? undefined : onLogicalDblClick} /* GROUP-LOGICAL grammar (t_eb8fab7e); UNISURF-S6 pendKey rides onLogicalClick; GROUP-BOUNDARY-INSIDE: view mode cannot enter */
           edgeTypes={edgeTypes}
           onInit={setRf}
           // L1: React Flow's colorMode themes its own ~24 --xy-* vars. It writes
@@ -4509,33 +4321,36 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             'ds-flow-wrap',
             snap ? 'snap-on' : '',
             animate ? '' : NO_ANIM,
-            // K — DEFECT 3: the ONE hook the mode-specific CSS hangs off. It
-            // goes on the flow wrapper (the element the canvas actually lives
-            // in), NOT on `.app`, so a review-mode rule re-scopes against
-            // exactly the subtree it means. Same shape as NO_ANIM above.
-            readOnly ? READ_ONLY : '',
+            // K — DEFECT 3: the ONE hook the mode-specific CSS hangs off —
+            // the flow wrapper, not `.app`. Same shape as NO_ANIM above.
+            canvasLock ? READ_ONLY : '',
           ].filter(Boolean).join(' ')}
           // K — DEFECT 2 / 3: bind React Flow's node-wrapper class to the SAME
           // token the CSS and this file already use. In review mode that token
           // is what RF reads back (`event.target.closest('.nopan')` in its
           // pan-zoom filter) to refuse a pan whose gesture began on a node.
           // Outside review mode `undefined` hands the decision back to RF's own
-          // default ('nopan', which RF applies itself to every draggable node),
-          // so edit mode is byte-for-byte what it was and node drags are
-          // untouched. `panOnDrag` below is deliberately NOT part of this.
-          noPanClassName={readOnly ? NO_PAN : undefined}
+          // default, so edit mode is what it was and drags are untouched.
+          noPanClassName={canvasLock ? NO_PAN : undefined}
           onEdgeMouseEnter={onEdgeMouseEnter}
           onEdgeMouseLeave={onEdgeMouseLeave}
           onNodeMouseEnter={onNodeMouseEnter}
           onNodeMouseLeave={onNodeMouseLeave}
-          deleteKeyCode={readOnly ? null : ['Delete', 'Backspace']}
-          // ---- Part B: read-only review mode ---------------------------------
-          // Every element-touching gesture is switched off through React Flow's
-          // OWN props, so nothing is re-implemented. `panOnDrag` (below) is left
-          // alone — panning is the whole point of the mode.
-          nodesDraggable={!readOnly}
-          nodesConnectable={!readOnly}
-          elementsSelectable={!readOnly}
+          deleteKeyCode={canvasLock ? null : ['Delete', 'Backspace']}
+          /* Part B: every element-touching gesture off through RF's OWN props
+             (review mode AND UNISURF-S4 stale, via canvasLock). Pan stays on.
+             BADGE-ON-SELECT (t_e1ad9237): `elementsSelectable` now keyed on
+             codeStale ALONE — review mode allows SOLE selection so the desc
+             badge can reveal (Harvey reads descriptions in review too).
+             UNISURF-S4's own contract is kept by construction: the marquee
+             stays off (selectionOnDrag false below), the ctx menu returns on
+             readOnly, the per-node resizers are gated off the injected
+             `readOnly`/`__review` tokens (CHROME-ABOVE: the grip/badge live
+             in NodeChrome now, gated there), and onSelectionChange below
+             keeps the inspector/palette chrome blind to a review selection. */
+          nodesDraggable={!canvasLock}
+          nodesConnectable={!canvasLock}
+          elementsSelectable={!codeStale}
           /* CONFIG ROUND (2026-10-23) — the LIVE prop follows the Setting
              (Canvas → Layer display). 'manual' = paint order is the stored
              zIndex, WYSIWYG; 'basic' = the library's select-raises default. */
@@ -4548,6 +4363,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           onNodeContextMenu={(e, node) => {
             e.preventDefault();
             if (readOnly) return;
+            /* GROUP-OBJECT+LOCK v1 — right-click SELECTS its node (Miro/Figma convention): menu rows act on what was clicked. */
+            if (!node.selected) setNodes(ns => ns.map(n => ({...n, selected: n.id === node.id})));
             setCtx({kind: 'node', id: node.id, x: e.clientX, y: e.clientY});
           }}
           onEdgeContextMenu={(e, edge) => {
@@ -4587,9 +4404,22 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             setSearchPos(rf.screenToFlowPosition({x: e.clientX, y: e.clientY}));
           }}
           onSelectionChange={({nodes: s, edges: se}) => {
-            setSel(s[0]?.id ?? null);
-            setSelCount(s.length);
+            /* BADGE-ON-SELECT (t_e1ad9237): under the canvas lock a selection
+               still happens (review's desc door) but drives NO App chrome —
+               inspector target, favourites, multi-select panels and code rail
+               all read sel/selCount, so this ONE seam keeps them blind.
+               IGNORE, never CLEAR: a pre-lock selection keeps its inspector
+               open (UNISURF-COMMIT C5f — stale keeps it, writes refused);
+               entering review clears it itself (S10). The badge reads RF's own
+               `selected` prop. COUNT = the VISIBLE selection (LOCK-COUNT
+               t_b3079954): `s` carries the null-rendering logical-group binder,
+               never counted — see nodeLock.visibleSelected. */
+            if (!canvasLock) { const v = visibleSelected(s); setSel(v[0]?.id ?? null); setSelCount(v.length); }
             setSelEdgeId(se.length === 1 ? se[0].id : null);
+            /* HL-GATE (owner override 2026-11-20) — the option gates the
+               selection PAINT too (read-only keeps its free lighting); the
+               canvasLock guard above only blinds App chrome, not the painter. */
+            applySelection(s);
           }}
           fitView fitViewOptions={fitOpts}
           minZoom={0.2} maxZoom={2.5}
@@ -4636,8 +4466,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           // `[1, 2]`. A left-drag here can never select: selection needs
           // `elementsSelectable` to be true (see `elementsSelectable={!readOnly}`
           // above), so no box-select / node toolbar / resize handle can appear.
-          panOnDrag={readOnly ? true : [1, 2]}
-          selectionOnDrag={!readOnly}
+          panOnDrag={canvasLock ? true : [1, 2]}
+          selectionOnDrag={!canvasLock}
           // ROUND AA, ITEM 2(a)/(b) — THE MARQUEE MODE. React Flow's own default
           // is `SelectionMode.Full` (`@xyflow/system`: `enum SelectionMode {
           // Partial = 'partial', Full = 'full' }`), and `Pane` passes
@@ -4692,23 +4522,38 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
           {/* ROTATE-FIX: hands the store's updateNodeInternals up (the hook
               needs a provider ancestor; App is above <ReactFlow>). */}
           <RotateInternalsBridge onReady={u => { rotateInternals.current = u; }} />
-          {/* GROUP-ROTATE: the ONE shared rotate grip for a multi-selection,
-              above-centre of the selection union box (it must be a <ReactFlow>
-              child: it reads the store's live nodes/transform to place itself
-              in screen space). Sole selection keeps the per-node RotateGrip. */}
-          {!readOnly && selCount >= 2 && (
-            <GroupRotateGrip onGesture={onGroupRotateGesture} />
+          {/* DA-2: every open description panel (an ordered id set — a
+              <ReactFlow> child so it can read the store). PANEL-SOLID: the
+              theme prop re-derives the opaque paint/ink on a theme switch
+              (the memo'd coordinator's store does not hear theme changes). */}
+          <DescPanels theme={effectiveTheme} />
+          {/* CHROME-ABOVE (t_31a9bec9, 2026-11-13): the selected node's ⓘ
+              badge in ONE popover host in the browser's TOP LAYER — a stored
+              z-index can be any number, so paint order must not be arithmetic.
+              SEL-CHROME-UNIFY (t_e479c12d): the grip and lock moved to the
+              selection pill below. A <ReactFlow> child: reads the store. */}
+          <NodeChrome />
+          {/* READONLY-DOT (t_c1564804): the read-only rest cue — a 5px inert dot at a desc card's top-right, ONLY in read-only (Shift+2 and
+              the #b= share view ride this same `readOnly` state; `codeStale` keeps every affordance on screen
+              and refuses the write, it is not a viewer mode). A <ReactFlow> child: it reads the store's nodes/zoom;
+              never in edit mode (the badge is enough there). */}
+          <DescDotLayer on={readOnly} />
+          {/* SEL-CHROME-UNIFY (t_e479c12d, 2026-11-19): the ONE pill of every selection — 1 node and N,
+              [rotate][group|ungroup][lock] since PILL-ORDER (t_1270c161), centred on the frame's top edge, flipping inside near the top (SEL-CHROME-B
+              geometry). The group verb is the MENU-STATES swap (menuState — the same derivation the context menu reads);
+              a solo selection rotates through the per-node writer. Read-only gets no pill. */}
+          {!readOnly && selCount >= 1 && (
+            <GroupRotateGrip onGesture={onGroupRotateGesture} onSoloGesture={onRotateGesture}
+              onLockToggle={toggleLockSelection} onGroup={groupSelection} onUngroup={ungroupSelection} menu={menuState} />
           )}
-          {/* SELBOX: the app's rotation-aware multi-selection box — RF's own
-              rect unions UNROTATED internals (no override prop) and lags a
-              rotated group; ours unions rotatedExtent in RF's selection
-              vocabulary, RF's rect is paint-hidden (styles.css), paint-only. */}
-          {selCount >= 2 && (
-            <SelectionBox />
-          )}
-          {/* F3: helper lines. `HelperLinesView` portals itself into React
-              Flow's viewport (`ViewportPortal`), so it must stay a direct child
-              of <ReactFlow> — it does its own flow-coord placement there. */}
+          {/* SELBOX: the app's rotation-aware multi-selection box — RF's own rect unions UNROTATED internals (no override prop)
+              and lags a rotated group; ours unions rotatedExtent in RF's selection vocabulary; RF's rect is paint-hidden (styles.css), paint-only. */}
+          {/* GROUP-BOUNDARY-INSIDE (t_42fb2888): the quiet INSIDE boundary rides SelectionBox — already an RF store holder, so the instance closed set does not grow. */}
+          {(selCount >= 2 || (!!insideId && !readOnly)) && <SelectionBox ctxGroupId={insideId ?? undefined} />}
+          {/* GROUP-GAP-DRAG t_10563e73: the D1 amendment — while a logical block is selected, its painted frame is the object's own drag surface (below every member, above the pane). */}
+          {!readOnly && <GroupGapDrag threshold={ui.isTouchScreen ? COARSE_DRAG_THRESHOLD_PX : FINE_DRAG_THRESHOLD_PX} onGesture={onGapDragGesture} />}
+          {/* F3: helper lines. `HelperLinesView` portals itself into React Flow's viewport (`ViewportPortal`), so it must stay a direct
+              child of <ReactFlow> — it does its own flow-coord placement there. */}
           {(guides.vertical || guides.horizontal) && <HelperLinesView guides={guides} />}
           <Controls showInteractive={false} />
           <ZoomPill />
@@ -4719,6 +4564,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             nodeColor={n => resolveColor(n.data as any)}
           />
         </ReactFlow>
+        {/* UNISURF-S3 — the code pane shell: rail by default, the mirror
+            generated inside CodePane (lazy). S4: commit-on-input + stale. */}
+        <CodePane open={codeOpen} onToggle={toggleCode} name={curBoard?.name ?? 'board'} nodes={nodes} edges={edges}
+          stale={codeStale} onCommit={onCodeCommit} onTypingEnd={onCodeTypingEnd} pending={pendKey} onCaret={k => { setHlKey(k); setPendKey(null); }} />
+        {/* UNISURF-S4 — the canvas's own stale banner (spec §4.3). */}
+        <StaleBanner stale={codeStale} />
       </main>
 
       {/* RIGHT — inspector */}
@@ -5183,7 +5034,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
               <div className="field">
                 {(() => {
                   /* the batch's SHARED key, or null when the batch disagrees —
-                     see the ROUND BD note at `swatchRow` above */
+                     see the ROUND BD note in swatchRow.tsx (hoisted DA-3) */
                   const keys = nodes.filter(n => n.selected).map(n => resolveColorKey(n.data as any));
                   const shared = keys.length && keys.every(k => k === keys[0]) ? keys[0] : null;
                   return swatchRow(shared, k => {
@@ -5203,10 +5054,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
             </>
           ) : selected?.type === 'table' ? (
             <>
-              {/* ROUND Y, ITEM 3 — THE `table` BADGE IS GONE, same reason as the
-                  edge's: Table / Columns / Show mode is the ERD vocabulary and
-                  no other target renders it. The badge restated the target kind
-                  the sections already name, so it went with its 12px spacer. */}
               {(() => { secBody('table', <>
               <div className="field">
                 <label>name</label>
@@ -5228,13 +5075,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 {swatchRow(
                   resolveColorKey(selected.data as any),
                   k => update({colorKey: k, color: undefined} as any),
-                  /* ROUND AO, AO-1c — a table node takes a literal exactly like a
-                     goblin node does: same two keys, same inverse write. The label
-                     above still says "symbolic key" because the KEY is what follows
-                     a theme; the custom cell is the documented escape hatch from it. */
+                  /* ROUND AO, AO-1c — a table node takes a literal like a goblin
+                     does: same two keys, same inverse write (the KEY follows the theme). */
                   {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
                 )}
               </div>
+              {/* TABLE-SCALE — one table's own scale (the board's density stays as-is). */}
+              <ScaleRow value={(selected.data as any).scale} onChange={(v: number) => update({scale: v} as any)} />
               </>); return null; })()}
               {(() => { secBody('columns', <>
               {((((selected.data as any).columns ?? []) as TableColumn[])).map((c, i) => (
@@ -5310,20 +5157,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                 referenced column. Crow's feet show the cardinality.
               </div>
               {renderSections()}
+              {/* TABLE-STYLE-CONTEXT (t_e965f3a8) — the board's style rows
+                  follow the SELECTION: they render here, under the table's
+                  own fields; the empty body is the hint alone. */}
+              <BoardPanel board={curBoard} onStyle={s => setBoardStyle(s, tableDensity)} onDensity={d => setBoardStyle(tableStyle, d)} disabled={readOnly} />
             </>
           ) : !selected ? (
-            <div className="empty">
-              No selection.<br />Click a node to edit its fields, or click an edge (the arrow)
-              to edit its label, stroke and arrow heads.
-            </div>
+            <BoardPanel empty onStyle={s => setBoardStyle(s, tableDensity)} onDensity={d => setBoardStyle(tableStyle, d)} disabled={readOnly} />
           ) : selected.type === 'label' ? (
             <>
-              {/* ROUND Y, ITEM 3 — THE `label` BADGE IS GONE, and this is the one
-                  Harvey pointed at ("cái label ở top có cần ko?"). A label target
-                  holds exactly ONE section, `text`, so the badge read `label`
-                  directly above a header that reads `Text` — it told the user
-                  nothing they could not see, and it pushed the section down.
-                  Badge and spacer both deleted. */}
+              {/* ROUND Y, ITEM 3 — the `label` badge is gone (it restated the
+                  `Text` header directly below it); badge + spacer deleted. */}
               {/* PACKAGE-P §E.3(a) — THE PANEL'S SECOND TEXT WRITER IS GONE.
                   This branch used to register a 4-row <textarea> as its `text`
                   section, i.e. a SECOND writer for the same `text` the in-place
@@ -5353,10 +5197,9 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                   do for every other kind. Deleted with its 12px spacer.
 
                   THE C4 CHIP STAYS AND IS THE ONE SURVIVOR — it is not a kind
-                  label. `{C4[...].kicker}` states the node's C4 ROLE (`Person`,
-                  `Container`, `System`…) which NOTHING else in this panel or on
-                  the node's own card prints. The spacer became PART of that
-                  conditional, because with the shape badge gone the chip is now
+                  label. `{C4[...].kicker}` states the node's C4 ROLE, which
+                  NOTHING else prints. The spacer became PART of that
+                  conditional: with the shape badge gone the chip is now
                   the only reason the spacer has to exist. */}
               {preset.id === 'c4' && isC4Type((selected.data as any).c4Type) && (
                 <>
@@ -5377,12 +5220,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     />
                   </div>
                 )}
-                {/* ROUND AG2, ITEM 1 — ONE label is enough for a flowchart node,
-                    the way Mermaid and draw.io model it, so `sub` is gated on the
-                    same §A.2 field-predicate mechanism as the kicker, metric and
-                    icon (`src/inspector.ts` — the ONE place the rule lives). The
-                    predicate hides the FIELD only: a node that already carries a
-                    `sub` still paints it. */}
+                {/* ROUND AG2, ITEM 1 — ONE label is enough for a flowchart
+                    node (Mermaid/draw.io), so `sub` is gated on the §A.2
+                    field predicate; the predicate hides the FIELD only: a
+                    node that already carries a `sub` still paints it. */}
                 {(['title', 'sub'] as const).filter(f => f !== 'sub' || hasSub(inspTarget)).map(f => (
                   <div className="field" key={f}>
                     <label>{f}</label>
@@ -5411,6 +5252,8 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                   </div>
                 )}
               </>); return null; })()}
+              {/* DESC-1 — the Additional Description body, keyed by the node id so a new selection REMOUNTS with a fresh draft (no store-echo sync). DA-3: paint/onPaint wire the two panel-colour rows. */}
+              {(() => { secBody('definition', <DefinitionSection key={sel ?? 'd'} value={((selected.data as any).desc ?? '') as string} onCommit={commitDesc} paint={(selected.data as any).descPaint} onPaint={commitDescPaint} />); return null; })()}
               {/* PACKAGE-P §E.1/§A.3 — the Text section, BETWEEN Content and
                   Style (the order is `src/inspector.ts`'s, not this file's).
                   `tsBody` is the one body both targets register: a goblin here,
@@ -5432,19 +5275,17 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                   value={(((selected.data as any).rotation as number | undefined) ?? 0)}
                   onChange={v => update({rotation: v === 0 ? undefined : norm180(v)} as any)}
                 />
-                {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the two
-                    inner arcs (database / storeddata only). A key choice keeps
-                    this row's neighbour contract simple: clearing the shape back
-                    to a non-cylinder leaves the flag stored but unread. */}
+                {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the
+                    two inner arcs (database / storeddata only); a cleared
+                    shape leaves the flag stored but unread. */}
                 {(() => {
                   const sh = asShape((selected.data as any).shape);
                   if (sh !== 'database' && sh !== 'storeddata') return null;
                   const on = (selected.data as any).plainCylinder !== false;
                   return (
                     <div className="field">
-                      {/* HARVEY-CHOSEN LABEL — "Details" generalises: other shapes
-                          with optional inner lines (queue dividers, external dash)
-                          can reuse the same Full/Minimal vocabulary. */}
+                      {/* HARVEY-CHOSEN LABEL — "Details" generalises to other
+                          shapes with optional inner lines. */}
                       <label>details</label>
                       <ToggleRow
                         value={on ? 'plain' : 'disks'}
@@ -5458,25 +5299,14 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                     </div>
                   );
                 })()}
-                {/* §C READ LITERALLY. The two halves of the sentence are
-                    "the `body` toggle sits behind the Style section's trigger
-                    rather than occupying a full row" AND "One control folds, not
-                    a section". The second half forbids folding Style itself —
-                    which §A.3 already forbids (its collapsed-default is
-                    `false`) and §F.4 confirms by listing Style among the OPEN
-                    sections. So the fold is a SECOND-LEVEL disclosure INSIDE
-                    Style: a `▸ body: card` trigger row that reveals the 2-way
-                    toggle. Nothing is reordered; the shape picker, icon and
-                    colour stay exactly where they were. The row's readout is the
-                    CURRENT value, so the collapsed state still says what it
-                    controls. Session-scoped open state: §C names ONE new
-                    persisted key. */}
-                {/* ROUND AI, ITEM 2 — the row is GATED on `hasBody`, not deleted.
-                    A flowchart node has one centred label, so Harvey asked for
-                    the `card` capability to go from the sixteen flowchart
-                    shapes ("Với flowchart tôi nghĩ k cần dùng card!"). The gate
-                    is the predicate, so there is no second shape list and no new
-                    ad-hoc branch here; the DATA is untouched, so a flowchart node
+                {/* §C READ LITERALLY: the `body` toggle sits behind the Style
+                    section's trigger as a SECOND-LEVEL disclosure inside Style
+                    (never folding Style itself — §A.3/§F.4); the row's readout
+                    is the CURRENT value; session-scoped open state. */}
+                {/* ROUND AI, ITEM 2 — the row is GATED on `hasBody`, not
+                    deleted: flowchart shapes dropped the card capability
+                    ("Với flowchart tôi nghĩ k cần dùng card!"). The gate is the
+                    predicate; the DATA is untouched, so a flowchart node
                     already carrying `body: 'card'` keeps painting as a card. */}
                 {hasBody(inspTarget) && (
                 <div className="field">
@@ -5536,9 +5366,7 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
                   )}
                 </div>
                 {/* ROUND AD, ITEM 5(a) — the colour-key note: visible,
-                    dismissible (persisted key in src/colorKeyNote.ts),
-                    one line, no focus steal. History pruned 2026-10-26
-                    for the ROUND ROTATE App budget. */}
+                    dismissible (persisted key), one line, no focus steal. */}
                 {keyNoteShown && (
                   <div className="key-note" data-key-note="true">
                     <span className="key-note-text">{KEY_NOTE_TEXT}</span>

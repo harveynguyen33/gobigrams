@@ -82,8 +82,7 @@
       "fromHandle": "top",
       "toHandle": "bottom",
       "card": [
-        "0",
-        "1",
+        "0..1",
         "n"
       ],
       "dash": "solid"

@@ -6,3 +6,8 @@
  * the package name) so bundlers always inline it — an externalised bare
  * specifier would be unresolvable for plain-node consumers of a subpath. */
 export * from '../../packages/gobi/src/model/theme.ts';
+
+/* HEADROOM (t_a21adb78) — the ONE dark-preference media query. It was spelled
+ * twice (App's system listener + ThemePicker's probe); a browser string, so it
+ * stays app-side and does not belong in the pure core model. */
+export const DARK_MQ = '(prefers-color-scheme: dark)';

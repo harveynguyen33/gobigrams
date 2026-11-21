@@ -50,14 +50,14 @@ export const ROADMAP: RoadmapItem[] = [
   },
   {
     title: 'Public launch',
-    desc: 'License, public repository and a hosted build so anyone can open the editor in a browser. Feedback and issue reporting shipped; the hosting decision is the gate.',
+    desc: 'License, public repository and hosted build are all live \u2014 anyone can open the editor in a browser. What remains is the launch itself: putting it in front of people.',
     status: 'now',
     confidence: 'committed',
     area: 'site',
   },
   {
     title: 'Collaboration',
-    desc: 'Live cursors, presence and comments. Held back until the editor can be shared with more than one person at a time.',
+    desc: 'Live cursors, presence and comments. The share link shipped one-way, read-only sharing; this is the live, two-way version.',
     status: 'next',
     confidence: 'exploring',
     area: 'editor',
@@ -77,15 +77,15 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'editor',
   },
   {
-    title: 'Share a board by link',
-    desc: 'The whole board folded into a URL — no account, no server, open-and-see. The companion to self-hosted storage.',
+    title: 'Mermaid import returns',
+    desc: 'The From-Mermaid door is hidden, not gone. It comes back rebuilt to do what the dialog promised.',
     status: 'later',
     confidence: 'exploring',
     area: 'data',
   },
   {
-    title: 'Embed a board in a page',
-    desc: 'An iframe snippet from the share link, for blogs and docs.',
+    title: '"What\u2019s new" release notes',
+    desc: 'A short sheet for feature changes that reach existing users \u2014 deferred, not rejected; it earns its place once there are users coming back.',
     status: 'later',
     confidence: 'exploring',
     area: 'site',
@@ -119,6 +119,15 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
+  {label: 'round SEL-CHROME', what: 'One selection chrome \u2014 a floating pill carries rotate, group and lock, for one shape or a whole selection', when: '2026-11'},
+  {label: 'round GROUP', what: 'Bind shapes into one block \u2014 drag it, rotate it or grab its inner gap, every member moves together, one undo entry', when: '2026-11'},
+  {label: 'round UNISURF', what: 'The board as .gobi text beside the canvas \u2014 edit either side, both stay in sync', when: '2026-11'},
+  {label: 'round HIGHLIGHT', what: 'Hover a shape and its own connections light up while the rest dim \u2014 the eye finds the path', when: '2026-11'},
+  {label: 'round FIDELITY', what: 'Every note is the same note \u2014 palette, search, canvas and export paint one post-it silhouette', when: '2026-11'},
+  {label: 'round PASTE', what: 'Paste lands where the cursor points \u2014 the clipboard\u2019s centre anchored on the pointer', when: '2026-11'},
+  {label: 'round EMBED', what: 'A chrome-less build for blogs and docs \u2014 the same share link, sized to fit any iframe', when: '2026-11'},
+  {label: 'round SHARE', what: 'Share a board as one link \u2014 no account, no server, the link carries the whole board', when: '2026-11'},
+  {label: 'round TOOLBAR', what: 'One icon language on the toolbar \u2014 dialogs open on the right tab and close back to where you were', when: '2026-11'},
   {label: 'round ROTATE', what: 'Rotate shapes and groups \u2014 connection points follow the shape and exports match', when: '2026-10'},
   {label: 'round LAYOUT', what: 'Auto-layout direction control + wide-board wrapping + islands keep their offsets', when: '2026-10'},
   {label: 'round PWA', what: 'Install as an app — PWA manifest + offline shell', when: '2026-10'},
@@ -146,4 +155,4 @@ export const SHIPPED: ShippedEntry[] = [
  * NOT a warning, a badge or a banner, and it changes nothing else: deleting this
  * one element is the whole change if it is ever dropped.
  */
-export const ROADMAP_REVIEWED = '2026-10-24';
+export const ROADMAP_REVIEWED = '2026-11-19';

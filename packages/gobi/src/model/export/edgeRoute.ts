@@ -41,6 +41,9 @@ export type RoutedPath = {
    *  route's endpoints. */
   start: {x: number; y: number};
   end: {x: number; y: number};
+  /** ERD-CARDINALITY — a self-loop's label point. The start/end midpoint is
+   *  INSIDE the node box; a loop routes the label to a clear rail instead. */
+  label?: {x: number; y: number};
 };
 
 /** The edge fields the route reads (a structural subset of `ExportEdge`, so
@@ -112,4 +115,59 @@ export function edgeRoute(e: RouteEdge, src: RouteBox, tgt: RouteBox): RoutedPat
     [d] = getBezierPath(opts);
   }
   return {d, start, end};
+}
+
+/* ------------------------------------------------- ERD-CARDINALITY (self) */
+
+/** The side a handle id names, including the table node's compound ids
+ *  (`left_rel_c2`, `right_rel_c1`, `target_rel_0_c3`). A table renders no
+ *  generic side handles, so the adapter translates BEFORE this reads one. */
+export function sideOfHandle(h: string | null | undefined): Side4 | null {
+  if (['left', 'right', 'top', 'bottom'].includes(h!)) return h as Side4;
+  return h && h.startsWith('left_rel_') ? 'left' : h && h.startsWith('right_rel_') ? 'right' : null;
+}
+
+/** The marker kind an edge end declares (a CrowFoot word, or the RF arrow
+ *  sentinels). Shared by the scene builder and the emitted glyph picker. */
+export function markerKindOf(m: unknown): string | undefined {
+  const t = m && typeof m === 'object' ? (m as {type?: unknown}).type : undefined;
+  return typeof t === 'string' && t ? t : undefined;
+}
+
+const n2 = (v: number) => Math.round(v * 100) / 100;
+const LOOP_GAP = 36;
+
+/**
+ * A self-edge's route: a rectangular detour OUTSIDE the node box, never a
+ * line through it. `variant` 0/1 picks the two bow directions (up/down for a
+ * left/right anchor pair, right/left for a top/bottom pair), so two self-edges
+ * between the same node are two distinct visible loops. The label rides the
+ * outer rail, clear of the box, and is returned on `label` because the
+ * start/end midpoint would sit inside it.
+ */
+export function selfLoopRoute(
+  b: RouteBox, sh: string | null | undefined, th: string | null | undefined, variant = 0,
+): RoutedPath | null {
+  const ss = sideOfHandle(sh), ts = sideOfHandle(th);
+  if (!ss || !ts) return null;
+  const A = handleAnchor(b, ss), B = handleAnchor(b, ts);
+  const first = variant % 2 === 0;
+  const p: {x: number; y: number}[] = [A];
+  let label: {x: number; y: number};
+  if (ss === 'left' || ss === 'right') {
+    const xa = A.x + (ss === 'right' ? LOOP_GAP : -LOOP_GAP);
+    const xb = B.x + (ts === 'right' ? LOOP_GAP : ts === 'left' ? -LOOP_GAP : 0);
+    const railY = first ? b.y - LOOP_GAP : b.y + b.h + LOOP_GAP;
+    p.push({x: xa, y: A.y}, {x: xa, y: railY}, {x: xb, y: railY}, {x: xb, y: B.y});
+    label = {x: (xa + xb) / 2, y: railY};
+  } else {
+    const ya = A.y + (ss === 'bottom' ? LOOP_GAP : -LOOP_GAP);
+    const yb = B.y + (ts === 'bottom' ? LOOP_GAP : ts === 'top' ? -LOOP_GAP : 0);
+    const railX = first ? b.x + b.w + LOOP_GAP : b.x - LOOP_GAP;
+    p.push({x: A.x, y: ya}, {x: railX, y: ya}, {x: railX, y: yb}, {x: B.x, y: yb});
+    label = {x: railX, y: (ya + yb) / 2};
+  }
+  p.push(B);
+  const d = p.map((q, i) => `${i ? 'L' : 'M'} ${n2(q.x)},${n2(q.y)}`).join(' ');
+  return {d, start: A, end: B, label};
 }

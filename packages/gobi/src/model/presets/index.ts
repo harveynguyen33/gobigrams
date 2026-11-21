@@ -11,7 +11,7 @@ import {type ColorKey} from '../colors';
 import {type PaletteItem} from '../palette';
 import {type Shape, FLOWCHART_EXTRA_SHAPES} from '../nodes/shapes';
 import {
-  SEQUENCE_ENABLED, ERD_ENABLED, FLOWCHART_EDGES, ERD_EDGES,
+  SEQUENCE_ENABLED, FLOWCHART_EDGES, ERD_PRESET_EDGES,
   type PresetId, type DiagramPreset, type TemplateSpec,
 } from './basic';
 import {libraryFor, ARCHITECTURE_PRESET, C4_PRESET} from './architecture';
@@ -67,21 +67,19 @@ export const ERD_PRESET: DiagramPreset = {
   label: 'Data model',
   hint: 'tables · columns · relationships',
   palette: libraryFor('erd'),
-  edges: ERD_EDGES,
+  edges: ERD_PRESET_EDGES,
   layout: {engine: 'grid', direction: 'LR', spacing: {x: 150, y: 90}, cols: 3},
   theme: {suggested: 'dark', canvas: 'plain', showLegend: true},
   guidance: {tip: 'Every table needs a primary key; draw the relationship from the FK column to the column it references.'},
   caps: {subflow: false, cyclePrevention: false, oneInput: false, resizable: true},
-  /* ERD_ENABLED (2026-10-24, HARVEY: template not needed yet) — the EXACT
-     C4_ENABLED pattern (see C4_PRESET's spread): the templates ARE the ERD
-     create offer, so the flag gates them. `templates: undefined` drops the
-     whole "Data model" family from `templateCatalog()` (a preset with no
-     templates contributes no family), hence from the gallery and the board
-     dialog; with no template a fresh ERD board is unreachable from every
-     create path. The erdTemplate spec stays in the tree and the `erd` key
-     stays in PRESETS — a STORED erd board still opens, renders and saves as
-     ERD. Flip ERD_ENABLED to true to put the family back. */
-  ...(ERD_ENABLED ? {templates: [erdTemplate]} : {}),
+  /* UNISURF-S13 (2026-11-09) — the `erd` family is ALWAYS offered. The template
+     used to sit behind the same flag that hid the entities palette rows and the
+     crow's-foot edge defaults; that flag gated three unrelated things to fix one
+     (new edges inheriting crow from the board preset). The template IS the `erd`
+     create offer — `templateCatalog()` builds the "Data model" family from this
+     array — so with it always present a fresh ERD board is reachable from every
+     create path, and the `erd` key stays a normal preset a stored board opens as. */
+  templates: [erdTemplate],
   showMode: 'ALL_FIELDS',
   note: 'FK edges attach column-to-column. Crow’s feet show cardinality: ring = zero, bar = one, foot = many.',
   legend: [

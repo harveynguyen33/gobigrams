@@ -61,6 +61,13 @@ export type NodeKind = {
   /** AQ15 — auto-grow: called once fonts/measure settle if the body clips;
       App grows the node's height (the same write a manual resize performs). */
   __onGrow?: (id: string, height: number, width?: number) => void;
+  /** DESC-1 (SPEC-NODE-DESCRIPTION, 2026-11-11) — the shape's PARAGRAPH, shown
+   *  on demand (inspector authoring; the D2 badge/panel). OPTIONAL: absent =
+   *  no description, a board from before the field renders byte-identically.
+   *  First-class, not a `meta` bag (the spec's §research-1); the short line
+   *  stays `sub`. NEVER painted on the canvas, and `.gobi` cannot speak it —
+   *  mergeGobi carries it across a text edit like `rotation`/`scale`. */
+  desc?: string;
 };
 
 /** Free-text annotation node data. No handles, no chrome. */
@@ -91,6 +98,8 @@ export type TableColumn = {
   type: string;
   pk?: boolean;
   fk?: boolean;
+  /** UNISURF-S7 — the FK target node id (the pane's ref:<id> token). */
+  ref?: string;
   notNull?: boolean;
   unique?: boolean;
 };
@@ -121,6 +130,20 @@ export type TableKind = {
   __rotateSel?: boolean;
   /** injected by App: called when a column is clicked (inspector focus) */
   __onPickColumn?: (id: string, col: TableColumn) => void;
+  /** UNISURF-S5 — App-injected: writes the FULL column array; `push` = ONE
+   *  history entry per gesture (structural, or a session's first keystroke). */
+  __onColumns?: (id: string, columns: TableColumn[], push?: boolean) => void;
+  /** UNISURF-S7 — App-injected: the ONE FK writer; the column-handle drag and
+   *  the .sp-* picker both land here (fk flag + ref target + the crow's-foot
+   *  edge, one history entry). */
+  __onFk?: (id: string, colId: string, targetId: string) => void;
+  /** UNISURF-S5 — render-only lock (readOnly || stale) for the row controls. */
+  __lock?: boolean;
+  /** TABLE-SCALE (t_cdd8e4f6) — this ONE table's scale on top of the board's
+   *  density: 1 = the density as-is, 0.75 - 1.5 in 0.05 steps. ABSENT reads 1,
+   *  exactly like a board authored before BOARD-STYLE (nothing migrates), and
+   *  the `.gobi` text language has no token for it (the document carries it). */
+  scale?: number;
 };
 
 /** Crow's-foot cardinality end (L3c). */
