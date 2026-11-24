@@ -56,9 +56,9 @@ export type Tip = {
 export const TIPS: Tip[] = [
   {id: 'edge', site: 'src/hooks/useConnections.ts',
     line: 'Labels sit on the line — select the edge and type in the Inspector.'},
-  {id: 'group', site: 'src/app/App.tsx',
+  {id: 'group', site: 'src/canvas/paletteInsert.ts',
     line: 'Drag a node into the boundary to make it a child of the group.'},
-  {id: 'table', site: 'src/app/App.tsx',
+  {id: 'table', site: 'src/canvas/paletteInsert.ts',
     line: 'Type in a cell to add a column; mark keys as pk or fk.'},
   {id: 'export', site: 'src/app/App.tsx',
     line: 'SVG keeps text selectable — outline only when a viewer lacks the fonts.'},

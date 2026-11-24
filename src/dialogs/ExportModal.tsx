@@ -44,6 +44,8 @@ type Props = {
   printPdf: (o: {nodes: Node[]; edges: Edge[]; theme: string; outline?: boolean}) => Promise<void>;
   /** AQ21-G — Import gets its own tab; JSON file picking stays in App (fileRef). */
   onImportJson: () => void;
+  /* F9 AUDIT-CLEANUP — the import door's refusal message (App owns the verdict). */
+  importFileMsg: string | null;
   onExported: () => void;  // ONBOARD-P7 — an export COMPLETED: App ticks the checklist's export task
 };
 
@@ -92,7 +94,7 @@ const storedTab = (): 'export' | 'import' | null => {
   } catch { return null; } /* private mode / SSR */
 };
 
-export default function ExportModal({open, onClose, returnFocusTo, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson, onExported}: Props) {
+export default function ExportModal({open, onClose, returnFocusTo, nodes, edges, liveTheme, boardName, selCount, buildSvg, buildPng, printPdf, onImportJson, importFileMsg, onExported}: Props) {
   const [tab, setTab] = useState<'export' | 'import'>('export');
   const [scope, setScope] = useState<ExportScope>('full');
   const [format, setFormat] = useState<ExportFormat>('svg');
@@ -358,8 +360,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
                   of this file says why and what flipping it restores. */}
               {MERMAID_IMPORT_ENABLED && (<>
               <div className="em-label">From Mermaid text</div>
-              <textarea
-                className="em-ta"
+              <textarea className="em-ta"
                 placeholder={'flowchart TD\n  A[Service] -->|reads| B[(Database)]'}
                 value={importText}
                 onChange={ev => setImportText(ev.target.value)}
@@ -378,8 +379,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
                   row: one line per compile error, line:col first, and NOTHING
                   reached the canvas. */}
               <div className="em-label">From .gobi text</div>
-              <textarea
-                className="em-ta"
+              <textarea className="em-ta"
                 placeholder={'board "Kafka rebalance storm"\ndirection LR\nbroker = service "Broker" icon:server color:amber\nbroker -> orders "append" flow:dots'}
                 value={gobiText}
                 onChange={ev => setGobiText(ev.target.value)}
@@ -404,7 +404,7 @@ export default function ExportModal({open, onClose, returnFocusTo, nodes, edges,
               <button className="em-go secondary" onClick={onImportJson}>
                 Import board JSON…
               </button>
-              <div className="em-note">Replaces the current board's content with a saved .json board.</div>
+              <div className="em-note">{importFileMsg ?? "Replaces the current board's content with a saved .json board."}</div>
             </div>
           )}
 

@@ -22,7 +22,7 @@ import {
   // point (`drawnMid`). The renderer's route is our own path on a stored // waypoint and the generator otherwise (`needsCustom`).
   // ROUND U — `bendAxisFor`/`dragPoint` are the ONE decision point shared with // `GoblinEdge`: on `bezier`/`straight` the axis is `'free'`, both coordinates
   // are written, and no axis is projected.
-  applyDrag, bendAxisFor, dragPoint, plainMidpoint, BEND_SNAP_PX, type BendPhase, type Pt,
+  type Pt,
 } from '../canvas/edgeBend';
 /* ROUND AK, PASS 2 — the label's own rules. `reverseEdgePatch` is AK-15's
    mirror; `labelBgOf` is AK-12's tolerant reader (an unknown value resolves to
@@ -30,13 +30,21 @@ import {
    AK-10's drag writer carries. (`labelWrite` itself is applied by `GoblinEdge`,
    the only side holding the resolved path, the anchor and the measured label
    box — see `useEdgeGesture`'s sibling note.) */
-import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch, type LabelWrite} from '../canvas/edgeLabel';
+import {LABEL_BG_VALUES, labelBgOf, reverseEdgePatch} from '../canvas/edgeLabel';
+/* APP-SPLIT t_b2cad7a8 (S5): idFactory (idc counter + HMR-safe nextId) +
+   paletteInsert (insert policy) moved verbatim — disjoint read sets, two modules. */
+import {bumpIdc, idc, makeNextId, setIdc} from '../canvas/idFactory';
+import {makeAddNodeByLabel, insertFromSearchImpl} from '../canvas/paletteInsert';
+import {ZoomPill, sep} from '../panels/ZoomPill';
+// APP-SPLIT t_502be2a0 (S2): the pure option tables now live in src/canvas/inspectorOptions.tsx, moved verbatim.
+import {CROW_FOOT, FLOW_ICON_OPTS, FLOW_OPTS, FONT_OPTS, MARKER_ICON_OPTS_START, MARKER_OPTS, SECTION_TITLES, SIZE_OPTS, VALIGN_OPTS, WEIGHT_OPTS, WIDTH_OPTS} from '../canvas/inspectorOptions';
+import {buildEdgeLabelTextBody, buildTsBody} from '../canvas/inspectorSections';
 
 import DiagramNode, {type NodeKind} from '../nodes/DiagramNode';
 import LabelNode, {type LabelKind} from '../nodes/LabelNode';
 import {newResizeGuard, recordResizeGesture, tableGripChanges} from '../board/resizeHistory';
+import {readImportedFile} from '../board/importLimits';
 import {useRotation, norm180} from '../hooks/useRotation';
-import {ROTATE_SNAP_DEG} from '../layout/layoutConstants';
 import {GroupRotateGrip} from '../components/GroupRotateGrip';
 import {GroupGapDrag} from '../components/GroupGapDrag';
 import {NodeChrome} from '../components/NodeChrome';
@@ -48,13 +56,14 @@ import {SelectionBox} from '../components/SelectionBox';
 import {useShareView, shareViewPayload} from '../hooks/useShareView';
 import {ShareBanner} from '../components/ShareBanner';
 import BoardsPopover from '../components/BoardsPopover';
-import TableNode, {type TableColumn, type ShowMode} from '../nodes/TableNode';
+import TableNode, {type ShowMode} from '../nodes/TableNode';
 import {edgeTypes} from '../edges';
+import type {EdgeData} from '../edges';
 import IconPicker from '../ui/IconPicker';
 import SearchPalette from '../ui/SearchPalette';
 import Tooltip from '../ui/Tooltip';
 import {COLOR_KEYS, COLOR_VAR, isColorKey, type ColorKey, resolveColor, resolveColorKey} from '../theme/colors';
-import {SHAPES, asShape, ShapePreview, type Shape} from '../nodes/shapes';
+import {SHAPES, asShape, type Shape} from '../nodes/shapes';
 /* ROUND BJ (bundle split) — the EXPORT PIPELINE is now a lazy chunk. The
  * editing surface (canvas render) never needs the emitter at first paint: * exportSvg/exportScene/textOutline/textOutlineHb/exportPng/fontFiles/
  * printView are only reachable from user actions (Export modal build, * Copy PNG, print PDF). So App keeps only the TYPES statically (import
@@ -69,7 +78,7 @@ import {
   getInspectorSections, hasBody, hasIcon, hasKicker, hasMetric, hasSub, type InspectorTarget, type SectionId,
 } from '../canvas/inspector';
 import {
-  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow, ScaleRow,
+  IconPickerRow, ShapesPicker, Stepper, ToggleRow, Section, RotationRow,
   /* ROUND AM, AM-4/AM-5 — the flow speed's slider and its live rail, plus the
      two pure helpers the harness executes rather than restates. */
   FlowSpeed,
@@ -90,7 +99,7 @@ import {
   type TextVAlign,
 } from '../layout/textStyle';
 import {
-  getPreset, edgeColorPatch, edgeColorLiteralPatch, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
+  getPreset, edgeColorPatch, C4, isC4Type, LIBRARY, DEFAULT_PRESET_ID,
   type PresetId, type DiagramPreset,
 } from '../presets';
 import {type PaletteItem} from '../theme/palette';
@@ -107,6 +116,7 @@ import {useGapDragGesture} from '../hooks/useGapDrag';
 import {useLogicalGroup} from '../hooks/useLogicalGroup';
 import {useCanvasPrefs} from '../hooks/useCanvasPrefs';
 import {useClipboard} from '../hooks/useClipboard';
+import {useLibraryPanel} from '../hooks/useLibraryPanel';
 import {HelpSheet} from '../components/HelpSheet';
 import {RotateInternalsBridge} from '../components/RotateInternalsBridge';
 import {DescPanels} from '../components/DescPanels';
@@ -127,7 +137,7 @@ import TipToast from '../components/TipToast';
 /* ROUND BI, ITEM 3 — the feedback dialog mounts ONCE, at this level: the ?
    help sheet and Settings → About are two entry points into the same form
    (one open-state, one focus-restore target per opener). */
-import {computeHelperSnap, snapToParentRelative, type HelperGuides} from '../canvas/helperLines';
+import {type HelperGuides} from '../canvas/helperLines';
 import HelperLinesView from '../canvas/HelperLinesView';
 /* ROUND AM, AM-3 — the flow glyphs' ONE home. Imported HERE and in
    `GoblinEdge.tsx` (AL-6: the chip row and the travelling chip read the same
@@ -156,6 +166,10 @@ import {useMarqueeMode} from '../canvas/marqueeMode';
 import {useZOrderMode} from '../board/zOrderMode';
 import {useLayoutDir} from '../layout/layoutMode';
 import {useInspectorSections} from '../canvas/inspectorState';
+import {useInspectorSectionRegistry} from '../hooks/useInspectorSections';
+import ShapeInspector from '../panels/ShapeInspector';
+import TableInspector from '../panels/TableInspector';
+import LibraryBody from '../panels/LibraryBody';
 import {searchLibrary, groupByCategory} from '../theme/paletteSearch';
 import {
   useCategoryCollapse, CATEGORY_ORDER, CATEGORY_LABEL, defaultOpenCategory,
@@ -163,17 +177,15 @@ import {
 /** PACKAGE-N pass 3 — the USER library client (§6 favourites / §7 store). NOT
  *  the shape `LIBRARY` above: that one is the 34-element constant, this one is
  *  the user's own starred document on disk. */
-import {type FavouriteNode} from '../board/library';
 import * as library from '../board/library';
 /** PACKAGE-N pass 4b — the custom-shape NODE KIND (§8.1–§8.3). The shape
  *  pipeline lives in `./customShape`; this is only the canvas node + the
  *  library plumbing. `Shape` stays at 19 — `customshape` is a node type. */
 import CustomShapeNode from '../nodes/CustomShapeNode';
-import {parseCustomShapeEntry, newCustomShape, svgDataUri, SHAPE_MAX_INPUT_BYTES, type CustomShape} from '../nodes/customShape';
 /* ROUND BN, ITEM 2 — the module-level helpers now live in focused modules;
    moved verbatim, imports only. Size budgets: checks/file-size-gate.mjs. */
 import {
-  SHAPE_REJECT_MESSAGE, PATH_TYPES, isGoblinEdge, RECONNECT_RADIUS,
+  PATH_TYPES, isGoblinEdge, RECONNECT_RADIUS,
   type PathType,
 } from '../board/boardConstants';
 import {migrateEdge, migrateDoc} from '../board/boardMigrations';
@@ -181,82 +193,19 @@ import {useUndoHistory, type Snap} from '../hooks/useUndoHistory';
 import {usePersistence} from '../hooks/usePersistence';
 import {useConnections} from '../hooks/useConnections';
 import {useExportActions} from '../hooks/useExportActions';
+import {useKeyboardShortcuts} from '../hooks/useKeyboardShortcuts';
+import {useEdgeWriters} from '../hooks/useEdgeWriters';
 import {useCanvasTools} from '../hooks/useCanvasTools';
 import {useBoardsMenu} from '../hooks/useBoardsMenu';
 import {useChecklist} from '../hooks/useChecklist';
 import {
   edgeMarkerUrl, edgeStrokeKeyOf, hasCrow, isEditable, nodeW, nodeH,
-  edgeGeo, edgeDrawnMid, TableGlyph, dashArray, favouritePreview, markerFor,
+  dashArray, markerFor,
   edgeStroke, edgeStrokeKey, bootTheme,
   absPos,
 } from '../board/boardUtils';
 
 const nodeTypes = {goblin: DiagramNode, label: LabelNode, table: TableNode, customshape: CustomShapeNode};
-let idc = 100;
-
-/** Per-edge extras that are not part of React Flow's Edge type. */
-export type EdgeData = {
-  shape?: string;
-  offset?: 'center' | 'start' | 'end';
-  /** STEP 1 (2026-09-18): the fraction `getSmoothStepPath` calls `stepPosition`
-   *  (0..1), which slides the step's cross-bar along the split axis. READ-ONLY *  LEGACY as of ROUND T — the slider that wrote it is gone, so nothing here
-   *  writes the key any more; it is read only so a board saved while the slider
-   *  existed still renders exactly as it did. */
-  bend?: number;
-  /** ROUND S/T (2026-09-18): the ABSOLUTE 2-D waypoint the edge's midpoint was
-   *  dragged to — `bendX` from a horizontal gesture, `bendY` from a vertical one *  (see `edgeBend.dragAxis`). BOTH are read: a stored key routes the edge
-   *  through `freePath`, which is the only route that can use both coordinates.
-   *  Absent means "never dragged", and the edge stays on the generator. */
-  bendX?: number;
-  bendY?: number;
-  /** ROUND AK, AK-10 — the FREE 2-D label position, in RELATIVE flow px, added
-   *  to the anchor `GoblinEdge` derives. ABSENT (not `{0,0}`) is the default: a *  board that never moved its label carries no key, and `onLabelWrite` below
-   *  DELETES both keys when the label is centred, so "reset", "snapped back" and *  "never moved" are one stored state rather than three that merely render the
-   *  same. */
-  labelOffset?: {x: number; y: number};
-  /** ROUND AK, AK-10 — Sirius Web's `movedByUser`. While falsy the label
-   *  auto-centres; once true `labelOffset` wins. */
-  labelPinned?: boolean;
-  /** ROUND AM, AM-1 — THE POINT the stored `labelOffset` was measured against,
-   *  in flow coordinates. It is what makes a dragged label keep tracking the *  pointer while a NODE moves: when a write states a different anchor than the
-   *  one stored here, `onLabelWrite` first corrects the stored offset by the *  anchor's movement and then applies the write. ABSENT is the normal state —
-   *  a board written before this round, and a centred label, carry no key — and *  an absent anchor simply means "nothing to rebase against", so an existing
-   *  board renders byte-identically and the first drag adopts the live anchor as
-   *  its base. */
-  labelAnchor?: {x: number; y: number};
-  /** ROUND AK, AK-12 — the label plate: THREE STORED STATES, where `None` is a
-   *  genuine value rather than the absence of one. Rendered as a class on
-   *  `.edge-label` by the renderer; absent resolves to `surface` (today's look). */
-  labelBg?: 'none' | 'surface' | 'outline';
-  /** ROUND AM, AM-2 — the LABEL'S TEXT STYLE: the same `TextStyle` a node
-   *  stores on `data.textStyle`, under the edge's own key. ABSENT is the state *  every existing board is in — `edgeTextStyleVars` returns `{}`, no custom
-   *  property reaches the element and `.edge-label`'s own fallbacks paint the *  11px / 600 / `var(--mono)` it painted before this round.
-   * *  WHY A SEPARATE KEY AND NOT `textStyle`. `data.textStyle` on an edge would
-   *  read as the text of something that is not a node, and an edge is the only *  target where a stored `TextStyle` can carry fields the target cannot
-   *  express (align / vAlign / colorKey — see `edgeTextStyleVars`). The label's *  ink stays `labelTextKey` above, so this key never becomes a second writer
-   *  for the colour. */
-  labelStyle?: TextStyle;
-  /** ROUND AK, AK-13 — the double-click-on-the-path signal, threaded per-edge
-   *  exactly like `__edit`: a fresh timestamp AND the flow point the click *  landed on. A double-click on a line with no label has nothing to edit yet,
-   *  so the editor has to be opened by a signal (the element does not exist) and *  the commit has to know where the label was created.
-   * *  ROUND AN, AN-1 — IT IS A ONE-SHOT AND IT MUST NEVER SURVIVE ITS MOMENT.
-   *  It was written by `openLabelAt` and deleted NOWHERE, so it stayed on the *  edge forever: every later rename re-entered the renderer's create branch
-   *  and wrote the CENTRED state (the owner's "đổi text, enter thì nó tự nhiên *  về lại center"). Two halves fix it, and they are not alternatives —
-   *  `consumeEditAt` below ends the signal on both editor exits, and *  `migrateEdge` FOLDS A STORED ONE AWAY ON READ, because this key reached
-   *  the saved document before the fix existed (measured: 4 + 2 + 1 occurrences *  across three of the user's own boards), so without the read-time fold a
-   *  reload would put every label back in the create state. */
-  __editAt?: {at: Pt; t: number};
-  /** ROUND AK, AK-10 — the label drag's writer, threaded per-edge exactly like
-   *  `__onBend`. It carries the FINISHED write, not the pointer: only the *  renderer holds the resolved path and the anchor, so the write is computed
-   *  there (since ROUND AM's AM-1 by `anchorWrite` — a DELTA plus the anchor *  frame it was measured in) and this merges the result — rebasing the stored
-   *  offset when the frame moved. */
-  __onLabelWrite?: (id: string, w: LabelWrite, phase: BendPhase) => void;
-  /** PACKAGE-SEQ — the UML message kind this edge carries. Drives arrowhead +
-   *  dash at render (GoblinEdge) and the Mermaid arrow token at export.
-   *  Absent = a normal (non-sequence) edge. */
-  seqMsg?: 'sync' | 'async' | 'return' | 'self';
-};
-
 
 export default function App() {
   /* ITEM 2 — the canvas holds NOTHING while a board load is in flight: seeding
@@ -322,23 +271,7 @@ export default function App() {
   const edgesRef = useRef<Edge[]>(edges);
   edgesRef.current = edges;
 
-  /* DUP-ID (t_0be8c968, 2026-11-12) — `idc` above is MODULE-LEVEL: a Vite HMR
-     re-eval of this module rewinds it to 100 while React state keeps the
-     loaded board, and the next blind n-prefixed mint re-mints an id the board
-     already carries — measured live on "ERP Test" (n100/n101/n102 table+goblin,
-     React Flow silently rendered 11 of 14 nodes). NEVER mint blind: skip any k
-     whose n-/e-prefixed id is still live in the CURRENT state, so no counter
-     rewind (HMR today, any setter tomorrow) can write a duplicate. Column ids
-     (`c${idc++}`) are intra-node data with no render loss and stay raw. */
-  const nextId = () => {
-    for (;;) {
-      const k = idc++;
-      /* node and edge ids live in SEPARATE React Flow namespaces — each mint
-         only has to avoid ids of its own kind */
-      if (!nodesRef.current.some(n => n.id === `n${k}`)
-        && !edgesRef.current.some(e => e.id === `e${k}`)) return k;
-    }
-  };
+  const nextId = useMemo(() => makeNextId(nodesRef, edgesRef), [nodesRef, edgesRef]);
 
   // ---- Part B: read-only review mode ------------------------------------- // A view-only canvas: pan and zoom freely, touch nothing. Kept LOCAL to
   // App.tsx on purpose — it is one boolean, toggled from one toolbar button and // read by this same component's <ReactFlow> props and its one keydown
@@ -423,6 +356,9 @@ export default function App() {
   ] = useCanvasPrefs();
   const [expOpen, setExpOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  /* F9 — the import refusal message: lives in the modal's From-file note (not the toast); cleared on modal close. */
+  const [importFileMsg, setImportFileMsg] = useState<string | null>(null);
+  useEffect(() => { if (!expOpen) setImportFileMsg(null); }, [expOpen]);
   /* MODAL-DOORS: ONE writer sets BOTH booleans — two doors can never be open at once. */
   const openDoor = (d: 'export' | 'share') => { setExpOpen(d === 'export'); setShareOpen(d === 'share'); };
   // ---- D1: searchable insert palette (position = double-click point) ----
@@ -697,11 +633,11 @@ export default function App() {
        rewind (HMR module re-eval) can no longer mint a live id even mid-session. */
     for (const n of doc.nodes) {
       const m = /^n(\d+)$/.exec(n.id);
-      if (m) idc = Math.max(idc, Number(m[1]) + 1);
+      if (m) bumpIdc(Number(m[1]) + 1);
     }
     for (const e of doc.edges) {
       const m = /^e(\d+)$/.exec(e.id);
-      if (m) idc = Math.max(idc, Number(m[1]) + 1);
+      if (m) bumpIdc(Number(m[1]) + 1);
     }
     animateLayout(() => {
       skipAutosave.current = 2;
@@ -735,7 +671,8 @@ export default function App() {
     padding: fitPaddingFor(!readChecklistDismissed() && !isChecklistComplete(readChecklistDone()))}), []);
 
   /* ROUND BN-2 — the save/load cluster lives in usePersistence.ts; applyBoard
-     stays HERE (it owns the module-level idc bump and the undo reset). */
+     stays HERE (it drives the counter through idFactory.bumpIdc and owns the
+     undo reset). */
   /* GOBI-S1 — a fragment-owned boot (`#b=`) is a SHARE VIEW: the persistence
    * bootstrap must not load (or seed) the visitor's boards while it is on. */
   const shareActive = useRef(shareViewPayload() !== null);
@@ -978,7 +915,7 @@ export default function App() {
   }, [absPos]);
   /* ROUND BN-2 — the connection cluster now lives in useConnections.ts
      (moved verbatim; the three edge id-mint sites call the nextId callback
-     because App owns the module-level counter — and nextId skips live ids,
+     minted by src/canvas/idFactory.ts — and nextId skips live ids,
      DUP-ID t_0be8c968). pendingDrop, connectOrigin,
      readOnlyRef and shiftDown stay here and pass down positionally. */
   const [createsCycle, onReconnect, onConnectEnd, onConnect, onConnectRules, fkConnect] = useConnections(
@@ -986,117 +923,6 @@ export default function App() {
     readOnlyRef, pendingDrop, connectOrigin, shiftDown, absNodes, noCycles, oneIn,
     dblConnect, dblRange, preset, defaultPath, nextId, fireTip, setNodes, lockRef);
 
-  const onNodeDrag = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
-    const ns = nodesRef.current;
-    const dragged = ns.find(n => n.id === draggedNode.id);
-    if (!dragged) return;
-    const absMap = absNodes(ns);
-    const me = absMap.get(dragged.id);
-    if (!me) return;
-
-    // F3: helper lines — single-node drags (top-level AND group children).
-    // IMPORTANT: while dragging we ONLY show the guides, we never write the
-    // node position (writing it every frame fights React Flow's own drag and
-    // makes the node feel stuck/snapped). The snap is applied once, on drop.
-    if (alignGuides) {
-      const others = [...absMap.values()].filter(v => v.n.id !== dragged.id);
-      const {guides: g} = computeHelperSnap(
-        {x: me.x, y: me.y, w: me.w, h: me.h},
-        others.map(v => ({x: v.x, y: v.y, w: v.w, h: v.h})),
-      );
-      helperDrag.current = true;
-      setGuides(g);
-    }
-
-  }, [absNodes, setNodes, alignGuides]);
-
-  const onNodeDragStop = useCallback((_e: MouseEvent | TouchEvent, draggedNode: Node) => {
-    tickTask('move');
-    const ns = nodesRef.current;
-    const dragged = ns.find(n => n.id === draggedNode.id);
-    if (!dragged || dragged.type === 'label') return;
-    const absMap = absNodes(ns);
-    const me = absMap.get(dragged.id);
-    if (!me) return;
-
-    // F3: apply the final snap ONCE, on drop — the guides were display-only
-    // while dragging. SHAPE-FIDELITY: membership (F1 below) is decided from
-    // the SNAPPED position and there is ONE write per drop, so the reparent
-    // can never race the snap back through a stale nodesRef.
-    let snap: {x: number, y: number} | null = null;
-    if (helperDrag.current) {
-      helperDrag.current = false;
-      setGuides({vertical: null, horizontal: null});
-      const others = [...absMap.values()].filter(v => v.n.id !== dragged.id);
-      if (others.length) {
-        const {position} = computeHelperSnap(
-          {x: me.x, y: me.y, w: me.w, h: me.h},
-          others.map(v => ({x: v.x, y: v.y, w: v.w, h: v.h})),
-        );
-        if (Math.abs(position.x - me.x) > 0.5 || Math.abs(position.y - me.y) > 0.5) snap = position;
-      }
-    }
-    const abs = snap ?? {x: me.x, y: me.y};
-
-    // F1: reparent on drop — inside a group bounds → adopt; outside → release.
-    const groups = ns.filter(n => asShape((n.data as any)?.shape) === 'group' && n.id !== dragged.id);
-    // never adopt into one of my own (future) children
-    const hit = groups.find(g => {
-      const gp = absMap.get(g.id)!;
-      return abs.x >= gp.x && abs.y >= gp.y && abs.x + me.w <= gp.x + gp.w && abs.y + me.h <= gp.y + gp.h;
-    });
-
-    /* GROUP-LOGICAL (t_eb8fab7e): release-on-drop is a FRAME rule only — a logical-group member leaves its block ONLY by Cmd+Shift+G (the container carries the block's drag; an inside-mode solo drag keeps membership). */
-    const parentIsFrame = !!ns.some(n => n.id === dragged.parentId && asShape((n.data as any)?.shape) === 'group');
-    if (hit && dragged.parentId !== hit.id) {
-      const hp = absMap.get(hit.id)!;
-      /* AUDIT-12 — no second push: onNodeDragStartAll already snapshotted the
-         pre-gesture state, and the adoption is part of the SAME perceived
-         gesture ("move it into the group"). Two pushes made the gesture cost
-         two undos. The drag-start entry restores position AND membership. */
-      const pos = snapToParentRelative(
-        {x: abs.x - hp.x, y: abs.y - hp.y}, {x: 0, y: 0, w: hp.w, h: hp.h});
-      setNodes(ns2 => {
-        const cur = ns2.find(n => n.id === dragged.id);
-        if (!cur) return ns2;
-        const child: Node = {
-          ...cur,
-          parentId: hit.id,
-          extent: 'parent' as const,
-          position: pos,
-        };
-        // keep parent before children in the array
-        const without = ns2.filter(n => n.id !== dragged.id);
-        const parentIdx = without.findIndex(n => n.id === hit.id);
-        const out = [...without];
-        out.splice(parentIdx + 1, 0, child);
-        return out;
-      });
-      flash(`Added to group “${(hit.data as any)?.title ?? hit.id}”`);
-    } else if (parentIsFrame && !hit) {
-      // dragged out of its group — keep the absolute position, drop the parent
-      /* AUDIT-12 — same collapse: the drag-start entry covers this. */
-      setNodes(ns2 => {
-        const cur = ns2.find(n => n.id === dragged.id);
-        if (!cur) return ns2;
-        const out: Node = {...cur, parentId: undefined, extent: undefined, position: {x: Math.round(abs.x), y: Math.round(abs.y)}};
-        const without = ns2.filter(n => n.id !== dragged.id);
-        // place after the former parent so ordering stays valid for siblings
-        const pIdx = without.findIndex(n => n.id === dragged.parentId);
-        const at = pIdx < 0 ? without.length : pIdx + 1;
-        const arr = [...without];
-        arr.splice(at, 0, out);
-        return arr;
-      });
-      flash('Removed from group');
-    } else if (snap) {
-      // SHAPE-FIDELITY: children store parent-relative positions, clamped
-      // inside the parent so extent:'parent' cannot undo the snap.
-      const parent0 = dragged.parentId ? absMap.get(dragged.parentId) : null;
-      const pos = snapToParentRelative(abs, parent0 && {x: parent0.x, y: parent0.y, w: parent0.w, h: parent0.h});
-      setNodes(ns2 => ns2.map(n => n.id === dragged.id ? {...n, position: pos} : n));
-    }
-  }, [tickTask, absNodes, pushHistory, setNodes, setEdges, flash]);
 
   /** History push on every node drag start (position moves are undoable). */
   const onNodeDragStartAll = useCallback((_e: MouseEvent | TouchEvent, _node: Node) => {
@@ -1121,63 +947,27 @@ export default function App() {
   const selectedEdge = edges.find(e => e.id === selEdgeId) ?? null; useRailReveal(rf, codeOpen, selected, revealTick); /* RAIL-COVER: the rail's width comes out of the canvas, so pan the selected node back inside it (pan only, on open + once per resize gesture end) */
   const edgeMode = !!selectedEdge && selCount === 0;
 
-  const update = (patch: Partial<NodeKind> | Partial<LabelKind>) => {
+  const update = useCallback((patch: Partial<NodeKind> | Partial<LabelKind>) => {
     if (!sel) return;
     pushHistory(); if ('scale' in patch) setRevealTick(t => t + 1); /* RAIL-COVER-2 — an inspector scale write is a gesture end: same bounded pan */
     setNodes(ns => ns.map(n => n.id === sel ? {...n, data: {...n.data, ...patch}} : n));
-  };
+  }, [sel, pushHistory, setNodes]);
 
-  /** DESC-1 — the Additional Description commit: ONE history entry per BLUR (typing stays in DefinitionSection's draft), and an empty commit REMOVES the key — `update()`'s spread cannot drop one, so the write goes through the same setNodes+pushHistory lane via `descData`'s delete. */
-  const commitDesc = (v: string) => {
-    if (!sel) return;
-    const cur = ((nodes.find(n => n.id === sel)?.data as {desc?: string} | undefined)?.desc ?? '');
-    if (cur === v) return; /* a no-op blur pushes no history */
-    pushHistory();
-    setNodes(ns => ns.map(n => n.id === sel
-      ? {...n, data: descData({...n.data}, v) as NodeKind} : n));
-  };
-  const commitDescPaint = (patch: DescPaint) => { /* DA-3 — commitDesc's lane; descPaintData's delete rule clears keys */
-    if (!sel) return;
-    pushHistory();
-    setNodes(ns => ns.map(n => n.id === sel
-      ? {...n, data: descPaintData({...n.data}, patch) as NodeKind} : n));
-  };
 
   const bendDragging = useRef(false);
 
-  /** Patch the selected edge only. Top-level keys plus style / markerEnd / markerStart.
-   *
-   *  `coalesce` — ROUND AM, AM-5 RESTORED THIS OPTION. ROUND T deleted it with
-   *  the bend slider it existed for; the flow-speed slider introduces the same
-   *  gesture shape and needs the same rule, so the machinery comes back
-   *  IDENTICALLY rather than in a second form.
-   *
-   *  It marks a CONTINUOUS gesture — a range drag — as ONE undo step: history is
-   *  recorded on the first move of the gesture only, so a 100-event drag costs
-   *  ONE entry (holding the pre-drag value) rather than flooding the 50-entry
-   *  stack and destroying the user's older undo steps. `src/resizeHistory.ts`
-   *  records the same lesson for the resize grip ("pushing per frame would bury
-   *  the user's real history under hundreds of steps — a worse bug than the one
-   *  being fixed"). The gesture ENDS when the control that opened it clears the
-   *  latch — see the slider's `onPointerUp` / `onKeyUp` / `onBlur`. */
-  const updateEdge = useCallback((patch: Partial<Edge> & {data?: EdgeData}, replaceData = false, coalesce = false) => {
-    if (!selEdgeId) return;
-    if ('label' in patch) tickTask('label');
-    if (!coalesce || !bendDragging.current) pushHistory();
-    if (coalesce) bendDragging.current = true;
-    setEdges(es => es.map(e => {
-      if (e.id !== selEdgeId) return e;
-      const {style, markerEnd, markerStart, data, ...rest} = patch;
-      // markerEnd/markerStart: honour an explicit `none` (undefined) by REMOVING the key,
-      // so the arrow head actually disappears — check for key presence, not value.
-      const out = {...e, ...rest} as Edge;
-      if (style !== undefined) out.style = {...(e.style ?? {}), ...style};
-      if ('markerEnd' in patch) { if (markerEnd === undefined) delete out.markerEnd; else out.markerEnd = markerEnd; }
-      if ('markerStart' in patch) { if (markerStart === undefined) delete out.markerStart; else out.markerStart = markerStart; }
-      if (data !== undefined) out.data = replaceData ? data : {...((e.data ?? {}) as EdgeData), ...data};
-      return out as Edge;
-    }));
-  }, [selEdgeId, tickTask, pushHistory, setEdges]);
+  /* APP-SPLIT S8 (t_62266c20) — the edge-write path moved VERBATIM to
+     src/hooks/useEdgeWriters.ts: the 8 edge-writing callbacks plus their
+     gesture latches and the gobi:node-grow receiver (the undo contract and
+     the audit trail live in that module's header). bendDragging STAYS here —
+     the inspector's bend slider reads it — and goes in via ctx.
+     onNodeDragStartAll and setEdgeColor stay in App too (the gesture snapshot
+     + the theme-key writer that routes through updateEdge below). */
+  const {onNodeDrag, onNodeDragStop, updateEdge, setEdgeColorLiteral,
+    onCommitLabel, onGrow, onBend, onLabelWrite} = useEdgeWriters({
+    selEdgeId, setSelEdgeId, tickTask, pushHistory, setEdges, setNodes, flash,
+    edgesRef, nodesRef, bendDragging, helperDrag, setGuides, alignGuides,
+    absNodes});
 
   /** Set stroke colour everywhere it is baked in (path + both markers). */
   /** L1 — the edge colour is stored as a KEY, so the path stroke, both markers
@@ -1199,260 +989,6 @@ export default function App() {
     updateEdge(patch);
   }, [selEdgeId, updateEdge]);
 
-  /** ROUND AO, AO-1c — the custom picker's edge writer: store the literal, drop
-   *  the symbolic key, recolour the path and both markers with it. See
-   *  `edgeColorLiteralPatch` for why each key is written or cleared. */
-  const setEdgeColorLiteral = useCallback((hex: string) => {
-    const e = edgesRef.current.find(x => x.id === selEdgeId);
-    if (!e) return;
-    updateEdge(edgeColorLiteralPatch(hex, {markerEnd: e.markerEnd, markerStart: e.markerStart}));
-  }, [selEdgeId, updateEdge]);
-
-  const onCommitLabel = useCallback((id: string, label: string) => {
-    const cur = edgesRef.current.find(e => e.id === id);
-    if (!cur || ((cur.label ?? '') as string) === label) return;
-    tickTask('label');
-    pushHistory();
-    setEdges(es => es.map(e => (e.id === id ? {...e, label} : e)));
-    setSelEdgeId(id);
-  }, [tickTask, pushHistory, setEdges]);
-
-  /* AUDIT-10 — the history entry for a bend/label gesture moves from 'start'
-     to the FIRST 'move'. beginGesture fires 'start' on every pointerdown (even
-     a plain click, which moves nothing), so a stray click pushed an undo entry
-     that changed nothing and made the next Ctrl+Z feel dead. Now the entry is
-     pushed by the first reported move: a click still selects, a drag pushes
-     exactly one entry, same as before. The ref lives at component level (a hook
-     inside a callback is illegal). */
-  const bendGesturePushed = useRef(false);
-  /* AUDIT-11 — the axis the gesture LOCKED (set on first real move, cleared on
-     end). The 'end' report carries dx=dy=0, which bendAxisFor resolves to 'h'
-     unconditionally — a vertical drag then stored a spurious bendX. */
-  const bendGestureAxis = useRef<'h' | 'v' | 'free' | null>(null);
-  /** ROUND S/T — the midpoint drag, draw.io's mechanic.
-   *
-   *  `'start'` records ONE history entry and selects the edge, exactly like
-   *  `onNodeDragStart` / `onReconnect`: history belongs at the start of a
-   *  gesture, never per pointermove, or a 200-event drag would bury the user's
-   *  older undo steps.
-   *
-   *  `'move'` writes the waypoint the pointer is at. On `step`/`smoothstep` that
-   *  is PROJECTED onto the ONE axis the gesture owns — draw.io's rule, decided
-   *  from the POINTER DELTA (`dragAxis`), NOT from the geometry (that was the
-   *  ROUND S bug: the generator's split decided the axis, so on any edge with
-   *  more than 0.001px of stagger the axis was `h` and up/down did nothing).
-   *
-   *  ROUND U — the axis is decided by `bendAxisFor` and it has THREE values:
-   *  `'h'`/`'v'` on the orthogonal kinds as before, and `'free'` on
-   *  `bezier`/`straight`, where draw.io moves BOTH coordinates together and there
-   *  is no axis to project onto. `dragPoint` is that projection in one place: the
-   *  pointer on the owned axis + `edgeDrawnMid` on the other (`'h'`/`'v'`), or the
-   *  raw pointer on BOTH (`'free'`). The base point matters on the orthogonal
-   *  kinds because their route reads BOTH coordinates too — a horizontal drag
-   *  must not drift vertically.
-   *
-   *  `'end'` is the auto-remove: a waypoint released within `BEND_SNAP_PX` of the
-   *  generator's own default point deletes BOTH keys, so the edge goes back to
-   *  the generator's clean route instead of storing a point that bends nothing.
-   *  It is kind-agnostic on purpose — `plainMidpoint` is the endpoints' geometric
-   *  midpoint on every kind.
-   *
-   *  It deliberately does NOT route through `updateEdge`: that is keyed on
-   *  `selEdgeId`, so on the very first move (the one that selects the edge) it
-   *  would write to the WRONG edge. */
-      /* AQ15 — AUTO-GROW: a freshly created node whose text overflows the shape's
-     safe band grows once to fit. `height` is the FULL node height needed (the
-     renderer measured the clipped body against the wrapper). Only nodes WITHOUT
-     an explicit user height are grown — the wrapper style check in the renderer
-     guarantees that — so a manual resize is never overridden. Not undoable
-     (it is the insert's own settling, not a user edit). */
-  const onGrow = useCallback((id: string, height: number, width?: number) => {
-    setNodes(ns => ns.map(n => {
-      if (n.id !== id) return n;
-      const style = {...(n.style ?? {})} as Record<string, string | number>;
-      if (style.height && Number(style.height) >= height) return n;
-      style.height = height;
-      /* AQ16 — the width floors at the content's natural single-line width
-         (capped 340) so long text widens the shape instead of over-wrapping.
-         Only ever grows: an explicit user width is never shrunk. */
-      if (width) {
-        const floored = Math.max(190, width); /* .node min-width — never under */
-        if (!style.width || Number(style.width) < floored) style.width = floored;
-      }
-      return {...n, style: style as any};
-    }));
-  }, [setNodes]);
-
-  /* AQ15 — the global receiver for the renderer's auto-grow reports. */
-  useEffect(() => {
-    const h = (ev: Event) => {
-      const {id, height, width} = (ev as CustomEvent<{id: string; height: number; width?: number}>).detail;
-      onGrow(id, height, width);
-    };
-    window.addEventListener('gobi:node-grow', h);
-    return () => window.removeEventListener('gobi:node-grow', h);
-  }, [onGrow]);
-
-const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy: number) => {
-    if (phase === 'start') {
-      bendGesturePushed.current = false;
-      bendGestureAxis.current = null;
-      setSelEdgeId(id);
-      return;
-    }
-    if (phase === 'move' && !bendGesturePushed.current) {
-      bendGesturePushed.current = true;
-      pushHistory();
-    }
-    setEdges(es => es.map(e => {
-      if (e.id !== id) return e;
-      const geo = edgeGeo(e, nodesRef.current);
-      if (!geo) return e;
-      const data = (e.data ?? {}) as EdgeData;
-      const base = edgeDrawnMid(e, nodesRef.current);
-      if (!base) return e;
-      /* AUDIT-11 — the LOCKED axis. 'move' records it; 'end' carries dx=dy=0,
-         which bendAxisFor would resolve to 'h' unconditionally — a vertical
-         drag then stored a spurious bendX from the pointer's final-x tremor. */
-      if (phase === 'move') bendGestureAxis.current = bendAxisFor(e.type, geo, dx, dy);
-      const axis = phase === 'end' && bendGestureAxis.current
-        ? bendGestureAxis.current
-        : bendAxisFor(e.type, geo, dx, dy);
-      const put: Pt = dragPoint(axis, W, base);
-      if (phase === 'end') {
-        bendGestureAxis.current = null;
-        const pm = plainMidpoint(geo);
-        if (Math.hypot(put.x - pm.x, put.y - pm.y) <= BEND_SNAP_PX) {
-          const out = {...data};
-          delete out.bendX;
-          delete out.bendY;
-          return {...e, data: out};
-        }
-      }
-      return {...e, data: applyDrag(data, axis, put)};
-    }));
-  }, [pushHistory, setEdges]);
-
-  /* ROUND AK, AK-10/AK-13 — THE LABEL DRAG AND THE CREATE-ON-DOUBLE-CLICK.
-
-     A DELIBERATE SIBLING OF `onBend` (above), and it keeps that function's two
-     load-bearing properties so the label never grows a second source of truth:
-
-       * `pushHistory()` ONCE, on `'start'` — the convention every gesture in this
-         file already documents. Never per move: a 200-event drag would bury the
-         user's older undo steps.
-       * it keys on the `id` the renderer hands back, NOT on `selEdgeId` — the
-         first move of a drag is also the move that selects the edge, so routing
-         through `updateEdge` would write to the WRONG edge (the same reason
-         `onBend` does not use it).
-
-     WHAT IT DOES NOT DO is re-derive geometry. `w` arrives finished — the
-     renderer computed it, because it is the only side that holds the resolved
-     path and the anchor, and since ROUND AM's AM-1 the gesture's write is
-     `anchorWrite`: a displacement added to the gesture's base offset. This
-     applies it.
-
-     ROUND AM, AM-1 — THE REBASE, and why it is here rather than in the renderer.
-     A write states the anchor it was measured against (`w.labelAnchor`) and
-     carries the pointer's INCREMENT for this write. The stored offset is a
-     running total, so the two are combined:
-
-         corrected = stored + (storedAnchor − w.labelAnchor)     [the frame moved]
-         offset    = corrected + w.labelOffset                   [this write's increment]
-
-     The first line is what makes a label keep tracking the pointer while a NODE
-     moves: the anchor moved by `Δ`, so the stored offset — expressed in the OLD
-     anchor's frame — is `Δ` too large in the new one and is corrected by exactly
-     that. "The line moved 30px right, so a label that was 20px right of it is now
-     10px right of it": the label stays where the user's EYE put it and only the
-     NUMBER changes. Without it the next write's increment would be added to an
-     offset already measured from the wrong origin, and the label would drift by
-     the node's movement each time. When the frames agree the correction is
-     `{0,0}` and this reduces to the plain accumulation.
-
-     `w.labelAnchor === null` is the ABSOLUTE case — the centred/reset write and
-     the create commit — and it is NEVER rebased or accumulated: those offsets are
-     not measured against the geometry at all, they ARE the stored value. It also
-     CLEARS the stored anchor, because after it there is nothing left to measure
-     against.
-
-     THE MERGE IS MODE-DEPENDENT ON PURPOSE, and it is what keeps the stored
-     document honest: a CENTRED write (`labelPinned: false`) DELETES all THREE
-     keys instead of storing `{0,0}`/`true`, so "dragged back to the centre",
-     "reset" and "never moved" are one stored state and a board cannot accumulate
-     a key that means nothing. `labelAnchor` joins the other two on that list in
-     this round — three situations, one stored state. A gesture that ENDS at the
-     centre lands there through the same door: the total it writes is `{0,0}`,
-     which is the pinned-but-empty case collapsed below. */
-  /* AUDIT-10 twin — same deferral as onBend above: the label gesture's history
-     entry lands on the first 'move', not on the pointerdown 'start'. */
-  const labelGesturePushed = useRef(false);
-  const onLabelWrite = useCallback((id: string, w: LabelWrite, phase: BendPhase) => {
-    if (phase === 'start') {
-      labelGesturePushed.current = false;
-      setSelEdgeId(id);
-      return;
-    }
-    if (phase === 'move' && !labelGesturePushed.current) {
-      labelGesturePushed.current = true;
-      pushHistory();
-    }
-    setEdges(es => es.map(e => {
-      if (e.id !== id) return e;
-      const data = {...((e.data ?? {}) as EdgeData)};
-      if (!w.labelPinned) {
-        delete data.labelOffset;
-        delete data.labelPinned;
-        delete data.labelAnchor;
-        return {...e, data};
-      }
-      if (w.labelAnchor === null) {
-        // ABSOLUTE (the centred/reset write, the create commit): stored as it
-        // stands, and there is no frame to record.
-        if (w.labelOffset.x === 0 && w.labelOffset.y === 0) {
-          delete data.labelOffset;
-          delete data.labelPinned;
-          delete data.labelAnchor;
-        } else {
-          data.labelOffset = w.labelOffset;
-          data.labelPinned = true;
-          delete data.labelAnchor;
-        }
-        return {...e, data};
-      }
-      const stored = data.labelOffset;
-      let storedAnchor = data.labelAnchor;
-      /* AUDIT-9 — migration-on-first-touch. Boards pinned before ROUND AM-1
-         carry labelOffset + labelPinned but NO labelAnchor. Without an anchor
-         the rebase below was skipped, and the first drag teleported the label
-         by whatever the geometry had drifted since the pin. One-time fix: if a
-         pinned offset arrives with no stored anchor, treat the LIVE anchor as
-         the one it was measured from (no rebase — the drift is absorbed), and
-         this gesture plus every later one rebases correctly. */
-      if (stored && !storedAnchor) {
-        storedAnchor = {x: w.labelAnchor.x, y: w.labelAnchor.y};
-        data.labelAnchor = {x: w.labelAnchor.x, y: w.labelAnchor.y};
-      }
-      const frameMoved = stored && storedAnchor
-        && (storedAnchor.x !== w.labelAnchor.x || storedAnchor.y !== w.labelAnchor.y);
-      const corrected = frameMoved
-        ? {x: stored!.x + (storedAnchor!.x - w.labelAnchor.x), y: stored!.y + (storedAnchor!.y - w.labelAnchor.y)}
-        : (stored ?? {x: 0, y: 0});
-      const offset = {x: corrected.x + w.labelOffset.x, y: corrected.y + w.labelOffset.y};
-      if (offset.x === 0 && offset.y === 0) {
-        // the gesture's total is the centred state — the SAME stored value as
-        // reset and never-moved, reached through the gesture's own door.
-        delete data.labelOffset;
-        delete data.labelPinned;
-        delete data.labelAnchor;
-      } else {
-        data.labelOffset = offset;
-        data.labelPinned = true;
-        data.labelAnchor = w.labelAnchor;
-      }
-      return {...e, data};
-    }));
-  }, [pushHistory, setEdges]);
 
   /** ROUND AK, AK-13 — the double-click-on-the-path SIGNAL, written exactly as
    *  the context menu's `editLabel` branch writes `__edit`: a fresh timestamp
@@ -1807,155 +1343,12 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     [nodes, showMode, pushHistory, setNodes, readOnly, codeStale, commitLabelText, commitNodeTitle, hlKey, fkConnect, canvasLock, titleEdit, lockedKey],
   );
 
-  /* ---------------------------------------------------------------------
-     PACKAGE-N 2b (fold) — insertion is keyed on IDENTITY, never a rendered
-     index: the panel now renders a FILTERED subset of the one library, so a
-     rendered index ≠ a library index and the drag payload must carry `label`
-     (unique across LIBRARY, verified — zero duplicates). Body below is the
-     previous one verbatim.
-     --------------------------------------------------------------------- */
-  const addNodeByLabel = (label: string, pos?: {x: number; y: number}) => {
-    const item = LIBRARY.find(p => p.label === label);
-    if (!item) return;
-    const id = `n${nextId()}`;
-    /* AUDIT-14 (fold) — the no-position default centres on the WRAP
-       (client coord rect.left + half), so with the palette open the insert
-       lands at the canvas centre like every sibling path. */
-    const wr3 = wrap.current?.getBoundingClientRect();
-    const p = pos ?? (rf && wr3
-      ? rf.screenToFlowPosition({x: wr3.left + wr3.width / 2, y: wr3.top + wr3.height / 2})
-      : {x: 480, y: 300});
-    pushHistory();
-    tickTask('node');
-
-    // L3c: the ERD `table` node is its own node type: a column list is not a
-    // Shape. UNISURF-S13 — no preset gate: the SHAPE picks the type, not the board.
-    if (item.label === 'Table') {
-      setNodes(ns => [...ns, {
-        id, type: 'table', position: p, selected: false,
-        style: {width: 250}, /* TABLE-HEIGHT: no stored height — the wrapper hugs the card */
-        data: {
-          name: 'new_table',
-          columns: [
-            {id: `c${idc++}`, name: 'id', type: 'uuid', pk: true, notNull: true},
-            {id: `c${idc++}`, name: 'created_at', type: 'timestamptz', notNull: true},
-          ],
-          colorKey: 'cyan',
-        } as any,
-      }]);
-      /* ONBOARD-P5 — the first table the user creates. The keys below (pk/fk)
-         are the one thing a fresh table cannot show them. */
-      fireTip('table');
-      return;
-    }
-
-    const data = item.make() as any;
-    const shape = asShape(data?.shape);
-    /* ONBOARD-P5 — the first frame the user drops teaches what a frame DOES
-       (it adopts what you drag into it), which is not visible from the empty
-       boundary on screen. */
-    if (data.shape === 'group') fireTip('group');
-    // C3: the palette item owns the box, so NodeResizer's baseline and the
-    // persisted style agree by construction. GOBI-SIZE (src/nodeSizes.ts) gave
-    // every kind an explicit size, which RETIRES the group/note fallbacks that
-    // used to sit here as a SECOND, quietly different answer (320x200 / 200x90).
-    const size = item.size;
-    /* AQ19 — CENTRE THE NODE UNDER THE CURSOR: `p` is the cursor/flow point and
-       RF anchors node.position at the TOP-LEFT, so a dropped node always sat
-       down-right of where the user pointed. Offset by half the node's known
-       size (every palette row has one — GOBI-SIZE made `size` REQUIRED on
-       PaletteItem) — every insert path funnels the cursor point through here
-       or its sibling inserters. */
-    const half = {w: size.width / 2, h: size.height / 2};
-    const centre = {x: p.x - half.w, y: p.y - half.h};
-    // L3a: a flowchart node defaults to vertical handles and a label-only body.
-    if (preset.id === 'flowchart' && shape !== 'group' && shape !== 'note') {
-      data.handles = 'tb';
-      data.body = 'label-only';
-    }
-    /* ITEM — NODE TEXT DEFAULTS TO CENTRE + MIDDLE, NEW NODES ONLY (2026-10-22).
-
-       Harvey: new nodes should read centred. The inherited defaults live in
-       `alignForBody`/`vAlignForBody` (`src/textStyle.ts`): `left` + `top` for a
-       card, `center` + `middle` for a label-only body. Changing THOSE would
-       repaint every stored board (absence is the value that renders), so the
-       default moves at INSERT TIME instead: a new node stores
-       `textStyle: {align: 'center', vAlign: 'middle'}` explicitly. The values
-       are deliberately stored even where they collide with the inherited
-       fallback (a label-only body already centres) — the stamp is a statement
-       about the NODE ("this box is a centred box"), not about the sheet, and
-       the inspector shows both keys as chosen, which is the truth.
-
-       Stored boards never pass through here, so old nodes keep exactly the
-       pixels they had. The `{align, vAlign}` literal is a NEW-NODE constant,
-       not a value the user chose, but the §E.2 probe's ban on literals targets
-       WRITE-PATH constructions in this file — the lazy-merge writers — and this
-       is an insert-path default, the same class as the flowchart
-       `handles: 'tb'` / `body: 'label-only'` stamps directly above. */
-    data.textStyle = {align: 'center', vAlign: 'middle'};
-    setNodes(ns => [...ns, {
-      id, type: item.kind, position: centre, data: {...data, __dropAt: p}, selected: false,
-      style: {width: size.width, height: size.height},
-    }]);
-    /* AQ19 — the estimated half-size differs from the RENDERED box (content,
-       font, auto-grow), so after the node mounts and settles, re-measure and
-       shift it so its CENTRE sits exactly on the drop point. One extra tick,
-       idempotent (reads __dropAt, then clears it). */
-    window.setTimeout(() => {
-      const el = document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement | null;
-      if (!el || !rf) return;
-      const rr = el.getBoundingClientRect();
-      if (!rr.width || !rr.height) return;
-      setNodes(ns => ns.map(n => {
-        if (n.id !== id || !(n.data as any)?.__dropAt) return n;
-        const at = (n.data as any).__dropAt as {x: number; y: number};
-        /* the rendered box is CLIENT coords — convert its centre to FLOW
-           space before comparing with __dropAt (mixing the two spaces at
-           non-1 zoom teleports the node — caught live at 0.53 zoom). */
-        const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
-        const dx = at.x - cf.x;
-        /* AQ19d — X-ONLY on BOTH passes now. The grow ladder's first steps
-           (60/150ms) land BEFORE this 320ms pass, so a cylinder is already
-           taller than the estimate here; a Y-recentre after that growth reads
-           as the node jumping UP ~1s after the drop (Harvey). Vertical is
-           decided at insert time and never revisited — growth extends
-           downward from the placed head. */
-        if (Math.abs(dx) < 1) return n;
-        return {...n, position: {x: n.position.x + dx, y: n.position.y}, data: {...n.data}};
-      }));
-    }, 320);
-    /* second pass after the auto-grow ladder settles (400/900ms steps) so a
-       node that GREW after the first pass still ends centred; the flag is
-       cleared here. */
-    window.setTimeout(() => {
-      const el = document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement | null;
-      if (!el || !rf) return;
-      const rr = el.getBoundingClientRect();
-      if (!rr.width || !rr.height) return;
-      setNodes(ns => ns.map(n => {
-        if (n.id !== id || !(n.data as any)?.__dropAt) return n;
-        const at = (n.data as any).__dropAt as {x: number; y: number};
-        const cf = rf.screenToFlowPosition({x: rr.x + rr.width / 2, y: rr.y + rr.height / 2});
-        const dx = at.x - cf.x;
-        /* HARVEY 2026-10-16 — X-ONLY on this pass. A cylinder auto-grows ~2.2×
-           taller on this ladder; re-centring Y after that growth yanks the node
-           UP ~1s after the drop (the grown body pulls the head back to the
-           drop point). The user placed the HEAD — growth belongs BELOW it, so
-           vertical is anchored at pass 1 and never touched again. */
-        const data = {...n.data};
-        delete data.__dropAt;
-        if (Math.abs(dx) < 1) return {...n, data};
-        return {...n, position: {x: n.position.x + dx, y: n.position.y}, data};
-      }));
-    }, 1150);
-  };
+  /* APP-SPLIT t_b2cad7a8 (S5): paletteInsert.ts owns the insert policy; App
+     threads the 10-value ctx — the two bindings below keep the same names. */
+const addNodeByLabel = useMemo(() => makeAddNodeByLabel({LIBRARY, nextId, wrap, rf, pushHistory, tickTask, fireTip, setNodes, preset, asShape}), [LIBRARY, nextId, wrap, rf, pushHistory, tickTask, fireTip, setNodes, preset, asShape]);
 
   // ---- D1: insert via the searchable palette ----
-  const insertFromSearch = useCallback((label: string) => {
-    if (!searchPos) return;
-    addNodeByLabel(label, searchPos);
-    setSearchPos(null);
-  }, [searchPos]);
+  const insertFromSearch = useCallback((label: string) => insertFromSearchImpl({searchPos, addNodeByLabel, setSearchPos}, label), [searchPos]);
 
   /* =====================================================================
      PACKAGE-N §6 — FAVOURITES (pass 3).
@@ -1978,492 +1371,13 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
         write is deferred past the commit and reads the committed list from a
         ref. That is why every mutation goes through `mutateFavourites`.
      ===================================================================== */
-  const [favourites, setFavourites] = useState<library.Favourite[]>([]);
-  /** Mirror of `favourites` for the persist step (same pattern as `nodesRef`):
-   *  the write reads the list React has actually COMMITTED, never a closure
-   *  copy that a same-tick second edit could have made stale. */
-  const favouritesRef = useRef<library.Favourite[]>(favourites);
-  favouritesRef.current = favourites;
-
-  /* ---------------------------------------------------------------------
-     PACKAGE-N §8.1–§8.2 pass 4b — the USER'S IMPORTED SHAPES, state only.
-
-     Same three rules as the favourites block above, for the same reasons:
-
-     1. THE PANEL NEVER WAITS ON THE NETWORK. `shapes` starts `[]` and the
-        mount GET only ever REPLACES it on success; a failed GET leaves an
-        empty list, never an error state.
-     2. STATE IS OPTIMISTIC. Importing a shape updates `shapes` immediately and
-        persists in the background; a failed PUT keeps the local change.
-     3. THE WRITE READS THE COMMITTED LIST FROM A REF (`shapesRef`), so a
-        persist deferred past the commit can never serialise a stale array.
-
-     ONE EXTRA RULE HERE — §8.2 rule 8, THE STORED FILE IS UNTRUSTED. Whatever
-     `/api/library` hands back goes through `parseCustomShapeEntry` before it
-     reaches this state: a hand-edited, foreign or older-build entry is dropped
-     (and so never reaches the canvas). This is the cheap structural gate; the
-     component renders through `svgDataUri` into an `<img>`, which is the
-     second, independent guard.
-     --------------------------------------------------------------------- */
-  const [shapes, setShapes] = useState<CustomShape[]>([]);
-  /** Mirror of `shapes` for the persist step — see `favouritesRef`. */
-  const shapesRef = useRef<CustomShape[]>(shapes);
-  shapesRef.current = shapes;
-
-  useEffect(() => {
-    let alive = true;
-    library.getLibrary()
-      .then(doc => {
-        if (!alive) return;
-        setFavourites(Array.isArray(doc?.favourites) ? doc.favourites : []);
-        // §8.2 rule 8 — gate EVERY stored entry, keep only what parses.
-        const stored = Array.isArray((doc as any)?.shapes) ? (doc as any).shapes : [];
-        const parsed: CustomShape[] = [];
-        for (const entry of stored) {
-          const res = parseCustomShapeEntry(entry, gridSize);
-          if (res.ok) parsed.push(res.shape);
-        }
-        setShapes(parsed);
-      })
-      .catch(() => { /* offline / not yet stored — an empty panel is correct */ });
-    return () => { alive = false; };
-    /* DELIBERATELY mount-only (the block's deps are unchanged from the
-       favourites-only version). `gridSize` is read here only to CLAMP the size
-       of a shape off disk, and any pitch yields a legal clamped size; adding it
-       to the deps would re-fetch on every pitch change and clobber optimistic
-       local state with the server copy — a worse failure than a stale clamp
-       that the next load corrects anyway. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** Persist the library. Always called with the lists the caller has ALREADY
-   *  decided to commit — never with a ref read at write time.
-   *
-   *  WHY THE LISTS ARE ARGUMENTS (measured bug, 2026-09-17): the write used to
-   *  read `shapesRef.current` after a `setTimeout(0)`. That is only correct when
-   *  the mutation happens in a SYNCHRONOUS event handler, because then React
-   *  commits before the timer fires. The IMPORT path is different: it awaits
-   *  `file.text()`, so it resumes as a microtask — the timer (a macrotask) fires
-   *  FIRST, reading the ref before React has committed. Measured: the PUT left at
-   *  **+2 ms carrying the PRE-import list**, while the DOM committed the new count
-   *  at **+27 ms**. The visible effect was a server library permanently one
-   *  import behind the panel (panel 4 / server 3), and a reload silently lost the
-   *  newest shape. Passing the lists explicitly removes the dependency on WHEN
-   *  the caller resumed.
-   *
-   *  It sends the CURRENT favourites too: the PUT replaces the whole document,
-   *  so a shapes-only write would blank the user's favourites. */
-  const persistLibrary = useCallback(async (
-    favourites: library.Favourite[],
-    shapes: CustomShape[],
-  ) => {
-    try {
-      await library.saveLibrary(library.libraryDoc(favourites, shapes));
-    } catch {
-      // §7.2 #4 — never fail silently. Excalidraw's wording: the store is not
-      // the user's only copy, and a file export is the escape hatch.
-      flash("Couldn't save the library. Export it to a file so you don't lose changes.");
-    }
-  }, [flash]);
-
-  /** The ONE way favourites change: a PURE updater, then a persist.
-   *
-   *  The updater must be pure because `setFavourites` updaters run TWICE under
-   *  StrictMode. It must also read `prev` rather than a closure copy: two star
-   *  clicks landing in one tick would otherwise both compute from the list as
-   *  it was before the first one, and the second would silently drop the first
-   *  (verified live — Queue vanished when Queue and Service were toggled in the
-   *  same tick). The write therefore CANNOT live inside the updater; it is
-   *  deferred past the commit and carries the list computed HERE.
-   *
-   *  `favouritesRef` is advanced SYNCHRONOUSLY, before `setState`, so a second
-   *  mutation in the same tick computes from the first one's result instead of
-   *  from stale state. React re-assigns the ref on the next render anyway, so
-   *  the early write is invisible and only closes the window. */
-  const mutateFavourites = useCallback(
-    (updater: (prev: library.Favourite[]) => library.Favourite[]) => {
-      const next = updater(favouritesRef.current);
-      favouritesRef.current = next;
-      setFavourites(next);
-      window.setTimeout(() => { void persistLibrary(next, shapesRef.current); }, 0);
-    },
-    [persistLibrary],
-  );
-
-  /** §6.3 — the star control. Add when absent, remove when present. */
-  const toggleFavourite = useCallback((item: PaletteItem) => {
-    mutateFavourites(prev => library.toggleFavouriteItem(prev, item));
-  }, [mutateFavourites]);
-
-  /** ROUND AB, ITEM 2 — remove ONE favourite from the strip.
-   *  ROUND AE — RE-KEYED ON THE ID, AND EVERY TILE NOW CARRIES IT.
-   *
-   *  The tile calls exactly this, through the same `mutateFavourites` writer the
-   *  palette star uses, so the strip and the star cannot drift and the write
-   *  keeps the ref-synchronous + deferred-persist contract.
-   *
-   *  WHY IT IS NO LONGER THE LABEL. A favourite saved from a SELECTION has no
-   *  `__label`, so `favouriteLabel` returns `undefined` for it — and matching on
-   *  that would remove EVERY unnamed favourite in one call. Round AB therefore
-   *  rendered the control only where a label existed, which left a
-   *  selection-saved favourite with NO removal path at all. `f.id` is the one
-   *  field that is always present and unique (the tile already keys on it and
-   *  the drag payload already carries it), so it is the honest identity.
-   *
-   *  The label-based `library.removeFavouriteItem` is NOT dead: it is still the
-   *  arm of `toggleFavouriteItem`, i.e. what the palette star removes through.
-   *  This function reaches `removeFavouriteById` instead, so there are two
-   *  library helpers and ONE app-level removal, not a third mechanism. */
-  const removeFavourite = useCallback((id: string) => {
-    mutateFavourites(prev => library.removeFavouriteById(prev, id));
-  }, [mutateFavourites]);
-
-  const isStarred = useCallback(
-    (label: string) => library.isFavouriteItem(favourites, label),
-    [favourites],
-  );
-
-  /** §6.4 — the pending `+` tile: "add from selection". The stored payload
-   *  carries each node's offset from the selection's corner (`__rel`), so the
-   *  group keeps its internal layout while the insert re-derives the absolute
-   *  geometry onto the drop point (§6.5). Prepend — the newest is on top. */
-  const addFavouriteFromSelection = useCallback(() => {
-    const selNodes = nodesRef.current.filter(n => n.selected);
-    if (!selNodes.length) return;
-    const ids = new Set(selNodes.map(n => n.id));
-    // Built OUTSIDE the updater (it reads refs, not state) — the updater below
-    // only has to be pure, not to re-derive the payload.
-    const fav = library.favouriteFromSelection(selNodes, edgesRef.current.filter(
-      e => ids.has(e.source) && ids.has(e.target),
-    ));
-    mutateFavourites(prev => [fav, ...prev]);
-    flash(`Saved ${selNodes.length} node${selNodes.length === 1 ? '' : 's'} to Favourites`);
-  }, [mutateFavourites, flash]);
-
-  /** §6.5 — insert a favourite. NEVER trust stored geometry: re-generate ids,
-   *  re-centre on the drop point, snap to `gridSize`, then select what landed.
-   *
-   *  A single-node favourite that still carries its palette label goes through
-   *  the ONE canonical palette payload (`LIBRARY.find`), so the `Table`/erd
-   *  special case and the container sizing in `addNodeByLabel` apply verbatim.
-   *  Anything else is re-derived from the stored payload: shape, colourKey and
-   *  the node `type` all come from data, and the geometry from the drop point. */
-  const insertFavourite = useCallback((fav: library.Favourite, pos?: {x: number; y: number}) => {
-    const label = library.favouriteLabel(fav);
-    /* §6.5 step 2 — SNAP TO THE GRID. Unconditional, and deliberately NOT tied
-       to the `snap` toolbar toggle: `addNodeByLabel` inserts at the raw drop
-       point, but a favourite's geometry is stored as offsets only, so the drop
-       point is the ONE thing that decides where the group lands. AC #17 tests
-       this, so the favourite path always quantises to `gridSize`. */
-    const snapTo = (v: number) => Math.round(v / gridSize) * gridSize;
-    const drop = pos ?? (rf
-      ? rf.screenToFlowPosition({
-        x: (wrap.current?.clientWidth ?? 900) / 2,
-        y: (wrap.current?.clientHeight ?? 600) / 2,
-      })
-      : {x: 480, y: 300});
-
-    if (label && fav.nodes.length === 1) {
-      // Identity path: the palette item rebuilds the payload, so no stored
-      // field is trusted, and `Table` / group sizing / flowchart handles all
-      // keep working because this IS the add path.
-      const item = LIBRARY.find(p => p.label === label);
-      if (item) {
-        const before = new Set(nodesRef.current.map(n => n.id));
-        addNodeByLabel(label, {x: snapTo(drop.x), y: snapTo(drop.y)});
-        // §6.5 step 4 — select what landed. The insert commits to state a tick
-        // later than this call, so the selection follows on the next tick.
-        window.setTimeout(() => {
-          const added = nodesRef.current.filter(n => !before.has(n.id)).map(n => n.id);
-          if (!added.length) return;
-          const ids = new Set(added);
-          setNodes(ns => ns.map(n => ids.has(n.id) ? {...n, selected: true} : {...n, selected: false}));
-        }, 0);
-        return;
-      }
-      // A stored label that no longer exists in the library falls through to
-      // the generic path rather than silently inserting nothing.
-    }
-
-    pushHistory();
-    tickTask('node');
-    const idMap = new Map<string, string>();
-    const stored = fav.nodes as FavouriteNode[];
-    /* §6.5 step 1 — RE-CENTRE. `__rel` is a node's offset from the favourite's
-       own top-left, so the group's BOUNDING BOX CENTRE is what lands on the
-       drop point: the offsets are kept exact (the internal layout is the one
-       thing worth preserving) and only the anchor is quantised to the grid. */
-    const offs = stored.map(n => {
-      const rel = (n as any)[library.REL_KEY];
-      return rel && typeof rel.x === 'number' && typeof rel.y === 'number'
-        ? {x: rel.x, y: rel.y}
-        : null;
-    });
-    const known = offs.filter(Boolean) as {x: number, y: number}[];
-    const centre = known.length
-      ? {
-        x: (Math.min(...known.map(o => o.x)) + Math.max(...known.map(o => o.x))) / 2,
-        y: (Math.min(...known.map(o => o.y)) + Math.max(...known.map(o => o.y))) / 2,
-      }
-      : {x: 0, y: 0};
-    const anchor = {x: snapTo(drop.x) - centre.x, y: snapTo(drop.y) - centre.y};
-
-    const newNodes: Node[] = stored.map((storedNode, i) => {
-      /* Two stored payload shapes are legal (see `library.ts`): a plain palette
-         payload, or a stripped node wrapper. `payload` is whichever object
-         actually holds the node `data`; the marker keys are dropped from it. */
-      const payload = (storedNode?.data ?? storedNode) as any;
-      const {[library.LABEL_KEY]: _l, [library.REL_KEY]: _r, __src: _s, ...payloadData} = payload;
-      void _l; void _r; void _s;
-      const rel = offs[i] ?? {x: 0, y: 0};
-      // §6.5 step 3 — RE-GENERATE IDS. Never reuse a stored one: it may collide
-      // with an id already on this board.
-      const id = `n${nextId()}`;
-      // A selection copy stores no board id at all, so `__src` is its only
-      // reference; `storedNode.id` covers a hand-written library file that did
-      // keep one.
-      // `FavouriteNode` is `Record<string, unknown>`: the reference fields are unknown
-      // until narrowed. `String()` is the honest key-maker (the old code relied on `any`).
-      idMap.set(String(storedNode.__src ?? storedNode.id ?? i), id);
-      return {
-        id,
-        type: (storedNode.type ?? 'goblin') as string,
-        position: {x: anchor.x + rel.x, y: anchor.y + rel.y},
-        data: payloadData,
-        // A selection copy keeps its own `style` (a container's size); a
-        // palette payload never had one, so nothing is invented here.
-        ...(storedNode.style ? {style: storedNode.style} : null),
-        selected: true,
-      } as Node;
-    });
-
-    const newEdges: Edge[] = (fav.edges ?? []).map((se: Edge) => {
-      const {selected: _sel, ...rest} = se;
-      void _sel;
-      const src = idMap.get(se.source) ?? idMap.get(String(se.source));
-      const tgt = idMap.get(se.target) ?? idMap.get(String(se.target));
-      return src && tgt ? ({...rest, id: `e${nextId()}`, source: src, target: tgt, selected: false} as Edge) : null;
-    }).filter(Boolean) as Edge[];
-
-    setNodes(ns => [...ns.map(n => (n.selected ? {...n, selected: false} : n)), ...newNodes]);
-    if (newEdges.length) setEdges(es => [...es, ...newEdges]);
-  }, [addNodeByLabel, gridSize, pushHistory, setNodes, setEdges, rf, tickTask]);
-
-  /* =====================================================================
-     PACKAGE-N §8.1–§8.3 pass 4b — CUSTOM-SHAPE library mutations.
-
-     `insertCustomShape` is the CANVAS half (the import UI is pass 4c): it is
-     the only place a custom shape becomes a node. Two §6.5 rules carry over
-     from the favourite path verbatim — the id is re-derived from the module
-     counter and the position is re-quantised to the grid, because a stored
-     coordinate is not a thing to trust.
-     ===================================================================== */
-
-  /** Insert an imported shape at `pos` (or the viewport centre), grid-quantised. */
-  const insertCustomShape = useCallback((shape: CustomShape, pos?: {x: number; y: number}) => {
-    pushHistory();
-    tickTask('node');
-    // §6.5 step 2 — SNAP TO THE GRID, unconditionally: the drop point is the
-    // only thing that decides where this lands, so it is the thing quantised.
-    /* AUDIT-7 — wrap-centre as a CLIENT coord (see the favourite twin above). */
-    const wr2 = wrap.current?.getBoundingClientRect();
-    const raw = pos ?? (rf && wr2
-      ? rf.screenToFlowPosition({x: wr2.left + wr2.width / 2, y: wr2.top + wr2.height / 2})
-      : {x: 480, y: 300});
-    let p = {x: Math.round(raw.x / gridSize) * gridSize, y: Math.round(raw.y / gridSize) * gridSize};
-    // AQ19 — centre the custom shape under the cursor (its own size is known).
-    p = {x: Math.round(p.x - shape.w / 2), y: Math.round(p.y - shape.h / 2)};
-    // §6.5 step 3 — RE-GENERATE THE ID. Never a stored one.
-    const id = `n${nextId()}`;
-    setNodes(ns => [...ns, {
-      id,
-      type: 'customshape',
-      position: p,
-      selected: false,
-      // §8.3 — the size came from `clampShapeSize` at import, so it is already
-      // quantised and inside 32–512; since ROUND BE (2026-10-23) the live
-      // resizer carries only the 32px floor — no ceiling, like every goblin node.
-      style: {width: shape.w, height: shape.h},
-      data: {svg: shape.data, viewBox: shape.viewBox, title: shape.title, colorKey: shape.colorKey},
-    } as Node]);
-  }, [gridSize, pushHistory, setNodes, rf, tickTask]);
-
-  /** The ONE way `shapes` changes: a PURE updater, then a persist — the same
-   *  contract as `mutateFavourites`, for the same StrictMode reason. The write
-   *  is deferred past the commit and reads the committed list from `shapesRef`;
-   *  it sends the CURRENT favourites with it, so the two halves of the library
-   *  document are never written apart. */
-  const mutateShapes = useCallback(
-    (updater: (prev: CustomShape[]) => CustomShape[]) => {
-      /* The ref is advanced SYNCHRONOUSLY, before `setState` — see the
-         measured race documented on `persistLibrary`. The import path resumes
-         from `await file.text()`, so reading the ref at write time would read
-         the PRE-import list. Computing `next` here and passing it makes the
-         write independent of when React commits. */
-      const next = updater(shapesRef.current);
-      shapesRef.current = next;
-      setShapes(next);
-      window.setTimeout(() => { void persistLibrary(favouritesRef.current, next); }, 0);
-    },
-    [persistLibrary],
-  );
-
-  /** §8.1 — drop an imported shape from the library, then persist.
-   *
-   *  IDENTITY NOTE: a `CustomShape` has NO id field (the spec's §8.1 store is
-   *  `{title, tags, data, w, h, aspect, colorKey, viewBox, sanitizer,
-   *  sanitizedAt, created}`). `created` is the epoch-ms stamp taken once at
-   *  import, which makes it the entry's stable, unique identity; the `title`
-   *  is also accepted so a caller holding only a label can still remove it. */
-  const removeCustomShape = useCallback((id: string) => {
-    const matches = (s: CustomShape) => String(s.created) === id || s.title === id;
-    if (!shapesRef.current.some(matches)) return;   // nothing to remove, nothing to persist
-    mutateShapes(prev => prev.filter(s => !matches(s)));
-  }, [mutateShapes]);
-
-  /* =====================================================================
-     PACKAGE-N §8.1–§8.3 pass 4c — the IMPORT UI.
-
-     One file → one stored shape, and ONE path does it (`importShapeFile`): the
-     hidden picker, the drop zone in the panel and a file dropped on the canvas
-     all funnel through it, so all three gate, parse and report identically.
-     ===================================================================== */
-
-  /** The hidden `<input type=file>`; `display:none` inputs can only be opened
-   *  programmatically, so every "import" affordance clicks this one node. */
-  const importInputRef = useRef<HTMLInputElement | null>(null);
-  const openShapeImport = useCallback(() => { importInputRef.current?.click(); }, []);
-
-  /** §8.1 — the one place a `File` becomes a stored shape.
-   *
-   *  ORDER MATTERS: the type gate comes first. A PNG is not an oversized SVG,
-   *  it is the wrong kind of file, and answering it with the size limit would
-   *  send the user off editing dimensions that were never the problem. The
-   *  size gate is then measured on the `File` itself, so a 40 MB file is
-   *  rejected without ever being read into memory. */
-  const importShapeFile = useCallback(async (file: File) => {
-    const name = file.name || '';
-    if (!/\.svg$/i.test(name) && file.type !== 'image/svg+xml') {
-      flash('Only .svg files can be imported.');
-      return;
-    }
-    if (file.size > SHAPE_MAX_INPUT_BYTES) {
-      flash(SHAPE_REJECT_MESSAGE['too-large']);
-      return;
-    }
-    let raw: string;
-    try {
-      raw = await file.text();
-    } catch {
-      flash("Couldn't read that file.");
-      return;
-    }
-    // §8.1 — naming is OPTIONAL (settled): the file's own name is the title,
-    // minus the extension, with a neutral fallback. No prompt, ever.
-    const title = name.replace(/\.svg$/i, '').trim() || 'Imported shape';
-    const res = newCustomShape({raw, title, colorKey: 'cyan', gridSize});
-    // The `'reason' in` discriminant is the idiom `customShape.ts` itself uses
-    // (see `newCustomShape`); a rejection is ALWAYS reported, because the toast
-    // is the only feedback there is — silence would look like a dead button.
-    if ('reason' in res) {
-      flash(SHAPE_REJECT_MESSAGE[res.reason]);
-      return;
-    }
-    const shape = res.shape;
-    // Prepend: the newest import is the one the user is about to place.
-    mutateShapes(prev => [shape, ...prev]);
-    flash(`Imported “${shape.title}”.`);
-  }, [flash, gridSize, mutateShapes]);
-
-  const onImportInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Cleared BEFORE the read: choosing the same file twice must fire `change`
-    // twice, and a retained value silently swallows the second pick.
-    e.target.value = '';
-    if (file) void importShapeFile(file);
-  }, [importShapeFile]);
-
-  /** Resolve a dragged custom-shape payload — the sanitised markup itself —
-   *  back to its stored entry, then insert it at `pos`.
-   *
-   *  IDENTITY: the payload carries no id (a `CustomShape` has none), and the
-   *  markup is exactly what the library holds, so matching on `data` is exact.
-   *  Read through the ref so this stays a stable callback. */
-  const dropCustomShape = useCallback((payload: string, pos?: {x: number; y: number}) => {
-    const found = shapesRef.current.find(s => s.data === payload);
-    if (found) insertCustomShape(found, pos);
-  }, [insertCustomShape]);
-
-  /** The `DataTransfer` type list, normalised — `types` is a `DOMStringList`
-   *  in older DOM libs and a readonly array in newer ones, so it is copied
-   *  into a plain array and both shapes work. */
-  const dragTypes = (e: React.DragEvent): string[] => {
-    const t = e.dataTransfer?.types;
-    return t ? Array.from(t as ArrayLike<string>) : [];
-  };
-
-  /** The panel drop zone's own drop path. It cannot be omitted: the zone lives
-   *  in the left panel, and `main` (which owns the canvas drop) is a SIBLING,
-   *  so a file dropped there bubbles to no handler at all. It is wired through
-   *  `shapeZoneProps` below rather than a second JSX drop attribute, keeping
-   *  the canvas `onDrop` the single drop path in this file. */
-  const onShapeZoneDragOver = useCallback((e: React.DragEvent) => {
-    // Claim the event ONLY when it carries OS files — an ordinary node drag
-    // passing over the panel must not be treated as an import.
-    if (dragTypes(e).includes('Files')) e.preventDefault();
-  }, []);
-
-  const onShapeZoneDrop = useCallback((e: React.DragEvent) => {
-    if (!dragTypes(e).includes('Files')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files?.[0];
-    if (file) void importShapeFile(file);
-  }, [importShapeFile]);
-
-  const shapeZoneProps = {onDragOver: onShapeZoneDragOver, onDrop: onShapeZoneDrop};
-
-  // ---- drag & drop from palette ----
-  const onDrop = useCallback((e: React.DragEvent) => {
-    // A file dropped anywhere on the canvas is an IMPORT (§8.1), not a node
-    // placement — same path as the picker.
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile && (!e.dataTransfer.types || dragTypes(e).includes('Files'))) {
-      e.preventDefault();
-      void importShapeFile(droppedFile);
-      return;
-    }
-    e.preventDefault();
-    if (!rf || !wrap.current) return;
-    const favId = e.dataTransfer.getData('favourite');
-    const label = e.dataTransfer.getData('palette');
-    const cust = e.dataTransfer.getData('customshape');
-    if (!favId && !label && !cust) return;
-    /* AQ18 — raw client coords: screenToFlowPosition subtracts the pane rect
-       itself; the extra `- b.left/- b.top` double-subtracted the wrap offset
-       and every palette drop landed up-left of the cursor (same defect AUDIT-7
-       fixed for the ctx-menu path — this sibling was missed). */
-    const p = rf.screenToFlowPosition({x: e.clientX, y: e.clientY});
-    // §6.5 — a favourite drop re-derives the geometry at the drop point; the
-    // payload carried only the favourite's ID, never a stored coordinate.
-    if (cust) {
-      // The custom-shape payload IS the sanitised markup: it carries no id,
-      // and the store holds exactly this string, so it resolves back exactly.
-      dropCustomShape(cust, p);
-      return;
-    }
-    if (favId) {
-      const fav = favourites.find(f => f.id === favId);
-      if (fav) insertFavourite(fav, p);
-      return;
-    }
-    addNodeByLabel(label, p);
-  }, [rf, favourites, insertFavourite, dropCustomShape, importShapeFile]);
-
-  // ---- record history on destructive changes only ----
-  // Node and edge removals arrive as separate callbacks for one Del press,
-  // so a short guard merges them into a single history entry.
-  const removeGuard = useRef(false);
+  /* APP-SPLIT S4 (t_7c67b8cd): the library/asset cluster (favourites/shapes state, its filters, its insert handlers) moved VERBATIM to ../hooks/useLibraryPanel — same state identities, same setters; its module header carries the census read set and the render rule. */
+  const {favourites, shapes, toggleFavourite, removeFavourite, isStarred, addFavouriteFromSelection,
+    insertFavourite, insertCustomShape, removeCustomShape, importInputRef, openShapeImport,
+    onImportInputChange, shapeZoneProps, onDrop, removeGuard} = useLibraryPanel({
+    rf, wrap, flash, pushHistory, tickTask, nextId, addNodeByLabel, gridSize, LIBRARY,
+    nodesRef, edgesRef, setNodes, setEdges,
+  });
   const noteRemove = useCallback(() => {
     if (removeGuard.current) return;
     removeGuard.current = true;
@@ -2543,285 +1457,63 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
     }
   }, [readOnly, setNodes, setEdges, flash, setCtx, setSearchPos, setSel, setSelEdgeId, setSelCount, shareActive, flushPending]);
 
-  // ---- keyboard shortcuts ----
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (isEditable(e.target)) return;
-      // M / §3.3: while the Settings dialog is open the app's shortcuts are
-      // inert — no bare d/z/? and no arrow-nudge while the user tabs the nav.
-      // (The dialog's own capture listener owns Escape; see the branch below.)
-      if (settingsOpen) return;
-      // ITEM 6b: the board dialog owns the keyboard too, and this return is
-      // DELIBERATELY HERE — above the Escape branch below, not in the overlay
-      // guard after it. The board MENU is handled down there (Escape is the way
-      // out of a menu and the branch below closes it). The DIALOG is different:
-      // its own capture listener owns Escape (cancel) and Tab (the trap), so a
-      // return further down would let Escape deselect every node behind the
-      // dialog; `isEditable(e.target)` covers the name field. This line stops
-      // only the app's shortcuts landing behind the dialog.
-      if (boardDlg) return;
-      /* PACKAGE-TEMPLATES §2.5 Pass 2 — the gallery owns the keyboard while it is
-         up, in the SAME guard as every other overlay and for the same reason.
-         It sits directly BELOW `boardDlg`: the two are independent, so with both
-         open (the gallery opened from the dialog's trailing row) the app is inert
-         behind them. The gallery's own capture listener owns Escape, so Escape
-         never reaches the branch below and cannot deselect the canvas behind two
-         scrims. */
-      if (tgOpen) return;
-      if (historyOpen) return;  /* HISTORY-V3 — the ledger dialog owns the keyboard like the two above (its capture listener carries Escape/Tab). */
-      const mod = e.metaKey || e.ctrlKey;
-      const k = e.key.toLowerCase();
-      // D3: Escape clears node + edge selection and closes open popovers.
-      // FIRST, before the overlay guard below: Escape is the way OUT of every
-      // surface that guard protects (move it after → search/help/boards stop closing).
-      if (e.key === 'Escape') {
-        // M: Settings closes first — before search → help → boards → clear.
-        if (settingsOpen) { setSettingsOpen(false); return; }
-        if (searchPos) { setSearchPos(null); return; }
-        if (help) { setHelp(false); return; }
-        if (boardsOpen) { setBoardsOpen(false); return; }
-        /* GROUP-LOGICAL (t_eb8fab7e): inside a logical group, Escape first LEAVES it (selection returns to the group) — the deselect below would exit the grammar entirely. */
-        if (escapeGroup()) return;
-        setNodes(ns => ns.map(n => n.selected ? {...n, selected: false} : n));
-        setEdges(es => es.map(e2 => e2.selected ? {...e2, selected: false} : e2));
-        return;
-      }
-      // H1: every other overlay owns the keyboard — while help, a board menu or
-      // the insert palette is open, an app shortcut must not fire behind it (a
-      // stray ⌘Z would undo the newcomer's work; `?` would stack sheets).
-      if (help || boardsOpen || searchPos) return;
-      // Shift+1 (physical Digit1) — "fit view", the Figma/Excalidraw/Miro
-      // convention; carries a modifier, so legal under the no-bare-key rule.
-      // Matched on `e.code`, NOT `e.key` (Shift+1 delivers `!` on most
-      // layouts); the overlay guard and `isEditable` keep typing safe.
-      if (e.shiftKey && e.code === 'Digit1' && !mod) {
-        e.preventDefault();
-        rf?.fitView({padding: 0.25});
-        return;
-      }
-      // Shift+2 (physical Digit2) — toggle the read-only review mode. Same
-      // convention as Shift+1: it carries a modifier, so it is legal under this
-      // app's no-bare-key rule, and it is matched on `e.code`, NOT `e.key` —
-      // Shift+2 delivers `@` as the key on most layouts, so a key-based match
-      // would break.
-      // PLACEMENT IS LOAD-BEARING: ABOVE the `if (readOnly)` early-return — the
-      // mode must be enterable AND leavable by the same key, before the handler
-      // starts swallowing everything (below it, the shortcut is one-way: ON and
-      // never OFF). It also sits after the overlay guard above, so a stray
-      // Shift+2 cannot flip the mode behind help, a board menu or the palette.
-      if (e.shiftKey && e.code === 'Digit2' && !mod) {
-        e.preventDefault();
-        toggleReadOnly();
-        return;
-      }
-      // ---- PACKAGE-Q: panel chrome — three chords, ONE writer each ----------
-      //   Cmd+Ctrl+Shift+backslash → hide BOTH docked panels if either one is on
-      //                              screen, else show BOTH (a single panel is
-      //                              still reachable from its own chevron)
-      //   Cmd+Ctrl+Shift+[         → toggle the LEFT panel only
-      //   Cmd+Ctrl+Shift+]         → toggle the RIGHT panel only
-      //
-      // THE GROUP CHORD GAINED A MODIFIER: on macOS the user asked for Cmd AND
-      // Ctrl together, and `mod` above is meta-OR-ctrl so it cannot express the
-      // pair — the real modifier PAIR is tested below, per platform. MATCHED ON
-      // `e.code`, NEVER the `k` string: Shift rewrites the delivered character,
-      // so a glyph match never fires (the Shift+1/Shift+2 trap above).
-      //
-      // VIEW-MODE CHROME (2026-11-14) — PLACEMENT IS LOAD-BEARING, now ABOVE the
-      // read-only early-return below, mirroring Shift+2's argument: hiding or
-      // showing a panel is a VIEW concern, not a board mutation, so review mode
-      // must reach these branches. In review they drive the TRANSIENT reveal
-      // (src/canvas/reviewChrome.ts — local state, never persisted; the
-      // `diagram-studio:panels` layout the editor will return to is never
-      // written); in edit mode the same branches keep the persisted writers. The
-      // overlay guard above still swallows them behind help, a board menu or the
-      // insert palette, and the stale lock gets NO reveal either: with
-      // `codeStale` (and not readOnly) the guard below still swallows them.
-      // They sit ABOVE the arrow-nudge, `?`, `/` branches, which they shadow.
-      //
-      // The VISIBLE-state read stays the `hiddenRef` one that made the M3/S2c
-      // desync unreachable, and `hiddenRef.current` is now the EFFECTIVE state
-      // (what the eye sees), so in review the group chord's "any visible → hide
-      // both" describes the revealed panels too. ONE atomic both-sides write of
-      // a VISIBLE decision per press; do not reintroduce a second path.
-      const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
-      const panelChord = mac ? (e.metaKey && e.ctrlKey && e.shiftKey) : (e.ctrlKey && e.shiftKey);
-      if (panelChord && (readOnly || !codeStale) &&
-          (e.code === 'Backslash' || e.code === 'BracketLeft' || e.code === 'BracketRight')) {
-        if (e.code === 'Backslash') {
-          e.preventDefault();
-          const {left, right} = hiddenRef.current;
-          // any panel visible → hide both; none visible → show both
-          if (readOnly) revealPanels(left && right); else { if (railPanel.active) railPanel.setShown(left && right); setPanelsVisible(left && right); }
-        } else if (e.code === 'BracketLeft') {
-          e.preventDefault();
-          if (readOnly) revealPanel('left'); else togglePanel('left');
-        } else if (e.code === 'BracketRight') {
-          e.preventDefault();
-          if (readOnly) revealPanel('right'); else if (railPanel.active) railPanel.toggle(); else togglePanel('right');
-        }
-        return;
-      }
-      // Part B: review mode / UNISURF-S4 stale own no mutation. Placed after
-      // `isEditable`, Settings, Escape and Shift+1 (viewport/surface changes)
-      // on purpose; everything below mutates. `?` stays available (pure read).
-      if (readOnly || !!codeStale) {
-        if (k === '?') { setHelp(h => !h); return; }
-        return;
-      }
-      if (mod && k === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) redo(); else undo();
-        return;
-      }
-      /* ROUND ROTATE — Alt+R / Alt+Shift+R = ±15° on the selection (single
-         node: its own delta; multi: each member keeps its own delta while
-         its centre orbits the selection centroid — ONE undo entry, the
-         useRotation chord writer). Matched on e.code (Shift rewrites the
-         delivered character), never `mod` — Alt alone, so the browser's
-         own menu-focus chords are not stolen. */
-      if (e.altKey && !mod && e.code === 'KeyR') {
-        e.preventDefault();
-        rotateSelection(e.shiftKey ? -ROTATE_SNAP_DEG : ROTATE_SNAP_DEG);
-        return;
-      }
-      /* GROUP-OBJECT + LOCK v1: Cmd+G group, Cmd+Shift+G ungroup, Alt+L lock (NOT Cmd+L — the browser owns the address bar). */
-      if (mod && k === 'g' && !canvasLock) { e.preventDefault(); (e.shiftKey ? ungroupSelection : groupSelection)(); return; }
-      if (e.altKey && !mod && e.code === 'KeyL' && !canvasLock) { e.preventDefault(); toggleLockSelection(); return; }
-      if (mod && k === 'c') { copySelection(); return; }
-      if (mod && k === 'v') { e.preventDefault(); pasteClipboard(40, true); return; }
-      if (mod && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
-      // INLINE-TITLE (t_cb9335df) — F2 opens the in-place title editor on the
-      // sole selected node, the keyboard twin of double-clicking the title.
-      // TABLE nodes are out of scope (their header renames through the
-      // inspector); review/stale mode already returned above, so the editor
-      // can never open on a locked canvas. The token is render-injected —
-      // F2 on a FRESH selection still refires because Date.now() moves.
-      if (e.key === 'F2' && !mod) {
-        const n = selCount === 1 ? nodesRef.current.find(m => m.id === sel) : undefined;
-        if (n && (n.type === 'goblin' || n.type === 'label' || n.type === 'customshape')) {
-          e.preventDefault();
-          setTitleEdit({id: n.id, at: Date.now()});
-        }
-        return;
-      }
-      // arrow keys nudge the selection: 1px, Shift+arrow 10px
-      if (k === 'arrowleft' || k === 'arrowright' || k === 'arrowup' || k === 'arrowdown') {
-        const step = e.shiftKey ? 10 : 1;
-        const selAny = nodesRef.current.some(n => n.selected);
-        if (!selAny) return;
-        e.preventDefault();
-        if (k === 'arrowleft') nudge(-step, 0);
-        else if (k === 'arrowright') nudge(step, 0);
-        else if (k === 'arrowup') nudge(0, -step);
-        else nudge(0, step);
-        return;
-      }
-      // D3: Escape clears node + edge selection and closes any open popovers
-      // (handled above, before the overlay guard — Escape must stay the way out).
-      if (k === '?') { setHelp(h => !h); return; }
-      // ---- PACKAGE-N 2c: `/` focuses the panel's shape search (draw.io's
-      // convention). Bare `/` only — the mod+/ variant is the code pane's
-      // (UNISURF-S3 below), and the overlay guard above plus the
-      // `isEditable` early-return keep both from firing behind a dialog or
-      // inside a field.
-      // UNISURF-S3 — Cmd/Ctrl+/ toggles the code pane rail (spec §6: the
-      // binding was free; mods pass the editable guard at the top).
-      if (k === '/' && mod) { e.preventDefault(); toggleCode(); return; }
-      if (k === '/' && !mod && !isEditable(e.target) && isPanelVisible('left')) {
-        e.preventDefault();
-        searchRef.current?.focus();
-        return;
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, setNodes, setEdges, searchPos, help, boardsOpen, settingsOpen, escapeGroup,
-      groupSelection, ungroupSelection, toggleLockSelection,
-      setPanelsVisible, readOnly, codeStale, toggleReadOnly, boardDlg, tgOpen, toggleCode, sel, selCount, setTitleEdit, canvasLock, railPanel]);
-
-  // ---- C5: live zoom level for the zoom pill ----
-  const ZoomPill = () => {
-    const z = useStore(s => s.transform[2]);
-    return (
-      <Tooltip label="Reset zoom to 100%">
-        <button
-          type="button"
-          className="zoom-pill"
-          aria-label="Reset zoom to 100%"
-          onClick={() => rf?.zoomTo(1)}
-        >
-          {Math.round(z * 100)}%
-        </button>
-      </Tooltip>
-    );
-  };
-
 
   /* ROUND BN-2 — the export cluster now lives in useExportActions.ts
      (moved verbatim; the lazy thunks moved with it and stay DYNAMIC inside
-     the hook). The Mermaid import mints ids through readNextId/setNextId
-     because App owns the module-level idc counter. */
+     the hook). The Mermaid import mints ids through readNextId/setNextId,
+     which read/write the idFactory counter (setIdc — an absolute set, made
+     safe by the nextId live-id skip, DUP-ID t_0be8c968). */
   const [buildSvg, buildPng, boardPngForFeedback, printPdf, fileRef] = useExportActions(
     wrap, rf, theme, nodes, edges, pngScale, pngPad, curBoard,
     pushHistory, setNodes, setEdges, bumpHist, flash, tickTask,
-    () => idc, (n: number) => { idc = n; });
+    () => idc, setIdc);
 
 
   const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      const okNodes = Array.isArray(parsed?.nodes) && parsed.nodes.every((n: {id?: string; type?: string; position?: {x: number; y: number}}) =>
-        n && typeof n.id === 'string' && n.position &&
-        typeof n.position.x === 'number' && typeof n.position.y === 'number');
-      const okEdges = Array.isArray(parsed?.edges) && parsed.edges.every((ed: {id?: string; source?: string; target?: string}) =>
-        ed && typeof ed.id === 'string' && typeof ed.source === 'string' && typeof ed.target === 'string');
-      if (!okNodes || !okEdges) {
-        flash('Import failed: invalid diagram JSON');
-        return;
-      }
-      // keep generated ids ahead of anything imported
-      let maxId = idc;
-      for (const n of parsed.nodes as Node[]) {
-        const m = /^n(\d+)$/.exec(n.id);
-        if (m) maxId = Math.max(maxId, Number(m[1]) + 1);
-      }
-      idc = maxId;
-      // importing resets the history to the imported state.
-      // Legacy files carry no edge type — normalise so old edges stay editable.
-      const importedEdges: Edge[] = (parsed.edges as Edge[]).map(ed => ({
-        ...ed,
-        type: isGoblinEdge(ed.type) ? ed.type : 'goblinEdge',
-        data: {...((ed.data ?? {}) as EdgeData)},
-      }));
-      past.current = [];
-      future.current = [];
-      setNodes(parsed.nodes);
-      setEdges(importedEdges);
-      bumpHist(v => v + 1);
-      tickTask('board');   // ONBOARD-P4 B2 — importing a board is an explicit act
-      // Import replaces the CURRENT board's content (or seeds a new board when
-      // none is open) — it does not create a separate board.
-      if (curBoard) {
-        setCurBoard(c => c ? {...c, nodes: parsed.nodes, edges: importedEdges} : c);
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = window.setTimeout(() => { void flushSave(); }, 30);
-        setNotice(`Imported ${parsed.nodes.length} nodes · ${parsed.edges.length} edges into “${curBoard.name}”`);
-      } else {
-        setNotice(`Imported ${parsed.nodes.length} nodes · ${parsed.edges.length} edges`);
-      }
-      setTimeout(() => setNotice(''), 2500);
-      /* HARVEY 2026-10-13 — maxZoom 1, same as the board-load fit. */
-      setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
-    } catch {
-      flash('Import failed: could not parse JSON');
+    /* F9 — caps + the ONE validator live in board/importLimits; every refusal
+       returns before a state write, message in the modal, not the toast. */
+    const verdict = await readImportedFile(file);
+    /* `ok === false` (not truthiness): non-strict tsc does not narrow via truthiness. */
+    if (verdict.ok === false) { setImportFileMsg(verdict.msg); return; }
+    setImportFileMsg(null);
+    const parsed = verdict.doc as {nodes: Node[]; edges: Edge[]; [k: string]: unknown};
+    // keep generated ids ahead of anything imported
+    let maxId = idc;
+    for (const n of parsed.nodes as Node[]) {
+      const m = /^n(\d+)$/.exec(n.id);
+      if (m) maxId = Math.max(maxId, Number(m[1]) + 1);
     }
+    setIdc(maxId);
+    // importing resets the history to the imported state.
+    // Legacy files carry no edge type — normalise so old edges stay editable.
+    const importedEdges: Edge[] = (parsed.edges as Edge[]).map(ed => ({
+      ...ed,
+      type: isGoblinEdge(ed.type) ? ed.type : 'goblinEdge',
+      data: {...((ed.data ?? {}) as EdgeData)},
+    }));
+    past.current = [];
+    future.current = [];
+    setNodes(parsed.nodes);
+    setEdges(importedEdges);
+    bumpHist(v => v + 1);
+    tickTask('board');   // ONBOARD-P4 B2 — importing a board is an explicit act
+    // Import replaces the CURRENT board's content (or seeds a new board when
+    // none is open) — it does not create a separate board.
+    if (curBoard) {
+      setCurBoard(c => c ? {...c, nodes: parsed.nodes, edges: importedEdges} : c);
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => { void flushSave(); }, 30);
+      setNotice(`Imported ${parsed.nodes.length} nodes · ${parsed.edges.length} edges into “${curBoard.name}”`);
+    } else {
+      setNotice(`Imported ${parsed.nodes.length} nodes · ${parsed.edges.length} edges`);
+    }
+    setTimeout(() => setNotice(''), 2500);
+    /* HARVEY 2026-10-13 — maxZoom 1, same as the board-load fit. */
+    setTimeout(() => rf?.fitView({padding: 0.25, maxZoom: 1}), 30);
   };
-
-  const sep = () => <span style={{width: 1, height: 18, background: 'var(--border)', flex: 'none'}} />;
 
   // ---- selected-edge derived values (toolbar + inspector) ----
   const eStroke = selectedEdge ? edgeStroke(selectedEdge) : COLOR_VAR.accent;
@@ -2866,21 +1558,10 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
      Each table is the SAME value set the `<select>` it replaces carried, so the
      conversion changes the control and nothing about what is stored. `art` is
      the glyph; `label` is both the trigger text and the row text. */
-  const MARKER_OPTS: PickerOption[] = [
-    {v: 'none', label: 'none', art: <ArtArrow kind="none" />},
-    {v: MarkerType.ArrowClosed, label: 'closed arrow', art: <ArtArrow kind="closed" />},
-    {v: MarkerType.Arrow, label: 'open arrow', art: <ArtArrow kind="open" />},
-  ];
   /** same table, mirrored — the head-START control is the head-END one flipped.
    *  HEADROOM t_a21adb78 — DERIVED instead of a hand-copied twin table (the
    *  rows share value + label; only the glyph mirrors). cloneElement keeps the
    *  same kind per row and adds flip, so the rendered table is identical. */
-  const MARKER_OPTS_START: PickerOption[] = MARKER_OPTS.map(o => ({
-    ...o, art: cloneElement(o.art as ReactElement<{kind: 'none' | 'closed' | 'open'; flip?: boolean}>, {flip: true}),
-  }));
-  const WIDTH_OPTS: PickerOption[] = [1, 1.5, 1.8, 2, 3].map(w => ({
-    v: String(w), label: String(w), art: <ArtWidth w={w} />,
-  }));
   const DASH_OPTS: PickerOption[] = (['solid', 'dashed', 'dotted'] as const).map(d => ({
     v: d, label: d, art: <ArtDash kind={d} />,
   }));
@@ -2917,7 +1598,6 @@ const onBend = useCallback((id: string, W: Pt, phase: BendPhase, dx: number, dy:
   }));
 
 // HEADROOM t_a21adb78 — hoisted: the drop hint was spelled twice (aria-label + title).
-const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
 
   /* ==========================================================================
      ROUND AL, AL-6 — THE ONE CHIP ROW. This is the panel's ONLY row control.
@@ -2956,12 +1636,8 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
   const DASH_ICON_OPTS = DASH_OPTS;
   const CURVE_ICON_OPTS = CURVE_OPTS;
   const MARKER_ICON_OPTS = MARKER_OPTS;
-  const MARKER_ICON_OPTS_START = MARKER_OPTS_START;
   /** AL-6 — `flow` becomes a GLYPH row. `flow glyph` reuses `FLOW_ICON_PATHS`'s
    *  own vocabulary rather than inventing a second one. */
-  const FLOW_OPTS: PickerOption[] = ([
-    ['none', 'None'], ['dots', 'Dots'], ['dash', 'Dash'], ['pulse', 'Pulse'], ['icon', 'Icon'],
-  ] as const).map(([v, label]) => ({v, label, art: <ArtFlow kind={v} />}));
   /** ROUND AM, AM-3 — `flow glyph` becomes a row of SIX ICON CHIPS carrying the
    *  glyph each option will actually travel along the line, drawn in miniature,
    *  exactly as the approved mockup draws them. Two things had to change for
@@ -3019,37 +1695,12 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
       not the button's size, so no rule was enlarged. The row still wraps on its
       own — `.chips` is `flex-wrap: wrap` and this row is that class — so six chips
       that no longer fit drop to a second line without a new rule. */
-      const FLOW_GLYPH_SCALE = 22 / 20;
-   const FLOW_ICON_OPTS: PickerOption[] = (([
-     ['mail', 'Letter'], ['package', 'Package'], ['file', 'File'],
-     ['zap', 'Zap'], ['settings', 'Gear'], ['database', 'DB'],
-   ] as const)).map(([v, label]) => ({
-     v, label,
-     art: (
-       /* `insp-glyph` is the class `G` itself renders, so both rows' figures are
-          carried by the same box — not a second frame that happens to look alike. */
-       <svg className="insp-glyph" viewBox="0 0 26 18" width={26} height={18}
-         fill="none" stroke="currentColor" strokeWidth={2 / FLOW_GLYPH_SCALE}
-         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-         <g transform={`translate(13 9) scale(${FLOW_GLYPH_SCALE}) translate(-12 -12)`}>
-           {FLOW_ICON_PATHS[v]}
-         </g>
-       </svg>
-     ),
-   }));
-  /** The goblin `body` switch (§B #12) — TWO options, not nineteen. */
-  const BODY_OPTS: PickerOption[] = [
-    {v: 'card', label: 'card', art: null},
-    {v: 'label-only', label: 'label only', art: null},
-  ];
   /* PACKAGE-P §E.1 — the Text section's three option tables. They carry NO art:
      §E.1 specifies a 4-step segmented size control, a 2-button weight toggle and
      a 3-button align row, and `ToggleRow` renders `o.art ?? o.label` — so the
      labels ARE the control, which is also why no glyph had to be invented for
      them. The tables themselves live in `src/textStyle.ts` (one source, shared
      with the harness) and are wrapped here only to satisfy `PickerOption`. */
-  const SIZE_OPTS: PickerOption[] = TEXT_SIZE_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
-  const WEIGHT_OPTS: PickerOption[] = TEXT_WEIGHT_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   const ALIGN_OPTS: PickerOption[] = TEXT_ALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   /* ROUND X, ITEM 3 — THE FONT TABLE, AS FOUR SELF-PREVIEWING BUTTONS. It is no
      longer an `IconPickerRow` (trigger + popover): Harvey asked for "4 nút bấm
@@ -3062,38 +1713,9 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
      `family` here is the CSS stack for the BUTTON'S PREVIEW only. The value that
      reaches the node is the KEY, and the key is resolved to a stack by
      `TEXT_FONT_FAMILY` in `src/textStyle.ts` — one place, not two. */
-  const FONT_OPTS: PickerOption[] = TEXT_FONT_OPTS.map(o => ({
-    v: o.v, label: o.label,
-    /* ROUND Z, ITEM 1 — THE BUTTON'S TOOLTIP IS THE FULL FAMILY NAME. The label
-       is short because the full one does not fit a 3-column cell (measured: at
-       10px `JetBrains Mono` is 84.0px and `Be Vietnam Pro` 75.2px, against a
-       65px content box), so the short name is what prints and the real family
-       name is what hovering says. */
-    title: o.title,
-    /* ROUND X, ITEM 3 — THE PREVIEW IS THE BUTTON'S OWN CONTENT. Each option
-       prints its own family NAME in its own family. That is the one thing a
-       native `<select>` cannot do, and it is why this control survives the
-       change from a popover to a segmented row: the label and the sample are
-       the SAME span, so the row prints each name exactly ONCE — there is no
-       second cell to suppress and therefore nothing to hide. */
-    art: (
-      <span className="insp-font-btn" style={{fontFamily: TEXT_FONT_FAMILY[o.v]}}>
-        {o.label}
-      </span>
-    ),
-  }));
   /* ROUND Z, ITEM 2 — the three vertical positions. Plain data, same idiom as
      the three tables above: no art, so the label IS the control. */
-  const VALIGN_OPTS: PickerOption[] = TEXT_VALIGN_OPTS.map(o => ({v: o.v, label: o.label, art: null}));
   /** Crow's-foot vocabulary (§B #9/#10) — IE / IDEF1X notation, drawn. */
-  const CROW_FOOT: {v: string; label: string}[] = [
-    {v: 'none', label: 'none'},
-    {v: 'one', label: 'one (bar)'},
-    {v: 'zeroOrOne', label: 'zero or one (ring + bar)'},
-    {v: 'many', label: 'many (crow\u2019s foot)'},
-    {v: 'zeroOrMany', label: 'zero or many (ring + foot)'},
-    {v: MarkerType.ArrowClosed, label: 'arrow'},
-  ];
   const CROW_END_OPTS: PickerOption[] = CROW_FOOT.map(o => ({
     ...o, art: <ArtCardinality kind={o.v} />,
   }));
@@ -3127,94 +1749,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
            body: (((selected.data as any).body ?? 'card') as 'card' | 'label-only')}
         : {kind: 'label'};
   const inspSections = getInspectorSections(inspTarget);
-  /* ---- PACKAGE-P §A.1/§D: the ordered render ----------------------------
-     Each branch REGISTERS its section bodies into `sectionBody` and then prints
-     `renderSections()` — the ORDER comes from `inspSections`, i.e. from
-     `src/inspector.ts` §D, not from the order the branches happen to build them
-     in. That is the whole point of the pass: reordering the panel is now an edit
-     to one array in a pure module, not a re-shuffle of 500 lines of JSX.
-
-     `data-section` lands on every rendered section (§F.3 asserts the ordered
-     list); `data-collapsed` is the literal `'false'` because there is no fold UI
-     yet — §C's trigger rows and the `diagram-studio:inspector-sections`
-     persistence are PASS 3. `data-collapsed-default` carries §A.3's truth table
-     as data so pass 3 reads it instead of re-deriving it. */
-  const sectionBody: Record<string, React.ReactNode> = {};
-  const secBody = (id: SectionId, node: React.ReactNode) => { sectionBody[id] = node; };
-  /** A branch is SHARED by several target kinds, so it may only REGISTER a body
-   *  for a section the DECISION actually lists. `renderSections()` filters as
-   *  well, but relying on that filter alone would hide the mistake: the body
-   *  would still be built — its controlled reads and derived values evaluated —
-   *  for a panel that never paints it. So the gate is expressed against
-   *  `inspSections`, the same ordered list the painter walks: one source of
-   *  truth, never a second copy of the ERD rule. */
-  const hasSection = (id: SectionId) => inspSections.some(s => s.id === id);
-  const SECTION_TITLES: Record<SectionId, string> = {
-    content: 'Content',
-    definition: 'Additional Description',
-    text: 'Text',
-    style: 'Style',
-    table: 'Table',
-    columns: 'Columns',
-    showMode: 'Show mode',
-    label: 'Label',
-    line: 'Line',
-    markers: 'Markers',
-    cardinality: "Cardinality (crow\u2019s foot)",
-    flow: 'Flow animation',
-  };
-  /* A section is only PAINTED when the current branch REGISTERED a body for it.
-     `content` and `style` are goblin-only; `table`/`columns`/`showMode` are
-     table-only; on a fresh board the fallback target is `{kind:'label'}`, whose
-     `text` body the label branch registers. A section with no body would be an
-     empty shell with a title, so it is skipped rather than rendered blank. */
-  /* PASS 3 §C — THE FOLDED ROW'S CURRENT VALUE. A fold that hid the thing it
-     controls would be a lie; both readouts read the SAME node/edge data the
-     expanded controls bind to, so there is no second source to drift. `label`
-     names the value for assistive tech without turning it into the button's
-     accessible name, which stays the section title. */
-  const CROW_WORD: Record<string, string> = {
-    one: 'one', zeroOrOne: 'zero or one', many: 'many', zeroOrMany: 'zero or many',
-  };
-  const crowWord = (end: unknown): string => {
-    const k = typeof end === 'string' ? end : '';
-    if (!k) return 'none';
-    return CROW_WORD[k] ?? (k === MarkerType.ArrowClosed ? 'arrow' : k);
-  };
-  /* `count` is a field of exactly three flows (the stepper renders for
-     dots/icon/event, App.tsx:4570), so the readout reports a number only where
-     the expanded body would show one. */
-  const flowReadout = () =>
-    eFlow === 'none' ? 'off'
-      : (eFlow === 'dots' || eFlow === 'icon') ? `on · ${eFlowCount}`
-      : 'on';
-  const FOLDED_READOUT: Partial<Record<SectionId, {node: React.ReactNode; label: string}>> = {
-    cardinality: {
-      node: <>
-        {crowWord((selectedEdge?.markerStart as any)?.type)}
-        {' → '}
-        {crowWord((selectedEdge?.markerEnd as any)?.type)}
-      </>,
-      label: 'ends',
-    },
-    flow: {node: flowReadout(), label: 'flow'},
-  };
-  const renderSections = () => inspSections
-    .filter(s => sectionBody[s.id] != null)
-    .map(s => (
-      <Section
-        key={s.id}
-        id={s.id}
-        title={SECTION_TITLES[s.id]}
-        collapsedDefault={s.collapsedDefault}
-        collapsed={isCollapsed(s.id)}
-        onToggle={toggleSection}
-        readout={FOLDED_READOUT[s.id]?.node}
-        readoutLabel={FOLDED_READOUT[s.id]?.label}
-      >
-        {sectionBody[s.id]}
-      </Section>
-    ));
+  const {secBody, hasSection, renderSections} = useInspectorSectionRegistry({inspSections, selectedEdge, eFlow, eFlowCount, isCollapsed, toggleSection});
   /** §B #11's preview colour is the node's LIVE outline colour, so the shape
    *  silhouettes recolour with the node exactly as the palette row does. */
   const nodeColor = selected ? resolveColor(selected.data as any) : COLOR_VAR.accent;
@@ -3296,108 +1831,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
    *  Font family and opacity/fill are deliberately ABSENT (§E.1): one node
    *  already mixes `--mono` and `--sans`, so a single family control would be a
    *  lie, and neither has a DOM analogue. */
-  const tsBody = (
-    <>
-      <div className="field">
-        <label>size</label>
-        {/* ROUND X, ITEM 1 — BACK TO THE BARE SEGMENTED ROW. ROUND W put a
-            custom-size number input beside these four buttons, and that flex
-            row squeezed the 4-column grid into a 31×121px COLUMN (Harvey:
-            "UI lệch, quá xấu"). The input is GONE; the steps are the control
-            again, full panel width, one row.
-
-            THE RULE STAYS (Harvey: "rule giữ khi cần"). `scale` on `TextStyle`,
-            `TEXT_SCALE_MIN/MAX`, `clampTextScale` and the `scale` read in
-            `textStyleVars` are all still in `src/textStyle.ts`, so a board that
-            already carries a custom multiplier still RENDERS it. What changed is
-            only how the panel REPORTS one: `readTextStyle` now derives `size`
-            from what actually paints (`stepForScale`), so a stored 1.7 lights NO
-            step here rather than claiming M while the node paints 1.7. */}
-        <ToggleRow
-          /* `null` is "matches no step" — a custom multiplier. `?? ''` matches no
-             option either, so nothing is marked and the node keeps painting its
-             stored scale. */
-          value={tsShown.size ?? ''}
-          onChange={v => writeTextStyle({size: v as TextSize})}
-          options={SIZE_OPTS}
-          title="Text size"
-        />
-      </div>
-      <div className="field">
-        <label>weight</label>
-        <ToggleRow
-          value={tsShown.weight}
-          onChange={v => writeTextStyle({weight: v as TextWeight})}
-          options={WEIGHT_OPTS}
-          title="Text weight"
-        />
-      </div>
-      {/* ROUND W, ITEM 2 — THE FAMILY, FOR THE WHOLE NODE. Harvey's own choice:
-          "cả node trước" — the one choice sets title + kicker + sub + metric +
-          the label node's text. That FLATTENS the mix this section's header used
-          to call out ("one node already mixes `--mono` and `--sans`, so a single
-          family control would be a lie") and it is a decision, not an accident:
-          the picker is worth having only if it actually changes what you read.
-          The lie that note warned about is gone because the control now DOES set
-          every one of those rows — see the EIGHT `var(--ts-font, …)` consumers
-          in `src/styles.css`, one per row that owns node text. */}
-      <div className="field">
-        <label>font</label>
-        {/* ROUND Z, ITEM 1 — SIX FAMILIES, TWO ROWS OF THREE, REAL NAMES.
-            Harvey: "Font name hơi kì, nên theo tên Font" + "nếu 6 nút thì 3 3
-            cho đẹp". The buttons print short labels because the full family
-            names do not fit a 3-column cell (measured: `JetBrains Mono` 84.0px
-            and `Be Vietnam Pro` 75.2px at 10px, against a 65px content box),
-            and each carries its real name as the tooltip. `grid3` is the
-            two-row modifier; the geometry is measured in the `.insp-seg.grid3`
-            block in `src/styles.css`.
-
-            THE HINT THAT USED TO SIT UNDER THIS CONTROL IS STILL GONE — with
-            six self-previewing buttons the control states its own scope, and
-            the whole Text section carries zero hints. */}
-        <ToggleRow
-          value={tsShown.font}
-          onChange={v => writeTextStyle({font: v as TextFont})}
-          options={FONT_OPTS}
-          title="Text font for the whole node"
-          grid3
-        />
-      </div>
-      <div className="field">
-        <label>text color</label>
-        {/* ROUND AQ2 — the custom literal cell, same as the edge stroke row: the
-            literal is stored on `textStyle.customColor` with `colorKey` cleared
-            (the merge enforces the exclusion); a key pick clears the literal. The
-            custom cell takes the ring when a literal is set (no hue lights). */}
-        {swatchRow(tsShown.colorKey, k => writeTextStyle({colorKey: k, customColor: undefined}),
-          {value: tsShown.customColor, onPick: hex => writeTextStyle({customColor: hex, colorKey: undefined})},
-        )}
-      </div>
-      <div className="field">
-        <label>align</label>
-        {/* ROUND Z, ITEM 2 — TWO ROWS IN ONE FIELD: the horizontal row Harvey
-            already had (Left / Center / Right, storing `align`), and the new
-            vertical one (Top / Middle / Bottom, storing `vAlign`). Both are the
-            same segmented control, both write through the same lazy-write
-            helper, and the vertical one is ALWAYS PRESENT for a text target —
-            the research flagged hiding it (Excalidraw force-sets `middle` when
-            text binds, Figma has no control at all) as the anti-pattern to
-            avoid. No hint: the whole Text section carries zero hints. */}
-        <ToggleRow
-          value={tsShown.align}
-          onChange={v => writeTextStyle({align: v as TextAlign})}
-          options={ALIGN_OPTS}
-          title="Text align"
-        />
-        <ToggleRow
-          value={tsShown.vAlign}
-          onChange={v => writeTextStyle({vAlign: v as TextVAlign})}
-          options={VALIGN_OPTS}
-          title="Text vertical align"
-        />
-      </div>
-    </>
-  );
+  const tsBody = buildTsBody({tsShown, writeTextStyle, ALIGN_OPTS});
 
   /** ROUND AM, AM-2 — THE EDGE LABEL'S TEXT SECTION: the same three controls,
    *  the same tables, and deliberately not the same FOURTH and FIFTH rows.
@@ -3432,38 +1866,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
    *  omission: the label's colour is `labelTextKey`, rendered as its own `text
    *  color` swatch row in the LABEL section, right above this one. A second
    *  swatch row here would be two controls for one stored fact. */
-  const edgeLabelTextBody = (
-    <>
-      <div className="field">
-        <label>size</label>
-        <ToggleRow
-          value={edgeLabelShown.size ?? ''}
-          onChange={v => writeEdgeLabelStyle({size: v as TextSize})}
-          options={SIZE_OPTS}
-          title="Edge label text size"
-        />
-      </div>
-      <div className="field">
-        <label>weight</label>
-        <ToggleRow
-          value={edgeLabelShown.weight}
-          onChange={v => writeEdgeLabelStyle({weight: v as TextWeight})}
-          options={WEIGHT_OPTS}
-          title="Edge label text weight"
-        />
-      </div>
-      <div className="field">
-        <label>font</label>
-        <ToggleRow
-          value={edgeLabelShown.font}
-          onChange={v => writeEdgeLabelStyle({font: v as TextFont})}
-          options={FONT_OPTS}
-          title="Edge label text font"
-          grid3
-        />
-      </div>
-    </>
-  );
+  const edgeLabelTextBody = buildEdgeLabelTextBody({edgeLabelShown, writeEdgeLabelStyle});
 
   // ---- M3/S2d: the inspector is DOCKED, like the palette — C4's selection auto-hide is GONE with the
   // `pinned` override it needed: a panel is hidden only when the user collapsed it by hand, so a
@@ -3496,7 +1899,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
       : ui.formFactor === 'phone' ? 'sheet'
         : null;
   const [overlay, setOverlay] = useState<'left' | 'right' | null>(null);
-  // Read by the global keydown handler (registered above), which must not
+  // Read by the global keydown handler (registered in useKeyboardShortcuts, below), which must not
   // re-register on every drawer open/close — same reason `hiddenRef` exists.
   const overlayRef = useRef<'left' | 'right' | null>(null);
   overlayRef.current = overlay;
@@ -3559,6 +1962,17 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
    *  that is not on screen. */
   const isPanelVisible = (side: 'left' | 'right') =>
     overlayMode !== null ? overlayRef.current === side : !(side === 'left' ? leftHidden : rightHidden);
+  // ---- keyboard shortcuts ---- (moved VERBATIM to src/hooks/useKeyboardShortcuts.ts —
+  // APP-SPLIT S6; the binding table in that module's header is the acceptance contract.
+  // The call sits BELOW hiddenRef/isPanelVisible: the ctx reads them at render time, and a const read above its declaration is a TDZ throw the old closure never hit.
+  useKeyboardShortcuts({
+    undo, redo, copySelection, pasteClipboard, duplicateSelection, nudge, setNodes,
+    setEdges, setSettingsOpen, setSearchPos, setHelp, setBoardsOpen, settingsOpen,
+    searchPos, help, boardsOpen, boardDlg, tgOpen, historyOpen, escapeGroup, canvasLock,
+    groupSelection, ungroupSelection, toggleLockSelection, setPanelsVisible, togglePanel,
+    readOnly, codeStale, toggleReadOnly, sel, selCount, nodesRef, setTitleEdit, toggleCode,
+    railPanel, hiddenRef, isPanelVisible, revealPanel, revealPanels, rotateSelection, rf, searchRef,
+  });
 
   const panelToggle = (side: 'left' | 'right') => {
     const hidden = side === 'left' ? leftHidden : rightHidden;
@@ -3632,66 +2046,6 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
       </Tooltip>
     );
   };
-
-  /** =====================================================================
-   *  PACKAGE-N pass 2c — ONE palette row, rendered from the data alone.
-   *
-   *  Deliberately a local function, not a component: it closes over
-   *  `addNodeByLabel`, `isStarred` and `toggleFavourite`, so extracting it to a
-   *  module would mean threading three callbacks through props for no gain.
-   *
-   *  `dimmed` is §9's "collapsed category still contributes hits". While
-   *  searching, a row whose category is folded renders at reduced opacity
-   *  instead of vanishing — the hit is never HIDDEN, only de-emphasised, which
-   *  is the difference between "your shape is not here" and "your shape is
-   *  here, in a section you folded".
-   *
-   *  THE ROW IS glyph + label + hint + star. Revision 3 removed the `types[]`
-   *  BADGE this used to render; `types[]` is still on the item (the model's
-   *  membership field) but nothing paints it, so a single-type element no
-   *  longer repeats its own category back at the user.
-   *  ===================================================================== */
-  const renderPaletteRow = (p: PaletteItem, key: string, dimmed = false) => (
-    <div
-      key={key}
-      className={`pal-item${dimmed ? ' pal-dimmed' : ''}`}
-      draggable
-      data-label={p.label}
-      data-dimmed={dimmed ? 'true' : undefined}
-      // pass 2b — the payload is the item's unique LABEL, never an index: the
-      // panel no longer renders the same array it resolves against, so a
-      // rendered index and a library index are different numbers.
-      onDragStart={e => e.dataTransfer.setData('palette', p.label)}
-      onDoubleClick={() => addNodeByLabel(p.label)}
-      title="Drag onto the canvas or double-click to add"
-    >
-      <div className="pal-swatch">
-        {p.kind === 'label'
-          ? <span style={{color: COLOR_VAR[p.colorKey]}}>T</span>
-          : p.label === 'Table'
-            ? <TableGlyph color={COLOR_VAR[p.colorKey]} />
-            : <ShapePreview shape={p.shape} color={COLOR_VAR[p.colorKey]} />}
-      </div>
-      <div className="pal-meta">
-        <span>{p.label}</span>
-        <small>{p.hint}</small>
-      </div>
-      {/* §6.3 — star / pin. `onPointerDown` stops the drag-from-row gesture so a
-          star click can never start dragging the shape underneath it. */}
-      <button
-        type="button"
-        className={`pal-star${isStarred(p.label) ? ' on' : ''}`}
-        data-star={p.label}
-        aria-pressed={isStarred(p.label)}
-        aria-label={isStarred(p.label)
-          ? `Remove ${p.label} from Favourites`
-          : `Add ${p.label} to Favourites`}
-        title={isStarred(p.label) ? 'Remove from Favourites' : 'Add to Favourites'}
-        onPointerDown={e => e.stopPropagation()}
-        onClick={e => { e.stopPropagation(); toggleFavourite(p); }}
-      >{isStarred(p.label) ? '★' : '☆'}</button>
-    </div>
-  );
 
   return (
     <div
@@ -3782,331 +2136,34 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
             {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : saveState === 'error' ? 'save failed' : (dirty && !autosave ? 'unsaved' : '')}
           </div>
         </div>
-        <div className="panel-body">
-          {/* PACKAGE-N §4.1 (Revision 3) — THREE sections in ONE scroll
-              container, in this order: search → favourites → categories.
-              The omnibox is now IN this pass; the type-filter row that used to
-              sit between favourites and categories is GONE (see the state block
-              above for the measurement that removed it). */}
-
-          {/* ---- SEARCH (§4.1 #1, §9) -------------------------------------
-              Pinned at the top so it stays the panel's first control, and
-              BEFORE Favourites: the field searches the shape LIBRARY, and a
-              query is a stronger statement of intent than a favourite tile.
-              It searches the WHOLE library, never the current view — a hit for
-              a shape is always reachable, whatever is folded. ---- */}
-          <div className="lib-search">
-            <input
-              ref={searchRef}
-              type="search"
-              className="lib-search-input"
-              data-lib-search="true"
-              placeholder="Search shapes…"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              aria-label="Search shapes by name, shape or synonym"
-              onKeyDown={e => {
-                // Escape clears first and stops there, so it never also falls
-                // through to the app's own "deselect" Escape behind it.
-                if (e.key === 'Escape' && query) {
-                  e.stopPropagation();
-                  setQuery('');
-                }
-              }}
-            />
-          </div>
-
-          {/* ---- FAVOURITES (§6) ------------------------------------------
-              Rendered only when there is something to show: a favourite, or a
-              live selection (which makes the pending `+` tile meaningful). An
-              empty section would be a permanent, useless header. ---- */}
-          {(favourites.length > 0 || selCount > 0) && (
-            <div className="fav-sec" data-fav-count={favourites.length} data-sel-count={selCount}>
-              <div className="sec-label">Favourites</div>
-              <div className="fav-grid">
-                {/* §6.4 — the pending `+`: "add from selection", one click, no
-                    menus. Only while a selection exists on the canvas. */}
-                {selCount > 0 && (
-                  <button
-                    type="button"
-                    className="fav-tile fav-pending"
-                    data-fav-pending="true"
-                    aria-label={`Save the ${selCount} selected node${selCount === 1 ? '' : 's'} to Favourites`}
-                    title={`Add ${selCount} selected node${selCount === 1 ? '' : 's'} to Favourites`}
-                    onClick={addFavouriteFromSelection}
-                  >
-                    <span className="fav-glyph" aria-hidden="true">+</span>
-                    <span className="fav-name">Add selection</span>
-                  </button>
-                )}
-                {favourites.map(f => (
-                  <button
-                    type="button"
-                    key={f.id}
-                    className="fav-tile"
-                    data-fav-id={f.id}
-                    data-fav-label={library.favouriteLabel(f) ?? ''}
-                    draggable
-                    // §6.5 — a drop re-derives the geometry; only the IDENTITY
-                    // travels in the payload, never a stored coordinate.
-                    onDragStart={e => e.dataTransfer.setData('favourite', f.id)}
-                    onDoubleClick={() => insertFavourite(f)}
-                    title={`Add “${library.favouriteName(f)}” to the canvas — click, double-click or drag`}
-                    onClick={() => insertFavourite(f)}
-                  >
-                    <span className="fav-glyph" aria-hidden="true">{favouritePreview(f)}</span>
-                    <span className="fav-name">{library.favouriteName(f)}</span>
-                    {/* ROUND AB, ITEM 2 — REMOVE FROM THE STRIP.
-                        ROUND AE — EVERY TILE NOW CARRIES IT, AND IT REMOVES BY ID.
-                        Harvey: "tôi muốn shape trong favorite cũng có thể có
-                        icon để click remove khỏi favorite". Until ROUND AB the
-                        only way out of Favourites was the star on the palette
-                        row, which means scrolling the library back to the item
-                        you just removed from your shortlist.
-
-                        ROUND AB RENDERED THIS ONLY WHERE A LABEL EXISTED, because
-                        the removal matched by label and a selection-saved
-                        favourite has none — so the control was absent on exactly
-                        the tiles that had no other way out. ROUND AE keys the
-                        removal on `f.id` (see `removeFavourite` above), so the
-                        condition is gone: every tile has a `×`, including the
-                        ones saved from a selection.
-
-                        WHAT IT STOPS, and nothing else. The tile inserts on
-                        `click` (and double-click, and drag), so this control
-                        stops: `click` (the whole point — a remove must never
-                        also insert), `dblclick` (a fast double-tap on the `×`
-                        would otherwise reach the tile's insert), and
-                        `dragstart` (mousedown on a child of a `draggable`
-                        button can begin the tile's drag, and the drag is what
-                        actually inserts on canvas drop). `keydown` stops its
-                        own Enter / Space so the key that activates the `×`
-                        cannot also reach a handler behind it.
-
-                        ALWAYS VISIBLE, at low emphasis (opacity .6) — not
-                        hover-only. This project treats tablet and phone as in
-                        scope, and there is no hover on a tablet: a
-                        hover-revealed control would be unreachable there. The
-                        `:focus-within` / `:hover` rules in `styles.css` only
-                        raise its emphasis, so touch users get the same target a
-                        mouse user does.
-
-                        A `<span role="button" tabIndex={0}>` rather than a
-                        nested `<button>`: identical to `.cust-remove` on the
-                        custom-shape tiles 40 lines below, so the two grids of
-                        tiles stay one control vocabulary — and a nested
-                        interactive element would be invalid inside the tile's
-                        own `<button>`.
-
-                        THE REMOVAL ITSELF IS NOT REIMPLEMENTED: it calls
-                        `removeFavourite` → the SAME `mutateFavourites` write
-                        path the palette star uses, now ending in
-                        `library.removeFavouriteById`. */}
-                    <span
-                      className="fav-remove"
-                      role="button"
-                      tabIndex={0}
-                      data-fav-remove={f.id}
-                      aria-label={`Remove ${library.favouriteName(f)} from Favourites`}
-                      title={`Remove ${library.favouriteName(f)} from Favourites`}
-                      onClick={e => {
-                        e.stopPropagation();
-                        removeFavourite(f.id);
-                      }}
-                      onDoubleClick={e => e.stopPropagation()}
-                      onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          removeFavourite(f.id);
-                        }
-                      }}
-                      ><X size={12} strokeWidth={2.5} /></span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ---- CUSTOM SHAPES (§4.1 item 3, §8.1–§8.3) --------------------
-              ALWAYS rendered, unlike Favourites above it: this section owns
-              the IMPORT control, and that control is the only way a first
-              shape can ever exist. An empty section here is not a useless
-              header — it is the door.
-
-              The artwork is drawn from `svgDataUri` through an `<img>`, never
-              as markup: the data: URI context disables scripts and external
-              fetches, which is the second guard behind the sanitiser. ---- */}
-          <div className="cust-shapes" data-cust-count={shapes.length}>
-            <div className="cust-head">
-              <span className="sec-label">Custom shapes</span>
-              <button
-                type="button"
-                className="cust-import"
-                data-custom-import-btn="true"
-                aria-label="Import an SVG file as a custom shape"
-                title="Import an SVG file as a custom shape"
-                onClick={openShapeImport}
-              >
-                Import
-              </button>
-            </div>
-            {/* Visually hidden, but the ONE picker every affordance clicks. */}
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".svg,image/svg+xml"
-              className="cust-file"
-              data-custom-import-input="true"
-              aria-label="Choose an SVG file to import"
-              onChange={onImportInputChange}
-            />
-            <div className="cust-grid">
-              {shapes.map(s => (
-                <button
-                  type="button"
-                  key={String(s.created)}
-                  className="fav-tile cust-tile"
-                  data-custom-shape={String(s.created)}
-                  data-custom-title={s.title}
-                  draggable
-                  // §8.1 — the payload is the sanitised MARKUP, not an id: the
-                  // stored entry has no id field, and the canvas resolves this
-                  // exact string back to the entry it already holds.
-                  onDragStart={e => e.dataTransfer.setData('customshape', s.data)}
-                  onDoubleClick={() => insertCustomShape(s)}
-                  /* ROUND BE (2026-10-23, Harvey: a single click must NOT
-                     insert — parity with the palette). The onClick here used to
-                     insert immediately, which the palette rows
-                     (`renderPaletteRow`: drag or double-click, no onClick) and
-                     the canvas both punish — one stray click littered the
-                     board. This tile now follows the PALETTE convention, not
-                     the favourites' (which are click-to-insert by design, and
-                     stay so). Double-click and drag still work unchanged. */
-                  title={`Drag onto the canvas or double-click to add “${s.title}”`}
-                >
-                  <span className="fav-glyph" aria-hidden="true">
-                    <img src={svgDataUri(s.data)} alt="" className="cust-art" />
-                  </span>
-                  <span className="fav-name">{s.title}</span>
-                  {/* `created` is the stable identity — the store has no id. */}
-                  <span
-                    className="cust-remove"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Remove ${s.title}`}
-                    title={`Remove ${s.title}`}
-                    onClick={e => {
-                      e.stopPropagation();
-                      removeCustomShape(String(s.created));
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        removeCustomShape(String(s.created));
-                      }
-                    }}
-                    ><X size={12} strokeWidth={2.5} /></span>
-                </button>
-              ))}
-              {/* The drop zone is ALWAYS a tile, and always LAST: it is the
-                  whole grid while the library is empty, and the "add the next
-                  one" cell once shapes exist. Without it the second import
-                  would only be reachable through the button. */}
-              <button
-                type="button"
-                className={`cust-drop${shapes.length ? ' cust-drop-compact' : ''}`}
-                data-custom-dropzone="true"
-                aria-label={CUST_DROP_HINT}
-                title={CUST_DROP_HINT}
-                onClick={openShapeImport}
-                {...shapeZoneProps}
-              >
-                <span className="cust-drop-glyph" aria-hidden="true">+</span>
-                <span className="cust-drop-text">Drop an SVG here, or Import</span>
-              </button>
-            </div>
-          </div>
-
-          {/* ---- THE LIBRARY -------------------------------------------------
-              TWO states, ONE list of 8 categories (§2, canonical order):
-
-                query EMPTY     the normal accordion. All 8 sections always
-                                render with their full counts — nothing filters
-                                them any more, so a category can never be absent.
-                query NON-EMPTY a flat result list grouped by category. A hit
-                                whose category is COLLAPSED renders DIMMED, not
-                                hidden (§9): collapsing a section must never
-                                hide a search hit, or the user concludes the app
-                                does not have the shape at all. Empty categories
-                                are dropped here (a "(0)" header is noise);
-                                clearing the field restores the accordion with
-                                its persisted fold state untouched. ---- */}
-          <div className="sec-label">Shapes</div>
-
-          {searching ? (
-            <div className="lib-cats" data-searching="true">
-              {searchGroups.map(({cat, label, items}) => (
-                <div className="lib-cat" key={cat} data-cat={cat} data-search-group={cat}>
-                  <div className="lib-search-head">
-                    <span className="lib-cat-name">{label}</span>
-                    <span className="lib-cat-n" data-group-count={items.length}>{items.length}</span>
-                  </div>
-                  <div className="palette">
-                    {items.map(p => {
-                      // Dimmed IFF the user folded this section. The fold is
-                      // read from the same persisted map the accordion uses, so
-                      // the two states can never disagree.
-                      const folded = !isCategoryOpen(presetId, cat);
-                      return renderPaletteRow(p, `${cat}-${p.label}`, folded);
-                    })}
-                  </div>
-                </div>
-              ))}
-              {/* A quiet line, not an error: an unmatched query is a normal
-                  state (the library is 34 fixed elements). */}
-              {searchGroups.length === 0 && (
-                <div className="lib-no-match" data-no-match="true">No shape matches</div>
-              )}
-            </div>
-          ) : (
-            <div className="lib-cats">
-              {librarySections.map(({cat, label, items}) => {
-                const open = isCategoryOpen(presetId, cat);
-                return (
-                  <div className="lib-cat" key={cat} data-cat={cat}>
-                    <button
-                      type="button"
-                      className="lib-cat-head"
-                      aria-expanded={open}
-                      data-cat-head={cat}
-                      data-open={open ? 'true' : 'false'}
-                      data-default-open={cat === defaultOpen ? 'true' : undefined}
-                      onClick={() => toggleCategory(presetId, cat)}
-                    >
-                      <ChevronDown size={13} className={`lib-chev${open ? ' open' : ''}`} />
-                      <span className="lib-cat-name">{label}</span>
-                      <span className="lib-cat-n" data-cat-count={cat}>{items.length}</span>
-                    </button>
-                    {open && (
-                      <div className="palette">
-                        {items.map(p => renderPaletteRow(p, `${cat}-${p.label}`))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {/* The old sidebar guideline block lived here. Harvey: it ate panel
-              space for information that belongs in the help surface ("choáng
-              chỗ bỏ qua"). Every row it carried is now in the `?` sheet,
-              Settings → Shortcuts AND the README table — verified one-for-one —
-              so removing it loses nothing. Do not re-add a permanent hint block
-              to the panel; put new guidance in those three surfaces instead. */}
-        </div>
+        <LibraryBody
+          favourites={favourites}
+          shapes={shapes}
+          toggleFavourite={toggleFavourite}
+          removeFavourite={removeFavourite}
+          isStarred={isStarred}
+          addFavouriteFromSelection={addFavouriteFromSelection}
+          insertFavourite={insertFavourite}
+          insertCustomShape={insertCustomShape}
+          removeCustomShape={removeCustomShape}
+          importInputRef={importInputRef}
+          openShapeImport={openShapeImport}
+          onImportInputChange={onImportInputChange}
+          shapeZoneDragOver={shapeZoneProps.onDragOver}
+          shapeZoneDrop={shapeZoneProps.onDrop}
+          query={query}
+          setQuery={setQuery}
+          presetId={presetId}
+          selCount={selCount}
+          searching={searching}
+          searchRef={searchRef}
+          isCategoryOpen={isCategoryOpen}
+          toggleCategory={toggleCategory}
+          defaultOpen={defaultOpen}
+          librarySections={librarySections}
+          searchGroups={searchGroups}
+          addNodeByLabel={addNodeByLabel}
+        />
       </aside>
 
       {/* CENTER — canvas */}
@@ -4281,6 +2338,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
           printPdf={printPdf}
           fileRef={fileRef}
           onImportFile={onImportFile}
+          importFileMsg={importFileMsg}
         />
 
         {/* J: Excalidraw-style canvas navigation — plain LEFT-drag box-selects
@@ -4556,7 +2614,7 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
               child of <ReactFlow> — it does its own flow-coord placement there. */}
           {(guides.vertical || guides.horizontal) && <HelperLinesView guides={guides} />}
           <Controls showInteractive={false} />
-          <ZoomPill />
+          <ZoomPill rf={rf} />
           <MiniMap
             pannable zoomable
             style={{background: 'var(--surface)', border: '1px solid var(--border)'}}
@@ -5053,115 +3111,20 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
               </div>
             </>
           ) : selected?.type === 'table' ? (
-            <>
-              {(() => { secBody('table', <>
-              <div className="field">
-                <label>name</label>
-                <input
-                  value={(((selected.data as any).name ?? '') as string)}
-                  onChange={e => update({name: e.target.value} as any)}
-                />
-              </div>
-              <div className="field">
-                <label>schema (optional)</label>
-                <input
-                  value={(((selected.data as any).schema ?? '') as string)}
-                  placeholder="public"
-                  onChange={e => update({schema: e.target.value} as any)}
-                />
-              </div>
-              <div className="field">
-                <label>color (symbolic key)</label>
-                {swatchRow(
-                  resolveColorKey(selected.data as any),
-                  k => update({colorKey: k, color: undefined} as any),
-                  /* ROUND AO, AO-1c — a table node takes a literal like a goblin
-                     does: same two keys, same inverse write (the KEY follows the theme). */
-                  {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
-                )}
-              </div>
-              {/* TABLE-SCALE — one table's own scale (the board's density stays as-is). */}
-              <ScaleRow value={(selected.data as any).scale} onChange={(v: number) => update({scale: v} as any)} />
-              </>); return null; })()}
-              {(() => { secBody('columns', <>
-              {((((selected.data as any).columns ?? []) as TableColumn[])).map((c, i) => (
-                <div className="tcol-edit" key={c.id}>
-                  <input
-                    className="tcol-name"
-                    value={c.name}
-                    aria-label={`column ${i + 1} name`}
-                    onChange={e => update({
-                      columns: ((selected.data as any).columns as TableColumn[]).map(x =>
-                        x.id === c.id ? {...x, name: e.target.value} : x),
-                    } as any)}
-                  />
-                  <input
-                    className="tcol-type"
-                    value={c.type}
-                    aria-label={`column ${i + 1} type`}
-                    onChange={e => update({
-                      columns: ((selected.data as any).columns as TableColumn[]).map(x =>
-                        x.id === c.id ? {...x, type: e.target.value} : x),
-                    } as any)}
-                  />
-                  <div className="tcol-flags">
-                    {([['pk', 'PK'], ['fk', 'FK'], ['notNull', 'NN'], ['unique', 'U']] as const).map(([f, lbl]) => (
-                      <button
-                        key={f}
-                        type="button"
-                        className={`mbtn${(c as any)[f] ? ' on' : ''}`}
-                        style={(c as any)[f] ? {borderColor: 'var(--sel)', color: 'var(--sel)'} : undefined}
-                        title={lbl}
-                        onClick={() => update({
-                          columns: ((selected.data as any).columns as TableColumn[]).map(x =>
-                            x.id === c.id ? {...x, [f]: !(x as any)[f]} : x),
-                        } as any)}
-                      >{lbl}</button>
-                    ))}
-                    <button
-                      type="button"
-                      className="mbtn danger"
-                      title="Remove this column"
-                      onClick={() => update({
-                        columns: ((selected.data as any).columns as TableColumn[]).filter(x => x.id !== c.id),
-                      } as any)}
-                    >×</button>
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="mbtn"
-                onClick={() => update({
-                  columns: [...(((selected.data as any).columns ?? []) as TableColumn[]),
-                    {id: `c${idc++}`, name: 'new_column', type: 'text'}],
-                } as any)}
-              >+ add column</button>
-              </>); return null; })()}
-              {(() => { secBody('showMode', <>
-                <div className="field">
-                <div className="swatches" style={{gap: 6}}>
-                  {([['ALL_FIELDS', 'All'], ['KEY_ONLY', 'Keys'], ['TABLE_NAME', 'Names']] as const).map(([v, lbl]) => (
-                    <button
-                      key={v}
-                      className={`mbtn${showMode === v ? ' on' : ''}`}
-                      style={showMode === v ? {borderColor: 'var(--sel)', color: 'var(--sel)'} : undefined}
-                      onClick={() => setShowMode(v)}
-                    >{lbl}</button>
-                  ))}
-                </div>
-              </div>
-              </>); return null; })()}
-              <div className="hint">
-                FK edges attach column-to-column — drag from a column's left dot to the
-                referenced column. Crow's feet show the cardinality.
-              </div>
-              {renderSections()}
-              {/* TABLE-STYLE-CONTEXT (t_e965f3a8) — the board's style rows
-                  follow the SELECTION: they render here, under the table's
-                  own fields; the empty body is the hint alone. */}
-              <BoardPanel board={curBoard} onStyle={s => setBoardStyle(s, tableDensity)} onDensity={d => setBoardStyle(tableStyle, d)} disabled={readOnly} />
-            </>
+            <TableInspector
+              selected={selected}
+              showMode={showMode}
+              setShowMode={setShowMode}
+              setBoardStyle={setBoardStyle}
+              tableStyle={tableStyle}
+              tableDensity={tableDensity}
+              curBoard={curBoard}
+              readOnly={readOnly}
+              update={update}
+              selectedEdge={selectedEdge}
+              isCollapsed={isCollapsed}
+              toggleSection={toggleSection}
+            />
           ) : !selected ? (
             <BoardPanel empty onStyle={s => setBoardStyle(s, tableDensity)} onDensity={d => setBoardStyle(tableStyle, d)} disabled={readOnly} />
           ) : selected.type === 'label' ? (
@@ -5185,210 +3148,21 @@ const CUST_DROP_HINT = 'Drop an SVG here, or click to choose a file';
               {renderSections()}
             </>
           ) : (
-            <>
-              {/* ROUND Y, ITEM 3 — THE GOBLIN SHAPE BADGE IS GONE. It printed the
-                  SHAPE's machine name (`service`, `queue`, `note`…) above the
-                  panel, and the Style section's own shape picker already names
-                  that same shape in the same panel — the trigger reads out
-                  `current.label` (InspectorPicker' `icon-trigger-name`), so the
-                  badge was a second, less readable copy of the control's own
-                  readout. Nothing is disambiguated by it: a goblin's sections
-                  (Content / Text / Style) name the target kind the same way they
-                  do for every other kind. Deleted with its 12px spacer.
-
-                  THE C4 CHIP STAYS AND IS THE ONE SURVIVOR — it is not a kind
-                  label. `{C4[...].kicker}` states the node's C4 ROLE, which
-                  NOTHING else prints. The spacer became PART of that
-                  conditional: with the shape badge gone the chip is now
-                  the only reason the spacer has to exist. */}
-              {preset.id === 'c4' && isC4Type((selected.data as any).c4Type) && (
-                <>
-                  <span className="badge preset">
-                    {C4[(selected.data as any).c4Type as keyof typeof C4].kicker}
-                  </span>
-                  <div style={{height: 12}} />
-                </>
-              )}
-              {preset.note && <div className="preset-warn" style={{padding: '0 0 10px'}}>{preset.note}</div>}
-              {(() => { secBody('content', <>
-                {hasKicker(inspTarget) && (
-                  <div className="field">
-                    <label>kicker</label>
-                    <input
-                      value={((selected.data as any).kicker ?? '') as string}
-                      onChange={e => update({kicker: e.target.value} as any)}
-                    />
-                  </div>
-                )}
-                {/* ROUND AG2, ITEM 1 — ONE label is enough for a flowchart
-                    node (Mermaid/draw.io), so `sub` is gated on the §A.2
-                    field predicate; the predicate hides the FIELD only: a
-                    node that already carries a `sub` still paints it. */}
-                {(['title', 'sub'] as const).filter(f => f !== 'sub' || hasSub(inspTarget)).map(f => (
-                  <div className="field" key={f}>
-                    <label>{f}</label>
-                    <input
-                      value={((selected.data as any)[f] ?? '') as string}
-                      onChange={e => update({[f]: e.target.value} as any)}
-                    />
-                  </div>
-                ))}
-                {hasMetric(inspTarget) && (
-                  <div className="field-row">
-                    <div className="field">
-                      <label>metric</label>
-                      <input
-                        value={((selected.data as any).metric ?? '') as string}
-                        onChange={e => update({metric: e.target.value} as any)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>unit</label>
-                      <input
-                        value={((selected.data as any).metricUnit ?? '') as string}
-                        onChange={e => update({metricUnit: e.target.value} as any)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>); return null; })()}
-              {/* DESC-1 — the Additional Description body, keyed by the node id so a new selection REMOUNTS with a fresh draft (no store-echo sync). DA-3: paint/onPaint wire the two panel-colour rows. */}
-              {(() => { secBody('definition', <DefinitionSection key={sel ?? 'd'} value={((selected.data as any).desc ?? '') as string} onCommit={commitDesc} paint={(selected.data as any).descPaint} onPaint={commitDescPaint} />); return null; })()}
-              {/* PACKAGE-P §E.1/§A.3 — the Text section, BETWEEN Content and
-                  Style (the order is `src/inspector.ts`'s, not this file's).
-                  `tsBody` is the one body both targets register: a goblin here,
-                  a label in the branch above. */}
-              {(() => { secBody('text', tsBody); return null; })()}
-              {(() => { secBody('style', <>
-                <div className="field">
-                  <label>shape</label>
-                  <ShapesPicker
-                    value={asShape((selected.data as any).shape)}
-                    onChange={v => update({shape: v as Shape} as any)}
-                    color={resolveColor(selected.data as any)}
-                  />
-                </div>
-                {/* ROUND ROTATE — the Rotation row lives in Rows.tsx
-                    (RotationRow): App.tsx must carry no numeric input element
-                    (a package-p invariant), and the row is presentational. */}
-                <RotationRow
-                  value={(((selected.data as any).rotation as number | undefined) ?? 0)}
-                  onChange={v => update({rotation: v === 0 ? undefined : norm180(v)} as any)}
-                />
-                {/* HARVEY 2026-10-14 — the cylinder's plain option: drops the
-                    two inner arcs (database / storeddata only); a cleared
-                    shape leaves the flag stored but unread. */}
-                {(() => {
-                  const sh = asShape((selected.data as any).shape);
-                  if (sh !== 'database' && sh !== 'storeddata') return null;
-                  const on = (selected.data as any).plainCylinder !== false;
-                  return (
-                    <div className="field">
-                      {/* HARVEY-CHOSEN LABEL — "Details" generalises to other
-                          shapes with optional inner lines. */}
-                      <label>details</label>
-                      <ToggleRow
-                        value={on ? 'plain' : 'disks'}
-                        onChange={v => update({plainCylinder: v === 'plain'} as any)}
-                        options={[
-                          {v: 'disks', label: 'Full', art: null},
-                          {v: 'plain', label: 'Minimal', art: null},
-                        ]}
-                        title="Details: Full keeps the inner lines, Minimal draws a bare shape"
-                      />
-                    </div>
-                  );
-                })()}
-                {/* §C READ LITERALLY: the `body` toggle sits behind the Style
-                    section's trigger as a SECOND-LEVEL disclosure inside Style
-                    (never folding Style itself — §A.3/§F.4); the row's readout
-                    is the CURRENT value; session-scoped open state. */}
-                {/* ROUND AI, ITEM 2 — the row is GATED on `hasBody`, not
-                    deleted: flowchart shapes dropped the card capability
-                    ("Với flowchart tôi nghĩ k cần dùng card!"). The gate is the
-                    predicate; the DATA is untouched, so a flowchart node
-                    already carrying `body: 'card'` keeps painting as a card. */}
-                {hasBody(inspTarget) && (
-                <div className="field">
-                  <button
-                    type="button"
-                    className="field-toggle-trigger"
-                    aria-expanded={bodyModeOpen}
-                    aria-controls="insp-body-toggle"
-                    onClick={() => setBodyModeOpen(o => !o)}
-                  >
-                    <span className="insp-sec-caret" aria-hidden="true">{bodyModeOpen ? '▾' : '▸'}</span>
-                    <span className="field-toggle-label">
-                      body: {(((selected.data as any).body ?? 'card') as string)}
-                    </span>
-                  </button>
-                  {bodyModeOpen && (
-                    <div id="insp-body-toggle">
-                      <ToggleRow
-                        value={(((selected.data as any).body ?? 'card') as string)}
-                        onChange={v => update({body: v as 'card' | 'label-only'} as any)}
-                        options={BODY_OPTS}
-                        title="Body"
-                      />
-                    </div>
-                  )}
-                </div>
-                )}
-                {/* §A.2: `note` draws no IconGlyph, so the field is absent —
-                    not disabled — for exactly that shape. */}
-                {hasIcon(inspTarget) && (
-                  <div className="field">
-                    <label>icon</label>
-                    <IconPicker
-                      value={((selected.data as any).icon ?? '') as string}
-                      onPick={name => update({icon: name ?? ''} as any)}
-                    />
-                  </div>
-                )}
-                <div className="field">
-                  <label>color</label>
-                  {swatchRow(
-                    resolveColorKey(selected.data as any),
-                    k => update({colorKey: k, color: undefined} as any),
-                    /* ROUND AO, AO-1c — THE LITERAL PATH, THE EXACT INVERSE OF THE
-                       KEY WRITE ABOVE. Picking a custom hex CLEARS the symbolic key
-                       and stores `color`. `resolveColor` then returns the literal
-                       (`isColorKey(colorKey)` is false, so it falls through to the
-                       `d.color` branch) and `resolveColorKey` returns `null` for an
-                       arbitrary hex, so no hue swatch lights and the custom cell
-                       takes the `.on` ring instead. Picking any KEY afterwards runs
-                       the key write, which clears `color` — that is the whole
-                       "back to a theme colour" path, so no separate reset control
-                       is needed. THEME HONESTY: a literal cannot follow a theme; a
-                       custom colour stays exactly as chosen across a theme switch,
-                       which is the honest consequence of choosing one. */
-                    {value: (selected.data as any).color, onPick: hex => update({color: hex, colorKey: undefined} as any)},
-                  )}
-                </div>
-                {/* ROUND AD, ITEM 5(a) — the colour-key note: visible,
-                    dismissible (persisted key), one line, no focus steal. */}
-                {keyNoteShown && (
-                  <div className="key-note" data-key-note="true">
-                    <span className="key-note-text">{KEY_NOTE_TEXT}</span>
-                    <span
-                      className="key-note-x"
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Dismiss the color-key note"
-                      title="Dismiss the color-key note"
-                      onClick={dismissKeyNote}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          dismissKeyNote();
-                        }
-                      }}
-                    >×</span>
-                  </div>
-                )}
-              </>); return null; })()}
-              {renderSections()}
-            </>
+            <ShapeInspector
+              selected={selected}
+              sel={sel}
+              bodyModeOpen={bodyModeOpen}
+              setBodyModeOpen={setBodyModeOpen}
+              keyNoteShown={keyNoteShown}
+              dismissKeyNote={dismissKeyNote}
+              preset={preset}
+              update={update}
+              selectedEdge={selectedEdge}
+              isCollapsed={isCollapsed}
+              toggleSection={toggleSection}
+              setNodes={setNodes}
+              pushHistory={pushHistory}
+            />
           )}
         </div>
       </aside>

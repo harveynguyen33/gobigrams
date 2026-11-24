@@ -917,32 +917,6 @@ body {
 .canvas-wrap { position: relative; background:
   radial-gradient(1200px 600px at 20% -10%, var(--canvas-glow), transparent 60%),
   var(--bg); }
-/* AR-7 — the React Flow attribution badge STAYS VISIBLE (Harvey's call, PASS 3
-   scope). It is a bottom-right `.react-flow__attribution` Panel; it is themed
-   from the same tokens as the controls cluster so it reads as part of the
-   canvas, sits clear of the zoom controls (bottom-LEFT), and remains a real
-   link — the library sets its own href/target/rel. No hex literals: tokens
-   only. */
-.react-flow__attribution {
-  background: var(--surface);
-  color: var(--dim);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.react-flow__attribution svg {
-  fill: var(--dim);
-}
-.react-flow__attribution a {
-  color: var(--dim);
-}
-.react-flow__attribution a:hover,
-.react-flow__attribution a:focus-visible {
-  color: var(--fg);
-  background: var(--surface);
-}
-
 /* controls (zoom) — dark theme */
 .react-flow__controls {
   box-shadow: var(--shadow-sm);
@@ -972,10 +946,6 @@ body {
   background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px; padding: 6px;
   height: 42px;
-}
-.tbtn-label {
-  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--dim); padding: 0 4px;
 }
 .tbtn {
   font-family: var(--mono); font-size: var(--fs-md);
@@ -1464,7 +1434,6 @@ body {
   white-space: nowrap; max-width: calc(100% - 28px); overflow: hidden;
 }
 .group-label small { color: var(--dim); font-size: var(--fs-xs); font-weight: 400; }
-.group-ico { display: grid; place-items: center; }
 
 /* ---------- note node (plain text annotation) ---------- */
 .note-node {
@@ -1784,7 +1753,7 @@ body {
  *  in `ShapesPicker`), so the state the user actually SEES on open is the FOCUS
  *  state — which is why the live measurement read `rgb(245, 78, 0)` even though
  *  the resting rule says `--border-strong`: the CONTROL KIT's text-input group
- *  (`.ui-input, …, .icon-search, …` at the end of this sheet) paints a focused
+ *  (`.icon-search, …` at the end of this sheet) paints a focused
  *  input with `border-color: var(--acc)` plus an `--acc-soft` halo, and being
  *  later in the sheet it wins the tie. Fixing only the resting border would have
  *  left the exact orange box Harvey photographed on screen every time the
@@ -1828,11 +1797,6 @@ body {
    `currentColor`, so the button's own `color` (and therefore the theme) drives
    the art. No new hex, no new dependency. */
 .insp-glyph { display: block; overflow: visible; }
-/* The picker triggers show 26x18 art instead of a 17px lucide glyph, so the
-   glyph cell must be as wide as the art or the silhouette is clipped. Scoped to
-   `.insp-trigger-glyph` so the node-icon picker (`IconPicker.tsx`) keeps its
-   18x18 cell untouched. */
-.insp-trigger-glyph { width: 26px; height: 18px; }
 .insp-pop { width: min(288px, calc(100% - 12px)); }
 .insp-opt-list { display: flex; flex-direction: column; gap: 3px; max-height: min(60dvh, 260px); overflow-y: auto; }
 .insp-opt {
@@ -3009,7 +2973,6 @@ kbd {
   background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: 10px; padding: 4px;
 }
-.sel-bar .tbtn-label { padding: 0 2px; }
 /* AQ13 — the count chip: number + word on ONE line, quiet by contrast */
 .sel-bar .sel-count {
   font-family: var(--mono); font-size: var(--fs-md); font-weight: 700;
@@ -3480,22 +3443,6 @@ kbd {
 }
 /* ---- K3: animation gating (persisted toggle; auto-off above 30 nodes) ---- */
 .ds-no-anim .ds-animated-payload { visibility: hidden; }
-.ds-toggle {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; background: var(--elevated); color: var(--fg);
-  border: 1px solid var(--border-strong); border-radius: 7px;
-  padding: 8px 10px; cursor: pointer;
-  font-family: var(--mono); font-size: var(--fs-sm); letter-spacing: .06em; text-transform: uppercase;
-  transition: all .15s;
-}
-.ds-toggle:hover { border-color: var(--sel); }
-.ds-toggle.on { background: var(--sel-soft); color: var(--sel); border-color: var(--sel); }
-.ds-toggle b { color: var(--sel); font-weight: 700; }
-.ds-hint {
-  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim);
-  line-height: 1.6; padding: 6px 2px 0;
-}
-.ds-hint.warn { color: var(--acc); }
 
 /* reduced-motion: freeze the new choreography as well */
 @media (prefers-reduced-motion: reduce) {
@@ -4012,10 +3959,6 @@ kbd {
   background: var(--acc-soft); color: var(--acc); font-weight: 700;
 }
 .settings-nav-item svg { flex: none; }
-.settings-nav-note {
-  margin-top: auto; padding: 10px 10px 2px;
-  font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim);
-}
 .settings-empty {
   color: var(--dim); font-family: var(--mono); font-size: var(--fs-md);
   padding: 14px 10px; line-height: 1.5;
@@ -4087,31 +4030,6 @@ kbd {
 .settings-state { font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); }
 .settings-state.on { color: var(--green); }
 .settings-state.off { color: var(--dim); } /* AP-1: was --dim2 (3.12:1) — real status text */
-/* M2 — the Editor pane's Board preset is a REAL control (everything else in the
-   dialog is still a readout). Same look as the nav search field, so the one
-   honest control reads as a control. */
-.settings-select {
-  background: var(--elevated); color: var(--fg);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 4px 20px 4px 9px;
-  font-family: var(--sans); font-size: var(--fs-md);
-  cursor: pointer; outline: none; transition: border-color .15s;
-}
-.settings-select:focus { border-color: var(--sel); }
-/* M4 — Canvas → Grid size: the pitch is a REAL number control. Same token
-   palette and shape as the preset select, but sized for a 2-digit value so the
-   label + control still read as one row. */
-.settings-input {
-  width: 72px; box-sizing: border-box;
-  background: var(--elevated); color: var(--fg);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 4px 9px;
-  font-family: var(--mono); font-size: var(--fs-md);
-  outline: none; transition: border-color .15s;
-}
-.settings-input:focus { border-color: var(--sel); }
-.settings-input::-webkit-outer-spin-button,
-.settings-input::-webkit-inner-spin-button { opacity: .45; }
 /* M3 — the connection rules are REAL controls now: a switch, painted from the
    token system so it reads in every theme (ON = --acc / --acc-soft,
    OFF = --elevated / --border). No hardcoded colour. */
@@ -4150,7 +4068,6 @@ kbd {
   background: var(--elevated);
   color: var(--dim); font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.55;
 }
-.settings-kv { font-family: var(--mono); font-size: var(--fs-md); color: var(--dim); line-height: 1.9; }
 
 /* ---- theme card grid (Appearance pane) ---- */
 .settings-grid {
@@ -4268,7 +4185,6 @@ kbd {
 .app[data-form-factor="tablet"][data-orientation="portrait"] .settings-search {
   width: 190px; flex: none; order: 2;
 }
-.app[data-form-factor="tablet"][data-orientation="portrait"] .settings-nav-note { display: none; }
 .app[data-form-factor="tablet"][data-orientation="portrait"] .settings-main { padding: 20px 24px; }
 
 /* ---- phone (either orientation) — a full-bleed sheet ---- */
@@ -4296,7 +4212,6 @@ kbd {
 .app[data-form-factor="phone"] .settings-nav-item {
   width: auto; white-space: nowrap; flex: none;
 }
-.app[data-form-factor="phone"] .settings-nav-note { display: none; }
 .app[data-form-factor="phone"] .settings-main { padding: 16px 14px 20px; }
 /* 360px cannot hold a label and its control side by side — the label wrapped
    to three lines and the control slid under the close button. Stack the row. */
@@ -4337,10 +4252,7 @@ kbd {
    The chevron is an inline SVG background. Its stroke colour is the one
    literal the kit cannot tokenise (a data-URI cannot read a CSS variable);
    the value is the one Harvey approved in the mockup. */
-.ui-select,
-.field select,
-.settings-select,
-.tnode-mode-sel {
+.field select {
   appearance: none;
   -webkit-appearance: none;
   background-color: var(--elevated);
@@ -4355,33 +4267,16 @@ kbd {
   background-repeat: no-repeat;
   background-position: right 10px center;
 }
-.ui-select:hover,
-.field select:hover,
-.settings-select:hover,
-.tnode-mode-sel:hover { border-color: var(--border-strong); }
-.ui-select:focus,
-.field select:focus,
-.settings-select:focus,
-.tnode-mode-sel:focus {
+.field select:hover { border-color: var(--border-strong); }
+.field select:focus {
   border-color: var(--acc);
   box-shadow: 0 0 0 3px var(--acc-soft);
   outline: none;
 }
-/* the legend's table-mode select rides in a compact legend row — same kit
-   chrome, smaller box so the legend keeps its size (see report). */
-.tnode-mode-sel {
-  padding: 4px 24px 4px 8px;
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  background-position: right 7px center;
-}
-
 /* ---- 2. TEXT INPUT / TEXTAREA ----------------------------------------- */
-.ui-input,
 .field input,
 .field textarea,
 .settings-search,
-.settings-input,
 .sp-input,
 .icon-search,
 .icon-raw,
@@ -4396,32 +4291,26 @@ kbd {
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
-.ui-input::placeholder,
 .field input::placeholder,
 .field textarea::placeholder,
 .settings-search::placeholder,
-.settings-input::placeholder,
 .sp-input::placeholder,
 .icon-search::placeholder,
 .icon-raw::placeholder,
 .tcol-name::placeholder,
 .tcol-type::placeholder { color: var(--dim2); }
-.ui-input:hover,
 .field input:hover,
 .field textarea:hover,
 .settings-search:hover,
-.settings-input:hover,
 .sp-input:hover,
 .icon-search:hover,
 .icon-raw:hover,
 .tcol-name:hover,
 .tcol-type:hover,
 .edge-label-input:hover { border-color: var(--border-strong); }
-.ui-input:focus,
 .field input:focus,
 .field textarea:focus,
 .settings-search:focus,
-.settings-input:focus,
 .sp-input:focus,
 .icon-search:focus,
 .icon-raw:focus,
@@ -5509,16 +5398,6 @@ kbd {
 .rm-chip-conf.committed { color: var(--green); border-color: var(--green); }
 .rm-chip-conf.exploring { color: var(--sel); border-color: var(--sel); }
 .rm-foot { margin: 9px 0 0; font-size: var(--fs-xs); font-style: italic; color: var(--dim2); }
-.rm-shipped-h {
-  margin: 20px 2px 6px;
-  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
-  letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
-}
-.rm-shipped { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; }
-.rm-ship-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: var(--fs-sm); }
-.rm-ship-label { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
-.rm-ship-what { flex: 1; min-width: 0; color: var(--fg); }
-.rm-ship-when { flex: none; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 .rm-reviewed { margin: 16px 2px 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim2); }
 
 /* Settings → About: the public-launch feedback line. Tokens only (no new
@@ -5611,11 +5490,6 @@ kbd {
   display: block; width: 240px; height: auto;
   margin: 0 auto 16px;
 }
-
-/* The only per-tier rule this block needs: the shipped list IS three columns at
-   a wide pane, so it stacks below the phone breakpoint. Same tier hook the
-   template gallery and the inspector use. */
-.app[data-form-factor="phone"] .rm-shipped { grid-template-columns: minmax(0, 1fr); }
 
 /* HARVEY 2026-10-14 — THE TEXT-FITS-THE-SHAPE PASS (all 25 shapes audited).
    The frames use viewBox 200x100 with preserveAspectRatio=none, so they scale

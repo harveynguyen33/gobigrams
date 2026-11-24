@@ -79,6 +79,9 @@ type ModalMountsProps = {
   /* ---- the hidden JSON import input ---- */
   fileRef: React.RefObject<HTMLInputElement | null>;
   onImportFile: React.ChangeEventHandler<HTMLInputElement>;
+  /* F9 AUDIT-CLEANUP — the import door's refusal message (App owns the
+     verdict; the ExportModal's From-file note renders it). */
+  importFileMsg: string | null;
 };
 
 /** The five top-level overlays, in their original mount order. */
@@ -174,6 +177,7 @@ export function ModalMounts(p: ModalMountsProps) {
           buildPng={p.buildPng}
           printPdf={p.printPdf}
           onImportJson={() => p.fileRef.current?.click()}
+          importFileMsg={p.importFileMsg}
           onExported={p.onExported}
         />
 
