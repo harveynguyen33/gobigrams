@@ -42,24 +42,31 @@ export interface ShippedEntry {
  */
 export const ROADMAP: RoadmapItem[] = [
   {
-    title: 'A canvas that mixes diagram families',
-    desc: 'Any shape on any board, with new-line defaults that follow the last style you set instead of the board\u2019s birth preset. Researched; the spec pass is next.',
+    title: 'Copy the diagram to the clipboard',
+    desc: 'Paste straight into a doc, a chat or an email \u2014 the diagram reaches the clipboard without a download step.',
     status: 'now',
     confidence: 'committed',
     area: 'editor',
   },
   {
-    title: 'Public launch',
-    desc: 'License, public repository and hosted build are all live \u2014 anyone can open the editor in a browser. What remains is the launch itself: putting it in front of people.',
+    title: 'Find and replace text',
+    desc: 'Rename an entity across a fifty-table ERD in one pass \u2014 the match comes into view as it is replaced.',
     status: 'now',
     confidence: 'committed',
-    area: 'site',
+    area: 'editor',
   },
   {
-    title: 'Collaboration',
-    desc: 'Live cursors, presence and comments. The share link shipped one-way, read-only sharing; this is the live, two-way version.',
+    title: 'Transparent-background PNG',
+    desc: 'The PNG sits on any slide or doc theme without dragging its own dark rectangle along.',
     status: 'next',
-    confidence: 'exploring',
+    confidence: 'committed',
+    area: 'editor',
+  },
+  {
+    title: 'Present mode',
+    desc: 'Walk a teammate through the architecture full-screen \u2014 arrow keys advance and all the chrome is gone.',
+    status: 'next',
+    confidence: 'committed',
     area: 'editor',
   },
   {
@@ -70,10 +77,24 @@ export const ROADMAP: RoadmapItem[] = [
     area: 'data',
   },
   {
-    title: 'Mobile and tablet refinements',
-    desc: 'The editor already has dedicated layouts per screen size. This is the next round of polish on real devices.',
-    status: 'next',
-    confidence: 'committed',
+    title: 'Command palette',
+    desc: 'Every command \u2014 export, board switch, toggles, templates \u2014 reachable by typing a few letters of its name.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'editor',
+  },
+  {
+    title: 'Import from draw.io',
+    desc: 'Paste .drawio XML and get nodes on the canvas — the migration path for the biggest audience.',
+    status: 'later',
+    confidence: 'exploring',
+    area: 'data',
+  },
+  {
+    title: 'More diagram notations',
+    desc: 'Beyond flowcharts, ERD, C4 and architecture \u2014 following the same shape-library and template structure.',
+    status: 'later',
+    confidence: 'exploring',
     area: 'editor',
   },
   {
@@ -90,27 +111,6 @@ export const ROADMAP: RoadmapItem[] = [
     confidence: 'exploring',
     area: 'site',
   },
-  {
-    title: 'Import from draw.io',
-    desc: 'Paste .drawio XML and get nodes on the canvas — the migration path for the biggest audience.',
-    status: 'later',
-    confidence: 'exploring',
-    area: 'data',
-  },
-  {
-    title: 'Find and replace text',
-    desc: 'Rename an entity across a fifty-table ERD in one pass.',
-    status: 'later',
-    confidence: 'exploring',
-    area: 'editor',
-  },
-  {
-    title: 'More diagram notations',
-    desc: 'Beyond flowcharts, ERD, C4 and architecture \u2014 following the same shape-library and template structure.',
-    status: 'later',
-    confidence: 'exploring',
-    area: 'editor',
-  },
 ];
 
 /**
@@ -119,6 +119,9 @@ export const ROADMAP: RoadmapItem[] = [
  * meaning. It is never used in the Now / Next / Exploring columns.
  */
 export const SHIPPED: ShippedEntry[] = [
+  {label: 'round LAUNCH', what: 'The editor is public on the product domain, with published releases', when: '2026-11'},
+  {label: 'package 8', what: 'The .gobi text surface ships as packages — an MCP server (@techgoblin/gobi-mcp 0.1.2) and an Obsidian plugin (obsidian-gobi 0.1.1) — plus the canvas-to-text direction (boardDocToGobi)', when: '2026-11'},
+  {label: 'round MIX', what: 'A board declares a diagram type and the palette, shapes, edge defaults, layout and theme follow it', when: '2026-11'},
   {label: 'round SEL-CHROME', what: 'One selection chrome \u2014 a floating pill carries rotate, group and lock, for one shape or a whole selection', when: '2026-11'},
   {label: 'round GROUP', what: 'Bind shapes into one block \u2014 drag it, rotate it or grab its inner gap, every member moves together, one undo entry', when: '2026-11'},
   {label: 'round UNISURF', what: 'The board as .gobi text beside the canvas \u2014 edit either side, both stay in sync', when: '2026-11'},
@@ -140,6 +143,7 @@ export const SHIPPED: ShippedEntry[] = [
   {label: 'round AR', what: 'SVG export became real vector \u2014 selectable text, no flicker', when: '2026-10'},
   {label: 'package 7', what: 'Settings completion \u2014 export defaults (PNG scale, padding), autosave control, persisted canvas preferences', when: '2026-10'},
   {label: 'package 6', what: 'Roadmap surface \u2014 what the tool does today, next, and is exploring, in Settings \u2192 About', when: '2026-09'},
+  {label: 'round MOBILE', what: 'Form factor resolved from the editor container into phone / tablet / desktop tiers with one docked-sidebar threshold', when: '2026-09'},
   {label: 'round 3', what: 'Colour palette, connection points, node resizing and rotation rules', when: '2026-09'},
   {label: 'round 2', what: 'Edge utilities \u2014 labels, line markers, flow animation', when: '2026-09'},
   {label: 'round 1', what: 'Templates gallery with three difficulty levels', when: '2026-09'},
@@ -155,4 +159,4 @@ export const SHIPPED: ShippedEntry[] = [
  * NOT a warning, a badge or a banner, and it changes nothing else: deleting this
  * one element is the whole change if it is ever dropped.
  */
-export const ROADMAP_REVIEWED = '2026-11-19';
+export const ROADMAP_REVIEWED = '2026-11-24';
