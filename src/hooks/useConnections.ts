@@ -17,7 +17,7 @@ import type {PresetId, PathId} from '../presets';
 import type {HelperGuides} from '../canvas/helperLines';
 import type {ChecklistTaskId} from '../nodes/Checklist';
 import type {TipId} from '../ui/tips';
-import type {EdgeData} from '../app/App';
+import type {EdgeData} from '../edges';
 
 /* Positional parameters, not an opts object (AGENTS.md perf ratchet). */
 export function useConnections(

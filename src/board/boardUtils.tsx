@@ -13,7 +13,7 @@ import {LIBRARY, DEFAULT_PRESET_ID, getPreset} from '../presets';
 import * as library from './library';
 import {loadMode, resolveMode, type ThemeName} from '../theme/theme';
 import {handleSidesOf} from './boardMigrations';
-import type {EdgeData} from '../app/App';
+import type {EdgeData} from '../edges';
 
 /** The live marker id for an edge's crow's-foot end. React Flow wraps a STRING
  *  marker in `url('#…')` itself and skips string markers when building its own
